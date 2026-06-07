@@ -8,6 +8,8 @@
 自选股 -> 日 K 数据导入 -> 指标计算 -> 策略信号 -> 简单回测 -> 风险提示 -> 复盘记录
 ```
 
+前端可以作为独立项目 `quant-trading-assistant-web` 并行开发。今天要跑雏形时，前端优先使用 mock/localStorage，先让自选股、交易记录和复盘可用，后续再逐步接后端 REST API。
+
 ## v0.1 功能清单
 
 1. 自选股管理
@@ -83,6 +85,13 @@
 - 建基础 Entity/Repository。
 - 建 watchlist REST API。
 - 跑通 `./mvnw test`。
+
+前端并行任务：
+
+- 创建 Vite + React + TypeScript 项目。
+- 实现 AppLayout、Dashboard、Watchlist、TradeJournal、Review。
+- 使用 localStorage 保存记录。
+- 后端 API 完成后再切换为 remote 模式。
 
 ### Iteration 2: CSV 导入和指标计算
 

@@ -156,3 +156,50 @@
 
 请按严重程度输出问题和建议。
 ```
+
+## 9. 创建前端项目
+
+```text
+请在 /Users/joker/code 下创建一个新的前端项目 quant-trading-assistant-web。
+
+请先阅读后端仓库：
+- /Users/joker/code/quant-trading-assistant/AGENTS.md
+- /Users/joker/code/quant-trading-assistant/docs/FRONTEND_ARCHITECTURE.md
+
+技术栈：
+- Vite
+- React
+- TypeScript
+- Ant Design
+- React Router
+- TanStack Query
+- Zustand
+- ECharts
+- Axios
+- dayjs
+
+目标：
+今天跑出可用雏形，让我下周能边炒股边记录。
+
+第一版必须包含：
+1. AppLayout：左侧菜单 + 顶部栏；
+2. Dashboard：今日工作台；
+3. Watchlist：自选股管理，先用 localStorage；
+4. TradeJournal：交易记录，先用 localStorage；
+5. Review：复盘笔记，先用 localStorage；
+6. Settings：API 模式展示，支持 mock/remote 的配置结构；
+7. 页面必须明确显示系统只做辅助记录，不自动交易。
+
+设计要求：
+- 后台工作台风格，信息密度适中；
+- 不做官网，不做 hero；
+- 表格、表单、筛选、抽屉优先；
+- 交易信号必须搭配风险提示；
+- 不连接券商，不保存真实密钥，不自动下单。
+
+验收：
+- npm install 成功；
+- npm run dev 成功；
+- 浏览器能打开首页；
+- 新增自选股、交易记录、复盘后刷新不丢。
+```
