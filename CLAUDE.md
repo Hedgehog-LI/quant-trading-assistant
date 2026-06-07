@@ -9,6 +9,12 @@
 5. `docs/DEVELOPMENT_ROADMAP.md`
 6. `docs/prompts/CODEX_CLAUDE_PROMPTS.md`
 
+如果任务是开发周一可用的 Today MVP，请继续阅读：
+
+7. `docs/claude/BACKEND_TODAY_MVP_IMPLEMENTATION_MANUAL.md`
+8. `docs/claude/FRONTEND_MVP_ARCHITECTURE_AND_CLAUDE_MANUAL.md`
+9. `docs/claude/CLAUDE_CODE_EXECUTION_GUIDE.md`
+
 ## 一句话目标
 
 用 Java + Spring Boot + MySQL 做一个本地运行、可部署到服务器、可持续积累数据的交易辅助系统。它只提供数据、指标、信号、回测、风控、复盘，不做自动下单。

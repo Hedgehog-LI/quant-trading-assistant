@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.tradeplan.dao.TradePlanMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.tradeplan.model.TradePlanDO">
+        <id column="id" property="id"/>
+        <result column="plan_date" property="planDate"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="plan_status" property="planStatus"/>
+        <result column="buy_condition" property="buyCondition"/>
+        <result column="sell_condition" property="sellCondition"/>
+        <result column="stop_loss_price" property="stopLossPrice"/>
+        <result column="take_profit_price" property="takeProfitPrice"/>
+        <result column="planned_position_ratio" property="plannedPositionRatio"/>
+        <result column="max_loss_amount" property="maxLossAmount"/>
+        <result column="allowed_to_trade" property="allowedToTrade"/>
+        <result column="risk_note" property="riskNote"/>
+        <result column="notes" property="notes"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, plan_date, symbol, name, plan_status, buy_condition, sell_condition,
+        stop_loss_price, take_profit_price, planned_position_ratio, max_loss_amount,
+        allowed_to_trade, risk_note, notes, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO trade_plan (
+            plan_date, symbol, name, plan_status, buy_condition, sell_condition,
+            stop_loss_price, take_profit_price, planned_position_ratio, max_loss_amount,
+            allowed_to_trade, risk_note, notes
+        ) VALUES (
+            #{planDate}, #{symbol}, #{name}, #{planStatus}, #{buyCondition}, #{sellCondition},
+            #{stopLossPrice}, #{takeProfitPrice}, #{plannedPositionRatio}, #{maxLossAmount},
+            #{allowedToTrade}, #{riskNote}, #{notes}
+        )
+    </insert>
+
+    <update id="updateById">
+        UPDATE trade_plan
+        <set>
+            <if test="planStatus != null">plan_status = #{planStatus},</if>
+            <if test="buyCondition != null">buy_condition = #{buyCondition},</if>
+            <if test="sellCondition != null">sell_condition = #{sellCondition},</if>
+            <if test="stopLossPrice != null">stop_loss_price = #{stopLossPrice},</if>
+            <if test="takeProfitPrice != null">take_profit_price = #{takeProfitPrice},</if>
+            <if test="plannedPositionRatio != null">planned_position_ratio = #{plannedPositionRatio},</if>
+            <if test="maxLossAmount != null">max_loss_amount = #{maxLossAmount},</if>
+            <if test="allowedToTrade != null">allowed_to_trade = #{allowedToTrade},</if>
+            <if test="riskNote != null">risk_note = #{riskNote},</if>
+            <if test="notes != null">notes = #{notes},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_plan
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectBySymbolAndDate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_plan
+        WHERE symbol = #{symbol} AND plan_date = #{planDate}
+    </select>
+
+    <select id="existsBySymbolAndDate" resultType="int">
+        SELECT COUNT(1) FROM trade_plan WHERE symbol = #{symbol} AND plan_date = #{planDate}
+    </select>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_plan
+        <where>
+            <if test="date != null">AND plan_date = #{date}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+        </where>
+        ORDER BY updated_at DESC
+    </select>
+
+    <select id="countActiveByDate" resultType="long">
+        SELECT COUNT(1) FROM trade_plan
+        WHERE plan_date = #{planDate} AND allowed_to_trade = true
+    </select>
+
+    <select id="countByDate" resultType="long">
+        SELECT COUNT(1) FROM trade_plan WHERE plan_date = #{planDate}
+    </select>
+
+</mapper>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.watchlist.dao.WatchlistMapper">
+
+    <!-- ==================== ResultMap ==================== -->
+    <resultMap id="BaseResultMap" type="com.quant.trade.watchlist.model.WatchlistDO">
+        <id column="id" property="id"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="market" property="market"/>
+        <result column="group_name" property="groupName"/>
+        <result column="watch_reason" property="watchReason"/>
+        <result column="trade_style" property="tradeStyle"/>
+        <result column="attention_level" property="attentionLevel"/>
+        <result column="support_price" property="supportPrice"/>
+        <result column="resistance_price" property="resistancePrice"/>
+        <result column="stop_loss_price" property="stopLossPrice"/>
+        <result column="risk_note" property="riskNote"/>
+        <result column="enabled" property="enabled"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- ==================== 通用列 ==================== -->
+    <sql id="Base_Column_List">
+        id, symbol, name, market, group_name, watch_reason, trade_style,
+        attention_level, support_price, resistance_price, stop_loss_price,
+        risk_note, enabled, created_at, updated_at
+    </sql>
+
+    <!-- ==================== INSERT ==================== -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO watchlist (
+            symbol, name, market, group_name, watch_reason, trade_style,
+            attention_level, support_price, resistance_price, stop_loss_price,
+            risk_note, enabled
+        ) VALUES (
+            #{symbol}, #{name}, #{market}, #{groupName}, #{watchReason}, #{tradeStyle},
+            #{attentionLevel}, #{supportPrice}, #{resistancePrice}, #{stopLossPrice},
+            #{riskNote}, #{enabled}
+        )
+    </insert>
+
+    <!-- ==================== UPDATE ==================== -->
+    <update id="updateById">
+        UPDATE watchlist
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="market != null">market = #{market},</if>
+            <if test="groupName != null">group_name = #{groupName},</if>
+            <if test="watchReason != null">watch_reason = #{watchReason},</if>
+            <if test="tradeStyle != null">trade_style = #{tradeStyle},</if>
+            <if test="attentionLevel != null">attention_level = #{attentionLevel},</if>
+            <if test="supportPrice != null">support_price = #{supportPrice},</if>
+            <if test="resistancePrice != null">resistance_price = #{resistancePrice},</if>
+            <if test="stopLossPrice != null">stop_loss_price = #{stopLossPrice},</if>
+            <if test="riskNote != null">risk_note = #{riskNote},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- ==================== SELECT ==================== -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM watchlist
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectBySymbol" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM watchlist
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="existsBySymbol" resultType="int">
+        SELECT COUNT(1) FROM watchlist WHERE symbol = #{symbol}
+    </select>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM watchlist
+        <where>
+            <if test="enabled != null">AND enabled = #{enabled}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (name LIKE CONCAT('%', #{keyword}, '%')
+                     OR symbol LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="tradeStyle != null and tradeStyle != ''">AND trade_style = #{tradeStyle}</if>
+        </where>
+        ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectEnabledHighAttention" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM watchlist
+        WHERE enabled = true AND attention_level = #{attentionLevel}
+        ORDER BY updated_at DESC
+    </select>
+
+    <select id="countEnabled" resultType="long">
+        SELECT COUNT(1) FROM watchlist WHERE enabled = true
+    </select>
+
+</mapper>

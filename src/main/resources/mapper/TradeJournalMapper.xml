@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.journal.dao.TradeJournalMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.journal.model.TradeJournalDO">
+        <id column="id" property="id"/>
+        <result column="trade_date" property="tradeDate"/>
+        <result column="trade_time" property="tradeTime"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="side" property="side"/>
+        <result column="price" property="price"/>
+        <result column="quantity" property="quantity"/>
+        <result column="amount" property="amount"/>
+        <result column="position_ratio" property="positionRatio"/>
+        <result column="plan_id" property="planId"/>
+        <result column="reason" property="reason"/>
+        <result column="plan_stop_loss" property="planStopLoss"/>
+        <result column="plan_take_profit" property="planTakeProfit"/>
+        <result column="followed_plan" property="followedPlan"/>
+        <result column="emotion_tags" property="emotionTags"/>
+        <result column="mistake_tags" property="mistakeTags"/>
+        <result column="actual_result" property="actualResult"/>
+        <result column="review_status" property="reviewStatus"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, trade_date, trade_time, symbol, name, side, price, quantity, amount,
+        position_ratio, plan_id, reason, plan_stop_loss, plan_take_profit,
+        followed_plan, emotion_tags, mistake_tags, actual_result, review_status,
+        created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO trade_journal (
+            trade_date, trade_time, symbol, name, side, price, quantity, amount,
+            position_ratio, plan_id, reason, plan_stop_loss, plan_take_profit,
+            followed_plan, emotion_tags, mistake_tags, actual_result, review_status
+        ) VALUES (
+            #{tradeDate}, #{tradeTime}, #{symbol}, #{name}, #{side}, #{price},
+            #{quantity}, #{amount}, #{positionRatio}, #{planId}, #{reason},
+            #{planStopLoss}, #{planTakeProfit}, #{followedPlan}, #{emotionTags},
+            #{mistakeTags}, #{actualResult}, #{reviewStatus}
+        )
+    </insert>
+
+    <update id="updateById">
+        UPDATE trade_journal
+        <set>
+            <if test="side != null">side = #{side},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="quantity != null">quantity = #{quantity},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="positionRatio != null">position_ratio = #{positionRatio},</if>
+            <if test="planId != null">plan_id = #{planId},</if>
+            <if test="reason != null">reason = #{reason},</if>
+            <if test="planStopLoss != null">plan_stop_loss = #{planStopLoss},</if>
+            <if test="planTakeProfit != null">plan_take_profit = #{planTakeProfit},</if>
+            <if test="followedPlan != null">followed_plan = #{followedPlan},</if>
+            <if test="emotionTags != null">emotion_tags = #{emotionTags},</if>
+            <if test="mistakeTags != null">mistake_tags = #{mistakeTags},</if>
+            <if test="actualResult != null">actual_result = #{actualResult},</if>
+            <if test="reviewStatus != null">review_status = #{reviewStatus},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_journal
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_journal
+        <where>
+            <if test="date != null">AND trade_date = #{date}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="reviewStatus != null and reviewStatus != ''">AND review_status = #{reviewStatus}</if>
+        </where>
+        ORDER BY trade_date DESC, updated_at DESC
+    </select>
+
+    <select id="selectByIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_journal
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="countByTradeDate" resultType="long">
+        SELECT COUNT(1) FROM trade_journal WHERE trade_date = #{tradeDate}
+    </select>
+
+    <select id="countByReviewStatus" resultType="long">
+        SELECT COUNT(1) FROM trade_journal WHERE review_status = #{reviewStatus}
+    </select>
+
+    <update id="batchUpdateReviewStatus">
+        UPDATE trade_journal
+        SET review_status = #{reviewStatus}
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+</mapper>

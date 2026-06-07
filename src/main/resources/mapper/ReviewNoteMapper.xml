@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.review.dao.ReviewNoteMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.review.model.ReviewNoteDO">
+        <id column="id" property="id"/>
+        <result column="review_date" property="reviewDate"/>
+        <result column="symbol" property="symbol"/>
+        <result column="title" property="title"/>
+        <result column="market_context" property="marketContext"/>
+        <result column="plan_summary" property="planSummary"/>
+        <result column="action_summary" property="actionSummary"/>
+        <result column="right_things" property="rightThings"/>
+        <result column="wrong_things" property="wrongThings"/>
+        <result column="rule_changes" property="ruleChanges"/>
+        <result column="next_actions" property="nextActions"/>
+        <result column="linked_journal_ids" property="linkedJournalIds"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, review_date, symbol, title, market_context, plan_summary, action_summary,
+        right_things, wrong_things, rule_changes, next_actions, linked_journal_ids,
+        created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO review_note (
+            review_date, symbol, title, market_context, plan_summary, action_summary,
+            right_things, wrong_things, rule_changes, next_actions, linked_journal_ids
+        ) VALUES (
+            #{reviewDate}, #{symbol}, #{title}, #{marketContext}, #{planSummary},
+            #{actionSummary}, #{rightThings}, #{wrongThings}, #{ruleChanges},
+            #{nextActions}, #{linkedJournalIds}
+        )
+    </insert>
+
+    <update id="updateById">
+        UPDATE review_note
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="marketContext != null">market_context = #{marketContext},</if>
+            <if test="planSummary != null">plan_summary = #{planSummary},</if>
+            <if test="actionSummary != null">action_summary = #{actionSummary},</if>
+            <if test="rightThings != null">right_things = #{rightThings},</if>
+            <if test="wrongThings != null">wrong_things = #{wrongThings},</if>
+            <if test="ruleChanges != null">rule_changes = #{ruleChanges},</if>
+            <if test="nextActions != null">next_actions = #{nextActions},</if>
+            <if test="linkedJournalIds != null">linked_journal_ids = #{linkedJournalIds},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM review_note
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM review_note
+        <where>
+            <if test="date != null">AND review_date = #{date}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+        </where>
+        ORDER BY review_date DESC, updated_at DESC
+    </select>
+
+    <select id="countByReviewDate" resultType="long">
+        SELECT COUNT(1) FROM review_note WHERE review_date = #{reviewDate}
+    </select>
+
+</mapper>
