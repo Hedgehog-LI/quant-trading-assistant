@@ -50,6 +50,7 @@ docker compose down
 
 - [AGENTS.md](AGENTS.md)：Codex 项目级开发指南。
 - [CLAUDE.md](CLAUDE.md)：Claude Code 接手上下文。
+- [docs/CONVERSATION_HANDOFF.md](docs/CONVERSATION_HANDOFF.md)：本轮对话关键决策和项目交接整理。
 - [docs/AI_HANDOFF.md](docs/AI_HANDOFF.md)：项目背景、当前状态和第一阶段闭环。
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：系统模块和数据流。
 - [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md)：v0.1/v0.2/v1.0 迭代路线。

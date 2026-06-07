@@ -1,6 +1,6 @@
 # Quant Trading Assistant - Codex Project Guide
 
-本文件是给 Codex 读取的项目级开发指南。新对话接手本仓库时，优先阅读本文件，然后阅读 `docs/AI_HANDOFF.md`。
+本文件是给 Codex 读取的项目级开发指南。新对话接手本仓库时，优先阅读本文件，然后阅读 `docs/CONVERSATION_HANDOFF.md` 和 `docs/AI_HANDOFF.md`。
 
 ## 项目定位
 

@@ -3,10 +3,11 @@
 本仓库是用户自建的 Java 后端量化交易辅助系统。Claude Code 接手时请先阅读：
 
 1. `AGENTS.md`
-2. `docs/AI_HANDOFF.md`
-3. `docs/ARCHITECTURE.md`
-4. `docs/DEVELOPMENT_ROADMAP.md`
-5. `docs/prompts/CODEX_CLAUDE_PROMPTS.md`
+2. `docs/CONVERSATION_HANDOFF.md`
+3. `docs/AI_HANDOFF.md`
+4. `docs/ARCHITECTURE.md`
+5. `docs/DEVELOPMENT_ROADMAP.md`
+6. `docs/prompts/CODEX_CLAUDE_PROMPTS.md`
 
 ## 一句话目标
 
