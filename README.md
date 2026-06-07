@@ -43,3 +43,14 @@ docker compose down
 - 不保存券商密码、交易密码或真实交易 API Key。
 - 不做自动下单。
 - 策略信号只用于辅助决策，必须结合风险控制和人工确认。
+
+## AI 开发文档入口
+
+后续让 Codex / Claude Code 继续开发时，优先让它读取：
+
+- [AGENTS.md](AGENTS.md)：Codex 项目级开发指南。
+- [CLAUDE.md](CLAUDE.md)：Claude Code 接手上下文。
+- [docs/AI_HANDOFF.md](docs/AI_HANDOFF.md)：项目背景、当前状态和第一阶段闭环。
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：系统模块和数据流。
+- [docs/DEVELOPMENT_ROADMAP.md](docs/DEVELOPMENT_ROADMAP.md)：v0.1/v0.2/v1.0 迭代路线。
+- [docs/prompts/CODEX_CLAUDE_PROMPTS.md](docs/prompts/CODEX_CLAUDE_PROMPTS.md)：可直接复制的新对话提示词。
