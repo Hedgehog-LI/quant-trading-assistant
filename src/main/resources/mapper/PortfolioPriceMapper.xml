@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.portfolio.dao.PortfolioPriceMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.portfolio.model.PortfolioPriceSnapshotDO">
+        <id column="id" property="id"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="current_price" property="currentPrice"/>
+        <result column="price_date" property="priceDate"/>
+        <result column="note" property="note"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, symbol, name, current_price, price_date, note, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO portfolio_price_snapshot (
+            symbol, name, current_price, price_date, note
+        ) VALUES (
+            #{symbol}, #{name}, #{currentPrice}, #{priceDate}, #{note}
+        )
+    </insert>
+
+    <update id="updateById">
+        UPDATE portfolio_price_snapshot
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="currentPrice != null">current_price = #{currentPrice},</if>
+            <if test="note != null">note = #{note},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectBySymbolAndDate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM portfolio_price_snapshot
+        WHERE symbol = #{symbol} AND price_date = #{priceDate}
+    </select>
+
+    <select id="selectLatestBySymbol" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM portfolio_price_snapshot
+        WHERE symbol = #{symbol}
+        ORDER BY price_date DESC
+        LIMIT 1
+    </select>
+
+    <!-- 每个股票最新价：子查询取 max(price_date) 再回连 -->
+    <select id="selectLatestBySymbols" resultMap="BaseResultMap">
+        SELECT s.id, s.symbol, s.name, s.current_price, s.price_date, s.note, s.created_at, s.updated_at
+        FROM portfolio_price_snapshot s
+        INNER JOIN (
+            SELECT symbol, MAX(price_date) AS max_date
+            FROM portfolio_price_snapshot
+            GROUP BY symbol
+        ) m ON s.symbol = m.symbol AND s.price_date = m.max_date
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM portfolio_price_snapshot
+        ORDER BY price_date DESC, updated_at DESC
+    </select>
+
+</mapper>
