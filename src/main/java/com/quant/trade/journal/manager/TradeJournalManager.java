@@ -63,10 +63,9 @@ public class TradeJournalManager {
             record.setAmount(calculateAmount(record.getPrice(), record.getQuantity()));
         }
 
-        // 如果更新了任意费用字段，重新归一与计算总费用
-        if (anyFeeTouched(record)) {
-            fillFees(record);
-        }
+        // 费用字段为全量编辑语义：每次更新都归一（null→0）并重算 totalFee。
+        // 配合 Converter 的 SET_TO_NULL 与 MyBatis 的非 null 更新，支持清空费用（清空后落库为 0.000000）。
+        fillFees(record);
     }
 
     /**
@@ -203,14 +202,6 @@ public class TradeJournalManager {
                     .add(record.getOtherFee());
             record.setTotalFee(scale(summed));
         }
-    }
-
-    private boolean anyFeeTouched(TradeJournalDO record) {
-        return record.getTotalFee() != null
-                || record.getCommissionFee() != null
-                || record.getStampTax() != null
-                || record.getTransferFee() != null
-                || record.getOtherFee() != null;
     }
 
     private BigDecimal nullToZero(BigDecimal value) {

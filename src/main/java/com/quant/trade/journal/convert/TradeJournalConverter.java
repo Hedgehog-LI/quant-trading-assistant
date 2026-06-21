@@ -15,8 +15,9 @@ import java.util.List;
  * <p>
  * 处理 emotionTags/mistakeTags 在 List 和逗号字符串之间的转换。
  * amount 为纯自动计算字段，转换时忽略；
- * totalFee 为条件计算字段（传入则以传入值为准，否则由 Manager 求和），需透传 DTO 值，
- * 其中 update 时 totalFee 为 null 要覆盖旧值（SET_TO_NULL）以触发重算。
+ * 费用字段（commissionFee/stampTax/transferFee/otherFee/totalFee）在 update 时为「全量编辑语义」：
+ * DTO 中的 null 表示「清空」，通过 SET_TO_NULL 透传到 DO，再由 Manager.fillFees 统一归一为 0 并重算 totalFee；
+ * 非 null 值则原样透传，由 Manager 归一落库（与 MyBatis 非 null 更新配合，支持清空费用）。
  */
 @Mapper(componentModel = "spring")
 public interface TradeJournalConverter {
@@ -36,6 +37,12 @@ public interface TradeJournalConverter {
     @Mapping(target = "symbol", ignore = true)
     @Mapping(target = "name", ignore = true)
     @Mapping(target = "amount", ignore = true)
+    // 费用字段为全量编辑语义：DTO null 表示「清空」，用 SET_TO_NULL 透传到 DO，
+    // 再由 Manager.fillFees 归一为 0 并写入 DB（MyBatis 非 null 即更新）。
+    @Mapping(target = "commissionFee", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
+    @Mapping(target = "stampTax", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
+    @Mapping(target = "transferFee", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
+    @Mapping(target = "otherFee", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
     @Mapping(target = "totalFee", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
