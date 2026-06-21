@@ -40,8 +40,9 @@ class TradeJournalServiceTest {
     void createSellSuccess() {
         CreateTradeJournalDTO dto = new CreateTradeJournalDTO(
                 LocalDate.of(2026, 6, 8), null, "300750", "宁德时代",
-                TradeSideEnum.SELL.getCode(), new BigDecimal("230.00"), 100L, null, null,
-                "止盈卖出", null, null, true, null, null, null
+                TradeSideEnum.SELL.getCode(), new BigDecimal("230.00"), 100L,
+                null, null, null, null, null,
+                null, null, "止盈卖出", null, null, true, null, null, null
         );
 
         TradeJournalVO vo = tradeJournalService.create(dto);
@@ -52,8 +53,9 @@ class TradeJournalServiceTest {
     void invalidSideThrowsError() {
         CreateTradeJournalDTO dto = new CreateTradeJournalDTO(
                 LocalDate.of(2026, 6, 8), null, "300750", "宁德时代",
-                "INVALID", new BigDecimal("220.00"), 100L, null, null,
-                null, null, null, null, null, null, null
+                "INVALID", new BigDecimal("220.00"), 100L,
+                null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null
         );
 
         assertThrows(BusinessException.class, () -> tradeJournalService.create(dto));
@@ -63,8 +65,9 @@ class TradeJournalServiceTest {
     void buyWithoutStopLossReturnsWarning() {
         CreateTradeJournalDTO dto = new CreateTradeJournalDTO(
                 LocalDate.of(2026, 6, 8), null, "600519", "贵州茅台",
-                TradeSideEnum.BUY.getCode(), new BigDecimal("1700.00"), 10L, null, null,
-                "跟风买入", null, null, null, null, null, null
+                TradeSideEnum.BUY.getCode(), new BigDecimal("1700.00"), 10L,
+                null, null, null, null, null,
+                null, null, "跟风买入", null, null, null, null, null, null
         );
 
         TradeJournalVO vo = tradeJournalService.create(dto);
@@ -98,6 +101,7 @@ class TradeJournalServiceTest {
         CreateTradeJournalDTO dto = new CreateTradeJournalDTO(
                 LocalDate.of(2026, 6, 8), null, "300750", "宁德时代",
                 TradeSideEnum.BUY.getCode(), new BigDecimal("220.50"), 100L,
+                null, null, null, null, null,
                 new BigDecimal("0.10"), null, "突破220，放量买入",
                 new BigDecimal("210.00"), new BigDecimal("240.00"),
                 true, List.of("CALM"), null, null

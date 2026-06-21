@@ -13,6 +13,11 @@
         <result column="price" property="price"/>
         <result column="quantity" property="quantity"/>
         <result column="amount" property="amount"/>
+        <result column="commission_fee" property="commissionFee"/>
+        <result column="stamp_tax" property="stampTax"/>
+        <result column="transfer_fee" property="transferFee"/>
+        <result column="other_fee" property="otherFee"/>
+        <result column="total_fee" property="totalFee"/>
         <result column="position_ratio" property="positionRatio"/>
         <result column="plan_id" property="planId"/>
         <result column="reason" property="reason"/>
@@ -29,6 +34,7 @@
 
     <sql id="Base_Column_List">
         id, trade_date, trade_time, symbol, name, side, price, quantity, amount,
+        commission_fee, stamp_tax, transfer_fee, other_fee, total_fee,
         position_ratio, plan_id, reason, plan_stop_loss, plan_take_profit,
         followed_plan, emotion_tags, mistake_tags, actual_result, review_status,
         created_at, updated_at
@@ -37,11 +43,14 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO trade_journal (
             trade_date, trade_time, symbol, name, side, price, quantity, amount,
+            commission_fee, stamp_tax, transfer_fee, other_fee, total_fee,
             position_ratio, plan_id, reason, plan_stop_loss, plan_take_profit,
             followed_plan, emotion_tags, mistake_tags, actual_result, review_status
         ) VALUES (
             #{tradeDate}, #{tradeTime}, #{symbol}, #{name}, #{side}, #{price},
-            #{quantity}, #{amount}, #{positionRatio}, #{planId}, #{reason},
+            #{quantity}, #{amount},
+            #{commissionFee}, #{stampTax}, #{transferFee}, #{otherFee}, #{totalFee},
+            #{positionRatio}, #{planId}, #{reason},
             #{planStopLoss}, #{planTakeProfit}, #{followedPlan}, #{emotionTags},
             #{mistakeTags}, #{actualResult}, #{reviewStatus}
         )
@@ -54,6 +63,11 @@
             <if test="price != null">price = #{price},</if>
             <if test="quantity != null">quantity = #{quantity},</if>
             <if test="amount != null">amount = #{amount},</if>
+            <if test="commissionFee != null">commission_fee = #{commissionFee},</if>
+            <if test="stampTax != null">stamp_tax = #{stampTax},</if>
+            <if test="transferFee != null">transfer_fee = #{transferFee},</if>
+            <if test="otherFee != null">other_fee = #{otherFee},</if>
+            <if test="totalFee != null">total_fee = #{totalFee},</if>
             <if test="positionRatio != null">position_ratio = #{positionRatio},</if>
             <if test="planId != null">plan_id = #{planId},</if>
             <if test="reason != null">reason = #{reason},</if>
@@ -110,5 +124,30 @@
             #{id}
         </foreach>
     </update>
+
+    <!-- 全量流水，按交易时间正序（trade_time 为空的排到当日最晚，id 作稳定 tiebreaker） -->
+    <select id="selectAllOrdered" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_journal
+        <where>
+            <if test="fromDate != null">AND trade_date &gt;= #{fromDate}</if>
+            <if test="toDate != null">AND trade_date &lt;= #{toDate}</if>
+        </where>
+        ORDER BY trade_date ASC,
+                 CASE WHEN trade_time IS NULL THEN 1 ELSE 0 END ASC,
+                 trade_time ASC,
+                 id ASC
+    </select>
+
+    <!-- 单股票流水，按交易时间正序 -->
+    <select id="selectBySymbolOrdered" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_journal
+        WHERE symbol = #{symbol}
+        ORDER BY trade_date ASC,
+                 CASE WHEN trade_time IS NULL THEN 1 ELSE 0 END ASC,
+                 trade_time ASC,
+                 id ASC
+    </select>
 
 </mapper>

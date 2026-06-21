@@ -23,6 +23,11 @@ public final class TradingDisclaimerConstants {
             "交易记录为手工录入，仅供复盘参考。"
             + "不连接券商，不自动同步真实交易。";
 
+    /** 持仓账本免责声明 */
+    public static final String PORTFOLIO_DISCLAIMER =
+            "持仓账本基于手工录入的交易记录按 FIFO 规则实时计算，仅供复盘参考。"
+            + "当前价为手工维护，不连接实时行情。不构成任何投资建议，投资有风险，入市需谨慎。";
+
     private TradingDisclaimerConstants() {
     }
 }

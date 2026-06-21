@@ -31,6 +31,24 @@ public interface TradeJournalMapper {
     long countByReviewStatus(@Param("reviewStatus") String reviewStatus);
 
     /**
+     * 全量交易流水，按交易时间正序排列（FIFO 配对所需）。
+     *
+     * @param fromDate 起始日期（可空）
+     * @param toDate   截止日期（可空）
+     * @return 按时间正序的流水
+     */
+    List<TradeJournalDO> selectAllOrdered(@Param("fromDate") LocalDate fromDate,
+                                          @Param("toDate") LocalDate toDate);
+
+    /**
+     * 单股票交易流水，按交易时间正序排列。
+     *
+     * @param symbol 股票代码
+     * @return 按时间正序的流水
+     */
+    List<TradeJournalDO> selectBySymbolOrdered(@Param("symbol") String symbol);
+
+    /**
      * 批量更新复核状态。
      *
      * @param ids          ID 列表

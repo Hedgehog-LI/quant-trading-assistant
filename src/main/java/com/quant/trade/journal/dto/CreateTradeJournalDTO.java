@@ -36,6 +36,21 @@ public record CreateTradeJournalDTO(
         @Min(value = 1, message = "quantity must be at least 1")
         Long quantity,
 
+        @DecimalMin(value = "0", message = "commissionFee must be at least 0")
+        BigDecimal commissionFee,
+
+        @DecimalMin(value = "0", message = "stampTax must be at least 0")
+        BigDecimal stampTax,
+
+        @DecimalMin(value = "0", message = "transferFee must be at least 0")
+        BigDecimal transferFee,
+
+        @DecimalMin(value = "0", message = "otherFee must be at least 0")
+        BigDecimal otherFee,
+
+        @DecimalMin(value = "0", message = "totalFee must be at least 0")
+        BigDecimal totalFee,
+
         @DecimalMin(value = "0", message = "positionRatio must be at least 0")
         BigDecimal positionRatio,
 

@@ -7,6 +7,7 @@ import com.quant.trade.journal.convert.TradeJournalConverter;
 import com.quant.trade.journal.dto.CreateTradeJournalDTO;
 import com.quant.trade.journal.dto.UpdateReviewStatusDTO;
 import com.quant.trade.journal.dto.UpdateTradeJournalDTO;
+import com.quant.trade.journal.flow.TradeFlowItem;
 import com.quant.trade.journal.manager.TradeJournalManager;
 import com.quant.trade.journal.model.TradeJournalDO;
 import com.quant.trade.journal.vo.TradeJournalVO;
@@ -45,7 +46,7 @@ public class TradeJournalService {
             record.setReviewStatus(ReviewStatusEnum.PENDING.getCode());
         }
 
-        // 校验并自动计算
+        // 校验并自动计算（金额、费用、总费用）
         tradeJournalManager.validateAndFillForCreate(record);
 
         // 买入无止损 -> warning（不阻断）
@@ -62,7 +63,9 @@ public class TradeJournalService {
         TradeJournalVO vo = tradeJournalConverter.toVO(record);
         return new TradeJournalVO(
                 vo.id(), vo.tradeDate(), vo.tradeTime(), vo.symbol(), vo.name(),
-                vo.side(), vo.price(), vo.quantity(), vo.amount(), vo.positionRatio(),
+                vo.side(), vo.price(), vo.quantity(), vo.amount(),
+                vo.commissionFee(), vo.stampTax(), vo.transferFee(), vo.otherFee(), vo.totalFee(),
+                vo.positionRatio(),
                 vo.planId(), vo.reason(), vo.planStopLoss(), vo.planTakeProfit(),
                 vo.followedPlan(), vo.emotionTags(), vo.mistakeTags(), vo.actualResult(),
                 vo.reviewStatus(), vo.createdAt(), vo.updatedAt(), warnings);
@@ -109,6 +112,23 @@ public class TradeJournalService {
     @Transactional
     public void markAsReviewed(List<Long> journalIds) {
         tradeJournalManager.markAsReviewed(journalIds);
+    }
+
+    /**
+     * 全量交易流水（portfolio 入参契约，时间正序）。供 Portfolio 模块 FIFO 计算调用。
+     *
+     * @param fromDate 起始日期（可空）
+     * @param toDate   截止日期（可空）
+     */
+    public List<TradeFlowItem> listFlowItems(LocalDate fromDate, LocalDate toDate) {
+        return tradeJournalConverter.toFlowItemList(tradeJournalManager.listAllOrdered(fromDate, toDate));
+    }
+
+    /**
+     * 单股票交易流水（portfolio 入参契约，时间正序）。
+     */
+    public List<TradeFlowItem> listFlowItemsBySymbol(String symbol) {
+        return tradeJournalConverter.toFlowItemList(tradeJournalManager.listBySymbolOrdered(symbol));
     }
 
     public long countByDate(LocalDate date) {

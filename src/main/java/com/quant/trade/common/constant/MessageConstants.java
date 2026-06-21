@@ -52,6 +52,20 @@ public final class MessageConstants {
     public static final String LINKED_JOURNALS_NOT_FOUND =
             "部分关联的交易记录不存在";
 
+    // ==================== 持仓账本告警 ====================
+
+    /** 股票未维护当前价，浮动盈亏不可用（%s = symbol） */
+    public static final String PORTFOLIO_NO_CURRENT_PRICE =
+            "股票 %s 未维护当前价，浮动盈亏相关字段返回空，不计入汇总统计";
+
+    /** 股票存在卖出超过持仓的异常数据（%s = symbol） */
+    public static final String PORTFOLIO_OVERSOLD_ANOMALY =
+            "股票 %s 存在卖出数量超过持仓的异常数据，该股票不参与统计，请核对交易记录";
+
+    /** 暂无已结算交易，胜率与平均指标不适用 */
+    public static final String PORTFOLIO_NO_CLOSED_TRADES =
+            "暂无已结算交易，平均收益率、平均持仓天数、胜率暂不适用";
+
     private MessageConstants() {
     }
 }

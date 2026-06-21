@@ -49,6 +49,21 @@ public class TradeJournalDO {
     /** 成交金额（自动计算 = price × quantity） */
     private BigDecimal amount;
 
+    /** 佣金 */
+    private BigDecimal commissionFee;
+
+    /** 印花税 */
+    private BigDecimal stampTax;
+
+    /** 过户费 */
+    private BigDecimal transferFee;
+
+    /** 其他费用 */
+    private BigDecimal otherFee;
+
+    /** 总费用（自动计算：传入则以传入值为准，否则为各项之和） */
+    private BigDecimal totalFee;
+
     /** 仓位比例（0 到 1） */
     private BigDecimal positionRatio;
 

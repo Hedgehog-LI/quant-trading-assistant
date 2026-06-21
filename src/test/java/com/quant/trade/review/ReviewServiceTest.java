@@ -91,8 +91,9 @@ class ReviewServiceTest {
     private TradeJournalVO createJournal() {
         return tradeJournalService.create(new CreateTradeJournalDTO(
                 LocalDate.of(2026, 6, 8), null, "300750", "宁德时代",
-                TradeSideEnum.BUY.getCode(), new BigDecimal("220.00"), 100L, null, null,
-                "突破买入", new BigDecimal("210.00"), null, true,
+                TradeSideEnum.BUY.getCode(), new BigDecimal("220.00"), 100L,
+                null, null, null, null, null,
+                null, null, "突破买入", new BigDecimal("210.00"), null, true,
                 null, null, null
         ));
     }

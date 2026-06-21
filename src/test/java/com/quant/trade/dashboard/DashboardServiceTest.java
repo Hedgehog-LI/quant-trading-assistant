@@ -53,13 +53,14 @@ class DashboardServiceTest {
                 null, null, null, null
         ));
 
-        // 创建交易记录
+        // 创建交易记录（21 个参数：tradeDate..actualResult，含 5 个费用字段）
         tradeJournalService.create(new CreateTradeJournalDTO(
                 date, null, "300750", "宁德时代",
                 TradeSideEnum.BUY.getCode(),
-                new BigDecimal("220.00"), 100L, null, null,
-                null, new BigDecimal("210.00"), null, null,
-                null, null, null
+                new BigDecimal("220.00"), 100L,
+                null, null, null, null, null,
+                null, null, null, new BigDecimal("210.00"), null,
+                null, null, null, null
         ));
 
         // 创建复盘
@@ -84,14 +85,16 @@ class DashboardServiceTest {
         tradeJournalService.create(new CreateTradeJournalDTO(
                 date, null, "000001", "平安银行",
                 TradeSideEnum.BUY.getCode(),
-                new BigDecimal("15.00"), 100L, null, null,
-                null, null, null, null, null, null, null
+                new BigDecimal("15.00"), 100L,
+                null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null
         ));
         tradeJournalService.create(new CreateTradeJournalDTO(
                 date, null, "000002", "万科A",
                 TradeSideEnum.BUY.getCode(),
-                new BigDecimal("10.00"), 200L, null, null,
-                null, null, null, null, null, null, null
+                new BigDecimal("10.00"), 200L,
+                null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null
         ));
 
         DashboardTodayVO vo = dashboardService.getToday(date);
