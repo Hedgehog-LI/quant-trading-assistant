@@ -73,4 +73,8 @@
         SELECT COUNT(1) FROM review_note WHERE review_date = #{reviewDate}
     </select>
 
+    <delete id="deleteById">
+        DELETE FROM review_note WHERE id = #{id}
+    </delete>
+
 </mapper>

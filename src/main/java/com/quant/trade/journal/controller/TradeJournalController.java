@@ -57,4 +57,10 @@ public class TradeJournalController {
             @Valid @RequestBody UpdateReviewStatusDTO dto) {
         return ApiResponse.ok(tradeJournalService.updateReviewStatus(id, dto));
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        tradeJournalService.delete(id);
+        return ApiResponse.ok();
+    }
 }

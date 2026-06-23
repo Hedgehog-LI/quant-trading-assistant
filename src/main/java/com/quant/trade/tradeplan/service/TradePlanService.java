@@ -96,4 +96,13 @@ public class TradePlanService {
     public long countActivePlansByDate(LocalDate date) {
         return tradePlanManager.countActiveByDate(date);
     }
+
+    /**
+     * 物理删除交易计划。
+     */
+    @Transactional
+    public void delete(Long id) {
+        tradePlanManager.deleteById(id);
+        log.info("Deleted trade plan: id={}", id);
+    }
 }

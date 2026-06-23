@@ -88,6 +88,29 @@ class ReviewServiceTest {
         assertFalse(results.isEmpty());
     }
 
+    @Test
+    void deleteReviewSuccess() {
+        ReviewVO created = reviewService.create(new CreateReviewDTO(
+                LocalDate.of(2026, 6, 8), "300750", "复盘",
+                null, null, null, null, null, null, null, null
+        ));
+        Long id = created.id();
+        assertNotNull(id);
+
+        reviewService.delete(id);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> reviewService.getById(id));
+        assertEquals(ErrorCodeEnum.RESOURCE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    void deleteNonExistentReviewThrowsError() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> reviewService.delete(99999L));
+        assertEquals(ErrorCodeEnum.RESOURCE_NOT_FOUND, ex.getErrorCode());
+    }
+
     private TradeJournalVO createJournal() {
         return tradeJournalService.create(new CreateTradeJournalDTO(
                 LocalDate.of(2026, 6, 8), null, "300750", "宁德时代",

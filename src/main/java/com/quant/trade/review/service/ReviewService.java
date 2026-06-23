@@ -81,4 +81,13 @@ public class ReviewService {
     public long countByDate(LocalDate date) {
         return reviewManager.countByDate(date);
     }
+
+    /**
+     * 物理删除复盘记录。
+     */
+    @Transactional
+    public void delete(Long id) {
+        reviewManager.deleteById(id);
+        log.info("Deleted review note: id={}", id);
+    }
 }

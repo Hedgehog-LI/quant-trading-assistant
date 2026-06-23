@@ -167,6 +167,23 @@ public class TradeJournalManager {
         return tradeJournalMapper.selectById(id);
     }
 
+    /**
+     * 物理删除交易记录。
+     * <p>
+     * 删除前先校验存在性，不存在则抛 RESOURCE_NOT_FOUND。
+     * <p>
+     * 关联限制：review_note.linked_journal_ids 以 JSON 数组形式存储关联的 journal id，
+     * 这里物理删除 journal 后，已存在的 review 记录中的引用会变成悬空引用。
+     * 本次不做级联清理（避免过度设计），相关方在读取 linked_journal_ids 时需容忍失效引用。
+     * 后续若需要强一致性，可补充一个清理步骤或改为软删除。
+     *
+     * @param id 主键
+     */
+    public void deleteById(Long id) {
+        getByIdOrThrow(id);
+        tradeJournalMapper.deleteById(id);
+    }
+
     // ==================== 私有方法 ====================
 
     private void validateSide(String side) {

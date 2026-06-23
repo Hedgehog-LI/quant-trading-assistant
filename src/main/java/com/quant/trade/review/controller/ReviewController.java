@@ -47,4 +47,10 @@ public class ReviewController {
                                          @Valid @RequestBody UpdateReviewDTO dto) {
         return ApiResponse.ok(reviewService.update(id, dto));
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        reviewService.delete(id);
+        return ApiResponse.ok();
+    }
 }

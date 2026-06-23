@@ -3,6 +3,7 @@ package com.quant.trade.journal;
 import com.quant.trade.common.enums.ReviewStatusEnum;
 import com.quant.trade.common.enums.TradeSideEnum;
 import com.quant.trade.common.exception.BusinessException;
+import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.journal.dto.CreateTradeJournalDTO;
 import com.quant.trade.journal.dto.UpdateReviewStatusDTO;
 import com.quant.trade.journal.service.TradeJournalService;
@@ -95,6 +96,26 @@ class TradeJournalServiceTest {
         TradeJournalVO vo = createBuy();
         assertNotNull(vo.amount());
         assertEquals(0, new BigDecimal("22050.000000").compareTo(vo.amount()));
+    }
+
+    @Test
+    void deleteTradeJournalSuccess() {
+        TradeJournalVO created = createBuy();
+        Long id = created.id();
+        assertNotNull(id);
+
+        tradeJournalService.delete(id);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tradeJournalService.getById(id));
+        assertEquals(ErrorCodeEnum.RESOURCE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    void deleteNonExistentTradeJournalThrowsError() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tradeJournalService.delete(99999L));
+        assertEquals(ErrorCodeEnum.RESOURCE_NOT_FOUND, ex.getErrorCode());
     }
 
     private TradeJournalVO createBuy() {

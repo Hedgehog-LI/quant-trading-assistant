@@ -150,4 +150,8 @@
                  id ASC
     </select>
 
+    <delete id="deleteById">
+        DELETE FROM trade_journal WHERE id = #{id}
+    </delete>
+
 </mapper>

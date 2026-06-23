@@ -31,4 +31,12 @@ public interface TradePlanMapper {
     long countActiveByDate(@Param("planDate") LocalDate planDate);
 
     long countByDate(@Param("planDate") LocalDate planDate);
+
+    /**
+     * 根据主键物理删除。
+     *
+     * @param id 主键
+     * @return 影响行数
+     */
+    int deleteById(@Param("id") Long id);
 }

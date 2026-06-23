@@ -102,6 +102,30 @@ class TradePlanServiceTest {
         assertEquals(ErrorCodeEnum.INVALID_ENUM_CODE, ex.getErrorCode());
     }
 
+    @Test
+    void deleteTradePlanSuccess() {
+        TradePlanVO created = tradePlanService.create(new CreateTradePlanDTO(
+                LocalDate.of(2026, 6, 8), "300750", "宁德时代",
+                PlanStatusEnum.DRAFT.getCode(), null, null, null, null, null, null,
+                false, null, null
+        ));
+        Long id = created.id();
+        assertNotNull(id);
+
+        tradePlanService.delete(id);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tradePlanService.getById(id));
+        assertEquals(ErrorCodeEnum.RESOURCE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    void deleteNonExistentTradePlanThrowsError() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> tradePlanService.delete(99999L));
+        assertEquals(ErrorCodeEnum.RESOURCE_NOT_FOUND, ex.getErrorCode());
+    }
+
     private void createPlan(LocalDate date, String symbol) {
         tradePlanService.create(new CreateTradePlanDTO(
                 date, symbol, "测试",

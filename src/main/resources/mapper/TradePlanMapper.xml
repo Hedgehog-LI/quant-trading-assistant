@@ -92,4 +92,8 @@
         SELECT COUNT(1) FROM trade_plan WHERE plan_date = #{planDate}
     </select>
 
+    <delete id="deleteById">
+        DELETE FROM trade_plan WHERE id = #{id}
+    </delete>
+
 </mapper>

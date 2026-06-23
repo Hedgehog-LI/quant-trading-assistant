@@ -106,6 +106,19 @@ public class TradePlanManager {
         return tradePlanMapper.selectById(id);
     }
 
+    /**
+     * 物理删除交易计划。
+     * <p>
+     * 删除前先校验存在性，不存在则抛 RESOURCE_NOT_FOUND。
+     * trade_plan 不被其他表外键引用，物理删除无悬空引用风险。
+     *
+     * @param id 主键
+     */
+    public void deleteById(Long id) {
+        getByIdOrThrow(id);
+        tradePlanMapper.deleteById(id);
+    }
+
     // ==================== 私有方法 ====================
 
     private void validatePlanStatus(String planStatus) {

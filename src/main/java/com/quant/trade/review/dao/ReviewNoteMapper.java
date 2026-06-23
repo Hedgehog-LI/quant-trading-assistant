@@ -23,4 +23,12 @@ public interface ReviewNoteMapper {
                                       @Param("symbol") String symbol);
 
     long countByReviewDate(@Param("reviewDate") LocalDate reviewDate);
+
+    /**
+     * 根据主键物理删除。
+     *
+     * @param id 主键
+     * @return 影响行数
+     */
+    int deleteById(@Param("id") Long id);
 }

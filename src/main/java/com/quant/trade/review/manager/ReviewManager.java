@@ -75,4 +75,17 @@ public class ReviewManager {
     public ReviewNoteDO selectById(Long id) {
         return reviewNoteMapper.selectById(id);
     }
+
+    /**
+     * 物理删除复盘记录。
+     * <p>
+     * 删除前先校验存在性，不存在则抛 RESOURCE_NOT_FOUND。
+     * 关联方向是 review -> journal（review 引用 journal），删除 review 不会产生悬空引用。
+     *
+     * @param id 主键
+     */
+    public void deleteById(Long id) {
+        getByIdOrThrow(id);
+        reviewNoteMapper.deleteById(id);
+    }
 }

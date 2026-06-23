@@ -57,4 +57,12 @@ public interface TradeJournalMapper {
      */
     int batchUpdateReviewStatus(@Param("ids") Collection<Long> ids,
                                 @Param("reviewStatus") String reviewStatus);
+
+    /**
+     * 根据主键物理删除。
+     *
+     * @param id 主键
+     * @return 影响行数
+     */
+    int deleteById(@Param("id") Long id);
 }

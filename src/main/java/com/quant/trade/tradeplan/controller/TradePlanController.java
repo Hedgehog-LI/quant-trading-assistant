@@ -55,4 +55,10 @@ public class TradePlanController {
                                                   @Valid @RequestBody UpdatePlanStatusDTO dto) {
         return ApiResponse.ok(tradePlanService.updateStatus(id, dto));
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        tradePlanService.delete(id);
+        return ApiResponse.ok();
+    }
 }

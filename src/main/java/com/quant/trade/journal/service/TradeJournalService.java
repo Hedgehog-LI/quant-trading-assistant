@@ -138,4 +138,13 @@ public class TradeJournalService {
     public long countByReviewStatus(String reviewStatus) {
         return tradeJournalManager.countByReviewStatus(reviewStatus);
     }
+
+    /**
+     * 物理删除交易记录。
+     */
+    @Transactional
+    public void delete(Long id) {
+        tradeJournalManager.deleteById(id);
+        log.info("Deleted trade journal: id={}", id);
+    }
 }
