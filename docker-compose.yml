@@ -31,7 +31,7 @@ services:
       MYSQL_PASSWORD: ${QTA_MYSQL_PASSWORD:-qta_dev_password}
       TZ: Asia/Shanghai
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     volumes:
       - qta_mysql_data:/var/lib/mysql
     healthcheck:

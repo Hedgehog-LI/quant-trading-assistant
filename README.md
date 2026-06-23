@@ -38,6 +38,28 @@ curl http://localhost:8080/actuator/health
 docker compose down
 ```
 
+## 运行模式与端口
+
+| 模式 | profile | 数据源 | 启动方式 |
+|------|---------|--------|----------|
+| 本机开发 | `local` | Docker MySQL `127.0.0.1:3306` | IDE 或 `./mvnw spring-boot:run` |
+| 容器化 | `docker` | compose 内 MySQL（服务名 `mysql`） | `docker compose up -d --build` |
+
+- 后端 HTTP 端口：`8080`（容器名 `qta-server`）。
+- MySQL 容器名 `qta-mysql`，宿主端口已收紧为 `127.0.0.1:3306`，**不对公网/局域网暴露**；容器间通过 Docker 网络以服务名 `mysql` 通信。
+- 测试使用 H2 内存库（MySQL 模式），`./mvnw test` 不依赖真实 MySQL，也不占用 8080。
+
+## 排障命令
+
+```bash
+./mvnw test                                    # 单元/集成测试（H2）
+./mvnw package                                 # 打包 fat jar → target/*.jar
+docker compose ps                              # 查看容器
+docker logs -f qta-server                      # 后端日志
+docker logs --tail 50 qta-mysql                # MySQL 日志
+curl http://localhost:8080/actuator/health     # 健康检查
+```
+
 ## 安全边界
 
 - 不保存券商密码、交易密码或真实交易 API Key。
