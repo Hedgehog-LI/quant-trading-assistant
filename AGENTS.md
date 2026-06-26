@@ -25,7 +25,8 @@
 - Spring Boot 3.5.14
 - Maven Wrapper
 - Spring Web
-- Spring Data JPA
+- MyBatis + XML Mapper
+- MapStruct
 - Spring Validation
 - Spring Boot Actuator
 - Flyway
@@ -41,8 +42,9 @@
 4. 所有策略信号必须经过风险模块。
 5. 回测逻辑必须避免未来函数、忽略手续费、忽略滑点、忽略 T+1 等常见错误。
 6. 数据库结构使用 Flyway migration 管理。
-7. 本地配置使用 `.env`，仓库只提交 `.env.example`。
-8. 新增功能必须能通过 `./mvnw test`，至少保证应用上下文可启动。
+7. 当前数据库访问使用 MyBatis，SQL 写在 `src/main/resources/mapper/*.xml`。
+8. 本地配置使用 `.env`，仓库只提交 `.env.example`。
+9. 新增功能必须能通过 `./mvnw test`，至少保证应用上下文可启动。
 
 ## 推荐包结构
 
@@ -51,7 +53,7 @@ com.quant.trade
 ├── common          # 通用异常、响应、时间、分页、枚举
 ├── config          # Spring 配置、属性绑定
 ├── data            # 数据采集、数据源适配、行情导入
-├── storage         # JPA entity/repository 或数据库访问
+├── storage         # 数据库存储边界；当前以 MyBatis mapper/xml 为主
 ├── indicator       # MA/MACD/RSI/BOLL/成交量指标
 ├── factor          # 因子计算，如趋势、波动率、量价关系
 ├── strategy        # 策略定义、策略配置、策略插件
@@ -92,5 +94,6 @@ docker compose down
 - 不要引入复杂平台化设计，v0.1 保持简单可运行。
 - 不要添加真实交易、券商接口或密钥读取功能。
 - 新增表必须通过 Flyway migration。
+- 新增 DB 访问优先沿用 MyBatis Mapper + XML SQL。
 - 新增 REST API 时补充请求/响应示例到文档。
 - 涉及策略、信号、风控时必须写明假设和失效场景。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "QTA Quality Acceptance"
+  short_description: "Verify QTA changes before delivery."
+  default_prompt: "Use this skill before calling QTA work complete; run checks, review docs, and report product/technical findings."

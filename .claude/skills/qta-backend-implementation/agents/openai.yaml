@@ -1,0 +1,4 @@
+interface:
+  display_name: "QTA Backend Implementation"
+  short_description: "Build QTA backend modules safely."
+  default_prompt: "Use this skill when implementing or reviewing QTA backend code, migrations, REST APIs, MyBatis mappers, and tests."

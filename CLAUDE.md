@@ -3,17 +3,26 @@
 本仓库是用户自建的 Java 后端量化交易辅助系统。Claude Code 接手时请先阅读：
 
 1. `AGENTS.md`
-2. `docs/CONVERSATION_HANDOFF.md`
-3. `docs/AI_HANDOFF.md`
-4. `docs/ARCHITECTURE.md`
-5. `docs/DEVELOPMENT_ROADMAP.md`
-6. `docs/prompts/CODEX_CLAUDE_PROMPTS.md`
+2. `docs/AI_DEVELOPMENT_INDEX.md`
+3. `docs/BUILD_CHECKLIST.md`
+4. `docs/CURRENT_ARCHITECTURE_AND_MODULES.md`
+5. `docs/CONVERSATION_HANDOFF.md`
+6. `docs/AI_HANDOFF.md`
+7. `docs/PRODUCT_BLUEPRINT.md`
+8. `docs/prompts/CODEX_CLAUDE_PROMPTS.md`
+
+如果当前工具支持项目级 skills，按任务类型读取：
+
+- 产品设计：`.claude/skills/qta-product-design/SKILL.md`
+- 后端实现：`.claude/skills/qta-backend-implementation/SKILL.md`
+- 前端实现：`.claude/skills/qta-frontend-implementation/SKILL.md`
+- 质量验收：`.claude/skills/qta-quality-acceptance/SKILL.md`
 
 如果任务是开发周一可用的 Today MVP，请继续阅读：
 
-7. `docs/claude/BACKEND_TODAY_MVP_IMPLEMENTATION_MANUAL.md`
-8. `docs/claude/FRONTEND_MVP_ARCHITECTURE_AND_CLAUDE_MANUAL.md`
-9. `docs/claude/CLAUDE_CODE_EXECUTION_GUIDE.md`
+9. `docs/claude/BACKEND_TODAY_MVP_IMPLEMENTATION_MANUAL.md`
+10. `docs/claude/FRONTEND_MVP_ARCHITECTURE_AND_CLAUDE_MANUAL.md`
+11. `docs/claude/CLAUDE_CODE_EXECUTION_GUIDE.md`
 
 ## 一句话目标
 
@@ -28,12 +37,7 @@
 
 ## 当前状态
 
-- Spring Boot 项目已经初始化。
-- Java 版本为 17。
-- 数据库选型为 MySQL 8.4。
-- Flyway 已接入，目前只有初始化 marker 表。
-- Docker Compose 已接入 app + mysql。
-- 业务模块尚未开始开发。
+以 `docs/BUILD_CHECKLIST.md` 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。当前已实现 Today MVP、交易账本和一批后端 REST API；下一阶段重点是“持仓快照 DB + 手工录入 + 历史查询”。
 
 ## 开发偏好
 

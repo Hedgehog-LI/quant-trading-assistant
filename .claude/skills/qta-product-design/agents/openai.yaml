@@ -1,0 +1,4 @@
+interface:
+  display_name: "QTA Product Design"
+  short_description: "Design QTA product modules and acceptance criteria."
+  default_prompt: "Use this skill to turn QTA feature ideas into PRD, scope, data model, and acceptance checklist."

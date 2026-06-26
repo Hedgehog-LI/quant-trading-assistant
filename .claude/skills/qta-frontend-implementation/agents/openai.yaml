@@ -1,0 +1,4 @@
+interface:
+  display_name: "QTA Frontend Implementation"
+  short_description: "Build QTA React frontend features."
+  default_prompt: "Use this skill when implementing or reviewing QTA React pages, API adapters, data-mode behavior, and UI tests."
