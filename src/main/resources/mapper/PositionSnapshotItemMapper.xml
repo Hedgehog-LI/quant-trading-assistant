@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.portfolio.dao.PositionSnapshotItemMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.portfolio.model.PositionSnapshotItemDO">
+        <id column="id" property="id"/>
+        <result column="snapshot_id" property="snapshotId"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="market_type" property="marketType"/>
+        <result column="holding_quantity" property="holdingQuantity"/>
+        <result column="available_quantity" property="availableQuantity"/>
+        <result column="cost_price" property="costPrice"/>
+        <result column="current_price" property="currentPrice"/>
+        <result column="cost_amount" property="costAmount"/>
+        <result column="market_value" property="marketValue"/>
+        <result column="unrealized_pnl" property="unrealizedPnl"/>
+        <result column="pnl_rate" property="pnlRate"/>
+        <result column="position_ratio" property="positionRatio"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="remark" property="remark"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, snapshot_id, symbol, name, market_type, holding_quantity, available_quantity,
+        cost_price, current_price, cost_amount, market_value, unrealized_pnl, pnl_rate,
+        position_ratio, sort_order, remark, created_at, updated_at
+    </sql>
+
+    <insert id="insertBatch">
+        INSERT INTO portfolio_position_snapshot_item (
+            snapshot_id, symbol, name, market_type, holding_quantity, available_quantity,
+            cost_price, current_price, cost_amount, market_value, unrealized_pnl,
+            pnl_rate, position_ratio, sort_order, remark
+        ) VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+                #{item.snapshotId}, #{item.symbol}, #{item.name}, #{item.marketType},
+                #{item.holdingQuantity}, #{item.availableQuantity}, #{item.costPrice},
+                #{item.currentPrice}, #{item.costAmount}, #{item.marketValue},
+                #{item.unrealizedPnl}, #{item.pnlRate}, #{item.positionRatio},
+                #{item.sortOrder}, #{item.remark}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectBySnapshotId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM portfolio_position_snapshot_item
+        WHERE snapshot_id = #{snapshotId}
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <delete id="deleteBySnapshotId">
+        DELETE FROM portfolio_position_snapshot_item WHERE snapshot_id = #{snapshotId}
+    </delete>
+
+</mapper>

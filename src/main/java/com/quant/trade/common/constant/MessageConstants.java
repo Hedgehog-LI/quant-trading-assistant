@@ -66,6 +66,56 @@ public final class MessageConstants {
     public static final String PORTFOLIO_NO_CLOSED_TRADES =
             "暂无已结算交易，平均收益率、平均持仓天数、胜率暂不适用";
 
+    // ==================== 持仓快照校验 ====================
+
+    /** 持仓快照不存在（%d = snapshot id） */
+    public static final String POSITION_SNAPSHOT_NOT_FOUND =
+            "持仓快照不存在: %d";
+
+    /** 只有草稿状态允许编辑 */
+    public static final String POSITION_SNAPSHOT_ONLY_DRAFT_EDITABLE =
+            "只有草稿状态的持仓快照允许编辑";
+
+    /** 创建时只允许草稿或已确认状态 */
+    public static final String POSITION_SNAPSHOT_INVALID_INITIAL_STATUS =
+            "新建持仓快照只允许 DRAFT 或 CONFIRMED 状态";
+
+    /** 无效快照状态编码（%s = status） */
+    public static final String POSITION_SNAPSHOT_INVALID_STATUS_CODE =
+            "无效的持仓快照状态: %s";
+
+    /** 无效快照来源编码（%s = source type） */
+    public static final String POSITION_SNAPSHOT_INVALID_SOURCE_CODE =
+            "无效的持仓快照来源: %s";
+
+    /** 无效市场编码（%s = market type） */
+    public static final String POSITION_SNAPSHOT_INVALID_MARKET_CODE =
+            "无效的证券市场类型: %s";
+
+    /** 状态流转非法（第一个 %s = current status，第二个 %s = target status） */
+    public static final String POSITION_SNAPSHOT_INVALID_TRANSITION =
+            "持仓快照不允许从 %s 流转到 %s";
+
+    /** 快照日期与时间中的日期必须一致 */
+    public static final String POSITION_SNAPSHOT_DATE_TIME_MISMATCH =
+            "snapshotDate 必须与 snapshotTime 中的日期一致";
+
+    /** 日期查询区间非法 */
+    public static final String POSITION_SNAPSHOT_INVALID_DATE_RANGE =
+            "fromDate 不能晚于 toDate";
+
+    /** 快照内股票代码重复（%s = symbol） */
+    public static final String POSITION_SNAPSHOT_DUPLICATE_SYMBOL =
+            "同一持仓快照内股票代码不能重复: %s";
+
+    /** 可用数量超过持仓数量（%s = symbol） */
+    public static final String POSITION_SNAPSHOT_AVAILABLE_EXCEEDS_HOLDING =
+            "股票 %s 的可用数量不能超过持仓数量";
+
+    /** 持仓明细数值非法（%s = symbol） */
+    public static final String POSITION_SNAPSHOT_INVALID_ITEM =
+            "股票 %s 的数量和价格必须符合持仓快照规则";
+
     private MessageConstants() {
     }
 }

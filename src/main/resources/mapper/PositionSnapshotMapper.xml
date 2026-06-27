@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.portfolio.dao.PositionSnapshotMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.portfolio.model.PositionSnapshotDO">
+        <id column="id" property="id"/>
+        <result column="snapshot_date" property="snapshotDate"/>
+        <result column="snapshot_time" property="snapshotTime"/>
+        <result column="snapshot_name" property="snapshotName"/>
+        <result column="source_type" property="sourceType"/>
+        <result column="snapshot_status" property="snapshotStatus"/>
+        <result column="total_cost_amount" property="totalCostAmount"/>
+        <result column="total_market_value" property="totalMarketValue"/>
+        <result column="total_unrealized_pnl" property="totalUnrealizedPnl"/>
+        <result column="total_pnl_rate" property="totalPnlRate"/>
+        <result column="position_count" property="positionCount"/>
+        <result column="remark" property="remark"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, snapshot_date, snapshot_time, snapshot_name, source_type, snapshot_status,
+        total_cost_amount, total_market_value, total_unrealized_pnl, total_pnl_rate,
+        position_count, remark, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO portfolio_position_snapshot (
+            snapshot_date, snapshot_time, snapshot_name, source_type, snapshot_status,
+            total_cost_amount, total_market_value, total_unrealized_pnl, total_pnl_rate,
+            position_count, remark
+        ) VALUES (
+            #{snapshotDate}, #{snapshotTime}, #{snapshotName}, #{sourceType}, #{snapshotStatus},
+            #{totalCostAmount}, #{totalMarketValue}, #{totalUnrealizedPnl}, #{totalPnlRate},
+            #{positionCount}, #{remark}
+        )
+    </insert>
+
+    <update id="updateDraft">
+        UPDATE portfolio_position_snapshot
+        SET snapshot_date = #{snapshotDate},
+            snapshot_time = #{snapshotTime},
+            snapshot_name = #{snapshotName},
+            total_cost_amount = #{totalCostAmount},
+            total_market_value = #{totalMarketValue},
+            total_unrealized_pnl = #{totalUnrealizedPnl},
+            total_pnl_rate = #{totalPnlRate},
+            position_count = #{positionCount},
+            remark = #{remark},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND snapshot_status = 'DRAFT'
+    </update>
+
+    <update id="updateStatus">
+        UPDATE portfolio_position_snapshot
+        SET snapshot_status = #{targetStatus},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+          AND snapshot_status IN
+          <foreach collection="currentStatuses" item="status" open="(" separator="," close=")">
+              #{status}
+          </foreach>
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM portfolio_position_snapshot
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM portfolio_position_snapshot
+        <where>
+            <if test="fromDate != null">AND snapshot_date &gt;= #{fromDate}</if>
+            <if test="toDate != null">AND snapshot_date &lt;= #{toDate}</if>
+            <choose>
+                <when test="status != null and status != ''">AND snapshot_status = #{status}</when>
+                <when test="!includeCanceled">AND snapshot_status != 'CANCELED'</when>
+            </choose>
+            <if test="sourceType != null and sourceType != ''">AND source_type = #{sourceType}</if>
+        </where>
+        ORDER BY snapshot_time DESC, id DESC
+    </select>
+
+    <select id="selectLatestConfirmed" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM portfolio_position_snapshot
+        WHERE snapshot_status = 'CONFIRMED'
+        ORDER BY snapshot_time DESC, id DESC
+        LIMIT 1
+    </select>
+
+</mapper>

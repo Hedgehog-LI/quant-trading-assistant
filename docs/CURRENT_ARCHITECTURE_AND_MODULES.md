@@ -60,6 +60,7 @@ convert     # MapStruct 转换器
 | Trade Journal | `journal` | `/api/v1/trade-journals` | `trade_journal` |
 | Review | `review` | `/api/v1/reviews` | `review_note` |
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
+| Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
 
 ## 4. 当前数据库迁移
 
@@ -68,8 +69,9 @@ convert     # MapStruct 转换器
 | `V1__init_schema.sql` | schema marker |
 | `V2__create_today_mvp_tables.sql` | watchlist、trade_plan、trade_journal、review_note |
 | `V3__add_portfolio_ledger.sql` | 交易费用字段、portfolio_price_snapshot |
+| `V4__add_position_snapshot.sql` | 持仓快照主表和明细表 |
 
-下一阶段持仓快照应新增 `V4__add_position_snapshot.sql`，不要修改已发布的 V1/V2/V3。
+已发布的 V1/V2/V3/V4 migration 不应修改；后续表结构调整继续新增更高版本 migration。
 
 ## 5. 交易账本口径
 
@@ -102,6 +104,22 @@ convert     # MapStruct 转换器
 - 和交易账本计算结果做核对。
 - 留存每日收盘持仓。
 - 后续承接图片识别或 CSV 导入。
+
+当前后端已经完成：
+
+- 草稿创建和整批更新。
+- 确认、作废状态流转。
+- 历史列表、详情和最新已确认快照查询。
+- 后端统一计算成本、市值、浮盈亏、盈亏率和仓位占比。
+
+当前前端已经完成：
+
+- 独立菜单和 `/position-snapshots` 路由。
+- 最近已确认快照、历史列表、日期与状态筛选。
+- 多行手工录入、计算预览、草稿编辑、确认和作废。
+- 快照详情抽屉和 A 股盈亏颜色。
+- mock/localStorage 与 remote/REST API 双模式。
+- 桌面与窄屏响应式验收、真实 MySQL 前后端联调。
 
 ## 7. 后端命令
 
