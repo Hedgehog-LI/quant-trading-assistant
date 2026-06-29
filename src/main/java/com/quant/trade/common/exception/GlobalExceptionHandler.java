@@ -8,6 +8,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+import static com.quant.trade.common.constant.MessageConstants.REQUEST_RESOURCE_NOT_FOUND;
 
 /**
  * 全局异常处理器。
@@ -41,6 +44,20 @@ public class GlobalExceptionHandler {
                 .orElse("Validation failed");
         log.warn("Validation exception: {}", message);
         return ApiResponse.fail(ErrorCodeEnum.VALIDATION_ERROR, message);
+    }
+
+    /**
+     * 处理不存在的请求路径。
+     * <p>
+     * Spring MVC 会将未匹配到 Controller 的路径交给静态资源处理器，最终抛出
+     * {@link NoResourceFoundException}。该异常属于客户端请求了不存在的资源，
+     * 应返回 404，不能被兜底异常处理器错误包装成 500。
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Void> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("Request resource not found: method={}, path={}", e.getHttpMethod(), e.getResourcePath());
+        return ApiResponse.fail(ErrorCodeEnum.RESOURCE_NOT_FOUND, REQUEST_RESOURCE_NOT_FOUND);
     }
 
     /**

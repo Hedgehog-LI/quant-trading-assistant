@@ -8,6 +8,12 @@ package com.quant.trade.common.constant;
  */
 public final class MessageConstants {
 
+    // ==================== HTTP 请求异常 ====================
+
+    /** 请求的 API 或静态资源不存在 */
+    public static final String REQUEST_RESOURCE_NOT_FOUND =
+            "请求资源不存在";
+
     // ==================== 风控告警 ====================
 
     /** 资金或止损距离不满足交易条件 */
