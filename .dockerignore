@@ -1,9 +1,6 @@
 .git
 .idea
-.mvn
 *.iml
 HELP.md
-mvnw
 mvnw.cmd
-target/*
-!target/quant-trading-assistant-0.0.1-SNAPSHOT.jar
+target

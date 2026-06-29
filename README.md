@@ -22,9 +22,11 @@
 
 ```bash
 cp .env.example .env
-./mvnw package
 docker compose up -d --build
 ```
+
+Dockerfile 使用多阶段构建，镜像会从当前源码自行执行 Maven 打包，不依赖宿主机
+`target` 目录。部署前仍建议先运行 `./mvnw test`，但不能通过预先放置 JAR 的方式跳过镜像内构建。
 
 健康检查：
 
@@ -53,7 +55,8 @@ docker compose down
 
 ```bash
 ./mvnw test                                    # 单元/集成测试（H2）
-./mvnw package                                 # 打包 fat jar → target/*.jar
+./mvnw package                                 # 本机验证 fat jar 打包
+docker compose build --no-cache app            # 必要时从源码强制重建后端镜像
 docker compose ps                              # 查看容器
 docker logs -f qta-server                      # 后端日志
 docker logs --tail 50 qta-mysql                # MySQL 日志
