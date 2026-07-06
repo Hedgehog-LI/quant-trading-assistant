@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.StockBasicMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.StockBasicDO">
+        <id column="id" property="id"/>
+        <result column="canonical_symbol" property="canonicalSymbol"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="market" property="market"/>
+        <result column="list_date" property="listDate"/>
+        <result column="delisted" property="delisted"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, canonical_symbol, symbol, name, market, list_date, delisted, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO stock_basic (canonical_symbol, symbol, name, market, list_date, delisted)
+        VALUES (#{canonicalSymbol}, #{symbol}, #{name}, #{market}, #{listDate}, #{delisted})
+    </insert>
+
+    <update id="updateById">
+        UPDATE stock_basic
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="listDate != null">list_date = #{listDate},</if>
+            <if test="delisted != null">delisted = #{delisted},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM stock_basic WHERE id = #{id}
+    </select>
+
+    <select id="selectByCanonicalSymbol" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM stock_basic WHERE canonical_symbol = #{canonicalSymbol}
+    </select>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM stock_basic
+        <where>
+            <if test="market != null and market != ''">AND market = #{market}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (canonical_symbol LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY canonical_symbol ASC
+    </select>
+
+    <select id="selectByCanonicalSymbols" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM stock_basic
+        WHERE canonical_symbol IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <delete id="deleteByCanonicalSymbol">
+        DELETE FROM stock_basic WHERE canonical_symbol = #{canonicalSymbol}
+    </delete>
+</mapper>
