@@ -1,6 +1,11 @@
 # Quant Trading Assistant - Codex Project Guide
 
-本文件是给 Codex 读取的项目级开发指南。新对话接手本仓库时，优先阅读本文件，然后阅读 `docs/CONVERSATION_HANDOFF.md` 和 `docs/AI_HANDOFF.md`。
+
+## 新会话上下文加载（必读）
+
+启用项目 skill `qta-context-bootstrap`（分阶段加载，避免一次读全部 docs）。信息真实性优先级与任务路由见 `docs/AI_DEVELOPMENT_INDEX.md` §2/§4；开发结束文档同步见 `docs/DEVELOPMENT_WORKFLOW.md`。
+
+本文件是给 Codex 读取的项目级开发指南。新对话接手时按 `.claude/skills/qta-context-bootstrap` 分阶段加载，入口顺序见 `docs/AI_DEVELOPMENT_INDEX.md`；当前事实见 `docs/AI_HANDOFF.md`。Historical 文档（清单见 `AI_DEVELOPMENT_INDEX §6`）不在主流程，无需读取。
 
 ## 项目定位
 
@@ -36,7 +41,7 @@
 
 ## 开发原则
 
-1. 后端优先，前端可以后续由 AI 生成。
+1. 前后端均已存在：后端 Spring Boot 单体 + 前端 React feature-based，按任务类型在对应仓库实现。
 2. 先做单体应用，模块边界清晰；成熟后再拆服务。
 3. 先做数据积累和可解释规则，不碰自动实盘。
 4. 所有策略信号必须经过风险模块。
@@ -69,14 +74,14 @@ com.quant.trade
 
 ## 下一阶段优先级
 
-1. 建核心数据库表和 migration。
-2. 建基础领域模型：股票、日 K、指标、信号、回测任务、复盘。
-3. 建 watchlist API，自选股先跑通增删查改。
-4. 建 daily bar 导入接口，先支持 CSV 手工导入。
-5. 建指标计算服务，先实现 MA、MACD、RSI、BOLL。
-6. 建第一个策略：均线趋势 + 成交量过滤。
-7. 建简化回测引擎。
-8. 建风险提示和复盘模块。
+v0.1.0 Today MVP + 交易账本 + 持仓快照、v0.1.1 基础交易闭环优化**均已完成并验收**。下一阶段（P1）按 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`：
+
+1. 建 `stock_basic` 与统一证券标识。
+2. CSV 日 K 幂等导入。
+3. 封装行情 provider，接入一个数据源。
+4. 明确手工估值、外部价格快照与日 K 的边界。
+
+后续（P2+）：指标（MA/MACD/RSI/BOLL）、策略信号、简化回测。AI 图片识别暂缓。
 
 ## 常用命令
 

@@ -77,7 +77,7 @@ class TradeJournalFeeTest {
         TradeJournalVO updated = tradeJournalService.update(created.id(), new UpdateTradeJournalDTO(
                 TradeSideEnum.BUY.getCode(), new BigDecimal("10"), 100L,
                 new BigDecimal("3"), null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null, null, null));
         assertEquals(0, new BigDecimal("3.000000").compareTo(updated.totalFee()));
         assertEquals(0, new BigDecimal("3.000000").compareTo(updated.commissionFee()));
     }
@@ -97,7 +97,7 @@ class TradeJournalFeeTest {
         TradeJournalVO updated = tradeJournalService.update(created.id(), new UpdateTradeJournalDTO(
                 TradeSideEnum.BUY.getCode(), new BigDecimal("10"), 100L,
                 null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null, null, null));
         assertEquals(0, new BigDecimal("0.000000").compareTo(updated.commissionFee()));
         assertEquals(0, new BigDecimal("0.000000").compareTo(updated.stampTax()));
         assertEquals(0, new BigDecimal("0.000000").compareTo(updated.transferFee()));
@@ -120,7 +120,7 @@ class TradeJournalFeeTest {
         TradeJournalVO updated = tradeJournalService.update(created.id(), new UpdateTradeJournalDTO(
                 TradeSideEnum.BUY.getCode(), new BigDecimal("10"), 100L,
                 new BigDecimal("1"), new BigDecimal("2"), null, null, new BigDecimal("99"),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null, null, null));
         assertEquals(0, new BigDecimal("99.000000").compareTo(updated.totalFee()));
     }
 }

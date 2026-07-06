@@ -60,5 +60,16 @@ public record UpdateTradeJournalDTO(
         @Size(max = 1024, message = "actualResult must be at most 1024 characters")
         String actualResult,
 
-        String reviewStatus
+        String reviewStatus,
+
+        /**
+         * 显式解除计划关联（v0.1.1 三态更新）。
+         * <ul>
+         *   <li>{@code true}：将 plan_id 置空（解绑）；</li>
+         *   <li>{@code null}/{@code false} 且 {@code planId != null}：更新为新 planId；</li>
+         *   <li>其余：保持原 planId（部分更新语义不变）。</li>
+         * </ul>
+         * 禁止用 0/-1 等魔法值表达"解绑"。
+         */
+        Boolean unlinkPlan
 ) {}

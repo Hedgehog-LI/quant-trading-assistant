@@ -18,6 +18,8 @@ import java.util.List;
  * 费用字段（commissionFee/stampTax/transferFee/otherFee/totalFee）在 update 时为「全量编辑语义」：
  * DTO 中的 null 表示「清空」，通过 SET_TO_NULL 透传到 DO，再由 Manager.fillFees 统一归一为 0 并重算 totalFee；
  * 非 null 值则原样透传，由 Manager 归一落库（与 MyBatis 非 null 更新配合，支持清空费用）。
+ * <p>
+ * planDate/planStatus/warnings 为非持久化字段，DO 中不存在，MapStruct 映射时忽略，由 service 填充。
  */
 @Mapper(componentModel = "spring")
 public interface TradeJournalConverter {
@@ -50,11 +52,15 @@ public interface TradeJournalConverter {
     @Mapping(target = "mistakeTags", qualifiedByName = "tagsToString")
     void updateDOFromDTO(UpdateTradeJournalDTO dto, @MappingTarget TradeJournalDO record);
 
+    @Mapping(target = "planDate", ignore = true)
+    @Mapping(target = "planStatus", ignore = true)
     @Mapping(target = "emotionTags", qualifiedByName = "stringToTags")
     @Mapping(target = "mistakeTags", qualifiedByName = "stringToTags")
     @Mapping(target = "warnings", ignore = true)
     TradeJournalVO toVO(TradeJournalDO record);
 
+    @Mapping(target = "planDate", ignore = true)
+    @Mapping(target = "planStatus", ignore = true)
     @Mapping(target = "emotionTags", qualifiedByName = "stringToTags")
     @Mapping(target = "mistakeTags", qualifiedByName = "stringToTags")
     @Mapping(target = "warnings", ignore = true)

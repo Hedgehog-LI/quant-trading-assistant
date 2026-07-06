@@ -1,116 +1,64 @@
 # AI Development Index
 
-> 本文件是后续 Claude Code、Codex、OpenClaw 接手本项目时的总入口。先读本文件，再按任务类型选择对应文档和 skill。
+> 唯一总入口。Claude Code / Codex / 其他 AI 接手时**先读本文件**，再按任务类型路由。本文件只做导航，不堆细节；详细事实在各专项文档。
 
 ## 1. 项目一句话
 
-Quant Trading Assistant 是一个本地优先、可服务器部署的交易辅助系统，用来记录自选股、交易计划、交易流水、交易账本、持仓快照、复盘和风控信息。
+Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统（自选股 / 计划 / 交易 / 账本 / 持仓快照 / 复盘 / 风控 / 工作台）。**不自动交易、不连接券商、不保存密钥、不承诺收益。**
 
-系统不做自动交易，不连接真实券商账户，不保存券商密码或交易 API Key，不输出稳赚或无风险结论。
+## 2. 信息真实性优先级（冲突裁决顺序，从高到低）
 
-## 2. 当前仓库
+1. **Flyway migration + 实际代码 + 自动化测试**（最高事实来源）
+2. `CURRENT_ARCHITECTURE_AND_MODULES.md` + `BUILD_CHECKLIST.md`
+3. API / 数据库 / 产品设计文档
+4. `development/DEVELOPMENT_LOG.md` + `acceptance/ACCEPTANCE_LOG.md`
+5. 历史交接 / 历史提示词（仅参考，**不覆盖当前事实**）
 
-| 仓库 | 路径 | 职责 |
-| --- | --- | --- |
-| 后端 | `/Users/joker/code/quant-trading-assistant` | Spring Boot、MyBatis、Flyway、MySQL、REST API |
-| 前端 | `/Users/joker/code/quant-trading-assistant-web` | React、Vite、TypeScript、Ant Design、mock/remote 双模式 |
+**禁止**用旧聊天或旧文档覆盖当前代码事实。
 
-后端文档统一沉淀在本仓库 `docs/` 下；前端开发也应先阅读本仓库的产品和架构文档，再进入前端仓库实现。
+## 3. 新会话推荐阅读顺序
 
-## 3. 必读顺序
+1. 启用项目 skill：`.claude/skills/qta-context-bootstrap`（分阶段加载，避免一次读全部 docs）。
+2. 读入口：`AGENTS.md` → `CLAUDE.md` → 本文件 → `AI_HANDOFF.md`。
+3. 按下方"任务类型路由"只读必要文档。
 
-若早期交接文档与 `docs/BUILD_CHECKLIST.md`、`docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 冲突，以后两者记录的当前实现事实为准。
+## 4. 任务类型路由
 
-### 任意开发任务
-
-1. `AGENTS.md`
-2. `CLAUDE.md`
-3. `docs/AI_DEVELOPMENT_INDEX.md`
-4. `docs/BUILD_CHECKLIST.md`
-5. `docs/CURRENT_ARCHITECTURE_AND_MODULES.md`
-
-### 产品或功能设计任务
-
-继续阅读：
-
-1. `docs/PRODUCT_BLUEPRINT.md`
-2. `docs/features/POSITION_SNAPSHOT_DESIGN.md`（涉及持仓快照时）
-
-### 后端实现任务
-
-继续阅读：
-
-1. `docs/API_TODAY_MVP.md`
-2. `docs/api/PORTFOLIO_API.md`
-3. `docs/api/POSITION_SNAPSHOT_API.md`（涉及持仓快照时）
-4. `docs/DATABASE_DESIGN.md`
-5. `docs/CURRENT_ARCHITECTURE_AND_MODULES.md`
-
-### 前端实现任务
-
-继续阅读：
-
-1. `docs/FRONTEND_ARCHITECTURE.md`
-2. `docs/PRODUCT_BLUEPRINT.md`
-3. `docs/CURRENT_ARCHITECTURE_AND_MODULES.md`
-
-### 验收、修复、部署任务
-
-继续阅读：
-
-1. `docs/BUILD_CHECKLIST.md`
-2. `docs/claude/CLAUDE_CODE_EXECUTION_GUIDE.md`
-3. 相关 API 文档和部署 README
-
-## 4. 项目内 skills
-
-项目级 skills 位于 `.claude/skills/`：
-
-| Skill | 用途 |
+| 任务类型 | 必读文档（除入口外） |
 | --- | --- |
-| `qta-product-design` | 把需求整理成 PRD、模块边界、数据模型、验收标准 |
-| `qta-backend-implementation` | 后端分层、Flyway、MyBatis、REST API、测试实现 |
-| `qta-frontend-implementation` | 前端页面、API adapter、mock/remote 双模式、UI 验收 |
-| `qta-quality-acceptance` | 最终质量门禁、测试、构建、文档和产品验收 |
+| 任意开发 | `BUILD_CHECKLIST.md`、`CURRENT_ARCHITECTURE_AND_MODULES.md`、`DEVELOPMENT_WORKFLOW.md` |
+| 产品 / 功能设计 | `PRODUCT_BLUEPRINT.md`、`docs/features/<对应设计>.md`、`BUILD_CHECKLIST.md`；新功能用 `docs/templates/FEATURE_DESIGN_TEMPLATE.md` |
+| 后端开发 | `api/API_INDEX.md`、对应 `api/*.md`、`DATABASE_DESIGN.md`、`decisions/ADR_INDEX.md`；启用 `qta-backend-implementation` skill |
+| 前端开发 | `FRONTEND_ARCHITECTURE.md`、`mock/MOCK_REMOTE_CONTRACT.md`、对应 feature 设计；启用 `qta-frontend-implementation` skill |
+| API 联调 | `api/API_INDEX.md`、对应 `api/*.md`、`mock/MOCK_REMOTE_CONTRACT.md` |
+| Mock 开发 | `mock/MOCK_REMOTE_CONTRACT.md`、对应 `features/*/api/*Api.ts` |
+| 测试验收 | `BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`；启用 `qta-quality-acceptance` skill |
+| 部署 / 修复 | `DEVELOPMENT_WORKFLOW.md`（部署段）、`docker-compose.yml`、`src/main/resources/application-*.properties` |
 
-如果当前 AI 工具支持 skills，应优先启用对应 skill；如果不支持，直接读取对应 `SKILL.md`。
+## 5. 单一事实来源映射（避免多份维护同一事实）
 
-## 5. 当前最高优先级
+| 事实 | 唯一来源 |
+| --- | --- |
+| 已实现 API 清单 | `api/API_INDEX.md`（链接到 `api/*.md`、`API_TODAY_MVP.md`，不复制定义） |
+| 当前架构与模块 | `CURRENT_ARCHITECTURE_AND_MODULES.md` |
+| 建设进度 / 勾选 | `BUILD_CHECKLIST.md` |
+| Mock / Remote 契约 | `mock/MOCK_REMOTE_CONTRACT.md` |
+| 架构决策 | `decisions/ADR_INDEX.md` + `decisions/ADR-XXXX-*.md` |
+| 开发历史 | `development/DEVELOPMENT_LOG.md` |
+| 验收历史 | `acceptance/ACCEPTANCE_LOG.md` |
+| 开发流程与同步规则 | `DEVELOPMENT_WORKFLOW.md` |
+| 当前接手事实 | `AI_HANDOFF.md`（精简，历史进 DEVELOPMENT_LOG） |
 
-1. 保证已实现的 Today MVP + 交易账本稳定可用。
-2. 将核心业务数据默认落库到后端 DB；`localStorage` 只作为本地开发、离线兜底或迁移前数据源。
-3. 保持“持仓快照”DB、API、手工录入、历史查询和双模式联调稳定可用。
-4. 下一阶段做 GLM/OCR 图片识别，只作为自动填表生成草稿，不直接无确认入库。
+## 6. Historical 文档（仅参考，不在主流程）
 
-## 6. 数据源原则
+以下文档已标 Historical，新会话**不必读**，仅排查历史时参考：`CONVERSATION_HANDOFF.md`、`docs/claude/*`（早期 MVP 指南，含过时 JPA/Repository 表述）、`docs/prompts/*`（历史执行提示词）、`docs/ARCHITECTURE.md` / `BACKTEST_ENGINE_DESIGN.md` / `STRATEGY_PLUGIN_DESIGN.md`（早期未实现设计）、`docs/ai/SKILL_USAGE.md`。
 
-| 模式 | 用途 | 数据位置 |
-| --- | --- | --- |
-| 本地模式 / mock | 本地开发、断网演示、临时记录 | 浏览器 `localStorage` |
-| 后端模式 / remote | 正式使用、服务器部署、跨设备一致数据 | 后端 MySQL |
+## 7. 完成定义
 
-正式部署时，核心业务数据应走 remote 模式并落库。图片识别、CSV 导入、手工录入都必须经过“草稿 -> 人工确认 -> 入库”的流程。
+**后端**：`./mvnw test` 通过；涉及部署时 `./mvnw package` 通过；新表用 Flyway migration；新接口更新 `api/API_INDEX.md` + 对应 `api/*.md`；不新增券商连接或密钥。
 
-## 7. 每轮开发完成定义
+**前端**：`npm run typecheck` / `lint` / `test` / `build` 全过；文案不误导用户把 localStorage 当正式数据源。
 
-后端任务完成前至少满足：
+**产品**：明确用户目标、范围、不做什么、数据模型、验收标准、风险。
 
-- `./mvnw test` 通过。
-- 涉及打包或部署时 `./mvnw package` 通过。
-- 新增表使用 Flyway migration。
-- 新增接口更新 API 文档。
-- 不新增真实券商连接或密钥存储。
-
-前端任务完成前至少满足：
-
-- `npm run typecheck` 通过。
-- `npm run lint` 通过。
-- `npm run test` 通过。
-- `npm run build` 通过。
-- 页面文案不误导用户把 localStorage 当成正式数据源。
-
-产品任务完成前至少满足：
-
-- 明确用户目标、范围、不做什么。
-- 明确数据模型、页面流程、接口边界。
-- 明确验收标准和风险提示。
+**所有任务结束**：按 `DEVELOPMENT_WORKFLOW.md` 执行"开发结束文档同步检查"。

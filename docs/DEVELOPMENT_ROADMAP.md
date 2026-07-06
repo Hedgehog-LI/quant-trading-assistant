@@ -1,129 +1,35 @@
 # Development Roadmap
 
-## v0.1 目标
+> 路线图。当前事实以 `BUILD_CHECKLIST.md` + `AI_HANDOFF.md` 为准。早期版本的"v0.1 功能清单"中的日 K / 指标 / 策略 / 回测属**未来能力**，非 v0.1.1 已实现范围。
 
-完成一个能在本机跑通的最小交易辅助闭环：
+## 已完成
 
-```text
-自选股 -> 日 K 数据导入 -> 指标计算 -> 策略信号 -> 简单回测 -> 风险提示 -> 复盘记录
-```
+- **v0.1.0** Today MVP + 交易账本 + 持仓快照（Spring Boot 单体 + MyBatis + Flyway V1-V4 + React mock/remote 双模式）。
+- **v0.1.1** 基础交易闭环优化（计划关联 / 复盘一致性 / 快照对比 / FIFO 对账 / 工作台待办 / 连接防呆 + 多轮质量收尾）。**已验收**：后端 121、前端 179 测试通过。
 
-前端可以作为独立项目 `quant-trading-assistant-web` 并行开发。今天要跑雏形时，前端优先使用 mock/localStorage，先让自选股、交易记录和复盘可用，后续再逐步接后端 REST API。
+## 下一阶段（P1）：证券主数据与行情基础
 
-## v0.1 功能清单
+设计基线：`features/MARKET_DATA_FOUNDATION_DESIGN.md`。
 
-1. 自选股管理
-   - 新增股票到 watchlist。
-   - 查询自选股。
-   - 标记关注理由、交易风格、风险备注。
+- 建 `stock_basic` 与统一证券标识。
+- 先做 CSV 日 K 幂等导入。
+- 再封装行情 provider，接入一个数据源。
+- 明确手工估值、外部价格快照与日 K 的边界。
+- API Key 只在服务端配置，不进前端与仓库。
 
-2. 日 K 数据导入
-   - 支持 CSV 导入。
-   - 字段包含 open/high/low/close/volume/amount。
-   - 同一股票同一交易日幂等写入。
+## 后续（P2+）：指标、策略、回测
 
-3. 技术指标
-   - MA5、MA10、MA20、MA60。
-   - MACD。
-   - RSI。
-   - BOLL。
-   - 成交量均线和量比。
+- 日 K 导入完成后：MA / MACD / RSI / BOLL 指标。
+- 策略信号（均线趋势 + 成交量过滤），统一表达为"辅助信号 + 风险提示 + 人工确认"。
+- 简化回测（手续费 / 滑点 / T+1）。
+- 早期 `BACKTEST_ENGINE_DESIGN.md` / `STRATEGY_PLUGIN_DESIGN.md` / `ARCHITECTURE.md` 已标 **Historical**，仅作参考；落地时按当时事实重新设计。
 
-4. 策略信号
-   - 均线趋势信号。
-   - 放量突破信号。
-   - BOLL 均值回归信号。
-   - 信号必须保存触发原因和指标快照。
+## 暂缓
 
-5. 简化回测
-   - 初期使用日线。
-   - 支持手续费、滑点。
-   - 支持 A 股 T+1 约束的简化模拟。
-   - 输出收益率、最大回撤、胜率、盈亏比。
+- AI 图片识别 / OCR 截图导入（持仓快照草稿流程已就绪，识别能力后置）。
 
-6. 风控
-   - 单票最大仓位。
-   - 单笔最大风险。
-   - 固定止损和结构止损。
-   - 连续亏损后的降仓/暂停提示。
+## 每次开发验收
 
-7. 复盘
-   - 记录交易计划。
-   - 记录真实买卖点。
-   - 记录错误原因和改进动作。
-
-## v0.2 目标
-
-- 接入 AKShare 或其他公开数据源。
-- 支持分钟线数据。
-- 支持板块和指数环境判断。
-- 增加策略参数管理。
-- 增加多策略对比报告。
-- 增加前端页面。
-
-## v1.0 目标
-
-- 稳定的数据采集和调度。
-- 策略插件化。
-- 风险预算模型。
-- 回测、复盘、报告一体化。
-- 支持服务器 Docker 部署。
-- 支持 Python 量化服务作为外部分析引擎。
-
-## 推荐迭代顺序
-
-### Iteration 1: 数据库和基础 API
-
-- 建 migration：
-  - `stock_basic`
-  - `watchlist`
-  - `stock_daily_bar`
-  - `technical_indicator_daily`
-  - `strategy_signal`
-  - `trade_journal`
-  - `risk_alert`
-- 建基础 Entity/Repository。
-- 建 watchlist REST API。
-- 跑通 `./mvnw test`。
-
-前端并行任务：
-
-- 创建 Vite + React + TypeScript 项目。
-- 实现 AppLayout、Dashboard、Watchlist、TradeJournal、Review。
-- 使用 localStorage 保存记录。
-- 后端 API 完成后再切换为 remote 模式。
-
-### Iteration 2: CSV 导入和指标计算
-
-- 实现日 K CSV 导入。
-- 实现指标计算服务。
-- 对单只股票生成指标。
-- 指标结果写入数据库。
-
-### Iteration 3: 信号和风控
-
-- 实现 Strategy 接口。
-- 实现均线策略。
-- 实现 SignalGenerator。
-- 实现 RiskManager。
-- 生成信号并保存风险说明。
-
-### Iteration 4: 简化回测
-
-- 实现 BacktestEngine。
-- 模拟买卖、手续费、滑点。
-- 输出收益曲线和指标。
-
-### Iteration 5: 复盘和报告
-
-- 实现交易日志。
-- 实现复盘记录。
-- 输出 JSON 报告。
-
-## 每次开发验收标准
-
-- 代码能编译。
-- `./mvnw test` 通过。
-- 数据库迁移能在空库执行。
-- REST API 有基本请求/响应示例。
-- 涉及交易信号时必须有风险提示。
+- 后端 `./mvnw test` + `package` 通过；前端 `typecheck` / `lint` / `test` / `build` 通过。
+- 新 DB 走更高版本 Flyway migration；新接口同步 `api/API_INDEX.md`。
+- 涉及交易信号必须有风险提示；不连券商 / 不自动下单 / 不存密钥。

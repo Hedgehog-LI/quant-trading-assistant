@@ -201,7 +201,94 @@ positionRatio = marketValue / totalMarketValue
 | `POSITION_SNAPSHOT_DUPLICATE_SYMBOL` | 同一快照存在重复股票代码 |
 | `POSITION_SNAPSHOT_INVALID_ITEM` | 数量、价格或可用数量不合法 |
 
-## 10. 当前阶段边界
+## 10. GET /comparison 两次已确认快照对比
+
+仅支持 `CONFIRMED` 快照，且基准快照时间必须严格早于目标快照时间。
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `baseSnapshotId` | long | 是 | 基准快照 ID（较早） |
+| `targetSnapshotId` | long | 是 | 目标快照 ID（较晚） |
+
+响应示例（节选）：
+
+```json
+{
+  "success": true,
+  "code": "SUCCESS",
+  "data": {
+    "baseSnapshotId": 1,
+    "targetSnapshotId": 2,
+    "baseSnapshotTime": "2026-07-04T15:00:00",
+    "targetSnapshotTime": "2026-07-05T15:00:00",
+    "baseStatus": "CONFIRMED",
+    "targetStatus": "CONFIRMED",
+    "totalCostDelta": 1000.000000,
+    "totalMarketValueDelta": 1500.000000,
+    "totalUnrealizedPnlDelta": 500.000000,
+    "positionCountDelta": 1,
+    "items": [
+      {
+        "symbol": "A",
+        "name": "A",
+        "changeType": "INCREASED",
+        "baseQuantity": 100,
+        "targetQuantity": 200,
+        "quantityDelta": 100,
+        "baseCostPrice": 10.000000,
+        "targetCostPrice": 10.000000,
+        "marketValueDelta": 1000.000000,
+        "unrealizedPnlDelta": 500.000000
+      }
+    ]
+  }
+}
+```
+
+变化类型 `changeType`：`NEW` 基准无目标有 / `INCREASED` 加仓 / `REDUCED` 减仓 / `CLOSED` 清仓 / `UNCHANGED` 未变化。
+
+排序：变化类型（NEW → INCREASED → REDUCED → CLOSED → UNCHANGED）→ 目标市值降序 → symbol 升序。金额均 `BigDecimal`，缺失侧按 0 参与 delta。结果实时计算，不新增结果表，不构成投资建议。
+
+## 11. GET /{snapshotId}/reconciliation 与 FIFO 账本对账
+
+仅支持 `CONFIRMED` 快照。以数量为核心一致性判断，成本差异只展示不判错；对账只读，不会自动修改交易流水。
+
+FIFO 纳入口径：
+
+- `trade_date < snapshotDate` 全部纳入。
+- 同日且 `trade_time` 为空默认纳入，并在 `warnings` 中提示时间精度不足。
+- 同日且 `trade_time` 非空，仅 `trade_time <= snapshot_time` 纳入。
+
+响应示例（节选）：
+
+```json
+{
+  "data": {
+    "snapshotId": 2,
+    "snapshotTime": "2026-07-05T15:00:00",
+    "matchedCount": 1,
+    "mismatchCount": 1,
+    "hasMismatch": true,
+    "warnings": [],
+    "items": [
+      {
+        "symbol": "A",
+        "name": "A",
+        "status": "QUANTITY_MISMATCH",
+        "snapshotQuantity": 200,
+        "ledgerQuantity": 100,
+        "quantityDifference": 100,
+        "snapshotCostPrice": 10.000000,
+        "ledgerAverageCost": 10.000000
+      }
+    ]
+  }
+}
+```
+
+对账状态 `status`：`MATCHED` 一致 / `QUANTITY_MISMATCH` 数量不一致 / `SNAPSHOT_ONLY` 仅快照有 / `LEDGER_ONLY` 仅账本有。结果不替代券商正式对账单，不构成投资建议。
+
+## 12. 当前阶段边界
 
 - 已完成：DB、手工数据 API、草稿/确认/作废、历史列表、详情、最近已确认快照。
 - 已完成：React 手工录入页、mock/remote adapter、页面联调、桌面与窄屏视觉验收。

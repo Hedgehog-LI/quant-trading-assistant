@@ -1,5 +1,7 @@
 # Strategy Plugin Design
 
+> ⚠️ Historical（历史参考，非当前执行入口）。当前事实以 AI_HANDOFF.md + development/DEVELOPMENT_LOG.md + CURRENT_ARCHITECTURE_AND_MODULES.md 为准；新会话入口见 AI_DEVELOPMENT_INDEX.md。
+
 ## 设计目标
 
 策略框架要做到：

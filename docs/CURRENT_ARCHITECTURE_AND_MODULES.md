@@ -148,3 +148,20 @@ npm run build
 - 不保存券商密码、交易密码或真实交易 API Key。
 - 不把 AI 识别结果未经用户确认直接入正式表。
 - 不为了跑通临时注释测试或关闭校验。
+
+## 10. v0.1.1 基础交易闭环优化（已实现）
+
+设计基线 `docs/features/TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md`，本轮全部落地：
+
+- **交易计划关联交易记录**：`TradeJournalManager.validatePlanLinkage` 校验 `planId` 存在、未取消、证券代码一致；`TradeJournalVO` 增加非持久化展示字段 `planDate`、`planStatus`；`planId` 为空允许保存；一个计划可关联多笔交易且不自动结束。
+- **复盘关联一致性**：`ReviewManager` 扫全表解析 `linked_journal_ids`（CSV）构建被引用集合；`ReviewService` 在新增/编辑/删除后对受影响 ID（旧 ∪ 新）回算 reviewStatus；`TradeJournalService.delete` 删除前做引用保护。`ReviewNoteMapper.selectAll` 提供全表扫描能力。
+- **持仓快照对比**：新增 `PositionSnapshotComparisonManager`（纯计算）+ `PositionSnapshotService.compare` + `GET /api/v1/position-snapshots/comparison`。五种 changeType、BigDecimal delta、稳定排序、仅 CONFIRMED 且基准严格早于目标。
+- **快照与 FIFO 账本对账**：新增 `PositionSnapshotReconciliationManager`（复用 `FifoCalculatorManager`）+ `TradeJournalService.listFlowItemsUpTo`（截止时点过滤）+ `GET /api/v1/position-snapshots/{snapshotId}/reconciliation`。四种 status、同日 trade_time 缺失 warning、只读不写库。
+- **工作台待办中心**：`DashboardTodayVO` 增加结构化 `todos`；`DashboardManager.buildTodos` 聚合六类待办（PENDING_REVIEW / UNLINKED_TRADE_PLAN / TRADE_AGAINST_PLAN / MISSING_STOP_LOSS / STALE_POSITION_SNAPSHOT / POSITION_RECONCILIATION_MISMATCH），STALE 阈值 3 自然日，RECONCILE 由 service 层调用对账补充；前端 remote 直接用后端聚合，mock 用同口径纯函数。
+- **生产连接防呆**：前端 `settingsApi` 增加 `isLocalhostHost` / `isLocalhostUrl` / `resolveEffectiveApiBaseUrl` / `testBackendConnection`；公网页面禁止保存指向 localhost 的后端地址；设置页展示有效请求地址并提供只读"测试连接"按钮（区分 success / timeout / http_error / business_error / network_error）。
+
+新增错误码：`TRADE_PLAN_NOT_FOUND` / `TRADE_PLAN_NOT_LINKABLE` / `TRADE_PLAN_SYMBOL_MISMATCH` / `JOURNAL_REFERENCED_BY_REVIEW` / `POSITION_SNAPSHOT_COMPARISON_INVALID`。新增枚举：`DashboardTodoCodeEnum` / `DashboardTodoLevelEnum`（common.enums）、`SnapshotChangeTypeEnum` / `ReconciliationStatusEnum`（portfolio.enums）。**未新增任何数据库表，未修改 V1-V4 migration。**
+
+## 11. 后续规划（未实现）
+
+证券主数据和行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`，目前仍是规划，不属于当前实现事实。AI 图片识别暂缓。

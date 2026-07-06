@@ -15,7 +15,11 @@ description: Design Quant Trading Assistant product features before implementati
    - `../../../docs/CURRENT_ARCHITECTURE_AND_MODULES.md`
 3. If the feature is position snapshot related, read:
    - `../../../docs/features/POSITION_SNAPSHOT_DESIGN.md`
-4. Produce a design, not code, unless the user explicitly asks for implementation.
+4. If the feature touches the current plan -> journal -> portfolio -> review workflow, read:
+   - `../../../docs/features/TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md`
+5. If the feature touches stock master data, quotes, or daily bars, read:
+   - `../../../docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`
+6. Produce a design, not code, unless the user explicitly asks for implementation.
 
 ## Output Shape
 

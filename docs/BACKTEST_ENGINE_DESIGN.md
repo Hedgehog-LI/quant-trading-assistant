@@ -1,5 +1,7 @@
 # Backtest Engine Design
 
+> ⚠️ Historical（历史参考，非当前执行入口）。当前事实以 AI_HANDOFF.md + development/DEVELOPMENT_LOG.md + CURRENT_ARCHITECTURE_AND_MODULES.md 为准；新会话入口见 AI_DEVELOPMENT_INDEX.md。
+
 ## v0.1 回测目标
 
 先实现一个日线级别、单体内运行的简化事件驱动回测引擎，用来验证策略规则是否大致合理。

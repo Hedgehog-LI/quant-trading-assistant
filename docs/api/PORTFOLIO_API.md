@@ -290,5 +290,5 @@
 - 所有金额字段精度 6 位小数（DECIMAL_SCALE=6），前端展示时按需格式化。
 - 盈亏收益率字段（returnPoint / unrealizedReturnPoint / averageReturnPoint）为**百分点**（如 20.0 表示 20%），前端展示时加 `%`。
 - **交易记录费用字段为全量编辑语义**（PUT `/api/v1/trade-journals/{id}`）：更新时清空费用字段（请求体传 `null`）会归一为 `0.000000` 落库，不会残留旧费用；`totalFee` 传值时以其为准，为 `null` 时按 `commissionFee + stampTax + transferFee + otherFee` 求和（缺失项按 0）。所有 null 费用统一按 0 处理，更新后 VO 与 DB 一致。
-- **前端 remote 模式当前仅交易账本（portfolio）已接入**：持仓 / 已结算交易 / 汇总 / 手工当前价走后端 REST API；交易记录、自选股、交易计划、盘后复盘等页面仍以浏览器 localStorage 为主。交易记录的 remote 写入不属于当前范围，后续再做。
+- **前端 remote 模式已接入全部核心模块**（v0.1.1）：交易账本（持仓/已结算/汇总/手工当前价）、持仓快照（含 `GET /comparison` 与 `GET /{id}/reconciliation`）、自选股、交易计划、交易记录、盘后复盘、工作台 `/dashboard/today` 待办聚合均走后端 REST API；mock 模式仍使用 localStorage，且 mock 计算口径（快照对比、FIFO 对账、待办）与后端一致。
 - 当前价与交易流水均为手工录入，不连接券商、不接实时行情，所有盈亏仅用于复盘，不构成投资建议。

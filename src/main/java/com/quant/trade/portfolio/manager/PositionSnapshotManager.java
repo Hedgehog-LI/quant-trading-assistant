@@ -139,6 +139,15 @@ public class PositionSnapshotManager {
         return positionSnapshotMapper.selectLatestConfirmed();
     }
 
+    /**
+     * 查询 snapshot_date <= upToDate 的最新一条已确认快照（历史日期口径）。
+     *
+     * @param upToDate 截止日期（包含）
+     */
+    public PositionSnapshotDO getLatestConfirmedUpTo(java.time.LocalDate upToDate) {
+        return positionSnapshotMapper.selectLatestConfirmedUpTo(upToDate);
+    }
+
     private void normalizeAndCalculate(PositionSnapshotDO snapshot,
                                        List<PositionSnapshotItemDO> items) {
         if (items == null) {

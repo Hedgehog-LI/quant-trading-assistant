@@ -1,5 +1,7 @@
 # Architecture
 
+> ⚠️ Historical（历史参考，非当前执行入口）。当前事实以 AI_HANDOFF.md + development/DEVELOPMENT_LOG.md + CURRENT_ARCHITECTURE_AND_MODULES.md 为准；新会话入口见 AI_DEVELOPMENT_INDEX.md。
+
 ## 系统定位
 
 `quant-trading-assistant` 是本地优先、可服务器部署的交易辅助后端。它的核心价值不是预测神奇买点，而是建立一套可验证、可复盘、可风控的数据流程。

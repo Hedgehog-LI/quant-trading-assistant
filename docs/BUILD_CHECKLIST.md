@@ -48,7 +48,7 @@
 - [~] 每个新增接口都要补 API 示例。
 - [x] 前端“建设看板”已完成并通过 typecheck/lint/test/build 验收。
 
-## 4. 下一阶段 P0: 建设看板
+## 4. 已完成 P0: 建设看板
 
 ### 产品设计
 
@@ -117,7 +117,81 @@
 - [x] 盈利红色、亏损绿色，符合 A 股习惯。
 - [x] 已确认快照默认不可硬删除，只允许作废。
 
-## 6. 后续 P1: 图片识别导入
+## 6. 已完成并验收: v0.1.1 基础交易闭环优化
+
+设计基线：`docs/features/TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md`。
+
+### 交易计划与交易记录
+
+- [x] 交易记录表单支持选择交易计划。
+- [x] 选择计划后自动带入股票、止损、止盈和计划仓位。
+- [x] 后端校验计划存在、未取消且证券代码一致。
+- [x] 一个计划允许关联多笔交易，不自动结束计划。
+- [x] 列表或详情能看到关联计划。
+
+### 复盘一致性
+
+- [x] 被复盘引用的交易记录禁止直接删除。
+- [x] 编辑复盘移除关联后重新计算交易复盘状态。
+- [x] 删除复盘后重新计算受影响交易复盘状态。
+- [x] 新增和更新复盘不得关联不存在的交易。
+
+### 持仓比较与账本对账
+
+- [x] 支持两个已确认快照的差异比较。
+- [x] 支持新增、加仓、减仓、清仓、未变化五种类型。
+- [x] 支持快照与指定时点 FIFO 理论持仓数量对账。
+- [x] 对账结果只提示，不自动修改交易流水。
+- [x] mock 与 remote 口径清晰且有测试。
+
+### 工作台和连接防呆
+
+- [x] 工作台展示待复盘、未关联计划、缺少止损、快照过期和对账差异。
+- [x] remote 模式使用后端 Dashboard 聚合结果。
+- [x] 生产页面禁止保存指向 localhost 的后端地址。
+- [x] 设置页展示有效 API 地址并支持只读连接测试。
+- [x] 不写死公网 IP，生产同域默认走 `/api/v1`。
+
+### 验收
+
+- [x] `./mvnw test` 和 `./mvnw package` 通过。
+- [x] Docker 冷构建和后端健康检查通过。
+- [x] 前端 typecheck、lint、test、build 通过。
+- [x] 本地联调覆盖计划关联、复盘回算、快照比较和账本对账。
+- [x] API、架构、README、建设看板和本 checklist 同步。
+
+### 收尾修复（v0.1.1+ 质量收尾）
+
+- [x] 快照待办 targetPath 统一为 `/position-snapshots`（修复 404）。
+- [x] 交易记录支持解除计划关联（`unlinkPlan` 三态，`plan_id` 真正可置 NULL）。
+- [x] Dashboard 历史日期口径统一（todos 与统计用请求 date，快照取截止 date 最新已确认）。
+- [x] 本地模式持仓对账改真正 FIFO（多买/部分卖/全卖/超卖 + 平均成本），超卖不判 MATCHED。
+- [x] 快照对比校验两份均 CONFIRMED 且基准严格早于目标（同一/反向拦截）。
+- [x] TRADE_AGAINST_PLAN 待办加 `followedPlan=false` 触发条件，前后端口径一致。
+- [x] 复盘历史脏数据（空段/非法/重复 ID）兼容，不抛 500。
+- [x] 对账页表格补成本列（快照成本价/账本平均成本/成本差异），窄屏横向滚动。
+- [x] 修复 Antd deprecated 警告、远程模式误导文案、清理误生成 node_modules + `.gitignore`。
+
+### 最终质量修复（v0.1.1 收尾二轮）
+
+- [x] Dashboard 历史日期"数据穿越"修复：`pendingReviewCount`/`pendingReviewJournals`/`riskWarnings`/`PENDING_REVIEW` 待办统一按 `trade_date <= date` 口径（新增 `TradeJournalMapper.selectByReviewStatusUpTo/countByReviewStatusUpTo`）。
+- [x] 后端纯超卖遗漏修复：`oversoldSymbols` 进入对账结果集合，空快照+纯卖出返回 `QUANTITY_MISMATCH` + warning。
+- [x] 前端 mock FIFO 与后端 `FifoCalculatorManager` 完全一致：买入批次单位成本含 `totalFee`、同日 null `tradeTime` 排有时间之后、稳定 ID 排序、超卖即停止后续计算。
+- [x] Antd 6.4 deprecated 清理：`Alert message→title`、`Spin tip→description`、`Space direction→orientation`、`Drawer width→size`、Dashboard `List→ul/li` 已全替换；Playwright 浏览器实测工作台/交易记录/持仓快照/设置 4 个页面，控制台 `DEPRECATED_WARNINGS=0, CONSOLE_ERRORS=0`。
+- [x] JSON 导出文案防误导：明确"仅导出浏览器 localStorage，不含后端 MySQL"，文件名改 `qta-local-export`。
+
+## 7. 后续 P1: 证券主数据和行情基础
+
+设计基线：`docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。
+
+- [ ] 建设 `stock_basic` 和统一证券标识。
+- [ ] 明确手工价格、外部价格快照、日 K 的数据边界。
+- [ ] 先支持 CSV 日 K 幂等导入。
+- [ ] 再接一个外部行情 provider。
+- [ ] 行情记录数据来源和抓取时间。
+- [ ] API Key 只在服务端配置，不进入前端和仓库。
+
+## 8. 暂缓: 图片识别导入
 
 - [ ] 新增 AI import task 设计。
 - [ ] 前端支持粘贴/上传图片。
@@ -127,15 +201,15 @@
 - [ ] 识别结果只生成草稿，不直接确认入库。
 - [ ] 增加隐私提示和日志脱敏。
 
-## 7. 后续 P2: 行情、指标、策略、回测
+## 9. 后续 P2: 指标、策略、回测
 
-- [ ] 日 K CSV 导入。
+- [ ] 在行情基础阶段完成日 K CSV 导入后，接入指标计算。
 - [ ] 指标计算：MA、MACD、RSI、BOLL。
 - [ ] 策略信号：均线趋势 + 成交量过滤。
 - [ ] 简化回测：手续费、滑点、T+1。
 - [ ] 风险提示与报告。
 
-## 8. 每轮开发检查
+## 10. 每轮开发检查
 
 ### 后端
 

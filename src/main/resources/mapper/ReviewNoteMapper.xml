@@ -69,6 +69,11 @@
         ORDER BY review_date DESC, updated_at DESC
     </select>
 
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM review_note
+    </select>
+
     <select id="countByReviewDate" resultType="long">
         SELECT COUNT(1) FROM review_note WHERE review_date = #{reviewDate}
     </select>

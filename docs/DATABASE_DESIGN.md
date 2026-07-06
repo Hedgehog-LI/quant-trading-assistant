@@ -2,6 +2,8 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
+当前已发布 V1-V4，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+
 ## 命名约定
 
 - 表名使用 snake_case。
@@ -11,28 +13,32 @@
 - 金额和价格使用 `decimal(20, 6)` 或更高精度。
 - 时间字段使用 `created_at`、`updated_at`。
 
-## v0.1 核心表
+## 当前与规划表
 
 ### stock_basic
 
-用途：保存股票基础信息。
+状态：规划，尚未实现。用途：保存证券基础信息，为后续行情落库提供统一标识。
 
 核心字段：
 
 - `id`
 - `symbol`
+- `canonical_symbol`
 - `name`
 - `exchange`
 - `market`
+- `currency`
 - `industry`
 - `list_date`
-- `status`
+- `list_status`
+- `data_source`
+- `source_updated_at`
 - `created_at`
 - `updated_at`
 
 索引：
 
-- unique `uk_stock_basic_symbol(symbol)`
+- unique `uk_stock_basic_canonical_symbol(canonical_symbol)`
 - index `idx_stock_basic_industry(industry)`
 
 ### watchlist
@@ -59,12 +65,13 @@
 
 ### stock_daily_bar
 
-用途：保存日 K 行情。
+状态：规划，尚未实现。用途：保存日 K 行情。
 
 核心字段：
 
 - `id`
 - `symbol`
+- `canonical_symbol`
 - `trade_date`
 - `open_price`
 - `high_price`
@@ -74,12 +81,38 @@
 - `volume`
 - `amount`
 - `turnover_rate`
+- `adjust_type`
+- `data_source`
+- `fetched_at`
 - `created_at`
 
 索引：
 
-- unique `uk_daily_symbol_date(symbol, trade_date)`
+- unique `uk_daily_symbol_date_adjust_source(canonical_symbol, trade_date, adjust_type, data_source)`
 - index `idx_daily_date(trade_date)`
+
+### stock_quote_snapshot
+
+状态：规划，尚未实现。用途：保存从外部数据源查询到的价格快照。
+
+核心字段：
+
+- `id`
+- `canonical_symbol`
+- `quote_time`
+- `current_price`
+- `open_price`
+- `high_price`
+- `low_price`
+- `pre_close_price`
+- `volume`
+- `amount`
+- `data_source`
+- `fetched_at`
+- `raw_hash`
+- `created_at`
+
+该表不得替代现有 `portfolio_price_snapshot`。后者是用户手工维护的估值数据。
 
 ### stock_minute_bar
 
@@ -232,22 +265,15 @@
 - `actual_result`
 - `created_at`
 
-### position_snapshot
+### portfolio_position_snapshot / portfolio_position_snapshot_item
 
-用途：保存持仓快照。
+状态：已由 V4 实现。用途：用主表和明细表保存某一时点的实际持仓盘点。
 
-核心字段：
+完整字段和状态规则见：
 
-- `id`
-- `snapshot_date`
-- `symbol`
-- `quantity`
-- `cost_price`
-- `market_price`
-- `market_value`
-- `profit_loss`
-- `position_ratio`
-- `created_at`
+- `src/main/resources/db/migration/V4__add_position_snapshot.sql`
+- `docs/features/POSITION_SNAPSHOT_DESIGN.md`
+- `docs/api/POSITION_SNAPSHOT_API.md`
 
 ### risk_alert
 
@@ -282,17 +308,12 @@
 - `created_at`
 - `updated_at`
 
-## 实施建议
+## 实施顺序
 
-第一版 migration 不必一次实现所有字段，但至少要先落：
+1. 当前先完成 `docs/features/TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md`，对比和对账结果不新增结果表。
+2. 行情阶段先实现 `stock_basic` 和证券代码规范化。
+3. 再实现 CSV 日 K 幂等导入。
+4. 外部最新价接入时新增 `stock_quote_snapshot` 和同步任务记录。
+5. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
-- `stock_basic`
-- `watchlist`
-- `stock_daily_bar`
-- `technical_indicator_daily`
-- `strategy_signal`
-- `trade_journal`
-- `risk_alert`
-- `review_note`
-
-复杂表如 `stock_minute_bar`、`backtest_result` 可以在回测模块开发时补充。
+详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。

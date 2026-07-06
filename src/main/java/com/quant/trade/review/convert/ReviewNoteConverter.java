@@ -40,8 +40,15 @@ public interface ReviewNoteConverter {
 
     @Named("idsToString")
     default String idsToString(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
+        if (ids == null) {
+            // null 表示"未提供"，保持 null 以支持 update 的 IGNORE 部分更新语义。
             return null;
+        }
+        if (ids.isEmpty()) {
+            // 空列表序列化为空串，确保 updateDOFromDTO 能把 existing.linkedJournalIds 覆盖为 ""，
+            // 进而经 Mapper xml 的 if(#{linkedJournalIds} != null) 写入 DB 完成清空。
+            // 若返回 null，会被 IGNORE 与 xml if 双重跳过，导致无法移除关联。
+            return "";
         }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < ids.size(); i++) {
@@ -58,9 +65,19 @@ public interface ReviewNoteConverter {
         if (str == null || str.isBlank()) {
             return List.of();
         }
+        // 容忍历史脏数据：trim、跳过空段、跳过非法、去重保序；与 ReviewManager.parseLinkedIds 口径一致
         return List.of(str.split(",")).stream()
                 .map(String::trim)
-                .map(Long::valueOf)
+                .filter(s -> !s.isEmpty())
+                .map(s -> {
+                    try {
+                        return Long.valueOf(s);
+                    } catch (NumberFormatException e) {
+                        return null;
+                    }
+                })
+                .filter(java.util.Objects::nonNull)
+                .distinct()
                 .toList();
     }
 }

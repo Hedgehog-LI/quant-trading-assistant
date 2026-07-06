@@ -1,6 +1,10 @@
 # Claude Code Execution Guide
 
+> ⚠️ Historical（早期 MVP 指南，非当前执行入口）。本文 Entity/Repository/JPA 表述已被 MyBatis+XML 取代（见 decisions/ADR-0002 + CURRENT_ARCHITECTURE_AND_MODULES.md）；当前事实以 AI_HANDOFF.md + development/DEVELOPMENT_LOG.md 为准，新会话入口见 AI_DEVELOPMENT_INDEX.md。
+
 本文告诉用户如何让 Claude Code 按本仓库的设计手册执行开发。
+
+> 当前项目已经完成早期 Today MVP 和持仓快照。本文后续早期提示词仅作为历史参考；当前 v0.1.1 请直接使用 `docs/prompts/TRADE_WORKFLOW_OPTIMIZATION_CLAUDE_PROMPT.md`。
 
 ## 1. 推荐执行顺序
 

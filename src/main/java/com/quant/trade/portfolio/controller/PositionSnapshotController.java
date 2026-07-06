@@ -5,7 +5,9 @@ import com.quant.trade.common.constant.PositionSnapshotConstants;
 import com.quant.trade.portfolio.dto.CreatePositionSnapshotDTO;
 import com.quant.trade.portfolio.dto.UpdatePositionSnapshotDTO;
 import com.quant.trade.portfolio.service.PositionSnapshotService;
+import com.quant.trade.portfolio.vo.PositionSnapshotComparisonVO;
 import com.quant.trade.portfolio.vo.PositionSnapshotDetailVO;
+import com.quant.trade.portfolio.vo.PositionSnapshotReconciliationVO;
 import com.quant.trade.portfolio.vo.PositionSnapshotSummaryVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +62,30 @@ public class PositionSnapshotController {
     @GetMapping("/latest")
     public ApiResponse<PositionSnapshotDetailVO> latest() {
         return ApiResponse.ok(positionSnapshotService.getLatestConfirmed());
+    }
+
+    /**
+     * 对比两个已确认持仓快照的差异。
+     * <p>
+     * 仅支持 {@code CONFIRMED} 快照，且基准快照时间必须严格早于目标快照时间。
+     * 结果仅用于复盘参考，不构成投资建议。
+     */
+    @GetMapping("/comparison")
+    public ApiResponse<PositionSnapshotComparisonVO> compare(
+            @RequestParam Long baseSnapshotId,
+            @RequestParam Long targetSnapshotId) {
+        return ApiResponse.ok(positionSnapshotService.compare(baseSnapshotId, targetSnapshotId));
+    }
+
+    /**
+     * 已确认快照与截止时点 FIFO 账本对账。
+     * <p>
+     * 以数量为核心一致性判断；结果只读，不会自动修改交易流水，也不构成投资建议。
+     */
+    @GetMapping("/{snapshotId}/reconciliation")
+    public ApiResponse<PositionSnapshotReconciliationVO> reconcile(
+            @PathVariable Long snapshotId) {
+        return ApiResponse.ok(positionSnapshotService.reconcile(snapshotId));
     }
 
     /** 查询快照详情。 */

@@ -122,6 +122,71 @@ public final class MessageConstants {
     public static final String POSITION_SNAPSHOT_INVALID_ITEM =
             "股票 %s 的数量和价格必须符合持仓快照规则";
 
+    // ==================== 交易计划关联校验 ====================
+
+    /** 关联的交易计划不存在（%d = plan id） */
+    public static final String TRADE_PLAN_NOT_FOUND =
+            "关联的交易计划不存在: %d";
+
+    /** 关联的交易计划已取消，不可关联（%d = plan id） */
+    public static final String TRADE_PLAN_NOT_LINKABLE =
+            "交易计划 %d 已取消，不可关联到新建或更新的交易记录";
+
+    /** 交易记录与计划的证券代码不一致（第一个 %s = journal symbol，第二个 %s = plan symbol，%d = plan id） */
+    public static final String TRADE_PLAN_SYMBOL_MISMATCH =
+            "交易记录证券代码 %s 与计划 %d 的证券代码 %s 不一致";
+
+    /** 交易记录被复盘引用，不可删除（%d = journal id） */
+    public static final String JOURNAL_REFERENCED_BY_REVIEW =
+            "交易记录 %d 被复盘引用，不可删除，请先在相关复盘中移除关联";
+
+    /** 持仓快照对比参数非法（%s = 原因） */
+    public static final String POSITION_SNAPSHOT_COMPARISON_INVALID =
+            "持仓快照对比参数非法: %s";
+
+    /** 持仓快照对比基准或目标不存在（%d = snapshot id） */
+    public static final String POSITION_SNAPSHOT_COMPARISON_NOT_FOUND =
+            "参与对比的持仓快照不存在: %d";
+
+    /** 持仓快照对比仅支持已确认快照（%s = 实际状态） */
+    public static final String POSITION_SNAPSHOT_COMPARISON_NOT_CONFIRMED =
+            "持仓快照对比仅支持已确认快照，当前状态: %s";
+
+    // ==================== Dashboard 待办文案 ====================
+
+    /** 待办：待复盘交易 */
+    public static final String DASHBOARD_TODO_PENDING_REVIEW_TITLE = "待复盘交易";
+    public static final String DASHBOARD_TODO_PENDING_REVIEW_DESC =
+            "存在尚未复盘的交易记录，及时复盘可沉淀经验";
+
+    /** 待办：交易未关联计划 */
+    public static final String DASHBOARD_TODO_UNLINKED_PLAN_TITLE = "交易未关联计划";
+    public static final String DASHBOARD_TODO_UNLINKED_PLAN_DESC =
+            "今日存在未关联交易计划的交易记录";
+
+    /** 待办：交易偏离计划 */
+    public static final String DASHBOARD_TODO_TRADE_AGAINST_PLAN_TITLE = "交易偏离计划";
+    public static final String DASHBOARD_TODO_TRADE_AGAINST_PLAN_DESC =
+            "今日存在关联到「不允许交易」计划的交易记录，建议复盘原因";
+
+    /** 待办：买入交易缺少止损 */
+    public static final String DASHBOARD_TODO_MISSING_STOP_LOSS_TITLE = "买入交易缺少止损";
+    public static final String DASHBOARD_TODO_MISSING_STOP_LOSS_DESC =
+            "今日买入交易未记录计划止损，纪律上需要明确止损位";
+
+    /** 待办：持仓快照过期 */
+    public static final String DASHBOARD_TODO_STALE_SNAPSHOT_TITLE = "持仓快照过期";
+    public static final String DASHBOARD_TODO_STALE_SNAPSHOT_DESC =
+            "最近一次已确认持仓快照已超过 3 个自然日，建议重新盘点";
+
+    /** 待办：快照与账本不一致 */
+    public static final String DASHBOARD_TODO_RECONCILE_MISMATCH_TITLE = "快照与账本不一致";
+    public static final String DASHBOARD_TODO_RECONCILE_MISMATCH_DESC =
+            "最新已确认快照与截止时点 FIFO 账本数量不一致，请核对";
+
+    /** 持仓快照过期阈值（自然日） */
+    public static final String DASHBOARD_STALE_SNAPSHOT_THRESHOLD_DAYS_DESC = "3 个自然日";
+
     private MessageConstants() {
     }
 }

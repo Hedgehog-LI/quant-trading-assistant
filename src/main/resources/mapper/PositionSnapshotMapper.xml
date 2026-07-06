@@ -94,4 +94,13 @@
         LIMIT 1
     </select>
 
+    <!-- 历史日期口径：snapshot_date <= upToDate 的最新已确认快照 -->
+    <select id="selectLatestConfirmedUpTo" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM portfolio_position_snapshot
+        WHERE snapshot_status = 'CONFIRMED' AND snapshot_date &lt;= #{upToDate}
+        ORDER BY snapshot_time DESC, id DESC
+        LIMIT 1
+    </select>
+
 </mapper>

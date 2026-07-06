@@ -1,5 +1,7 @@
 # Backend Today MVP Implementation Manual
 
+> ⚠️ Historical（历史参考，非当前执行入口）。当前事实以 AI_HANDOFF.md + development/DEVELOPMENT_LOG.md + CURRENT_ARCHITECTURE_AND_MODULES.md 为准；新会话入口见 AI_DEVELOPMENT_INDEX.md。
+
 本文是给 Claude Code 执行后端开发用的手册。目标不是一次做完整量化平台，而是先把周一可用的 6 个实用工具对应的后端 API、数据模型和分层架子设计清楚。
 
 Claude Code 实现前必须先阅读：
@@ -67,8 +69,8 @@ com.quant.trade
 ├── journal              # TradeJournalService
 ├── review               # ReviewService
 └── storage
-    ├── entity           # JPA Entity
-    └── repository       # Spring Data JPA Repository
+    ├── dao              # MyBatis Mapper 接口
+    └── mapper           # resources/mapper/*.xml SQL
 ```
 
 分层职责：
@@ -76,9 +78,10 @@ com.quant.trade
 | 层 | 职责 | 禁止事项 |
 | --- | --- | --- |
 | `web` | 参数校验、REST 路由、请求响应 DTO 转换 | 不写业务规则，不直接拼 SQL |
-| `service` | 编排业务流程、事务边界、调用 repository | 不暴露 Entity 给 Controller |
+| `service` | 编排业务流程、事务边界、调用 manager | 不暴露 DO 给 Controller |
+| `manager` | 业务规则、计算、校验和 DAO 编排 | 不处理 HTTP 语义 |
 | `risk` domain | 计算仓位、亏损金额、风险等级、阻断原因 | 不输出确定性买卖建议 |
-| `storage` | Entity、Repository、数据库访问 | 不写 Controller 逻辑 |
+| `storage/dao` | MyBatis Mapper 和 XML SQL | 不写 Controller 逻辑 |
 | `common` | 统一响应、异常、枚举、工具 | 不依赖具体业务模块 |
 
 ## 4. Java 编码规范
@@ -89,7 +92,7 @@ com.quant.trade
 - 方法名、变量名使用 lowerCamelCase。
 - 常量使用 UPPER_UNDERSCORE_CASE。
 - 表名和字段名使用 snake_case。
-- Controller 不返回 JPA Entity。
+- Controller 不返回数据库 DO。
 - Request/Response DTO 命名清晰，例如 `CreateWatchlistRequest`、`WatchlistResponse`。
 - 金额、价格、比例使用 `BigDecimal`，不要使用 `double`/`float`。
 - 交易日期使用 `LocalDate`，创建更新时间使用 `LocalDateTime`。

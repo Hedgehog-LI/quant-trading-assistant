@@ -40,4 +40,11 @@ public interface PositionSnapshotMapper {
 
     /** 查询最新一条已确认快照。 */
     PositionSnapshotDO selectLatestConfirmed();
+
+    /**
+     * 查询 snapshot_date <= upToDate 的最新一条已确认快照（用于历史日期口径的工作台）。
+     *
+     * @param upToDate 截止日期（包含）
+     */
+    PositionSnapshotDO selectLatestConfirmedUpTo(@Param("upToDate") LocalDate upToDate);
 }

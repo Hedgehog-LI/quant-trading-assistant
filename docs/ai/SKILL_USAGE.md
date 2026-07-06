@@ -1,5 +1,7 @@
 # Skill Usage
 
+> ⚠️ Historical（历史参考，非当前执行入口）。当前事实以 AI_HANDOFF.md + development/DEVELOPMENT_LOG.md + CURRENT_ARCHITECTURE_AND_MODULES.md 为准；新会话入口见 AI_DEVELOPMENT_INDEX.md。
+
 > 本文件说明项目级 skills 的使用方式。若 AI 工具不能自动发现 `.claude/skills`，请让它直接读取对应 `SKILL.md`。
 
 ## 1. Skills 目录

@@ -22,6 +22,16 @@ public interface ReviewNoteMapper {
     List<ReviewNoteDO> selectByFilter(@Param("date") LocalDate date,
                                       @Param("symbol") String symbol);
 
+    /**
+     * 查询全部复盘记录。
+     * <p>
+     * 用于工作台与复盘一致性回算：扫描所有 linked_journal_ids 解析当前被引用的交易记录。
+     * 个人项目数据量可控，全表扫描足够。
+     *
+     * @return 全部复盘记录
+     */
+    List<ReviewNoteDO> selectAll();
+
     long countByReviewDate(@Param("reviewDate") LocalDate reviewDate);
 
     /**

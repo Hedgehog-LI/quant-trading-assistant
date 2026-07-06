@@ -1,5 +1,7 @@
 # Frontend MVP Architecture And Claude Manual
 
+> ⚠️ Historical（历史参考，非当前执行入口）。当前事实以 AI_HANDOFF.md + development/DEVELOPMENT_LOG.md + CURRENT_ARCHITECTURE_AND_MODULES.md 为准；新会话入口见 AI_DEVELOPMENT_INDEX.md。
+
 本文是给 Claude Code 创建和开发前端项目用的执行手册。前端项目目标是让用户周一可以打开页面记录自选股、盘前计划、风险计算、交易记录和盘后复盘。
 
 前端项目路径：

@@ -1,91 +1,38 @@
 # AI Handoff
 
-这份文件用于让新的 Codex / Claude Code 对话快速理解项目背景、当前状态和下一步开发方式。
+> 本文件只记录**当前接手所需事实**。历史开发细节见 `development/DEVELOPMENT_LOG.md`；验收记录见 `acceptance/ACCEPTANCE_LOG.md`。若与代码冲突，以 migration、测试、`BUILD_CHECKLIST.md`、`CURRENT_ARCHITECTURE_AND_MODULES.md` 为准（优先级见 `AI_DEVELOPMENT_INDEX.md §2`）。
 
-## 用户背景
+## 项目定位
 
-- 用户是 Java 开发者，金融和量化处于系统学习阶段。
-- 用户希望学习股票投资、短线交易、做 T、量化投资和风控。
-- 当前最大痛点是：买点、卖点、止损点、仓位设置缺少规则。
-- 用户不想一开始自动实盘交易。
-- 用户希望先开发一个本地运行的交易辅助系统，并后续可部署到自己的服务器。
+Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易 / 账本 / 持仓快照 / 复盘 / 风控 / 工作台）。**不自动交易、不连券商、不存密钥、不承诺收益。**
 
-## 产品目标
+## 仓库与技术栈
 
-本系统面向个人学习和辅助决策：
+| 仓库 | 路径 | 技术栈 |
+| --- | --- | --- |
+| 后端 + 文档 | `/Users/joker/code/quant-trading-assistant` | Java 17、Spring Boot 3.5、MyBatis XML、MapStruct、Flyway、MySQL 8.4、H2 test、Docker Compose |
+| 前端 | `/Users/joker/code/quant-trading-assistant-web` | React 19、Vite、TypeScript、Ant Design 6、mock/remote 双模式 |
 
-- 获取和积累股票数据。
-- 计算 MA、MACD、RSI、BOLL、成交量指标。
-- 识别支撑压力位。
-- 生成买入、卖出、观望信号。
-- 做历史回测。
-- 输出风险提示。
-- 记录交易复盘。
-- 辅助短线和做 T 决策。
+## 当前状态（2026-07）
 
-## 非目标
+- **v0.1.0** Today MVP + 交易账本 + 持仓快照：已完成。
+- **v0.1.1** 基础交易闭环优化（计划关联 + 复盘一致性 + 快照对比 + FIFO 对账 + 工作台待办 + 连接防呆）及多轮质量收尾：**已完成并验收**。范围与改动见 `development/DEVELOPMENT_LOG.md`。
+- **验收**：后端 121 测试通过、前端 179 测试通过、Docker 冷构建 + curl 端到端 + 浏览器（4 页面控制台 `DEPRECATED_WARNINGS=0`）全绿。详见 `acceptance/ACCEPTANCE_LOG.md`。
+- **未新增数据库表，未修改 V1-V4 migration。**
 
-- 不自动下单。
-- 不连接券商账户。
-- 不做高频交易。
-- 不承诺收益。
-- 不把技术指标当成确定性预测工具。
+## 下一阶段
 
-## 当前仓库状态
+按 `features/MARKET_DATA_FOUNDATION_DESIGN.md` 建设证券主数据与日 K 边界；AI 图片识别暂缓；外部行情暂不实现，只保持边界清晰。
 
-路径：
+## 接手顺序（新会话）
 
-```text
-/Users/joker/code/quant-trading-assistant
-```
+1. 启用 skill `.claude/skills/qta-context-bootstrap`（分阶段加载上下文）。
+2. `AGENTS.md` → `CLAUDE.md` → `docs/AI_DEVELOPMENT_INDEX.md` → 本文件。
+3. 按任务类型路由（`AI_DEVELOPMENT_INDEX.md §4`）只读必要文档；Historical 文档（§6）不必读。
 
-当前技术基线：
+## 开发完成定义
 
-- Spring Boot 3.5.14
-- Java 17
-- Maven
-- MySQL 8.4
-- Flyway
-- Docker Compose
-
-当前业务状态：
-
-- 应用骨架已创建。
-- Docker MySQL 和应用启动流程已验证过。
-- 健康检查路径为 `/actuator/health`。
-- 业务表、领域模型、REST API、策略、回测尚未实现。
-
-## 推荐开发方式
-
-每次让 AI 开发时，尽量按这个顺序：
-
-1. 先让 AI 阅读 `AGENTS.md` 和 `docs/AI_HANDOFF.md`。
-2. 指定一个小目标，不要一次做完整系统。
-3. 要求 AI 先列出会修改哪些文件。
-4. 要求 AI 实现后运行 `./mvnw test`。
-5. 成功后再 commit/push。
-
-## 第一阶段最小闭环
-
-第一阶段不要追求完整量化平台，先完成最小闭环：
-
-```text
-自选股 -> 导入日 K -> 计算指标 -> 生成信号 -> 简单回测 -> 风险提示 -> 复盘记录
-```
-
-对应功能：
-
-1. `watchlist` 自选股。
-2. `stock_daily_bar` 日 K 数据。
-3. `technical_indicator_daily` 技术指标。
-4. `strategy_signal` 策略信号。
-5. `backtest_task` / `backtest_result` 回测。
-6. `risk_alert` 风险提示。
-7. `trade_journal` / `review_note` 复盘。
-
-## 默认假设
-
-- 初期使用手工 CSV 导入或公开数据源导入，不接券商。
-- 初期只支持 A 股日线和分钟线设计，不急着接美股、港股、期货、期权。
-- 初期策略只做规则策略，不做机器学习。
-- 初期回测以单票或少量股票为主，不做复杂组合优化。
+- 后端 `./mvnw test` + `./mvnw package` 通过；前端 typecheck / lint / test / build 通过。
+- 新增 DB 结构只通过更高版本 Flyway migration；MyBatis SQL 在 XML；分层清晰。
+- 开发结束按 `docs/DEVELOPMENT_WORKFLOW.md §2` 执行文档同步检查。
+- 未经用户明确要求，**不自动 commit / push / 部署远程**。

@@ -69,7 +69,8 @@
             <if test="otherFee != null">other_fee = #{otherFee},</if>
             <if test="totalFee != null">total_fee = #{totalFee},</if>
             <if test="positionRatio != null">position_ratio = #{positionRatio},</if>
-            <if test="planId != null">plan_id = #{planId},</if>
+            <!-- plan_id 始终写入（service 层按三态设置 existing.planId），保证 NULL 能落库以支持解绑 -->
+            plan_id = #{planId},
             <if test="reason != null">reason = #{reason},</if>
             <if test="planStopLoss != null">plan_stop_loss = #{planStopLoss},</if>
             <if test="planTakeProfit != null">plan_take_profit = #{planTakeProfit},</if>
@@ -148,6 +149,34 @@
                  CASE WHEN trade_time IS NULL THEN 1 ELSE 0 END ASC,
                  trade_time ASC,
                  id ASC
+    </select>
+
+    <!-- 截止指定时点的全量流水（对账用）：trade_date < snapshotDate，或同日且 trade_time 为空，或同日且 trade_time <= snapshotDateTime -->
+    <select id="selectAllOrderedUpTo" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_journal
+        <where>
+            trade_date &lt; #{snapshotDate}
+            OR (trade_date = #{snapshotDate} AND trade_time IS NULL)
+            OR (trade_date = #{snapshotDate} AND trade_time &lt;= #{snapshotDateTime})
+        </where>
+        ORDER BY trade_date ASC,
+                 CASE WHEN trade_time IS NULL THEN 1 ELSE 0 END ASC,
+                 trade_time ASC,
+                 id ASC
+    </select>
+
+    <!-- trade_date <= toDate 且指定复核状态（Dashboard 历史日期口径） -->
+    <select id="selectByReviewStatusUpTo" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM trade_journal
+        WHERE trade_date &lt;= #{toDate} AND review_status = #{reviewStatus}
+        ORDER BY trade_date DESC, updated_at DESC
+    </select>
+
+    <select id="countByReviewStatusUpTo" resultType="long">
+        SELECT COUNT(1) FROM trade_journal
+        WHERE trade_date &lt;= #{toDate} AND review_status = #{reviewStatus}
     </select>
 
     <delete id="deleteById">

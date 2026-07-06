@@ -1,5 +1,7 @@
 # Codex / Claude Code Prompts
 
+> ⚠️ Historical（历史参考，非当前执行入口）。当前事实以 AI_HANDOFF.md + development/DEVELOPMENT_LOG.md + CURRENT_ARCHITECTURE_AND_MODULES.md 为准；新会话入口见 AI_DEVELOPMENT_INDEX.md。
+
 这些提示词可以直接复制到新的 Codex 或 Claude Code 对话中。
 
 ## 0. 接手项目

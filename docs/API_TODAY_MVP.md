@@ -44,11 +44,36 @@
       }
     ],
     "todayPlans": [],
-    "pendingReviewJournals": []
+    "pendingReviewJournals": [],
+    "todos": [
+      {
+        "code": "PENDING_REVIEW",
+        "level": "WARNING",
+        "title": "待复盘交易",
+        "description": "存在尚未复盘的交易记录，及时复盘可沉淀经验",
+        "count": 4,
+        "targetPath": "/journal?reviewStatus=PENDING"
+      }
+    ]
   },
   "timestamp": "2026-06-08T09:00:00"
 }
 ```
+
+**`todos` 字段（v0.1.1 新增）：** 结构化待办列表，由后端聚合，remote 模式直接使用；mock 模式由前端按相同口径纯函数计算。每项含 `code` / `level` / `title` / `description` / `count` / `targetPath`，`count==0` 不返回。级别 `level`：`INFO` 提示 / `WARNING` 关注 / `RISK` 风险。待办码 `code`：
+
+| code | level | 说明 |
+|------|-------|------|
+| `PENDING_REVIEW` | WARNING | 存在待复盘交易 |
+| `UNLINKED_TRADE_PLAN` | INFO | 交易未关联计划 |
+| `TRADE_AGAINST_PLAN` | WARNING | 关联计划 allowedToTrade=false |
+| `MISSING_STOP_LOSS` | RISK | 今日买入交易未记录计划止损 |
+| `STALE_POSITION_SNAPSHOT` | INFO | 最新已确认快照超过 3 个自然日 |
+| `POSITION_RECONCILIATION_MISMATCH` | WARNING | 最新快照与截止时点 FIFO 账本数量不一致 |
+
+待办只表达记录、数据质量和纪律事项，**不包含买卖建议**；点击跳转 `targetPath` 对应页面。
+
+**日期口径（v0.1.1 最终修复）**：`date` 参数为空时按当天；非空时 `pendingReviewCount`、`pendingReviewJournals`、`riskWarnings` 以及 `PENDING_REVIEW` 待办均只统计 `trade_date <= date` 的交易，**绝不混入未来交易**；`STALE_POSITION_SNAPSHOT` / `POSITION_RECONCILIATION_MISMATCH` 待办取 `snapshot_date <= date` 的最新已确认快照。
 
 ---
 
@@ -331,6 +356,10 @@ positionRatio = positionAmount / totalCapital
 - `symbol` 可为空（表示每日总复盘）。
 - `linkedJournalIds` 中的 ID 必须存在，否则报 RESOURCE_NOT_FOUND。
 - 创建复盘后，关联的交易记录自动标记为 REVIEWED。
+- v0.1.1 一致性回算：新增/编辑/删除复盘后，对受影响交易记录（旧关联 ∪ 新关联）重新计算 reviewStatus——仍被任意复盘引用为 REVIEWED，否则恢复 PENDING。
+- v0.1.1 删除保护：被任意复盘引用的交易记录禁止删除，返回 `JOURNAL_REFERENCED_BY_REVIEW`，需先在相关复盘中移除关联。
+- v0.1.1 计划关联校验（POST/PUT `/trade-journals`）：`planId` 非空时计划必须存在（`TRADE_PLAN_NOT_FOUND`）、未取消（`TRADE_PLAN_NOT_LINKABLE`）、证券代码一致（`TRADE_PLAN_SYMBOL_MISMATCH`）；`planId` 为空允许保存；`allowedToTrade=false` 不阻断记录，由工作台单独提醒。交易记录响应新增可空展示字段 `planDate`、`planStatus`。
+- v0.1.1 解除计划关联（PUT `/trade-journals/{id}`）：请求体新增 `unlinkPlan`（Boolean）实现三态更新。`unlinkPlan=true` → `plan_id` 置 NULL（解绑）；`unlinkPlan!=true` 且 `planId!=null` → 更新为新计划；其余情况保持原值（部分更新语义不变）。禁止用 0/-1 等魔法值表达解绑。
 
 ### GET /api/v1/reviews/{id}
 
@@ -362,6 +391,11 @@ positionRatio = positionAmount / totalCapital
 | BUSINESS_RULE_VIOLATION | 违反业务规则 |
 | INVALID_ENUM_CODE | 无效的枚举值 |
 | RISK_CALCULATION_ERROR | 风控计算异常 |
+| TRADE_PLAN_NOT_FOUND | 关联的交易计划不存在 |
+| TRADE_PLAN_NOT_LINKABLE | 交易计划已取消，不可关联 |
+| TRADE_PLAN_SYMBOL_MISMATCH | 交易记录与计划的证券代码不一致 |
+| JOURNAL_REFERENCED_BY_REVIEW | 交易记录被复盘引用，不可删除 |
+| POSITION_SNAPSHOT_COMPARISON_INVALID | 持仓快照对比参数非法（非 CONFIRMED 或时间顺序非法） |
 | INTERNAL_ERROR | 系统内部错误 |
 
 ---
