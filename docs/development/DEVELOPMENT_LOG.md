@@ -4,6 +4,36 @@
 
 ---
 
+## 2026-07-06 — 生产环境实测验证
+
+- **目标**：验证生产 Nginx → 后端 → MySQL 链路，确认 production-data-mode 真实状态。
+- **验证（只读 GET）**：
+  - `http://129.204.169.155:18080/` 首页 → HTTP 200。
+  - `/api/v1/watchlist` → `success=true, data=[]`。
+  - `/api/v1/trade-plans` → `success=true, data=[]`。
+  - `/api/v1/dashboard/today` → `success=true`，含完整 date/todos/pendingReviewJournals 数据（1 条 AAPL PENDING 交易）。
+- **结论**：生产同源 /api/v1 + Nginx 反代 + Docker qta-server + MySQL 链路**实测通过**。production-data-mode 升级为 DONE/M4。
+- **关联**：`acceptance/ACCEPTANCE_LOG.md`、前端 `buildStatusData.ts`。
+
+---
+
+## 2026-07 — 建设看板状态同步与发布收口
+
+- **目标**：让建设看板与 v0.1.1 已验收事实、BUILD_CHECKLIST、PRODUCT_BLUEPRINT 完全一致。
+- **范围**：前端看板数据 + 同步机制，不改业务代码/DB。
+- **改动**：
+  - `buildStatusData.ts` 重写：修正 6 类过期节点（pnl-explainability target、portfolio-pnl IN_PROGRESS→DONE、production-data-mode RISK→DONE、ai-collaboration "已推送"→"已沉淀"、trade-loop/position-snapshot nextActions）；新增 `market-data-foundation` P1 一级节点（stock-basic/daily-bar-import/market-data-provider）；`ai-input` P1→P2；`daily-bar-import` 从 quant-analysis 移入行情基础。
+  - `pages/build-status.tsx` 加看板基线提示（v0.1.1 / 2026-07-06 / 与 BUILD_CHECKLIST 同步）。
+  - `useBuildStatus` selectedId 初始 `null`（进入/刷新不默认打开抽屉）。
+  - `production-data-mode` currentEvidence 分两条（同源 /api/v1 + curl 链路 / mock 4 页面 Playwright）。
+  - 同步机制：`DEVELOPMENT_WORKFLOW` + `qta-context-bootstrap` 加 buildStatusData 同步规则；`BUILD_STATUS_BOARD_DESIGN` 标初始基线。
+  - 口径统一：BUILD_CHECKLIST/PRODUCT_BLUEPRINT/buildStatusData "证券主数据**与**行情基础"。
+- **测试**：`buildStatusData.test.ts` 重写（v0.1.1 DONE/M4、snapshot-comparison 100%、market-data-foundation P1、ai-input 非 P1、无过期下一步、一级分类含行情基础）；新增 `useBuildStatus.test.ts`（初始未选中/选择/关闭）。
+- **验收**：后端 121、前端 191 测试通过；浏览器 /build-status 控制台 0 deprecated/error；基线 + P1 行情基础 + 节点显示；production-data-mode 降级 RISK/M3（生产 Nginx 反代未实测，不与"已验证"矛盾）。
+- **关联文档**：`BUILD_CHECKLIST.md`、`PRODUCT_BLUEPRINT.md`、`acceptance/ACCEPTANCE_LOG.md`。
+
+---
+
 ## 2026-07 — 文档体系治理与上下文加载 Skill
 
 - **目标**：建立可自洽的文档体系，让任意 AI 新会话不依赖历史聊天即可继续开发。

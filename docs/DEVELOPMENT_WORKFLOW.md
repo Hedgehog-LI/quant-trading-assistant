@@ -40,7 +40,7 @@
 | API 变化（新增/修改/删除接口） | 是 | `api/API_INDEX.md` + 对应 `api/*.md` + `mock/MOCK_REMOTE_CONTRACT.md` |
 | DB 变化（新表/字段/migration） | 是 | 新增 `src/main/resources/db/migration/V*.sql` + `DATABASE_DESIGN.md` + `CURRENT_ARCHITECTURE_AND_MODULES.md` |
 | Mock 契约变化（key/ID/计算口径） | 是 | `mock/MOCK_REMOTE_CONTRACT.md` |
-| 产品状态变化（功能完成/范围调整） | 是 | `BUILD_CHECKLIST.md` + `PRODUCT_BLUEPRINT.md` |
+| 产品状态/功能完成度/优先级/路线图变化 | 是 | `BUILD_CHECKLIST.md` + `PRODUCT_BLUEPRINT.md` + 前端 `src/features/build-status/api/buildStatusData.ts` + `buildStatusData.test.ts` |
 | 重要架构决策 | 是 | 新增 `decisions/ADR-XXXX-*.md` + 更新 `ADR_INDEX.md` |
 | 重要开发记录 | 产品/架构/功能/缺陷/契约/治理有实质变化时 | `development/DEVELOPMENT_LOG.md` 追加一条（用 `DEVELOPMENT_LOG_TEMPLATE.md`）；普通问答/只读检查/错别字不追加 |
 | 验收执行 | 是 | `acceptance/ACCEPTANCE_LOG.md` 追加 |

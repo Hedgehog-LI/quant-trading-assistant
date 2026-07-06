@@ -72,7 +72,7 @@
 ### 验收
 
 - [x] 一眼能看到整体成熟度和当前最优先事项。
-- [x] 能看到所有建设主线：基础设施、交易闭环、持仓盈亏、智能录入、量化分析。
+- [x] 能看到所有建设主线：基础设施、交易闭环、持仓盈亏、证券主数据与行情基础、智能录入、量化分析。
 - [x] 能区分已完成、进行中、待开始、有风险、阻塞。
 - [x] 能看到持仓快照 P0 已完成验收。
 - [x] 页面不需要后端也能展示。
@@ -180,7 +180,7 @@
 - [x] Antd 6.4 deprecated 清理：`Alert message→title`、`Spin tip→description`、`Space direction→orientation`、`Drawer width→size`、Dashboard `List→ul/li` 已全替换；Playwright 浏览器实测工作台/交易记录/持仓快照/设置 4 个页面，控制台 `DEPRECATED_WARNINGS=0, CONSOLE_ERRORS=0`。
 - [x] JSON 导出文案防误导：明确"仅导出浏览器 localStorage，不含后端 MySQL"，文件名改 `qta-local-export`。
 
-## 7. 后续 P1: 证券主数据和行情基础
+## 7. 后续 P1: 证券主数据与行情基础
 
 设计基线：`docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。
 

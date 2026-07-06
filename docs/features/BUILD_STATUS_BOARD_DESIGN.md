@@ -1,5 +1,7 @@
 # Build Status Board Design
 
+> ⚠️ 本文件为**初始设计基线**。当前建设看板的事实以 `src/features/build-status/api/buildStatusData.ts`（前端静态快照）+ `docs/BUILD_CHECKLIST.md` 为准；本文件保留作历史参考，不再逐字段维护。
+
 > 建设情况看板用于让用户一眼看懂 Quant Trading Assistant 还要建设什么、当前做到什么程度、下一步优先做什么。它是产品/研发管理页面，不是交易建议页面。
 
 ## 1. 功能定位

@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-07-06 — 生产环境实测验证
+
+- **地址**：`http://129.204.169.155:18080`（只读 GET，未新增/修改/删除任何数据）。
+- **首页**：HTTP 200。
+- **/api/v1/watchlist**：`success=true, data=[]`。
+- **/api/v1/trade-plans**：`success=true, data=[]`。
+- **/api/v1/dashboard/today**：`success=true`，含 date/todos/pendingReviewJournals 完整数据。
+- **结论**：生产 Nginx → Docker qta-server → MySQL 链路实测通过。**production-data-mode 升级 DONE/M4**。
+
+---
+
+## 2026-07 — 建设看板状态同步验收
+
+- **后端** `./mvnw test`：121 通过（业务代码未改，回归）。
+- **前端** typecheck/lint/test/build：0 error / **191 测试通过**（+8 buildStatusData + 3 useBuildStatus + 1 production RISK 矛盾检测）/ build 成功。
+- **production-data-mode 口径**：降级 RISK/M3（生产 Nginx /api 反代未实测）；currentEvidence 不含"已验证"与"待部署"同时出现的矛盾；测试断言保护。
+- **浏览器 /build-status**（Playwright，mock 模式）：桌面 + 窄屏；看板基线提示（v0.1.1 / 2026-07-06）显示；`证券主数据与行情基础` P1 节点 + `快照对比与账本对账` DONE 节点显示；`useBuildStatus` 初始 `null`（默认无抽屉，需点击节点打开）；控制台 `DEPRECATED_WARNINGS=0, CONSOLE_ERRORS=0`。
+- **口径一致**：BUILD_CHECKLIST / PRODUCT_BLUEPRINT / buildStatusData 三处统一为"证券主数据**与**行情基础"。
+- **git diff --check**：两仓库 clean。
+- **结论**：看板同步通过；**未改业务代码/DB/未 commit/push**。
+
+---
+
 ## 2026-07 — 文档治理最终收尾验收
 
 在文档治理基础上修复 6 项残留：① `AGENTS.md` 删除"读取 CONVERSATION_HANDOFF"旧指令 + "前端可以后续生成"改为"前后端均已存在"；② `BUILD_CHECKLIST.md` "当前 P0.5" 改为 "已完成并验收"；③ `api/API_INDEX.md` 全部路径改完整 `/api/v1/...`（27 条，含 Position Snapshot 的 `/api/v1/position-snapshots/{id}/reconciliation` 等）；④ `qta-context-bootstrap` + `DEVELOPMENT_WORKFLOW` 删除"每轮总是追加 DEVELOPMENT_LOG"（改为"仅产品/架构/功能/缺陷/契约/治理重要变更才追加"）；⑤ `FRONTEND_ARCHITECTURE.md` 部署改为"宿主机 Nginx 托管 dist + Docker qta-server/qta-mysql，前端不容器化"（删除虚构的 qta-frontend 容器）；⑥ 日志规则修正（不声称未执行的检查通过）。
