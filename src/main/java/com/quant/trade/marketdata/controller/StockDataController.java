@@ -2,20 +2,23 @@ package com.quant.trade.marketdata.controller;
 
 import com.quant.trade.common.api.ApiResponse;
 import com.quant.trade.common.constant.ApiConstants;
+import com.quant.trade.marketdata.constant.MarketDataConstants;
 import com.quant.trade.marketdata.dto.CreateStockBasicDTO;
 import com.quant.trade.marketdata.dto.DailyBarQueryDTO;
+import com.quant.trade.marketdata.dto.UpdateStockBasicDTO;
 import com.quant.trade.marketdata.service.StockDataService;
 import com.quant.trade.marketdata.vo.DailyBarImportResultVO;
-import com.quant.trade.marketdata.vo.StockBasicVO;
-import com.quant.trade.marketdata.vo.StockDailyBarVO;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.List;
+import java.util.Map;
 
 /** 行情数据 REST 控制器。 */
 @RestController
@@ -28,29 +31,30 @@ public class StockDataController {
     // ===== 证券主数据 =====
 
     @GetMapping("/stocks")
-    public ApiResponse<List<StockBasicVO>> listStocks(
+    public ApiResponse<Map<String, Object>> listStocks(
             @RequestParam(required = false) String market,
-            @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok(stockDataService.listStocks(market, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = MarketDataConstants.DEFAULT_PAGE_SIZE) int size) {
+        if (size > MarketDataConstants.MAX_PAGE_SIZE) size = MarketDataConstants.MAX_PAGE_SIZE;
+        return ApiResponse.ok(stockDataService.listStocks(market, keyword, page, size));
     }
 
     @PostMapping("/stocks")
-    public ApiResponse<StockBasicVO> createStock(@Valid @RequestBody CreateStockBasicDTO dto) {
+    public ApiResponse<Object> createStock(@Valid @RequestBody CreateStockBasicDTO dto) {
         return ApiResponse.ok(stockDataService.createStock(dto));
     }
 
     @GetMapping("/stocks/{canonicalSymbol}")
-    public ApiResponse<StockBasicVO> getStock(@PathVariable String canonicalSymbol) {
+    public ApiResponse<Object> getStock(@PathVariable String canonicalSymbol) {
         return ApiResponse.ok(stockDataService.getStock(canonicalSymbol));
     }
 
     @PutMapping("/stocks/{id}")
-    public ApiResponse<StockBasicVO> updateStock(
+    public ApiResponse<Object> updateStock(
             @PathVariable Long id,
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) LocalDate listDate,
-            @RequestParam(required = false) Boolean delisted) {
-        return ApiResponse.ok(stockDataService.updateStock(id, name, listDate, delisted));
+            @Valid @RequestBody UpdateStockBasicDTO dto) {
+        return ApiResponse.ok(stockDataService.updateStock(id, dto));
     }
 
     @DeleteMapping("/stocks/{canonicalSymbol}")
@@ -62,24 +66,30 @@ public class StockDataController {
     // ===== 日 K 数据 =====
 
     @GetMapping("/daily-bars")
-    public ApiResponse<List<StockDailyBarVO>> queryDailyBars(
+    public ApiResponse<Map<String, Object>> queryDailyBars(
             @RequestParam(required = false) String canonicalSymbol,
             @RequestParam(required = false) LocalDate fromDate,
             @RequestParam(required = false) LocalDate toDate,
-            @RequestParam(required = false) String adjustType) {
+            @RequestParam(required = false) String adjustType,
+            @RequestParam(required = false) String dataSource,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = MarketDataConstants.DEFAULT_PAGE_SIZE) int size) {
+        if (size > MarketDataConstants.MAX_PAGE_SIZE) size = MarketDataConstants.MAX_PAGE_SIZE;
         return ApiResponse.ok(stockDataService.queryDailyBars(
-                new DailyBarQueryDTO(canonicalSymbol, fromDate, toDate, adjustType)));
+                new DailyBarQueryDTO(canonicalSymbol, fromDate, toDate, adjustType, dataSource), page, size));
     }
 
     @PostMapping("/daily-bars/import")
     public ApiResponse<DailyBarImportResultVO> importDailyBars(@RequestParam("file") MultipartFile file)
             throws IOException {
-        return ApiResponse.ok(stockDataService.importDailyBars(file.getInputStream()));
+        return ApiResponse.ok(stockDataService.importDailyBars(file.getInputStream(), file.getSize()));
     }
 
     @GetMapping("/daily-bars/template")
-    public ApiResponse<String> downloadTemplate() {
-        return ApiResponse.ok("canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type\n" +
-                "SH.600519,2026-07-01,1680.00,1695.00,1678.00,1690.00,25000,42250000.00,NONE\n");
+    public void downloadTemplate(HttpServletResponse response) throws IOException {
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=daily-bar-template.csv");
+        response.getWriter().write(MarketDataConstants.CSV_TEMPLATE);
+        response.getWriter().flush();
     }
 }

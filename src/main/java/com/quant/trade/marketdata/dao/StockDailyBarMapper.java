@@ -19,5 +19,13 @@ public interface StockDailyBarMapper {
     List<StockDailyBarDO> selectByFilter(@Param("canonicalSymbol") String canonicalSymbol,
                                           @Param("fromDate") LocalDate fromDate,
                                           @Param("toDate") LocalDate toDate,
-                                          @Param("adjustType") String adjustType);
+                                          @Param("adjustType") String adjustType,
+                                          @Param("dataSource") String dataSource,
+                                          @Param("limit") int limit, @Param("offset") int offset);
+    long countByFilter(@Param("canonicalSymbol") String canonicalSymbol,
+                       @Param("fromDate") LocalDate fromDate,
+                       @Param("toDate") LocalDate toDate,
+                       @Param("adjustType") String adjustType,
+                       @Param("dataSource") String dataSource);
+    long countByCanonicalSymbol(@Param("canonicalSymbol") String canonicalSymbol);
 }

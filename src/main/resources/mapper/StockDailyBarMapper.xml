@@ -14,30 +14,44 @@
         <result column="close_price" property="closePrice"/>
         <result column="volume" property="volume"/>
         <result column="amount" property="amount"/>
+        <result column="fetched_at" property="fetchedAt"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
     <sql id="Base_Column_List">
         id, canonical_symbol, trade_date, adjust_type, data_source,
-        open_price, high_price, low_price, close_price, volume, amount, created_at, updated_at
+        open_price, high_price, low_price, close_price, volume, amount,
+        fetched_at, created_at, updated_at
+    </sql>
+
+    <sql id="Filter_Clause">
+        <where>
+            <if test="canonicalSymbol != null and canonicalSymbol != ''">
+                AND canonical_symbol = #{canonicalSymbol}
+            </if>
+            <if test="fromDate != null">AND trade_date &gt;= #{fromDate}</if>
+            <if test="toDate != null">AND trade_date &lt;= #{toDate}</if>
+            <if test="adjustType != null and adjustType != ''">AND adjust_type = #{adjustType}</if>
+            <if test="dataSource != null and dataSource != ''">AND data_source = #{dataSource}</if>
+        </where>
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO stock_daily_bar (canonical_symbol, trade_date, adjust_type, data_source,
-            open_price, high_price, low_price, close_price, volume, amount)
+            open_price, high_price, low_price, close_price, volume, amount, fetched_at)
         VALUES (#{canonicalSymbol}, #{tradeDate}, #{adjustType}, #{dataSource},
-            #{openPrice}, #{highPrice}, #{lowPrice}, #{closePrice}, #{volume}, #{amount})
+            #{openPrice}, #{highPrice}, #{lowPrice}, #{closePrice}, #{volume}, #{amount}, #{fetchedAt})
     </insert>
 
     <insert id="batchInsert">
         INSERT INTO stock_daily_bar (canonical_symbol, trade_date, adjust_type, data_source,
-            open_price, high_price, low_price, close_price, volume, amount)
+            open_price, high_price, low_price, close_price, volume, amount, fetched_at)
         VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.canonicalSymbol}, #{item.tradeDate}, #{item.adjustType}, #{item.dataSource},
              #{item.openPrice}, #{item.highPrice}, #{item.lowPrice}, #{item.closePrice},
-             #{item.volume}, #{item.amount})
+             #{item.volume}, #{item.amount}, #{item.fetchedAt})
         </foreach>
     </insert>
 
@@ -52,7 +66,7 @@
     <update id="updateByUniqueKey">
         UPDATE stock_daily_bar
         SET open_price = #{openPrice}, high_price = #{highPrice}, low_price = #{lowPrice},
-            close_price = #{closePrice}, volume = #{volume}, amount = #{amount}
+            close_price = #{closePrice}, volume = #{volume}, amount = #{amount}, fetched_at = #{fetchedAt}
         WHERE canonical_symbol = #{canonicalSymbol}
           AND trade_date = #{tradeDate}
           AND adjust_type = #{adjustType}
@@ -61,14 +75,16 @@
 
     <select id="selectByFilter" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/> FROM stock_daily_bar
-        <where>
-            <if test="canonicalSymbol != null and canonicalSymbol != ''">
-                AND canonical_symbol = #{canonicalSymbol}
-            </if>
-            <if test="fromDate != null">AND trade_date &gt;= #{fromDate}</if>
-            <if test="toDate != null">AND trade_date &lt;= #{toDate}</if>
-            <if test="adjustType != null and adjustType != ''">AND adjust_type = #{adjustType}</if>
-        </where>
+        <include refid="Filter_Clause"/>
         ORDER BY trade_date ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(1) FROM stock_daily_bar <include refid="Filter_Clause"/>
+    </select>
+
+    <select id="countByCanonicalSymbol" resultType="long">
+        SELECT COUNT(1) FROM stock_daily_bar WHERE canonical_symbol = #{canonicalSymbol}
     </select>
 </mapper>

@@ -26,6 +26,7 @@ public class StockDailyBarDO {
     private BigDecimal closePrice;
     private Long volume;
     private BigDecimal amount;
+    private LocalDateTime fetchedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

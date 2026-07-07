@@ -18,6 +18,15 @@
         id, canonical_symbol, symbol, name, market, list_date, delisted, created_at, updated_at
     </sql>
 
+    <sql id="Filter_Clause">
+        <where>
+            <if test="market != null and market != ''">AND market = #{market}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (canonical_symbol LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </sql>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO stock_basic (canonical_symbol, symbol, name, market, list_date, delisted)
         VALUES (#{canonicalSymbol}, #{symbol}, #{name}, #{market}, #{listDate}, #{delisted})
@@ -43,13 +52,13 @@
 
     <select id="selectByFilter" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/> FROM stock_basic
-        <where>
-            <if test="market != null and market != ''">AND market = #{market}</if>
-            <if test="keyword != null and keyword != ''">
-                AND (canonical_symbol LIKE CONCAT('%', #{keyword}, '%') OR name LIKE CONCAT('%', #{keyword}, '%'))
-            </if>
-        </where>
+        <include refid="Filter_Clause"/>
         ORDER BY canonical_symbol ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(1) FROM stock_basic <include refid="Filter_Clause"/>
     </select>
 
     <select id="selectByCanonicalSymbols" resultMap="BaseResultMap">

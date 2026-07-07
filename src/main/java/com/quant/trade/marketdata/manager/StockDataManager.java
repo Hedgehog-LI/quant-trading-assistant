@@ -2,6 +2,7 @@ package com.quant.trade.marketdata.manager;
 
 import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
+import com.quant.trade.marketdata.constant.MarketDataConstants;
 import com.quant.trade.marketdata.dao.StockBasicMapper;
 import com.quant.trade.marketdata.dao.StockDailyBarMapper;
 import com.quant.trade.marketdata.model.StockBasicDO;
@@ -20,9 +21,10 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
-/** 行情数据领域规则层：canonical 规范化、CSV 解析校验、幂等导入。 */
+/** 行情数据领域规则层：canonical 规范化、CSV 解析校验、幂等导入（含文件内重复键检测）。 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -31,16 +33,11 @@ public class StockDataManager {
     private final StockBasicMapper stockBasicMapper;
     private final StockDailyBarMapper stockDailyBarMapper;
 
-    private static final String[] CSV_HEADERS = {
-        "canonical_symbol", "trade_date", "open", "high", "low", "close", "volume", "amount", "adjust_type"
-    };
-    private static final int MAX_ROWS = 10000;
-
     /** 规范化 canonical_symbol：SH.600519 / SZ.000001 / BJ.430047 */
     public String buildCanonicalSymbol(String market, String symbol) {
         String m = market.trim().toUpperCase(Locale.ROOT);
         String s = symbol.trim();
-        if (!Set.of("SH", "SZ", "BJ").contains(m)) {
+        if (!MarketDataConstants.VALID_MARKETS.contains(m)) {
             throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL,
                     "市场必须为 SH/SZ/BJ: " + market);
         }
@@ -51,65 +48,93 @@ public class StockDataManager {
         return m + "." + s;
     }
 
-    /** CSV 解析 + 校验 + 幂等导入（原子提交）。 */
-    public DailyBarImportResultVO importDailyBarsCsv(InputStream input) {
+    /**
+     * CSV 解析 + 校验 + 幂等导入（原子提交）。
+     * 处理同一文件内重复幂等键：
+     * - 相同键且内容一致 → skipped。
+     * - 相同键但内容冲突 → 整批拒绝，返回行错误。
+     * - DB 中已存在 → skipped（一致）或 updated（不同）。
+     */
+    public DailyBarImportResultVO importDailyBarsCsv(InputStream input, long fileSize) {
+        // 文件级校验
+        if (fileSize <= 0) {
+            throw new BusinessException(ErrorCodeEnum.CSV_EMPTY_FILE, "CSV 文件为空");
+        }
+        if (fileSize > MarketDataConstants.MAX_FILE_SIZE) {
+            throw new BusinessException(ErrorCodeEnum.CSV_FILE_TOO_LARGE,
+                    "文件超过 " + MarketDataConstants.MAX_FILE_SIZE + " 字节限制");
+        }
+
         List<DailyBarImportResultVO.RowError> errors = new ArrayList<>();
         List<StockDailyBarDO> toInsert = new ArrayList<>();
         List<StockDailyBarDO> toUpdate = new ArrayList<>();
         int skipped = 0;
+        // 文件内幂等键 → 第一次解析到的 bar（用于检测后续冲突）
+        Map<String, StockDailyBarDO> fileSeen = new LinkedHashMap<>();
+        // 预加载的 stock_basic 缓存
+        Map<String, StockBasicDO> stockMap = new HashMap<>();
+        // 预加载的 DB existing bar 缓存
+        Map<String, StockDailyBarDO> dbExistingMap = new HashMap<>();
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
-             CSVParser parser = CSVFormat.DEFAULT.builder()
-                     .setHeader(CSV_HEADERS).setSkipHeaderRecord(true).build().parse(reader)) {
+        // 手动读取并校验首行表头
+        BufferedReader headerReader;
+        try {
+            headerReader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
+            String headerLine = headerReader.readLine();
+            if (headerLine == null || headerLine.isBlank()) {
+                throw new BusinessException(ErrorCodeEnum.CSV_EMPTY_FILE, "CSV 文件为空或仅有空行");
+            }
+            String[] actualHeaders = headerLine.split(",");
+            List<String> expectedHeaders = Arrays.asList(MarketDataConstants.CSV_HEADERS);
+            for (String h : actualHeaders) {
+                if (!expectedHeaders.contains(h.trim())) {
+                    throw new BusinessException(ErrorCodeEnum.CSV_WRONG_HEADER,
+                            "CSV 表头不匹配，期望: " + String.join(",", MarketDataConstants.CSV_HEADERS)
+                            + "，实际: " + headerLine);
+                }
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCodeEnum.DAILY_BAR_CSV_PARSE_ERROR, "CSV 读取失败: " + e.getMessage());
+        }
 
-            // 预加载所有涉及的 stock_basic（校验股票存在）
-            Set<String> seenSymbols = new HashSet<>();
-            Map<String, StockBasicDO> stockMap = new HashMap<>();
+        try (CSVParser parser = CSVFormat.DEFAULT.builder()
+                     .setHeader(MarketDataConstants.CSV_HEADERS)
+                     .build().parse(headerReader)) {
 
             int rowNum = 1;
             for (CSVRecord record : parser) {
                 rowNum++;
-                if (rowNum - 1 > MAX_ROWS) {
-                    errors.add(new DailyBarImportResultVO.RowError(rowNum, "超过最大行数限制 " + MAX_ROWS));
+                if (rowNum - 1 > MarketDataConstants.MAX_ROWS) {
+                    errors.add(new DailyBarImportResultVO.RowError(rowNum,
+                            "超过最大行数限制 " + MarketDataConstants.MAX_ROWS));
                     break;
                 }
                 try {
-                    String canonicalSymbol = record.get("canonical_symbol").trim().toUpperCase();
-                    String tradeDateStr = record.get("trade_date").trim();
-                    String adjustType = record.get("adjust_type").trim().toUpperCase();
-                    BigDecimal open = new BigDecimal(record.get("open").trim());
-                    BigDecimal high = new BigDecimal(record.get("high").trim());
-                    BigDecimal low = new BigDecimal(record.get("low").trim());
-                    BigDecimal close = new BigDecimal(record.get("close").trim());
-                    long volume = Long.parseLong(record.get("volume").trim());
-                    BigDecimal amount = new BigDecimal(record.get("amount").trim());
+                    StockDailyBarDO bar = parseAndValidateRow(record, rowNum, stockMap);
+                    String uniqueKey = bar.getCanonicalSymbol() + "|" + bar.getTradeDate() + "|"
+                            + bar.getAdjustType() + "|" + bar.getDataSource();
 
-                    validateCanonicalSymbol(canonicalSymbol);
-                    validateAdjustType(adjustType);
-                    validateOhlc(open, high, low, close);
-                    if (volume < 0) throw new IllegalArgumentException("volume 不能为负");
-                    if (amount.signum() < 0) throw new IllegalArgumentException("amount 不能为负");
-
-                    // 延迟加载 stock_basic
-                    if (!stockMap.containsKey(canonicalSymbol)) {
-                        StockBasicDO stock = stockBasicMapper.selectByCanonicalSymbol(canonicalSymbol);
-                        if (stock == null) {
-                            throw new IllegalArgumentException("证券不存在: " + canonicalSymbol);
+                    // 文件内重复键检测
+                    if (fileSeen.containsKey(uniqueKey)) {
+                        StockDailyBarDO firstSeen = fileSeen.get(uniqueKey);
+                        if (isSameData(firstSeen, bar)) {
+                            skipped++; // 内容一致，跳过
+                        } else {
+                            errors.add(new DailyBarImportResultVO.RowError(rowNum,
+                                    "同一文件内幂等键冲突: " + uniqueKey
+                                    + "（行内容与第 " + firstSeen.getTradeDate() + " 行不一致）"));
                         }
-                        stockMap.put(canonicalSymbol, stock);
+                        continue;
                     }
+                    fileSeen.put(uniqueKey, bar);
 
-                    LocalDate tradeDate = LocalDate.parse(tradeDateStr);
-                    String dataSource = "CSV";
-
-                    StockDailyBarDO existing = stockDailyBarMapper.selectByUniqueKey(
-                            canonicalSymbol, tradeDate, adjustType, dataSource);
-
-                    StockDailyBarDO bar = StockDailyBarDO.builder()
-                            .canonicalSymbol(canonicalSymbol).tradeDate(tradeDate)
-                            .adjustType(adjustType).dataSource(dataSource)
-                            .openPrice(open).highPrice(high).lowPrice(low).closePrice(close)
-                            .volume(volume).amount(amount).build();
+                    // 查 DB existing（缓存避免重复查询）
+                    StockDailyBarDO existing = dbExistingMap.computeIfAbsent(uniqueKey, k ->
+                            stockDailyBarMapper.selectByUniqueKey(
+                                    bar.getCanonicalSymbol(), bar.getTradeDate(),
+                                    bar.getAdjustType(), bar.getDataSource()));
 
                     if (existing == null) {
                         toInsert.add(bar);
@@ -118,18 +143,29 @@ public class StockDataManager {
                     } else {
                         toUpdate.add(bar);
                     }
+                } catch (BusinessException e) {
+                    throw e; // 表头级错误向上抛
                 } catch (Exception e) {
                     errors.add(new DailyBarImportResultVO.RowError(rowNum, e.getMessage()));
                 }
             }
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             throw new BusinessException(ErrorCodeEnum.DAILY_BAR_CSV_PARSE_ERROR,
                     "CSV 解析失败: " + e.getMessage());
         }
 
-        // 原子提交
+        // 原子提交：任意错误整批不写库
         if (!errors.isEmpty()) {
             return new DailyBarImportResultVO(0, 0, 0, errors.size(), errors);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (StockDailyBarDO bar : toInsert) {
+            bar.setFetchedAt(now);
+        }
+        for (StockDailyBarDO bar : toUpdate) {
+            bar.setFetchedAt(now);
         }
         if (!toInsert.isEmpty()) stockDailyBarMapper.batchInsert(toInsert);
         for (StockDailyBarDO bar : toUpdate) stockDailyBarMapper.updateByUniqueKey(bar);
@@ -137,14 +173,61 @@ public class StockDataManager {
         return new DailyBarImportResultVO(toInsert.size(), toUpdate.size(), skipped, 0, errors);
     }
 
+    /** 删除前检查是否有关联日 K 数据。 */
+    public void ensureNoDailyBars(String canonicalSymbol) {
+        long count = stockDailyBarMapper.countByCanonicalSymbol(canonicalSymbol);
+        if (count > 0) {
+            throw new BusinessException(ErrorCodeEnum.STOCK_HAS_DAILY_BARS,
+                    "证券 " + canonicalSymbol + " 存在 " + count + " 条日 K 数据，不可删除");
+        }
+    }
+
+    // ==================== 私有方法 ====================
+
+    private StockDailyBarDO parseAndValidateRow(CSVRecord record, int rowNum,
+                                                  Map<String, StockBasicDO> stockMap) {
+        String canonicalSymbol = record.get("canonical_symbol").trim().toUpperCase();
+        String tradeDateStr = record.get("trade_date").trim();
+        String adjustType = record.get("adjust_type").trim().toUpperCase();
+        BigDecimal open = new BigDecimal(record.get("open").trim());
+        BigDecimal high = new BigDecimal(record.get("high").trim());
+        BigDecimal low = new BigDecimal(record.get("low").trim());
+        BigDecimal close = new BigDecimal(record.get("close").trim());
+        long volume = Long.parseLong(record.get("volume").trim());
+        BigDecimal amount = new BigDecimal(record.get("amount").trim());
+
+        validateCanonicalSymbol(canonicalSymbol);
+        validateAdjustType(adjustType);
+        validateOhlc(open, high, low, close);
+        if (volume < 0) throw new IllegalArgumentException("volume 不能为负");
+        if (amount.signum() < 0) throw new IllegalArgumentException("amount 不能为负");
+
+        // 延迟加载 stock_basic
+        if (!stockMap.containsKey(canonicalSymbol)) {
+            StockBasicDO stock = stockBasicMapper.selectByCanonicalSymbol(canonicalSymbol);
+            if (stock == null) {
+                throw new IllegalArgumentException("证券不存在: " + canonicalSymbol);
+            }
+            stockMap.put(canonicalSymbol, stock);
+        }
+
+        LocalDate tradeDate = LocalDate.parse(tradeDateStr);
+
+        return StockDailyBarDO.builder()
+                .canonicalSymbol(canonicalSymbol).tradeDate(tradeDate)
+                .adjustType(adjustType).dataSource(MarketDataConstants.DATA_SOURCE_CSV)
+                .openPrice(open).highPrice(high).lowPrice(low).closePrice(close)
+                .volume(volume).amount(amount).build();
+    }
+
     private void validateCanonicalSymbol(String symbol) {
-        if (!symbol.matches("^(SH|SZ|BJ)\\.\\d{4,6}$")) {
+        if (!symbol.matches(MarketDataConstants.CANONICAL_SYMBOL_REGEX)) {
             throw new IllegalArgumentException("canonical_symbol 格式不合法: " + symbol);
         }
     }
 
     private void validateAdjustType(String adjustType) {
-        if (!Set.of("NONE", "QF", "HF").contains(adjustType)) {
+        if (!MarketDataConstants.VALID_ADJUST_TYPES.contains(adjustType)) {
             throw new IllegalArgumentException("adjust_type 必须为 NONE/QF/HF: " + adjustType);
         }
     }
@@ -161,12 +244,12 @@ public class StockDataManager {
         }
     }
 
-    private boolean isSameData(StockDailyBarDO existing, StockDailyBarDO bar) {
-        return existing.getOpenPrice().compareTo(bar.getOpenPrice()) == 0
-                && existing.getHighPrice().compareTo(bar.getHighPrice()) == 0
-                && existing.getLowPrice().compareTo(bar.getLowPrice()) == 0
-                && existing.getClosePrice().compareTo(bar.getClosePrice()) == 0
-                && existing.getVolume() != null && existing.getVolume().equals(bar.getVolume())
-                && existing.getAmount().compareTo(bar.getAmount()) == 0;
+    private boolean isSameData(StockDailyBarDO a, StockDailyBarDO b) {
+        return a.getOpenPrice().compareTo(b.getOpenPrice()) == 0
+                && a.getHighPrice().compareTo(b.getHighPrice()) == 0
+                && a.getLowPrice().compareTo(b.getLowPrice()) == 0
+                && a.getClosePrice().compareTo(b.getClosePrice()) == 0
+                && a.getVolume() != null && a.getVolume().equals(b.getVolume())
+                && a.getAmount().compareTo(b.getAmount()) == 0;
     }
 }

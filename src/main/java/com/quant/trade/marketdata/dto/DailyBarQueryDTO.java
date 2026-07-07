@@ -7,5 +7,6 @@ public record DailyBarQueryDTO(
     String canonicalSymbol,
     LocalDate fromDate,
     LocalDate toDate,
-    String adjustType
+    String adjustType,
+    String dataSource
 ) {}

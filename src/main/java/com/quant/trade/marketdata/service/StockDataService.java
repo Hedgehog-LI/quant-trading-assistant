@@ -2,11 +2,13 @@ package com.quant.trade.marketdata.service;
 
 import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
+import com.quant.trade.marketdata.constant.MarketDataConstants;
 import com.quant.trade.marketdata.convert.StockDataConverter;
 import com.quant.trade.marketdata.dao.StockBasicMapper;
 import com.quant.trade.marketdata.dao.StockDailyBarMapper;
 import com.quant.trade.marketdata.dto.CreateStockBasicDTO;
 import com.quant.trade.marketdata.dto.DailyBarQueryDTO;
+import com.quant.trade.marketdata.dto.UpdateStockBasicDTO;
 import com.quant.trade.marketdata.manager.StockDataManager;
 import com.quant.trade.marketdata.model.StockBasicDO;
 import com.quant.trade.marketdata.model.StockDailyBarDO;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 
 /** 行情数据应用服务。 */
 @Slf4j
@@ -45,8 +48,13 @@ public class StockDataService {
         return converter.toVO(record);
     }
 
-    public List<StockBasicVO> listStocks(String market, String keyword) {
-        return converter.toVOList(stockBasicMapper.selectByFilter(market, keyword));
+    /** 分页查询证券主数据。 */
+    public Map<String, Object> listStocks(String market, String keyword, int page, int size) {
+        int offset = (page - 1) * size;
+        List<StockBasicVO> items = converter.toVOList(
+                stockBasicMapper.selectByFilter(market, keyword, size, offset));
+        long total = stockBasicMapper.countByFilter(market, keyword);
+        return Map.of("items", items, "total", total, "page", page, "size", size);
     }
 
     public StockBasicVO getStock(String canonicalSymbol) {
@@ -56,29 +64,40 @@ public class StockDataService {
     }
 
     @Transactional
-    public StockBasicVO updateStock(Long id, String name, java.time.LocalDate listDate, Boolean delisted) {
+    public StockBasicVO updateStock(Long id, UpdateStockBasicDTO dto) {
         StockBasicDO existing = stockBasicMapper.selectById(id);
         if (existing == null) throw new BusinessException(ErrorCodeEnum.STOCK_NOT_FOUND, "id=" + id);
-        if (name != null) existing.setName(name);
-        if (listDate != null) existing.setListDate(listDate);
-        if (delisted != null) existing.setDelisted(delisted);
+        if (dto.name() != null) existing.setName(dto.name());
+        if (dto.listDate() != null) existing.setListDate(dto.listDate());
+        if (dto.delisted() != null) existing.setDelisted(dto.delisted());
         stockBasicMapper.updateById(existing);
         return converter.toVO(stockBasicMapper.selectById(id));
     }
 
+    /** 删除前检查是否有日 K 数据。 */
     @Transactional
     public void deleteStock(String canonicalSymbol) {
+        StockBasicDO existing = stockBasicMapper.selectByCanonicalSymbol(canonicalSymbol);
+        if (existing == null) throw new BusinessException(ErrorCodeEnum.STOCK_NOT_FOUND, canonicalSymbol);
+        manager.ensureNoDailyBars(canonicalSymbol);
         stockBasicMapper.deleteByCanonicalSymbol(canonicalSymbol);
     }
 
-    public List<StockDailyBarVO> queryDailyBars(DailyBarQueryDTO query) {
+    /** 分页查询日 K。 */
+    public Map<String, Object> queryDailyBars(DailyBarQueryDTO query, int page, int size) {
+        int offset = (page - 1) * size;
         List<StockDailyBarDO> records = stockDailyBarMapper.selectByFilter(
-                query.canonicalSymbol(), query.fromDate(), query.toDate(), query.adjustType());
-        return records.stream().map(converter::toBarVO).toList();
+                query.canonicalSymbol(), query.fromDate(), query.toDate(),
+                query.adjustType(), query.dataSource(), size, offset);
+        long total = stockDailyBarMapper.countByFilter(
+                query.canonicalSymbol(), query.fromDate(), query.toDate(),
+                query.adjustType(), query.dataSource());
+        List<StockDailyBarVO> items = records.stream().map(converter::toBarVO).toList();
+        return Map.of("items", items, "total", total, "page", page, "size", size);
     }
 
     @Transactional
-    public DailyBarImportResultVO importDailyBars(InputStream input) {
-        return manager.importDailyBarsCsv(input);
+    public DailyBarImportResultVO importDailyBars(InputStream input, long fileSize) {
+        return manager.importDailyBarsCsv(input, fileSize);
     }
 }
