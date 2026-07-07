@@ -13,6 +13,7 @@ import com.quant.trade.marketdata.manager.StockDataManager;
 import com.quant.trade.marketdata.model.StockBasicDO;
 import com.quant.trade.marketdata.model.StockDailyBarDO;
 import com.quant.trade.marketdata.vo.DailyBarImportResultVO;
+import com.quant.trade.marketdata.vo.PageResultVO;
 import com.quant.trade.marketdata.vo.StockBasicVO;
 import com.quant.trade.marketdata.vo.StockDailyBarVO;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.util.List;
-import java.util.Map;
 
 /** 行情数据应用服务。 */
 @Slf4j
@@ -34,6 +34,17 @@ public class StockDataService {
     private final StockDailyBarMapper stockDailyBarMapper;
     private final StockDataConverter converter;
     private final StockDataManager manager;
+
+    /** 校验分页参数，非法时抛 PARAM_ERROR。 */
+    public static void validatePaging(int page, int size) {
+        if (page < 1) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "page 必须 >= 1: " + page);
+        }
+        if (size < 1 || size > MarketDataConstants.MAX_PAGE_SIZE) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR,
+                    "size 必须在 1.." + MarketDataConstants.MAX_PAGE_SIZE + ": " + size);
+        }
+    }
 
     @Transactional
     public StockBasicVO createStock(CreateStockBasicDTO dto) {
@@ -48,13 +59,13 @@ public class StockDataService {
         return converter.toVO(record);
     }
 
-    /** 分页查询证券主数据。 */
-    public Map<String, Object> listStocks(String market, String keyword, int page, int size) {
+    public PageResultVO<StockBasicVO> listStocks(String market, String keyword, int page, int size) {
+        validatePaging(page, size);
         int offset = (page - 1) * size;
         List<StockBasicVO> items = converter.toVOList(
                 stockBasicMapper.selectByFilter(market, keyword, size, offset));
         long total = stockBasicMapper.countByFilter(market, keyword);
-        return Map.of("items", items, "total", total, "page", page, "size", size);
+        return new PageResultVO<>(items, total, page, size);
     }
 
     public StockBasicVO getStock(String canonicalSymbol) {
@@ -74,7 +85,6 @@ public class StockDataService {
         return converter.toVO(stockBasicMapper.selectById(id));
     }
 
-    /** 删除前检查是否有日 K 数据。 */
     @Transactional
     public void deleteStock(String canonicalSymbol) {
         StockBasicDO existing = stockBasicMapper.selectByCanonicalSymbol(canonicalSymbol);
@@ -83,8 +93,8 @@ public class StockDataService {
         stockBasicMapper.deleteByCanonicalSymbol(canonicalSymbol);
     }
 
-    /** 分页查询日 K。 */
-    public Map<String, Object> queryDailyBars(DailyBarQueryDTO query, int page, int size) {
+    public PageResultVO<StockDailyBarVO> queryDailyBars(DailyBarQueryDTO query, int page, int size) {
+        validatePaging(page, size);
         int offset = (page - 1) * size;
         List<StockDailyBarDO> records = stockDailyBarMapper.selectByFilter(
                 query.canonicalSymbol(), query.fromDate(), query.toDate(),
@@ -93,7 +103,7 @@ public class StockDataService {
                 query.canonicalSymbol(), query.fromDate(), query.toDate(),
                 query.adjustType(), query.dataSource());
         List<StockDailyBarVO> items = records.stream().map(converter::toBarVO).toList();
-        return Map.of("items", items, "total", total, "page", page, "size", size);
+        return new PageResultVO<>(items, total, page, size);
     }
 
     @Transactional

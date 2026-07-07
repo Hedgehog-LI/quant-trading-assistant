@@ -76,21 +76,32 @@ public class StockDataManager {
         // 预加载的 DB existing bar 缓存
         Map<String, StockDailyBarDO> dbExistingMap = new HashMap<>();
 
-        // 手动读取并校验首行表头
+        // 手动读取并校验首行表头（兼容 UTF-8 BOM）
         BufferedReader headerReader;
         try {
             headerReader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
+            headerReader.mark(8);
+            int firstChar = headerReader.read();
+            if (firstChar != 0xFEFF) {
+                headerReader.reset();
+            }
             String headerLine = headerReader.readLine();
             if (headerLine == null || headerLine.isBlank()) {
                 throw new BusinessException(ErrorCodeEnum.CSV_EMPTY_FILE, "CSV 文件为空或仅有空行");
             }
-            String[] actualHeaders = headerLine.split(",");
-            List<String> expectedHeaders = Arrays.asList(MarketDataConstants.CSV_HEADERS);
-            for (String h : actualHeaders) {
-                if (!expectedHeaders.contains(h.trim())) {
+            // 严格匹配表头：数量、名称、顺序完全一致
+            String[] actualHeaders = headerLine.split(",", -1);
+            String[] expectedHeaders = MarketDataConstants.CSV_HEADERS;
+            if (actualHeaders.length != expectedHeaders.length) {
+                throw new BusinessException(ErrorCodeEnum.CSV_WRONG_HEADER,
+                        "CSV 表头列数不匹配，期望 " + expectedHeaders.length + " 列: "
+                        + String.join(",", expectedHeaders) + "，实际: " + headerLine);
+            }
+            for (int i = 0; i < expectedHeaders.length; i++) {
+                if (!expectedHeaders[i].equals(actualHeaders[i].trim())) {
                     throw new BusinessException(ErrorCodeEnum.CSV_WRONG_HEADER,
-                            "CSV 表头不匹配，期望: " + String.join(",", MarketDataConstants.CSV_HEADERS)
-                            + "，实际: " + headerLine);
+                            "CSV 表头第 " + (i + 1) + " 列不匹配，期望: " + expectedHeaders[i]
+                            + "，实际: " + actualHeaders[i].trim());
                 }
             }
         } catch (BusinessException e) {

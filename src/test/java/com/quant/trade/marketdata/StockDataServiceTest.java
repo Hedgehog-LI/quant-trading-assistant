@@ -3,6 +3,7 @@ package com.quant.trade.marketdata;
 import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.marketdata.dto.CreateStockBasicDTO;
 import com.quant.trade.marketdata.dto.DailyBarQueryDTO;
+import com.quant.trade.marketdata.vo.PageResultVO;
 import com.quant.trade.marketdata.dto.UpdateStockBasicDTO;
 import com.quant.trade.marketdata.manager.StockDataManager;
 import com.quant.trade.marketdata.service.StockDataService;
@@ -17,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -102,20 +102,20 @@ class StockDataServiceTest {
         createStock("000001", "SZ", "平安银行");
         createStock("430047", "BJ", "诺思兰德");
 
-        Map<String, Object> page1 = stockDataService.listStocks(null, null, 1, 2);
-        assertEquals(3L, page1.get("total"));
-        assertEquals(2, ((java.util.List<?>) page1.get("items")).size());
+        PageResultVO<StockBasicVO> page1 = stockDataService.listStocks(null, null, 1, 2);
+        assertEquals(3L, page1.total());
+        assertEquals(2, page1.items().size());
 
-        Map<String, Object> page2 = stockDataService.listStocks(null, null, 2, 2);
-        assertEquals(1, ((java.util.List<?>) page2.get("items")).size());
+        PageResultVO<StockBasicVO> page2 = stockDataService.listStocks(null, null, 2, 2);
+        assertEquals(1, page2.items().size());
     }
 
     @Test
     void listStocksMarketFilter() {
         createStock("600519", "SH", "贵州茅台");
         createStock("000001", "SZ", "平安银行");
-        Map<String, Object> result = stockDataService.listStocks("SH", null, 1, 20);
-        assertEquals(1L, result.get("total"));
+        PageResultVO<StockBasicVO> result = stockDataService.listStocks("SH", null, 1, 20);
+        assertEquals(1L, result.total());
     }
 
     @Test
@@ -127,10 +127,10 @@ class StockDataServiceTest {
             "SH.600519,2026-07-03,1695,1710,1690,1705,18000,30690000,NONE\n";
         stockDataService.importDailyBars(stream(csv), csv.getBytes(StandardCharsets.UTF_8).length);
 
-        Map<String, Object> page1 = stockDataService.queryDailyBars(
+        PageResultVO<com.quant.trade.marketdata.vo.StockDailyBarVO> page1 = stockDataService.queryDailyBars(
                 new DailyBarQueryDTO("SH.600519", null, null, null, null), 1, 2);
-        assertEquals(3L, page1.get("total"));
-        assertEquals(2, ((java.util.List<?>) page1.get("items")).size());
+        assertEquals(3L, page1.total());
+        assertEquals(2, page1.items().size());
     }
 
     // ===== CSV 导入 =====
@@ -237,9 +237,9 @@ class StockDataServiceTest {
             "SH.600519,2026-07-01,1680.00,1695.00,1678.00,1690.00,25000,42250000.00,NONE\n" +
             "SH.600519,2026-07-02,1690.00,1700.00,1685.00,1695.00,22000,37290000.00,NONE\n";
         stockDataService.importDailyBars(stream(csv), csv.getBytes(StandardCharsets.UTF_8).length);
-        Map<String, Object> result = stockDataService.queryDailyBars(
+        PageResultVO<com.quant.trade.marketdata.vo.StockDailyBarVO> result = stockDataService.queryDailyBars(
                 new DailyBarQueryDTO("SH.600519", null, null, null, null), 1, 20);
-        assertEquals(2L, result.get("total"));
+        assertEquals(2L, result.total());
     }
 
     @Test
@@ -247,12 +247,92 @@ class StockDataServiceTest {
         createStock("600519", "SH", "贵州茅台");
         String csv = header() + "SH.600519,2026-07-01,1680.00,1695.00,1678.00,1690.00,25000,42250000.00,NONE\n";
         stockDataService.importDailyBars(stream(csv), csv.getBytes(StandardCharsets.UTF_8).length);
-        Map<String, Object> result = stockDataService.queryDailyBars(
+        PageResultVO<com.quant.trade.marketdata.vo.StockDailyBarVO> filterResult = stockDataService.queryDailyBars(
                 new DailyBarQueryDTO("SH.600519", null, null, null, "CSV"), 1, 20);
-        assertEquals(1L, result.get("total"));
-        result = stockDataService.queryDailyBars(
+        assertEquals(1L, filterResult.total());
+        filterResult = stockDataService.queryDailyBars(
                 new DailyBarQueryDTO("SH.600519", null, null, null, "MANUAL"), 1, 20);
-        assertEquals(0L, result.get("total"));
+        assertEquals(0L, filterResult.total());
+    }
+
+    // ===== 分页参数校验 =====
+
+    @Test
+    void listStocksInvalidPageThrows() {
+        assertThrows(BusinessException.class,
+                () -> stockDataService.listStocks(null, null, 0, 10));
+    }
+
+    @Test
+    void listStocksInvalidSizeZeroThrows() {
+        assertThrows(BusinessException.class,
+                () -> stockDataService.listStocks(null, null, 1, 0));
+    }
+
+    @Test
+    void listStocksInvalidSizeTooLargeThrows() {
+        assertThrows(BusinessException.class,
+                () -> stockDataService.listStocks(null, null, 1, 501));
+    }
+
+    @Test
+    void queryDailyBarsInvalidPageThrows() {
+        assertThrows(BusinessException.class,
+                () -> stockDataService.queryDailyBars(new DailyBarQueryDTO(null, null, null, null, null), -1, 10));
+    }
+
+    // ===== CSV 表头严格校验 =====
+
+    @Test
+    void csvImportExtraColumnHeaderThrows() {
+        createStock("600519", "SH", "贵州茅台");
+        String csv = "canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type,extra\n" +
+                "SH.600519,2026-07-01,1680,1695,1678,1690,25000,42250000,NONE,x\n";
+        assertThrows(BusinessException.class, () ->
+                stockDataService.importDailyBars(stream(csv), csv.getBytes(StandardCharsets.UTF_8).length));
+    }
+
+    @Test
+    void csvImportMissingColumnHeaderThrows() {
+        createStock("600519", "SH", "贵州茅台");
+        String csv = "canonical_symbol,trade_date,open,high,low,close,volume\n" +
+                "SH.600519,2026-07-01,1680,1695,1678,1690,25000\n";
+        assertThrows(BusinessException.class, () ->
+                stockDataService.importDailyBars(stream(csv), csv.getBytes(StandardCharsets.UTF_8).length));
+    }
+
+    @Test
+    void csvImportWrongColumnOrderThrows() {
+        createStock("600519", "SH", "贵州茅台");
+        String csv = "trade_date,canonical_symbol,open,high,low,close,volume,amount,adjust_type\n" +
+                "2026-07-01,SH.600519,1680,1695,1678,1690,25000,42250000,NONE\n";
+        assertThrows(BusinessException.class, () ->
+                stockDataService.importDailyBars(stream(csv), csv.getBytes(StandardCharsets.UTF_8).length));
+    }
+
+    @Test
+    void csvImportUtf8BomSuccess() {
+        createStock("600519", "SH", "贵州茅台");
+        // UTF-8 BOM + 正常 CSV
+        byte[] bom = { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF };
+        byte[] csvBytes = (header() + "SH.600519,2026-07-01,1680.00,1695.00,1678.00,1690.00,25000,42250000.00,NONE\n")
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] combined = new byte[bom.length + csvBytes.length];
+        System.arraycopy(bom, 0, combined, 0, bom.length);
+        System.arraycopy(csvBytes, 0, combined, bom.length, csvBytes.length);
+        DailyBarImportResultVO result = stockDataService.importDailyBars(
+                new ByteArrayInputStream(combined), combined.length);
+        assertEquals(1, result.inserted());
+        assertEquals(0, result.failed());
+    }
+
+    @Test
+    void csvImportInvalidDateThrows() {
+        createStock("600519", "SH", "贵州茅台");
+        String csv = header() + "SH.600519,2026-13-45,1680,1695,1678,1690,25000,42250000,NONE\n";
+        DailyBarImportResultVO result = stockDataService.importDailyBars(
+                stream(csv), csv.getBytes(StandardCharsets.UTF_8).length);
+        assertEquals(1, result.failed());
     }
 
     // ===== helpers =====
