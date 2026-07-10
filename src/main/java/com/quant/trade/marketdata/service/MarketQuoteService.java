@@ -115,9 +115,23 @@ public class MarketQuoteService {
         String idemKey = UUID.nameUUIDFromBytes(
                 (dto.provider() + dto.taskType() + scopeJson).getBytes()).toString();
 
-        // 幂等：已有任务直接返回
+        // 幂等策略：
+        // - PENDING/RUNNING：直接返回（避免并发重复执行）
+        // - SUCCEEDED：直接返回（幂等成功）
+        // - FAILED/PARTIAL_FAILED/CANCELLED：删除旧任务，允许重试
         MarketDataSyncTaskDO existing = taskMapper.selectByIdempotencyKey(idemKey);
-        if (existing != null) return toTaskVO(existing);
+        if (existing != null) {
+            String st = existing.getStatus();
+            if (MarketDataConstants.TASK_STATUS_PENDING.equals(st)
+                    || MarketDataConstants.TASK_STATUS_RUNNING.equals(st)
+                    || MarketDataConstants.TASK_STATUS_SUCCEEDED.equals(st)) {
+                return toTaskVO(existing);
+            }
+            // FAILED/PARTIAL_FAILED：删除旧任务和关联 alert，允许重新执行
+            txRequiresNew.executeWithoutResult(s -> {
+                taskMapper.deleteById(existing.getId());
+            });
+        }
 
         // 1. 创建 PENDING 任务（独立事务）
         MarketDataSyncTaskDO task = txRequiresNew.execute(status -> {

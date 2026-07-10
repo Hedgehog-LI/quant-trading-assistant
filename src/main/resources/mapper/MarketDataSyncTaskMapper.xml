@@ -11,4 +11,5 @@
     <select id="selectByIdempotencyKey" resultMap="BaseResultMap">SELECT <include refid="Cols"/> FROM market_data_sync_task WHERE idempotency_key=#{key}</select>
     <select id="selectByFilter" resultMap="BaseResultMap">SELECT <include refid="Cols"/> FROM market_data_sync_task<where><if test="status!=null and status!=''">AND status=#{status}</if><if test="provider!=null and provider!=''">AND provider=#{provider}</if></where>ORDER BY created_at DESC LIMIT #{limit} OFFSET #{offset}</select>
     <select id="countByFilter" resultType="long">SELECT COUNT(1) FROM market_data_sync_task<where><if test="status!=null and status!=''">AND status=#{status}</if><if test="provider!=null and provider!=''">AND provider=#{provider}</if></where></select>
+    <delete id="deleteById">DELETE FROM market_data_sync_task WHERE id=#{id}</delete>
 </mapper>

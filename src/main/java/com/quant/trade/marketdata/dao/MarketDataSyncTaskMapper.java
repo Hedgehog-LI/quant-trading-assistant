@@ -13,4 +13,5 @@ public interface MarketDataSyncTaskMapper {
     List<MarketDataSyncTaskDO> selectByFilter(@Param("status") String status, @Param("provider") String provider,
                                               @Param("limit") int limit, @Param("offset") int offset);
     long countByFilter(@Param("status") String status, @Param("provider") String provider);
+    int deleteById(@Param("id") Long id);
 }
