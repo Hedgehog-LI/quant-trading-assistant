@@ -33,10 +33,20 @@
 | Position Snapshot | GET | `/api/v1/position-snapshots/{id}/reconciliation` | 已实现（v0.1.1） | `POSITION_SNAPSHOT_API.md` |
 | Position Snapshot | PATCH | `/api/v1/position-snapshots/{id}/confirm` | 已实现 | `POSITION_SNAPSHOT_API.md` |
 | Position Snapshot | PATCH | `/api/v1/position-snapshots/{id}/cancel` | 已实现 | `POSITION_SNAPSHOT_API.md` |
+| Market Data | GET / POST | `/api/v1/market-data/stocks` | 已实现 | `MARKET_DATA_API.md` |
+| Market Data | GET / DELETE | `/api/v1/market-data/stocks/{canonicalSymbol}` | 已实现 | `MARKET_DATA_API.md` |
+| Market Data | PUT | `/api/v1/market-data/stocks/{id}` | 已实现 | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/daily-bars` | 已实现 | `MARKET_DATA_API.md` |
+| Market Data | POST | `/api/v1/market-data/daily-bars/import` | 已实现 | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/daily-bars/template` | 已实现 | `MARKET_DATA_API.md` |
+| Market Data | GET / POST | `/api/v1/market-data/providers/LONGPORT/*` | 设计中（v0.1.2） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET | `/api/v1/market-data/quotes/latest`, `/api/v1/market-data/quote-snapshots` | 设计中（v0.1.2） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET | `/api/v1/market-data/sync-tasks/*` | 设计中（v0.1.2） | `MARKET_DATA_API.md` |
+| Market Data | GET / PATCH | `/api/v1/market-data/alerts/*` | 设计中（v0.1.2） | `MARKET_DATA_API.md` |
 
 ## 错误码
 
-通用错误码表见 `../API_TODAY_MVP.md`；v0.1.1 新增：`TRADE_PLAN_NOT_FOUND` / `TRADE_PLAN_NOT_LINKABLE` / `TRADE_PLAN_SYMBOL_MISMATCH` / `JOURNAL_REFERENCED_BY_REVIEW` / `POSITION_SNAPSHOT_COMPARISON_INVALID`。
+通用错误码表见 `../API_TODAY_MVP.md`；v0.1.1 新增：`TRADE_PLAN_NOT_FOUND` / `TRADE_PLAN_NOT_LINKABLE` / `TRADE_PLAN_SYMBOL_MISMATCH` / `JOURNAL_REFERENCED_BY_REVIEW` / `POSITION_SNAPSHOT_COMPARISON_INVALID`。行情错误码见 `MARKET_DATA_API.md` 和实际 `ErrorCodeEnum`。
 
 ## 维护规则
 

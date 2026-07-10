@@ -2,7 +2,7 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
-当前已发布 V1-V4，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+当前已发布 V1-V6，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
 
 ## 命名约定
 
@@ -17,7 +17,7 @@
 
 ### stock_basic
 
-状态：规划，尚未实现。用途：保存证券基础信息，为后续行情落库提供统一标识。
+状态：已由 V5 实现。用途：保存证券基础信息，为后续行情落库提供统一标识。
 
 核心字段：
 
@@ -25,21 +25,17 @@
 - `symbol`
 - `canonical_symbol`
 - `name`
-- `exchange`
 - `market`
-- `currency`
-- `industry`
 - `list_date`
-- `list_status`
-- `data_source`
-- `source_updated_at`
+- `delisted`
 - `created_at`
 - `updated_at`
 
 索引：
 
-- unique `uk_stock_basic_canonical_symbol(canonical_symbol)`
-- index `idx_stock_basic_industry(industry)`
+- unique `uk_stock_basic_canonical(canonical_symbol)`
+- index `idx_stock_basic_market(market)`
+- index `idx_stock_basic_symbol(symbol)`
 
 ### watchlist
 
@@ -65,35 +61,34 @@
 
 ### stock_daily_bar
 
-状态：规划，尚未实现。用途：保存日 K 行情。
+状态：已由 V5/V6 实现。用途：保存日 K 行情。
 
 核心字段：
 
 - `id`
-- `symbol`
 - `canonical_symbol`
 - `trade_date`
 - `open_price`
 - `high_price`
 - `low_price`
 - `close_price`
-- `pre_close_price`
 - `volume`
 - `amount`
-- `turnover_rate`
 - `adjust_type`
 - `data_source`
 - `fetched_at`
 - `created_at`
+- `updated_at`
 
 索引：
 
-- unique `uk_daily_symbol_date_adjust_source(canonical_symbol, trade_date, adjust_type, data_source)`
-- index `idx_daily_date(trade_date)`
+- unique `uk_daily_bar_key(canonical_symbol, trade_date, adjust_type, data_source)`
+- index `idx_daily_bar_symbol_date(canonical_symbol, trade_date)`
+- index `idx_daily_bar_date(trade_date)`
 
 ### stock_quote_snapshot
 
-状态：规划，尚未实现。用途：保存从外部数据源查询到的价格快照。
+状态：规划，尚未实现。用途：保存从外部数据源查询到的价格快照。第一目标来源为 LongPort，只作为外部行情快照，不替代手工估值。
 
 核心字段：
 
@@ -108,11 +103,76 @@
 - `volume`
 - `amount`
 - `data_source`
+- `trade_status`
 - `fetched_at`
 - `raw_hash`
 - `created_at`
+- `updated_at`
+
+索引：
+
+- unique `uk_quote_snapshot_symbol_source_time(canonical_symbol, data_source, quote_time)`
+- index `idx_quote_snapshot_symbol_time(canonical_symbol, quote_time)`
+- index `idx_quote_snapshot_fetched_at(fetched_at)`
 
 该表不得替代现有 `portfolio_price_snapshot`。后者是用户手工维护的估值数据。
+
+### market_data_sync_task
+
+状态：规划，尚未实现。用途：记录 LongPort/CSV 等行情同步任务的状态、范围和错误摘要。
+
+核心字段：
+
+- `id`
+- `task_type`
+- `provider`
+- `scope_json`
+- `status`
+- `idempotency_key`
+- `total_count`
+- `success_count`
+- `fail_count`
+- `inserted_count`
+- `updated_count`
+- `skipped_count`
+- `started_at`
+- `finished_at`
+- `last_error_code`
+- `error_summary_json`
+- `created_at`
+- `updated_at`
+
+索引：
+
+- unique `uk_market_sync_idempotency(idempotency_key)`
+- index `idx_market_sync_provider_status(provider, status)`
+- index `idx_market_sync_created_at(created_at)`
+
+### market_data_alert
+
+状态：规划，尚未实现。用途：保存行情数据质量和量价观察提醒。提醒只用于观察和复盘，不作为交易指令。
+
+核心字段：
+
+- `id`
+- `alert_type`
+- `severity`
+- `canonical_symbol`
+- `provider`
+- `quote_time`
+- `trade_date`
+- `task_id`
+- `message`
+- `trigger_value_json`
+- `resolved`
+- `created_at`
+- `updated_at`
+
+索引：
+
+- index `idx_market_alert_symbol_resolved(canonical_symbol, resolved)`
+- index `idx_market_alert_severity_created(severity, created_at)`
+- index `idx_market_alert_task(task_id)`
 
 ### stock_minute_bar
 
@@ -310,10 +370,10 @@
 
 ## 实施顺序
 
-1. 当前先完成 `docs/features/TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md`，对比和对账结果不新增结果表。
-2. 行情阶段先实现 `stock_basic` 和证券代码规范化。
-3. 再实现 CSV 日 K 幂等导入。
-4. 外部最新价接入时新增 `stock_quote_snapshot` 和同步任务记录。
+1. `docs/features/TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md` 已完成，对比和对账结果不新增结果表。
+2. 行情 P1.0 已实现 `stock_basic` 和证券代码规范化。
+3. 行情 P1.0 已实现 CSV 日 K 幂等导入。
+4. LongPort P1.1 外部最新价接入时新增 `stock_quote_snapshot`、`market_data_sync_task`、`market_data_alert`。
 5. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。

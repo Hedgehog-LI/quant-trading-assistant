@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-07-10 — LongPort 只读行情源产品与架构设计
+
+- **目标**：研究 LongPort/长桥 OpenAPI 是否适合接入 A 股行情，并沉淀下一轮前后端开发设计。
+- **范围**：只做产品/架构/文档设计，不改业务实现代码，不接真实交易能力。
+- **发现**：
+  - 代码事实已包含 `marketdata` 模块、V5/V6、`stock_basic`、`stock_daily_bar`、CSV 日 K 导入和 `/api/v1/market-data/*` 基础接口。
+  - 部分文档仍把行情基础标为规划，已在本轮同步。
+  - LongPort 能力覆盖实时行情、历史 K 线、MCP/SDK，但 MCP 也暴露交易/账户能力，必须通过 ADR 限定 quote-only。
+- **产品决策**：
+  - LongPort 只作为只读行情 provider。
+  - 最新价进入 `stock_quote_snapshot`，历史日 K 进入 `stock_daily_bar(data_source=LONGPORT)`。
+  - 外部行情不得覆盖 `portfolio_price_snapshot` 手工当前价。
+  - 异常提醒先做数据质量，再做量价观察，不输出买卖建议。
+- **新增文档**：
+  - `features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`
+  - `features/MARKET_ALERT_RULES_DESIGN.md`
+  - `development/2026-07-10-longport-market-data-research.md`
+  - `decisions/ADR-0008-longport-quote-only-provider.md`
+  - `api/MARKET_DATA_API.md`
+  - `prompts/LONGPORT_MARKET_DATA_CLAUDE_PROMPT.md`
+- **同步文档**：`PRODUCT_BLUEPRINT.md`、`BUILD_CHECKLIST.md`、`CURRENT_ARCHITECTURE_AND_MODULES.md`、`DATABASE_DESIGN.md`、`api/API_INDEX.md`、`AI_HANDOFF.md`、`decisions/ADR_INDEX.md`。
+
+---
+
 ## 2026-07-06 — 生产环境实测验证
 
 - **目标**：验证生产 Nginx → 后端 → MySQL 链路，确认 production-data-mode 真实状态。

@@ -1,7 +1,7 @@
 # Market Data Foundation Design
 
-> 状态：规划中，本轮不实现外部行情接入。  
-> 目的：为后续查询股票价格并落库预先确定数据边界，避免把手工估值、实时快照和历史 K 线混在一起。
+> 状态：P1.0 已实现证券主数据 + CSV 日 K；P1.1 设计 LongPort 只读行情源。
+> 目的：为查询股票价格并落库确定数据边界，避免把手工估值、外部实时快照和历史 K 线混在一起。
 
 ## 1. 产品目标
 
@@ -24,6 +24,14 @@
 | 同步任务 | `market_data_sync_task` | 记录任务状态、范围和错误摘要 |
 
 现有 `portfolio_price_snapshot` 不重命名、不冒充真实行情，也不直接被外部行情覆盖。
+
+当前实现事实：
+
+- `stock_basic` 已由 `V5__add_market_data_tables.sql` 实现。
+- `stock_daily_bar` 已由 `V5__add_market_data_tables.sql` 实现。
+- `stock_daily_bar.fetched_at` 已由 `V6__add_fetched_at_to_daily_bar.sql` 实现。
+- CSV 日 K 幂等导入已实现，`data_source=CSV`。
+- LongPort provider、`stock_quote_snapshot`、`market_data_sync_task`、`market_data_alert` 尚未实现。
 
 ## 3. 证券主数据
 
@@ -102,23 +110,29 @@ MarketDataProvider
 - 原始响应默认不长期保存；需要审计时只保存脱敏摘要或 hash。
 - 限流、重试、超时和熔断必须由数据源适配层统一处理。
 
+LongPort 特别约束：
+
+- LongPort 只作为只读行情 provider，见 `../decisions/ADR-0008-longport-quote-only-provider.md`。
+- 只允许使用 Quote 相关能力，不允许接入交易、订单、账户资金、真实持仓能力。
+- LongPort 标的代码使用 `ticker.region`，系统内部使用 `region.ticker`，例如内部 `SH.600519` 映射为 provider `600519.SH`。
+- LongPort 凭据只存在服务端环境变量或安全配置中，不进入前端、DB、日志或 Git。
+
 ## 7. 推荐实施顺序
 
 1. 完成当前交易闭环优化。
-2. 实现 `stock_basic`、代码规范化和查询 API。
-3. 实现 CSV 日 K 导入，先验证表结构和幂等规则。
-4. 接入一个公开行情 provider 的最新价查询。
-5. 增加同步任务、失败重试和数据质量检查。
-6. 再让交易账本选择性使用外部最新价估值。
+2. 已完成 `stock_basic`、代码规范化和查询 API。
+3. 已完成 CSV 日 K 导入，验证表结构和幂等规则。
+4. 接入 LongPort 只读行情 provider 的最新价查询。
+5. 增加 `stock_quote_snapshot`、同步任务、失败重试和数据质量检查。
+6. 仅在用户明确选择时，让交易账本参考外部最新价展示估值来源；不得自动覆盖手工价。
 7. 最后建设指标、策略和回测。
 
 ## 8. 验收原则
 
-- [ ] 手工价格与外部行情来源清楚区分。
-- [ ] 股票代码有统一、无歧义的规范化方式。
-- [ ] 同一行情不会重复写入。
-- [ ] 每条行情可追溯数据来源和抓取时间。
-- [ ] API Key 不出现在前端、日志和仓库。
-- [ ] 外部数据异常不会覆盖用户手工数据。
+- [x] 手工价格与日 K 来源清楚区分。
+- [x] 股票代码有统一、无歧义的规范化方式。
+- [x] CSV 日 K 不会重复写入。
+- [x] CSV 日 K 可追溯数据来源和抓取时间。
+- [ ] LongPort API Key 不出现在前端、日志和仓库。
+- [ ] 外部最新价快照不覆盖用户手工数据。
 - [ ] 行情仅用于辅助分析，不包装成确定性交易建议。
-

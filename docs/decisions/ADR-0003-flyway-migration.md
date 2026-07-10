@@ -11,10 +11,10 @@
 
 ## 原因
 - 版本化、可重放、CI/测试一致（H2 + MySQL 双环境）。
-- 已发布 V1-V4 不可改动，避免污染既有环境。
+- 已发布 migration 不可改动，避免污染既有环境。当前已发布到 V6。
 
 ## 影响
-新表/字段必须新增 `VX__*.sql`；测试 profile（H2）用同一套 migration 建表。当前 V1-V4：init/today_mvp/portfolio_ledger/position_snapshot。
+新表/字段必须新增 `VX__*.sql`；测试 profile（H2）用同一套 migration 建表。当前 V1-V6：init/today_mvp/portfolio_ledger/position_snapshot/market_data/fetched_at。
 
 ## 替代方案
 Liquibase / JPA 自动建表——后者不可控（见 ADR-0002）。

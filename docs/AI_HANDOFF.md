@@ -17,12 +17,12 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 - **v0.1.0** Today MVP + 交易账本 + 持仓快照：已完成。
 - **v0.1.1** 基础交易闭环优化（计划关联 + 复盘一致性 + 快照对比 + FIFO 对账 + 工作台待办 + 连接防呆）及多轮质量收尾：**已完成并验收**。范围与改动见 `development/DEVELOPMENT_LOG.md`。
-- **验收**：后端 121 测试通过、前端 179 测试通过、Docker 冷构建 + curl 端到端 + 浏览器（4 页面控制台 `DEPRECATED_WARNINGS=0`）全绿。详见 `acceptance/ACCEPTANCE_LOG.md`。
-- **未新增数据库表，未修改 V1-V4 migration。**
+- **P1.0 行情基础**：`marketdata` 模块已存在，V5/V6 已实现 `stock_basic`、`stock_daily_bar`、CSV 日 K 导入和 `fetched_at`。
+- **v0.1.1 验收**：后端 121 测试通过、前端 179 测试通过、Docker 冷构建 + curl 端到端 + 浏览器（4 页面控制台 `DEPRECATED_WARNINGS=0`）全绿。详见 `acceptance/ACCEPTANCE_LOG.md`。
 
 ## 下一阶段
 
-按 `features/MARKET_DATA_FOUNDATION_DESIGN.md` 建设证券主数据与日 K 边界；AI 图片识别暂缓；外部行情暂不实现，只保持边界清晰。
+P1.0 证券主数据和 CSV 日 K 基础已由 `marketdata` 模块实现（V5/V6）。下一阶段按 `features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md` 和 `features/MARKET_ALERT_RULES_DESIGN.md` 建设 LongPort 只读行情源、外部最新价快照、历史日 K 同步任务和行情异常提醒。AI 图片识别暂缓。
 
 ## 接手顺序（新会话）
 

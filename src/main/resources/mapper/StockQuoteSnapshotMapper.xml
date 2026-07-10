@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.StockQuoteSnapshotMapper">
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.StockQuoteSnapshotDO">
+        <id column="id" property="id"/>
+        <result column="canonical_symbol" property="canonicalSymbol"/>
+        <result column="quote_time" property="quoteTime"/>
+        <result column="current_price" property="currentPrice"/>
+        <result column="open_price" property="openPrice"/>
+        <result column="high_price" property="highPrice"/>
+        <result column="low_price" property="lowPrice"/>
+        <result column="pre_close_price" property="preClosePrice"/>
+        <result column="volume" property="volume"/>
+        <result column="amount" property="amount"/>
+        <result column="trade_status" property="tradeStatus"/>
+        <result column="data_source" property="dataSource"/>
+        <result column="fetched_at" property="fetchedAt"/>
+        <result column="raw_hash" property="rawHash"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="Cols">id,canonical_symbol,quote_time,current_price,open_price,high_price,low_price,pre_close_price,volume,amount,trade_status,data_source,fetched_at,raw_hash,created_at,updated_at</sql>
+    <insert id="upsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO stock_quote_snapshot (canonical_symbol,quote_time,current_price,open_price,high_price,low_price,pre_close_price,volume,amount,trade_status,data_source,fetched_at,raw_hash)
+        VALUES (#{canonicalSymbol},#{quoteTime},#{currentPrice},#{openPrice},#{highPrice},#{lowPrice},#{preClosePrice},#{volume},#{amount},#{tradeStatus},#{dataSource},#{fetchedAt},#{rawHash})
+        ON DUPLICATE KEY UPDATE current_price=VALUES(current_price),open_price=VALUES(open_price),high_price=VALUES(high_price),low_price=VALUES(low_price),pre_close_price=VALUES(pre_close_price),volume=VALUES(volume),amount=VALUES(amount),trade_status=VALUES(trade_status),fetched_at=VALUES(fetched_at),raw_hash=VALUES(raw_hash)
+    </insert>
+    <select id="selectByUniqueKey" resultMap="BaseResultMap">SELECT <include refid="Cols"/> FROM stock_quote_snapshot WHERE canonical_symbol=#{canonicalSymbol} AND data_source=#{dataSource} AND quote_time=#{quoteTime}</select>
+    <select id="selectByFilter" resultMap="BaseResultMap">SELECT <include refid="Cols"/> FROM stock_quote_snapshot<where><if test="canonicalSymbol!=null and canonicalSymbol!=''">AND canonical_symbol=#{canonicalSymbol}</if><if test="dataSource!=null and dataSource!=''">AND data_source=#{dataSource}</if></where>ORDER BY quote_time DESC LIMIT #{limit} OFFSET #{offset}</select>
+    <select id="countByFilter" resultType="long">SELECT COUNT(1) FROM stock_quote_snapshot<where><if test="canonicalSymbol!=null and canonicalSymbol!=''">AND canonical_symbol=#{canonicalSymbol}</if><if test="dataSource!=null and dataSource!=''">AND data_source=#{dataSource}</if></where></select>
+</mapper>

@@ -61,6 +61,7 @@ convert     # MapStruct 转换器
 | Review | `review` | `/api/v1/reviews` | `review_note` |
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
+| Market Data | `marketdata` | `/api/v1/market-data/*` | `stock_basic`, `stock_daily_bar` |
 
 ## 4. 当前数据库迁移
 
@@ -70,8 +71,10 @@ convert     # MapStruct 转换器
 | `V2__create_today_mvp_tables.sql` | watchlist、trade_plan、trade_journal、review_note |
 | `V3__add_portfolio_ledger.sql` | 交易费用字段、portfolio_price_snapshot |
 | `V4__add_position_snapshot.sql` | 持仓快照主表和明细表 |
+| `V5__add_market_data_tables.sql` | 证券主数据 stock_basic、日 K stock_daily_bar |
+| `V6__add_fetched_at_to_daily_bar.sql` | stock_daily_bar 增加 fetched_at |
 
-已发布的 V1/V2/V3/V4 migration 不应修改；后续表结构调整继续新增更高版本 migration。
+已发布的 V1-V6 migration 不应修改；后续表结构调整继续新增更高版本 migration。
 
 ## 5. 交易账本口径
 
@@ -160,8 +163,14 @@ npm run build
 - **工作台待办中心**：`DashboardTodayVO` 增加结构化 `todos`；`DashboardManager.buildTodos` 聚合六类待办（PENDING_REVIEW / UNLINKED_TRADE_PLAN / TRADE_AGAINST_PLAN / MISSING_STOP_LOSS / STALE_POSITION_SNAPSHOT / POSITION_RECONCILIATION_MISMATCH），STALE 阈值 3 自然日，RECONCILE 由 service 层调用对账补充；前端 remote 直接用后端聚合，mock 用同口径纯函数。
 - **生产连接防呆**：前端 `settingsApi` 增加 `isLocalhostHost` / `isLocalhostUrl` / `resolveEffectiveApiBaseUrl` / `testBackendConnection`；公网页面禁止保存指向 localhost 的后端地址；设置页展示有效请求地址并提供只读"测试连接"按钮（区分 success / timeout / http_error / business_error / network_error）。
 
-新增错误码：`TRADE_PLAN_NOT_FOUND` / `TRADE_PLAN_NOT_LINKABLE` / `TRADE_PLAN_SYMBOL_MISMATCH` / `JOURNAL_REFERENCED_BY_REVIEW` / `POSITION_SNAPSHOT_COMPARISON_INVALID`。新增枚举：`DashboardTodoCodeEnum` / `DashboardTodoLevelEnum`（common.enums）、`SnapshotChangeTypeEnum` / `ReconciliationStatusEnum`（portfolio.enums）。**未新增任何数据库表，未修改 V1-V4 migration。**
+新增错误码：`TRADE_PLAN_NOT_FOUND` / `TRADE_PLAN_NOT_LINKABLE` / `TRADE_PLAN_SYMBOL_MISMATCH` / `JOURNAL_REFERENCED_BY_REVIEW` / `POSITION_SNAPSHOT_COMPARISON_INVALID`。新增枚举：`DashboardTodoCodeEnum` / `DashboardTodoLevelEnum`（common.enums）、`SnapshotChangeTypeEnum` / `ReconciliationStatusEnum`（portfolio.enums）。该阶段未新增任何数据库表。
 
 ## 11. 后续规划（未实现）
 
-证券主数据和行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`，目前仍是规划，不属于当前实现事实。AI 图片识别暂缓。
+证券主数据和 CSV 日 K 基础已经由 `marketdata` 模块实现。下一步行情 provider、外部价格快照、同步任务和行情异常提醒见：
+
+- `docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`
+- `docs/features/MARKET_ALERT_RULES_DESIGN.md`
+- `docs/decisions/ADR-0008-longport-quote-only-provider.md`
+
+AI 图片识别暂缓。

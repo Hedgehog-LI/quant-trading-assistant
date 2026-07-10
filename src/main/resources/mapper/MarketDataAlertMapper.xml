@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.MarketDataAlertMapper">
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketDataAlertDO">
+        <id column="id" property="id"/><result column="alert_type" property="alertType"/><result column="severity" property="severity"/><result column="canonical_symbol" property="canonicalSymbol"/><result column="quote_time" property="quoteTime"/><result column="trade_date" property="tradeDate"/><result column="provider" property="provider"/><result column="task_id" property="taskId"/><result column="message" property="message"/><result column="trigger_value_json" property="triggerValueJson"/><result column="resolved" property="resolved"/><result column="created_at" property="createdAt"/><result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="Cols">id,alert_type,severity,canonical_symbol,quote_time,trade_date,provider,task_id,message,trigger_value_json,resolved,created_at,updated_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">INSERT INTO market_data_alert(alert_type,severity,canonical_symbol,quote_time,trade_date,provider,task_id,message,trigger_value_json,resolved) VALUES(#{alertType},#{severity},#{canonicalSymbol},#{quoteTime},#{tradeDate},#{provider},#{taskId},#{message},#{triggerValueJson},#{resolved})</insert>
+    <select id="selectById" resultMap="BaseResultMap">SELECT <include refid="Cols"/> FROM market_data_alert WHERE id=#{id}</select>
+    <select id="selectByFilter" resultMap="BaseResultMap">SELECT <include refid="Cols"/> FROM market_data_alert<where><if test="resolved!=null">AND resolved=#{resolved}</if><if test="severity!=null and severity!=''">AND severity=#{severity}</if><if test="canonicalSymbol!=null and canonicalSymbol!=''">AND canonical_symbol=#{canonicalSymbol}</if></where>ORDER BY created_at DESC LIMIT #{limit} OFFSET #{offset}</select>
+    <select id="countByFilter" resultType="long">SELECT COUNT(1) FROM market_data_alert<where><if test="resolved!=null">AND resolved=#{resolved}</if><if test="severity!=null and severity!=''">AND severity=#{severity}</if><if test="canonicalSymbol!=null and canonicalSymbol!=''">AND canonical_symbol=#{canonicalSymbol}</if></where></select>
+    <update id="updateResolved">UPDATE market_data_alert SET resolved=#{resolved} WHERE id=#{id}</update>
+</mapper>

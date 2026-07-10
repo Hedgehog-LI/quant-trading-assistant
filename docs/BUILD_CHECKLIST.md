@@ -180,16 +180,30 @@
 - [x] Antd 6.4 deprecated 清理：`Alert message→title`、`Spin tip→description`、`Space direction→orientation`、`Drawer width→size`、Dashboard `List→ul/li` 已全替换；Playwright 浏览器实测工作台/交易记录/持仓快照/设置 4 个页面，控制台 `DEPRECATED_WARNINGS=0, CONSOLE_ERRORS=0`。
 - [x] JSON 导出文案防误导：明确"仅导出浏览器 localStorage，不含后端 MySQL"，文件名改 `qta-local-export`。
 
-## 7. 后续 P1: 证券主数据与行情基础
+## 7. P1: 证券主数据与行情基础
 
-设计基线：`docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。
+设计基线：`docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`、`docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`。
 
-- [ ] 建设 `stock_basic` 和统一证券标识。
-- [ ] 明确手工价格、外部价格快照、日 K 的数据边界。
-- [ ] 先支持 CSV 日 K 幂等导入。
-- [ ] 再接一个外部行情 provider。
-- [ ] 行情记录数据来源和抓取时间。
-- [ ] API Key 只在服务端配置，不进入前端和仓库。
+### P1.0 已实现：证券主数据 + CSV 日 K
+
+- [x] 建设 `stock_basic` 和统一证券标识。
+- [x] 建设 `stock_daily_bar`。
+- [x] `stock_daily_bar` 增加 `fetched_at`，记录抓取/导入时间。
+- [x] 支持 CSV 日 K 幂等导入。
+- [x] 明确手工价格、外部价格快照、日 K 的数据边界。
+- [x] 后端 `/api/v1/market-data/*` 基础接口已实现。
+- [x] 前端 `/market-data` 证券主数据和日 K 页面已实现。
+
+### P1.1 待实现：LongPort 只读行情源
+
+- [ ] 新增 LongPort quote-only provider，禁止交易、账户、订单、真实持仓调用。
+- [ ] 新增 provider 状态和健康检查 API。
+- [ ] 新增 `stock_quote_snapshot` 外部最新价快照。
+- [ ] 新增 `market_data_sync_task` 历史日 K 同步任务。
+- [ ] 新增 `market_data_alert` 行情异常提醒。
+- [ ] 前端 `/market-data` 扩展为行情状态、证券主数据、最新价快照、历史同步、异常提醒 5 个 Tab。
+- [ ] 建设看板补充 LongPort provider、最新价快照、历史同步、异常提醒节点。
+- [ ] API Key/token 只在服务端配置，不进入前端、日志和仓库。
 
 ## 8. 暂缓: 图片识别导入
 
