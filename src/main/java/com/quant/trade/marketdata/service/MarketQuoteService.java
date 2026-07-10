@@ -1,5 +1,6 @@
 package com.quant.trade.marketdata.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.constant.MarketDataConstants;
@@ -14,7 +15,9 @@ import com.quant.trade.marketdata.vo.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,6 +34,8 @@ public class MarketQuoteService {
     private final MarketDataSyncTaskMapper taskMapper;
     private final MarketDataAlertMapper alertMapper;
     private final StockDailyBarMapper dailyBarMapper;
+    private final TransactionTemplate txRequiresNew;
+    private final ObjectMapper objectMapper;
 
     // ==================== Provider 状态 ====================
 
@@ -46,14 +51,13 @@ public class MarketQuoteService {
 
     // ==================== 最新价快照 ====================
 
-    /**
-     * 获取最新行情并可选落库。
-     *
-     * @return 快照 VO 列表
-     */
     @Transactional
     public List<StockQuoteSnapshotVO> fetchLatestQuotes(FetchQuotesRequestDTO dto) {
         if (!provider.isConfigured()) {
+            txRequiresNew.executeWithoutResult(s -> createAlert(
+                    MarketDataConstants.ALERT_TYPE_PROVIDER_NOT_CONFIGURED,
+                    MarketDataConstants.ALERT_SEVERITY_HIGH, null, null, null,
+                    "行情 provider 未配置，获取最新行情请求被拒"));
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
                     "行情 provider 未配置，无法获取最新行情");
         }
@@ -71,9 +75,7 @@ public class MarketQuoteService {
                     .volume(q.volume() != null ? q.volume() : 0L).amount(q.amount())
                     .tradeStatus(q.tradeStatus()).dataSource(provider.getProviderCode())
                     .fetchedAt(now).build();
-            if (persist) {
-                quoteMapper.upsert(snapshot);
-            }
+            if (persist) quoteMapper.upsert(snapshot);
             result.add(toVO(snapshot));
         }
         return result;
@@ -91,113 +93,124 @@ public class MarketQuoteService {
     // ==================== 历史日 K 同步 ====================
 
     /**
-     * 创建并立即执行日 K 同步任务。
+     * 创建并执行日 K 同步任务。
      * <p>
-     * 流程：创建 PENDING → RUNNING → 调用 provider → 逐条幂等写入 stock_daily_bar
-     * → 更新 SUCCEEDED/FAILED + inserted/updated/skipped/failed 计数。
-     *
-     * @return 同步任务 VO（含执行结果）
+     * 事务策略：任务创建、状态更新、alert 均用 REQUIRES_NEW 独立事务，
+     * 保证即使 provider 调用失败或外层回滚，DB 仍可查到任务状态和 alert。
      */
-    @Transactional
     public MarketDataSyncTaskVO createAndExecuteDailyBarSync(CreateSyncTaskDTO dto) {
+        // 结构化 scope -> JSON（Jackson 序列化）
+        Map<String, Object> scopeMap = new LinkedHashMap<>();
+        scopeMap.put("canonicalSymbol", dto.canonicalSymbol());
+        scopeMap.put("startDate", dto.startDate());
+        scopeMap.put("endDate", dto.endDate());
+        scopeMap.put("adjustType", dto.adjustType());
+        String scopeJson;
+        try {
+            scopeJson = objectMapper.writeValueAsString(scopeMap);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "scope 序列化失败: " + e.getMessage());
+        }
+
+        String idemKey = UUID.nameUUIDFromBytes(
+                (dto.provider() + dto.taskType() + scopeJson).getBytes()).toString();
+
+        // 幂等：已有任务直接返回
+        MarketDataSyncTaskDO existing = taskMapper.selectByIdempotencyKey(idemKey);
+        if (existing != null) return toTaskVO(existing);
+
+        // 1. 创建 PENDING 任务（独立事务）
+        MarketDataSyncTaskDO task = txRequiresNew.execute(status -> {
+            MarketDataSyncTaskDO t = MarketDataSyncTaskDO.builder()
+                    .taskType(dto.taskType()).provider(dto.provider()).scopeJson(scopeJson)
+                    .status(MarketDataConstants.TASK_STATUS_PENDING).idempotencyKey(idemKey)
+                    .build();
+            taskMapper.insert(t);
+            return t;
+        });
+
+        Long taskId = task.getId();
+
+        // 2. 检查 provider 配置
         if (!provider.isConfigured()) {
-            createAlert(MarketDataConstants.ALERT_TYPE_PROVIDER_NOT_CONFIGURED,
-                    MarketDataConstants.ALERT_SEVERITY_HIGH, null, null, null,
+            updateTaskFailed(taskId, ErrorCodeEnum.BUSINESS_RULE_VIOLATION.getCode(),
+                    "行情 provider 未配置", null);
+            createAlertInNewTx(MarketDataConstants.ALERT_TYPE_PROVIDER_NOT_CONFIGURED,
+                    MarketDataConstants.ALERT_SEVERITY_HIGH, dto.canonicalSymbol(), null, taskId,
                     "行情 provider 未配置，同步任务无法执行");
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
                     "行情 provider 未配置，同步任务无法执行");
         }
 
-        // 幂等检查
-        String idemKey = UUID.nameUUIDFromBytes(
-                (dto.provider() + dto.taskType() + dto.scopeJson()).getBytes()).toString();
-        MarketDataSyncTaskDO existing = taskMapper.selectByIdempotencyKey(idemKey);
-        if (existing != null) {
-            return toTaskVO(existing);
-        }
+        // 3. 转 RUNNING（独立事务）
+        txRequiresNew.executeWithoutResult(status -> {
+            MarketDataSyncTaskDO running = new MarketDataSyncTaskDO();
+            running.setId(taskId);
+            running.setStatus(MarketDataConstants.TASK_STATUS_RUNNING);
+            running.setStartedAt(LocalDateTime.now());
+            taskMapper.updateById(running);
+        });
 
-        // 创建任务 PENDING
-        MarketDataSyncTaskDO task = MarketDataSyncTaskDO.builder()
-                .taskType(dto.taskType()).provider(dto.provider()).scopeJson(dto.scopeJson())
-                .status(MarketDataConstants.TASK_STATUS_PENDING).idempotencyKey(idemKey)
-                .build();
-        taskMapper.insert(task);
-
-        // 转 RUNNING
-        task.setStatus(MarketDataConstants.TASK_STATUS_RUNNING);
-        task.setStartedAt(LocalDateTime.now());
-        taskMapper.updateById(task);
-
-        // 执行同步
+        // 4. 执行同步（不包事务，单条写入各自独立）
+        SyncResult sr;
         try {
-            SyncResult sr = executeDailyBarSync(dto.scopeJson());
-            task.setTotalCount(sr.total);
-            task.setSuccessCount(sr.success);
-            task.setFailCount(sr.failed);
-            task.setInsertedCount(sr.inserted);
-            task.setUpdatedCount(sr.updated);
-            task.setSkippedCount(sr.skipped);
-            task.setStatus(sr.failed > 0
-                    ? MarketDataConstants.TASK_STATUS_PARTIAL_FAILED
-                    : MarketDataConstants.TASK_STATUS_SUCCEEDED);
-            task.setFinishedAt(LocalDateTime.now());
-            taskMapper.updateById(task);
-
-            // 空数据提醒
-            if (sr.total > 0 && sr.inserted == 0 && sr.updated == 0 && sr.skipped == sr.total) {
-                createAlert(MarketDataConstants.ALERT_TYPE_EMPTY_DAILY_BARS,
-                        MarketDataConstants.ALERT_SEVERITY_INFO, null, null, task.getId(),
-                        "同步完成但未写入新数据，可能数据已存在或范围为空");
-            }
-
-            log.info("Daily bar sync task {} completed: total={}, inserted={}, updated={}, skipped={}, failed={}",
-                    task.getId(), sr.total, sr.inserted, sr.updated, sr.skipped, sr.failed);
+            sr = executeDailyBarSync(dto);
         } catch (BusinessException e) {
-            task.setStatus(MarketDataConstants.TASK_STATUS_FAILED);
-            task.setFinishedAt(LocalDateTime.now());
-            task.setLastErrorCode(e.getErrorCode().getCode());
-            taskMapper.updateById(task);
-            createAlert(MarketDataConstants.ALERT_TYPE_SYNC_FAILED,
-                    MarketDataConstants.ALERT_SEVERITY_HIGH, null, null, task.getId(),
+            updateTaskFailed(taskId, e.getErrorCode().getCode(), e.getMessage(), null);
+            createAlertInNewTx(MarketDataConstants.ALERT_TYPE_SYNC_FAILED,
+                    MarketDataConstants.ALERT_SEVERITY_HIGH, dto.canonicalSymbol(), null, taskId,
                     "日 K 同步失败: " + e.getMessage());
             throw e;
         } catch (Exception e) {
-            task.setStatus(MarketDataConstants.TASK_STATUS_FAILED);
-            task.setFinishedAt(LocalDateTime.now());
-            task.setLastErrorCode(ErrorCodeEnum.INTERNAL_ERROR.getCode());
-            task.setErrorSummaryJson("{\"error\":\"" + e.getMessage() + "\"}");
-            taskMapper.updateById(task);
-            createAlert(MarketDataConstants.ALERT_TYPE_SYNC_FAILED,
-                    MarketDataConstants.ALERT_SEVERITY_HIGH, null, null, task.getId(),
+            updateTaskFailed(taskId, ErrorCodeEnum.INTERNAL_ERROR.getCode(), e.getMessage(),
+                    "{\"error\":\"" + e.getMessage() + "\"}");
+            createAlertInNewTx(MarketDataConstants.ALERT_TYPE_SYNC_FAILED,
+                    MarketDataConstants.ALERT_SEVERITY_HIGH, dto.canonicalSymbol(), null, taskId,
                     "日 K 同步异常: " + e.getMessage());
             throw new BusinessException(ErrorCodeEnum.INTERNAL_ERROR, "日 K 同步异常: " + e.getMessage());
         }
 
-        return toTaskVO(taskMapper.selectById(task.getId()));
+        // 5. 更新 SUCCEEDED/PARTIAL_FAILED（独立事务）
+        txRequiresNew.executeWithoutResult(status -> {
+            MarketDataSyncTaskDO done = new MarketDataSyncTaskDO();
+            done.setId(taskId);
+            done.setStatus(sr.failed > 0
+                    ? MarketDataConstants.TASK_STATUS_PARTIAL_FAILED
+                    : MarketDataConstants.TASK_STATUS_SUCCEEDED);
+            done.setTotalCount(sr.total());
+            done.setSuccessCount(sr.success());
+            done.setFailCount(sr.failed());
+            done.setInsertedCount(sr.inserted());
+            done.setUpdatedCount(sr.updated());
+            done.setSkippedCount(sr.skipped());
+            done.setFinishedAt(LocalDateTime.now());
+            taskMapper.updateById(done);
+        });
+
+        // 空数据提醒
+        if (sr.total > 0 && sr.inserted == 0 && sr.updated == 0 && sr.skipped == sr.total) {
+            createAlertInNewTx(MarketDataConstants.ALERT_TYPE_EMPTY_DAILY_BARS,
+                    MarketDataConstants.ALERT_SEVERITY_INFO, dto.canonicalSymbol(), null, taskId,
+                    "同步完成但未写入新数据，可能数据已存在或范围为空");
+        }
+
+        log.info("Daily bar sync task {} completed: total={}, inserted={}, updated={}, skipped={}, failed={}",
+                taskId, sr.total, sr.inserted, sr.updated, sr.skipped, sr.failed);
+        return toTaskVO(taskMapper.selectById(taskId));
     }
 
     /**
-     * 实际执行日 K 同步逻辑：解析 scope → 调 provider → 逐条幂等写入。
+     * 实际执行日 K 同步：调用 provider → 逐条幂等写入。
+     * 不使用事务包裹，单条写入各自独立（保证部分失败也能保留已成功数据）。
      */
-    private SyncResult executeDailyBarSync(String scopeJson) {
-        // 简化 scope 解析：期望格式 {"canonicalSymbol":"SH.600519","startDate":"2026-06-01","endDate":"2026-07-01","adjustType":"NONE"}
-        // 此处用简单字符串解析避免引入 JSON 库
-        String symbol = extractField(scopeJson, "canonicalSymbol");
-        String startDateStr = extractField(scopeJson, "startDate");
-        String endDateStr = extractField(scopeJson, "endDate");
-        String adjustType = extractField(scopeJson, "adjustType");
-        if (adjustType == null || adjustType.isBlank()) adjustType = "NONE";
+    private SyncResult executeDailyBarSync(CreateSyncTaskDTO dto) {
+        String adjustType = (dto.adjustType() == null || dto.adjustType().isBlank())
+                ? "NONE" : dto.adjustType();
+        LocalDate startDate = dto.startDate() != null ? dto.startDate() : LocalDate.now().minusMonths(1);
+        LocalDate endDate = dto.endDate() != null ? dto.endDate() : LocalDate.now();
 
-        if (symbol == null || symbol.isBlank()) {
-            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "scope 中 canonicalSymbol 不能为空");
-        }
-
-        LocalDate startDate = startDateStr != null && !startDateStr.isBlank()
-                ? LocalDate.parse(startDateStr) : LocalDate.now().minusMonths(1);
-        LocalDate endDate = endDateStr != null && !endDateStr.isBlank()
-                ? LocalDate.parse(endDateStr) : LocalDate.now();
-
-        List<ProviderDailyBar> bars = provider.getDailyBars(symbol, startDate, endDate, adjustType);
+        List<ProviderDailyBar> bars = provider.getDailyBars(
+                dto.canonicalSymbol(), startDate, endDate, adjustType);
         int total = bars.size(), inserted = 0, updated = 0, skipped = 0, failed = 0;
 
         for (ProviderDailyBar bar : bars) {
@@ -226,10 +239,9 @@ public class MarketQuoteService {
                 }
             } catch (Exception e) {
                 failed++;
-                log.warn("Failed to sync bar {} {}: {}", symbol, bar.tradeDate(), e.getMessage());
+                log.warn("Failed to sync bar {} {}: {}", dto.canonicalSymbol(), bar.tradeDate(), e.getMessage());
             }
         }
-
         return new SyncResult(total, total - failed, failed, inserted, updated, skipped);
     }
 
@@ -241,19 +253,24 @@ public class MarketQuoteService {
                 && a.getVolume() != null && a.getVolume().equals(b.getVolume());
     }
 
-    /** 从简单 JSON 字符串中提取字段值（避免引入 Jackson 到此方法）。 */
-    private String extractField(String json, String field) {
-        if (json == null) return null;
-        String key = "\"" + field + "\"";
-        int idx = json.indexOf(key);
-        if (idx < 0) return null;
-        int colon = json.indexOf(':', idx);
-        if (colon < 0) return null;
-        int startQuote = json.indexOf('"', colon + 1);
-        if (startQuote < 0) return null;
-        int endQuote = json.indexOf('"', startQuote + 1);
-        if (endQuote < 0) return null;
-        return json.substring(startQuote + 1, endQuote);
+    /** 独立事务更新任务为 FAILED（同时设 startedAt 兜底，保证有时间范围）。 */
+    private void updateTaskFailed(Long taskId, String errorCode, String errorMsg, String errorJson) {
+        txRequiresNew.executeWithoutResult(status -> {
+            MarketDataSyncTaskDO fail = new MarketDataSyncTaskDO();
+            fail.setId(taskId);
+            fail.setStatus(MarketDataConstants.TASK_STATUS_FAILED);
+            fail.setStartedAt(LocalDateTime.now());
+            fail.setFinishedAt(LocalDateTime.now());
+            fail.setLastErrorCode(errorCode);
+            fail.setTotalCount(0);
+            fail.setSuccessCount(0);
+            fail.setFailCount(0);
+            fail.setInsertedCount(0);
+            fail.setUpdatedCount(0);
+            fail.setSkippedCount(0);
+            if (errorJson != null) fail.setErrorSummaryJson(errorJson);
+            taskMapper.updateById(fail);
+        });
     }
 
     // ==================== 同步任务查询 ====================
@@ -292,15 +309,21 @@ public class MarketQuoteService {
         return toAlertVO(a);
     }
 
-    /** 内部方法：创建异常提醒。 */
+    /** 在当前事务中创建 alert。 */
     private void createAlert(String alertType, String severity, String canonicalSymbol,
                             LocalDateTime quoteTime, Long taskId, String message) {
-        MarketDataAlertDO alert = MarketDataAlertDO.builder()
+        alertMapper.insert(MarketDataAlertDO.builder()
                 .alertType(alertType).severity(severity)
                 .canonicalSymbol(canonicalSymbol).quoteTime(quoteTime)
                 .provider(provider.getProviderCode()).taskId(taskId)
-                .message(message).resolved(false).build();
-        alertMapper.insert(alert);
+                .message(message).resolved(false).build());
+    }
+
+    /** 在独立新事务中创建 alert（保证失败时仍留痕）。 */
+    private void createAlertInNewTx(String alertType, String severity, String canonicalSymbol,
+                                    LocalDateTime quoteTime, Long taskId, String message) {
+        txRequiresNew.executeWithoutResult(status -> createAlert(
+                alertType, severity, canonicalSymbol, quoteTime, taskId, message));
     }
 
     // ==================== 转换 ====================

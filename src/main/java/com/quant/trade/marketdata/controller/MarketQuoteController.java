@@ -59,7 +59,7 @@ public class MarketQuoteController {
 
     // ==================== 历史日 K 同步 ====================
 
-    /** 创建并执行日 K 同步任务。 */
+    /** 创建并执行日 K 同步任务（结构化 DTO，不暴露 scopeJson 手写解析）。 */
     @PostMapping("/sync-tasks/daily-bars")
     public ApiResponse<MarketDataSyncTaskVO> createAndExecuteSyncTask(@Valid @RequestBody CreateSyncTaskDTO dto) {
         return ApiResponse.ok(marketQuoteService.createAndExecuteDailyBarSync(dto));
