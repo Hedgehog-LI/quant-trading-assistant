@@ -1,6 +1,7 @@
 package com.quant.trade.marketdata.provider;
 
 import org.springframework.stereotype.Component;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,5 +15,10 @@ public class DisabledMarketDataProvider implements MarketDataProvider {
     }
     @Override public List<ProviderQuote> getLatestQuotes(List<String> canonicalSymbols) {
         throw new UnsupportedOperationException("LongPort provider 未配置，无法获取行情");
+    }
+
+    @Override
+    public List<ProviderDailyBar> getDailyBars(String canonicalSymbol, LocalDate startDate, LocalDate endDate, String adjustType) {
+        throw new UnsupportedOperationException("LongPort provider 未配置，无法获取历史日 K");
     }
 }
