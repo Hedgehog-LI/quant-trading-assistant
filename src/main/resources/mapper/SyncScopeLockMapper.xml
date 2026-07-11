@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.SyncScopeLockMapper">
+
+    <!-- 确保锁行存在。H2 MERGE INTO ... KEY 兼容 MySQL 模式。 -->
+    <insert id="upsert">
+        MERGE INTO market_data_sync_scope_lock (provider, task_type, scope_hash)
+        KEY (provider, task_type, scope_hash)
+        VALUES (#{provider}, #{taskType}, #{scopeHash})
+    </insert>
+
+    <!-- SELECT FOR UPDATE 行级锁（锁定实际行，而非 COUNT 聚合） -->
+    <select id="selectForUpdate" resultType="int">
+        SELECT 1 FROM market_data_sync_scope_lock
+        WHERE provider = #{provider} AND task_type = #{taskType} AND scope_hash = #{scopeHash}
+        FOR UPDATE
+    </select>
+</mapper>

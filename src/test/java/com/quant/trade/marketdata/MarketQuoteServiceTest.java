@@ -17,6 +17,11 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -213,16 +218,57 @@ class MarketQuoteServiceTest {
         assertEquals("SUCCEEDED", result.status());
     }
 
-    /**
-     * 验证：当 scope 最新任务为 SUCCEEDED 时，同 scope 再次请求直接返回，不创建新任务。
-     * <p>
-     * 通过 mapper 直接插入一条 SUCCEEDED 任务（模拟 provider 已配置且成功的场景），
-     * 然后调用 createAndExecuteDailyBarSync，应直接返回该 SUCCEEDED 任务而非创建新的。
-     */
+    @Test
+    void concurrentRetryNoSiblingTasks() throws Exception {
+        String uniqueSymbol = "SH.999988";
+        String scopeJson = "{\"canonicalSymbol\":\"" + uniqueSymbol + "\",\"startDate\":\"2026-06-01\",\"endDate\":\"2026-07-01\",\"adjustType\":\"NONE\"}";
+        taskMapper.insert(MarketDataSyncTaskDO.builder()
+                .taskType(MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC).provider("LONGPORT")
+                .scopeJson(scopeJson)
+                .status(MarketDataConstants.TASK_STATUS_FAILED).idempotencyKey("pre-fail-" + uniqueSymbol)
+                .parentTaskId(null).build());
+
+        CreateSyncTaskDTO dto = new CreateSyncTaskDTO(
+                MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC, "LONGPORT",
+                uniqueSymbol, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 7, 1), "NONE");
+
+        ExecutorService exec = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        AtomicReference<Exception> err1 = new AtomicReference<>();
+        AtomicReference<Exception> err2 = new AtomicReference<>();
+
+        exec.submit(() -> {
+            try { start.await(); marketQuoteService.createAndExecuteDailyBarSync(dto); }
+            catch (Exception e) { err1.set(e); }
+            return null;
+        });
+        exec.submit(() -> {
+            try { start.await(); marketQuoteService.createAndExecuteDailyBarSync(dto); }
+            catch (Exception e) { err2.set(e); }
+            return null;
+        });
+        start.countDown();
+        exec.shutdown();
+        exec.awaitTermination(30, TimeUnit.SECONDS);
+
+        var allTasks = marketQuoteService.listSyncTasks("FAILED", null, 1, 100);
+        var sameScope = allTasks.items().stream()
+                .filter(t -> t.scopeJson().contains(uniqueSymbol))
+                .toList();
+
+        // 检查 parentTaskId 唯一性：同一 parentTaskId 不应出现两次（无 sibling）
+        var parentTaskIds = sameScope.stream()
+                .map(MarketDataSyncTaskVO::parentTaskId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        var distinctParents = parentTaskIds.stream().distinct().toList();
+        assertEquals(parentTaskIds.size(), distinctParents.size(),
+                "同 scope 下不存在两个任务拥有相同的非空 parentTaskId（无 sibling）");
+    }
+
     @Test
     void succeededLatestTaskIsIdempotentReturn() {
         String uniqueSymbol = "SH.999955";
-        // 直接插入一条 SUCCEEDED 任务
         MarketDataSyncTaskDO succeeded = MarketDataSyncTaskDO.builder()
                 .taskType(MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC)
                 .provider("LONGPORT")
@@ -236,7 +282,6 @@ class MarketQuoteServiceTest {
                 .build();
         taskMapper.insert(succeeded);
 
-        // 同 scope 请求应直接返回 SUCCEEDED，不创建新任务、不抛异常
         CreateSyncTaskDTO dto = new CreateSyncTaskDTO(
                 MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC, "LONGPORT",
                 uniqueSymbol, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 7, 1), "NONE");

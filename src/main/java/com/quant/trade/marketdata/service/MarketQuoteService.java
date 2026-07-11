@@ -4,7 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.constant.MarketDataConstants;
-import com.quant.trade.marketdata.dao.*;
+import com.quant.trade.marketdata.dao.MarketDataAlertMapper;
+import com.quant.trade.marketdata.dao.MarketDataSyncTaskMapper;
+import com.quant.trade.marketdata.dao.StockDailyBarMapper;
+import com.quant.trade.marketdata.dao.StockQuoteSnapshotMapper;
+import com.quant.trade.marketdata.dao.SyncScopeLockMapper;
 import com.quant.trade.marketdata.dto.CreateSyncTaskDTO;
 import com.quant.trade.marketdata.dto.FetchQuotesRequestDTO;
 import com.quant.trade.marketdata.model.*;
@@ -34,6 +38,7 @@ public class MarketQuoteService {
     private final MarketDataSyncTaskMapper taskMapper;
     private final MarketDataAlertMapper alertMapper;
     private final StockDailyBarMapper dailyBarMapper;
+    private final SyncScopeLockMapper syncScopeLockMapper;
     private final TransactionTemplate txRequiresNew;
     private final ObjectMapper objectMapper;
 
@@ -115,10 +120,14 @@ public class MarketQuoteService {
         String idemKey = UUID.nameUUIDFromBytes(
                 (dto.provider() + dto.taskType() + scopeJson).getBytes()).toString();
 
-        // 幂等策略（按 scope 最新任务判断，不依赖原始 idempotencyKey）：
-        // - 无历史任务：首次创建。
-        // - 最新任务为 PENDING/RUNNING/SUCCEEDED：直接返回（避免重复执行 / 幂等成功）。
-        // - 最新任务为 FAILED/PARTIAL_FAILED：创建新 retry，parentTaskId 指向最新失败。
+        // 幂等策略（按 scope 最新任务判断 + scope 级行锁防并发 sibling）：
+        // 1. 快速检查：无锁读最新任务，PENDING/RUNNING/SUCCEEDED 直接返回。
+        // 2. 若需要创建（无历史 或 FAILED），进入 scope 级行锁临界区：
+        //    锁内重新查最新 → 若已被并发请求改为 PENDING/RUNNING/SUCCEEDED 则返回它 → 否则创建 retry。
+        //    锁只保护"重新判断+创建PENDING"，不覆盖 provider 网络调用。
+        String scopeHash = UUID.nameUUIDFromBytes(scopeJson.getBytes()).toString();
+
+        // 快速无锁检查
         MarketDataSyncTaskDO latest = taskMapper.selectLatestByScope(dto.provider(), dto.taskType(), scopeJson);
         if (latest != null) {
             String latestStatus = latest.getStatus();
@@ -127,22 +136,35 @@ public class MarketQuoteService {
                     || MarketDataConstants.TASK_STATUS_SUCCEEDED.equals(latestStatus)) {
                 return toTaskVO(latest);
             }
-            // FAILED/PARTIAL_FAILED：创建新 retry，parentTaskId 指向最新失败任务
         }
-        Long parentTaskId = latest != null ? latest.getId() : null;
 
-        // 1. 创建 PENDING 任务（独立事务）
-        //    首次用原始 idemKey；重试用含 parentTaskId + nanoTime 的唯一 key
-        final Long finalParentTaskId = parentTaskId;
-        final String effectiveIdemKey = parentTaskId != null
-                ? UUID.nameUUIDFromBytes((idemKey + "#retry#" + parentTaskId + "#" + System.nanoTime()).getBytes()).toString()
-                : idemKey;
+        // 进入 scope 级行锁临界区，防止并发 sibling retry
         final String finalScopeJson = scopeJson;
         MarketDataSyncTaskDO task = txRequiresNew.execute(status -> {
+            // 确保锁行存在
+            syncScopeLockMapper.upsert(dto.provider(), dto.taskType(), scopeHash);
+            // 行级锁（FOR UPDATE），此事务内持有直到 commit
+            syncScopeLockMapper.selectForUpdate(dto.provider(), dto.taskType(), scopeHash);
+            // 锁内重新查最新任务（可能已被并发请求修改）
+            MarketDataSyncTaskDO rechecked = taskMapper.selectLatestByScope(dto.provider(), dto.taskType(), finalScopeJson);
+            if (rechecked != null) {
+                String rst = rechecked.getStatus();
+                if (MarketDataConstants.TASK_STATUS_PENDING.equals(rst)
+                        || MarketDataConstants.TASK_STATUS_RUNNING.equals(rst)
+                        || MarketDataConstants.TASK_STATUS_SUCCEEDED.equals(rst)) {
+                    // 并发请求已经创建了 PENDING/RUNNING/SUCCEEDED，直接返回它
+                    return rechecked;
+                }
+            }
+            // 锁内确认仍需创建 retry 或首次创建
+            Long parentTaskId = rechecked != null ? rechecked.getId() : null;
+            String effectiveIdemKey = parentTaskId != null
+                    ? UUID.nameUUIDFromBytes((idemKey + "#retry#" + parentTaskId + "#" + System.nanoTime()).getBytes()).toString()
+                    : idemKey;
             MarketDataSyncTaskDO t = MarketDataSyncTaskDO.builder()
-                    .taskType(dto.taskType()).provider(dto.provider()).scopeJson(scopeJson)
+                    .taskType(dto.taskType()).provider(dto.provider()).scopeJson(finalScopeJson)
                     .status(MarketDataConstants.TASK_STATUS_PENDING)
-                    .idempotencyKey(effectiveIdemKey).parentTaskId(finalParentTaskId)
+                    .idempotencyKey(effectiveIdemKey).parentTaskId(parentTaskId)
                     .build();
             taskMapper.insert(t);
             return t;
