@@ -7,6 +7,7 @@ import com.quant.trade.marketdata.dao.MarketDataSyncTaskMapper;
 import com.quant.trade.marketdata.dto.CreateSyncTaskDTO;
 import com.quant.trade.marketdata.dto.FetchQuotesRequestDTO;
 import com.quant.trade.marketdata.model.MarketDataAlertDO;
+import com.quant.trade.marketdata.model.MarketDataSyncTaskDO;
 import com.quant.trade.marketdata.service.MarketQuoteService;
 import com.quant.trade.marketdata.vo.*;
 import org.junit.jupiter.api.Test;
@@ -155,5 +156,38 @@ class MarketQuoteServiceTest {
     @Test
     void getSyncTaskNotFoundThrows() {
         assertThrows(BusinessException.class, () -> marketQuoteService.getSyncTask(99999L));
+    }
+
+    /**
+     * 验证：当 scope 最新任务为 SUCCEEDED 时，同 scope 再次请求直接返回，不创建新任务。
+     * <p>
+     * 通过 mapper 直接插入一条 SUCCEEDED 任务（模拟 provider 已配置且成功的场景），
+     * 然后调用 createAndExecuteDailyBarSync，应直接返回该 SUCCEEDED 任务而非创建新的。
+     */
+    @Test
+    void succeededLatestTaskIsIdempotentReturn() {
+        String uniqueSymbol = "SH.999955";
+        // 直接插入一条 SUCCEEDED 任务
+        MarketDataSyncTaskDO succeeded = MarketDataSyncTaskDO.builder()
+                .taskType(MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC)
+                .provider("LONGPORT")
+                .scopeJson("{\"canonicalSymbol\":\"" + uniqueSymbol + "\",\"startDate\":\"2026-06-01\",\"endDate\":\"2026-07-01\",\"adjustType\":\"NONE\"}")
+                .status(MarketDataConstants.TASK_STATUS_SUCCEEDED)
+                .idempotencyKey("test-succeeded-" + uniqueSymbol)
+                .totalCount(10).successCount(10).failCount(0)
+                .insertedCount(5).updatedCount(3).skippedCount(2)
+                .startedAt(java.time.LocalDateTime.now().minusMinutes(5))
+                .finishedAt(java.time.LocalDateTime.now().minusMinutes(4))
+                .build();
+        taskMapper.insert(succeeded);
+
+        // 同 scope 请求应直接返回 SUCCEEDED，不创建新任务、不抛异常
+        CreateSyncTaskDTO dto = new CreateSyncTaskDTO(
+                MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC, "LONGPORT",
+                uniqueSymbol, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 7, 1), "NONE");
+        MarketDataSyncTaskVO result = marketQuoteService.createAndExecuteDailyBarSync(dto);
+
+        assertEquals(succeeded.getId(), result.id(), "应直接返回 SUCCEEDED 任务");
+        assertEquals("SUCCEEDED", result.status());
     }
 }
