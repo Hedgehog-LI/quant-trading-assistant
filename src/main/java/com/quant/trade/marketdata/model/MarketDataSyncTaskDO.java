@@ -22,6 +22,7 @@ public class MarketDataSyncTaskDO {
     private LocalDateTime finishedAt;
     private String lastErrorCode;
     private String errorSummaryJson;
+    private Long parentTaskId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

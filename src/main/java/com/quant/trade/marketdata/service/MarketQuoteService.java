@@ -115,11 +115,12 @@ public class MarketQuoteService {
         String idemKey = UUID.nameUUIDFromBytes(
                 (dto.provider() + dto.taskType() + scopeJson).getBytes()).toString();
 
-        // 幂等策略：
+        // 幂等策略（保留历史，不删除旧任务）：
         // - PENDING/RUNNING：直接返回（避免并发重复执行）
         // - SUCCEEDED：直接返回（幂等成功）
-        // - FAILED/PARTIAL_FAILED/CANCELLED：删除旧任务，允许重试
+        // - FAILED/PARTIAL_FAILED：创建新 retry 任务，parentTaskId 指向旧任务
         MarketDataSyncTaskDO existing = taskMapper.selectByIdempotencyKey(idemKey);
+        Long parentTaskId = null;
         if (existing != null) {
             String st = existing.getStatus();
             if (MarketDataConstants.TASK_STATUS_PENDING.equals(st)
@@ -127,17 +128,21 @@ public class MarketQuoteService {
                     || MarketDataConstants.TASK_STATUS_SUCCEEDED.equals(st)) {
                 return toTaskVO(existing);
             }
-            // FAILED/PARTIAL_FAILED：删除旧任务和关联 alert，允许重新执行
-            txRequiresNew.executeWithoutResult(s -> {
-                taskMapper.deleteById(existing.getId());
-            });
+            // FAILED/PARTIAL_FAILED：保留旧任务，新任务链接到旧任务
+            parentTaskId = existing.getId();
         }
 
-        // 1. 创建 PENDING 任务（独立事务）
+        // 1. 创建 PENDING 任务（独立事务，parentTaskId 指向旧 FAILED）
+        //    重试时用含 parentTaskId 的新 idempotencyKey 避免唯一键冲突
+        final Long finalParentTaskId = parentTaskId;
+        final String effectiveIdemKey = parentTaskId != null
+                ? UUID.nameUUIDFromBytes((idemKey + "#retry#" + parentTaskId).getBytes()).toString()
+                : idemKey;
         MarketDataSyncTaskDO task = txRequiresNew.execute(status -> {
             MarketDataSyncTaskDO t = MarketDataSyncTaskDO.builder()
                     .taskType(dto.taskType()).provider(dto.provider()).scopeJson(scopeJson)
-                    .status(MarketDataConstants.TASK_STATUS_PENDING).idempotencyKey(idemKey)
+                    .status(MarketDataConstants.TASK_STATUS_PENDING)
+                    .idempotencyKey(effectiveIdemKey).parentTaskId(finalParentTaskId)
                     .build();
             taskMapper.insert(t);
             return t;
@@ -354,7 +359,7 @@ public class MarketQuoteService {
                 t.getStatus(), t.getTotalCount(), t.getSuccessCount(), t.getFailCount(),
                 t.getInsertedCount(), t.getUpdatedCount(), t.getSkippedCount(),
                 t.getStartedAt(), t.getFinishedAt(), t.getLastErrorCode(), t.getErrorSummaryJson(),
-                t.getCreatedAt());
+                t.getParentTaskId(), t.getCreatedAt());
     }
 
     private MarketDataAlertVO toAlertVO(MarketDataAlertDO a) {

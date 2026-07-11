@@ -8,5 +8,5 @@ public record MarketDataSyncTaskVO(
     Integer totalCount, Integer successCount, Integer failCount,
     Integer insertedCount, Integer updatedCount, Integer skippedCount,
     LocalDateTime startedAt, LocalDateTime finishedAt,
-    String lastErrorCode, String errorSummaryJson, LocalDateTime createdAt
+    String lastErrorCode, String errorSummaryJson, Long parentTaskId, LocalDateTime createdAt
 ) {}
