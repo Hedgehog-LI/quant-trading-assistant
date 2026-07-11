@@ -31,7 +31,7 @@
 - `stock_daily_bar` 已由 `V5__add_market_data_tables.sql` 实现。
 - `stock_daily_bar.fetched_at` 已由 `V6__add_fetched_at_to_daily_bar.sql` 实现。
 - CSV 日 K 幂等导入已实现，`data_source=CSV`。
-- LongPort provider、`stock_quote_snapshot`、`market_data_sync_task`、`market_data_alert` 尚未实现。
+- LongPort provider facade、stock_quote_snapshot、market_data_sync_task、market_data_alert 已实现（V7-V9 migration）。真实 LongPort SDK 凭据联调待完成。
 
 ## 3. 证券主数据
 

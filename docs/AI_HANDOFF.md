@@ -22,7 +22,7 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 ## 下一阶段
 
-P1.0 证券主数据和 CSV 日 K 基础已由 `marketdata` 模块实现（V5/V6）。下一阶段按 `features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md` 和 `features/MARKET_ALERT_RULES_DESIGN.md` 建设 LongPort 只读行情源、外部最新价快照、历史日 K 同步任务和行情异常提醒。AI 图片识别暂缓。
+P1.0 证券主数据和 CSV 日 K 基础已由 `marketdata` 模块实现（V5/V6）。P1.1 LongPort provider facade + V7-V9 migration + 9 API + 6 Tab 前端已实现；真实 LongPort SDK 凭据联调待完成。
 
 ## 接手顺序（新会话）
 

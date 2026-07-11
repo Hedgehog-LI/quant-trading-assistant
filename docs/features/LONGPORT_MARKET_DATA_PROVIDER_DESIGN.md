@@ -1,6 +1,6 @@
 # Feature Design: LongPort 只读行情源接入
 
-> 版本：v0.1.2 · 状态：设计定稿 / 待实现 · 关联：`../BUILD_CHECKLIST.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../decisions/ADR-0008-longport-quote-only-provider.md`
+> 版本：v0.1.2 · 状态：已实现（facade+DB+API+前端），真实 SDK 待凭据 · 关联：`../BUILD_CHECKLIST.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../decisions/ADR-0008-longport-quote-only-provider.md`
 
 ## 1. 用户目标
 
@@ -171,7 +171,7 @@ qta.market-data.longport.max-concurrency=5
 | `task_type` | `DAILY_BAR_SYNC` / `LATEST_QUOTE_REFRESH` |
 | `provider` | `LONGPORT` |
 | `scope_json` | 证券、日期、复权范围 |
-| `status` | `PENDING` / `RUNNING` / `SUCCEEDED` / `PARTIAL_FAILED` / `FAILED` / `CANCELLED` |
+| `status` | `PENDING` / `RUNNING` / `SUCCEEDED` / `PARTIAL_FAILED` / `FAILED` |
 | `idempotency_key` | 防重复提交 |
 | `total_count` / `success_count` / `fail_count` | 处理统计 |
 | `inserted_count` / `updated_count` / `skipped_count` | 落库统计 |

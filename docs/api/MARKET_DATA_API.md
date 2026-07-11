@@ -1,6 +1,6 @@
 # Market Data API
 
-> 统一前缀：`/api/v1/market-data`。统一响应：`ApiResponse<T>`。当前实现事实以代码为准；LongPort 相关接口为 v0.1.2 设计目标。
+> 统一前缀：`/api/v1/market-data`。统一响应：`ApiResponse<T>`。当前实现事实以代码为准；LongPort 只读行情接口已实现（provider facade + DB + API），真实 LongPort SDK 凭据联调待完成。
 
 ## 1. 当前已实现接口
 
@@ -36,7 +36,7 @@ canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type
 - 幂等键：`canonical_symbol + trade_date + adjust_type + data_source`。
 - 文件内相同幂等键且内容一致则跳过；内容冲突则整批拒绝。
 
-## 2. v0.1.2 LongPort 设计目标接口
+## 2. LongPort 只读行情接口（已实现，真实 SDK 待凭据）
 
 ### Provider 状态
 
@@ -125,7 +125,7 @@ canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type
 任务状态：
 
 ```text
-PENDING -> RUNNING -> SUCCEEDED / PARTIAL_FAILED / FAILED / CANCELLED
+PENDING -> RUNNING -> SUCCEEDED / PARTIAL_FAILED / FAILED /
 ```
 
 ### 行情异常提醒
