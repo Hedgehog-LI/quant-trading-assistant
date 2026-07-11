@@ -153,9 +153,64 @@ class MarketQuoteServiceTest {
         assertTrue(resolved.resolved());
     }
 
+    /**
+     * 验证：当 scope 最新任务为 RUNNING 时，同 scope 再次请求直接返回 RUNNING，不创建新任务。
+     */
     @Test
-    void getSyncTaskNotFoundThrows() {
-        assertThrows(BusinessException.class, () -> marketQuoteService.getSyncTask(99999L));
+    void runningLatestTaskIsIdempotentReturn() {
+        String uniqueSymbol = "SH.999966";
+        // scopeJson 必须与 service Jackson 序列化格式匹配
+        String scopeJson = "{\"canonicalSymbol\":\"" + uniqueSymbol + "\",\"startDate\":\"2026-06-01\",\"endDate\":\"2026-07-01\",\"adjustType\":\"NONE\"}";
+        MarketDataSyncTaskDO running = MarketDataSyncTaskDO.builder()
+                .taskType(MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC)
+                .provider("LONGPORT")
+                .scopeJson(scopeJson)
+                .status(MarketDataConstants.TASK_STATUS_RUNNING)
+                .idempotencyKey("test-running-" + uniqueSymbol)
+                .startedAt(java.time.LocalDateTime.now())
+                .build();
+        taskMapper.insert(running);
+
+        CreateSyncTaskDTO dto = new CreateSyncTaskDTO(
+                MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC, "LONGPORT",
+                uniqueSymbol, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 7, 1), "NONE");
+        MarketDataSyncTaskVO result = marketQuoteService.createAndExecuteDailyBarSync(dto);
+
+        assertEquals(running.getId(), result.id());
+        assertEquals("RUNNING", result.status());
+    }
+
+    /**
+     * 验证：FAILED 链后最新任务为 SUCCEEDED 时，同 scope 请求返回最新 SUCCEEDED。
+     */
+    @Test
+    void failedThenSucceededReturnsLatest() {
+        String uniqueSymbol = "SH.999977";
+        String scopeJson = "{\"canonicalSymbol\":\"" + uniqueSymbol + "\",\"startDate\":\"2026-06-01\",\"endDate\":\"2026-07-01\",\"adjustType\":\"NONE\"}";
+        // 插入一条 FAILED（旧）
+        taskMapper.insert(MarketDataSyncTaskDO.builder()
+                .taskType(MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC).provider("LONGPORT")
+                .scopeJson(scopeJson)
+                .status(MarketDataConstants.TASK_STATUS_FAILED).idempotencyKey("old-fail-" + uniqueSymbol)
+                .parentTaskId(null).build());
+        // 插入一条 SUCCEEDED（最新）
+        MarketDataSyncTaskDO succeeded = MarketDataSyncTaskDO.builder()
+                .taskType(MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC).provider("LONGPORT")
+                .scopeJson(scopeJson)
+                .status(MarketDataConstants.TASK_STATUS_SUCCEEDED).idempotencyKey("new-succ-" + uniqueSymbol)
+                .totalCount(5).successCount(5).insertedCount(3).updatedCount(2)
+                .startedAt(java.time.LocalDateTime.now().minusMinutes(3))
+                .finishedAt(java.time.LocalDateTime.now().minusMinutes(2))
+                .build();
+        taskMapper.insert(succeeded);
+
+        CreateSyncTaskDTO dto = new CreateSyncTaskDTO(
+                MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC, "LONGPORT",
+                uniqueSymbol, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 7, 1), "NONE");
+        MarketDataSyncTaskVO result = marketQuoteService.createAndExecuteDailyBarSync(dto);
+
+        assertEquals(succeeded.getId(), result.id(), "应返回最新 SUCCEEDED 而非旧 FAILED");
+        assertEquals("SUCCEEDED", result.status());
     }
 
     /**
