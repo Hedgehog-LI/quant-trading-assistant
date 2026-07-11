@@ -14,4 +14,5 @@ public interface MarketDataSyncTaskMapper {
                                               @Param("limit") int limit, @Param("offset") int offset);
     long countByFilter(@Param("status") String status, @Param("provider") String provider);
     int deleteById(@Param("id") Long id);
+    MarketDataSyncTaskDO selectLatestByScope(@Param("provider") String provider, @Param("taskType") String taskType, @Param("scopeJson") String scopeJson);
 }

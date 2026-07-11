@@ -79,54 +79,58 @@ class MarketQuoteServiceTest {
     }
 
     /**
-     * 关键测试：FAILED 后同 scope 重试，旧任务保留可追溯，新任务 parentTaskId 指向旧任务。
+     * 关键测试：连续 3 次同 scope 失败重试，生成 3 条 FAILED，parentTaskId 链路正确，无 500。
      * <p>
-     * 第一次失败 → task1=FAILED + alert1(taskId=task1.id)
-     * 第二次重试 → task2=FAILED + alert2(taskId=task2.id)，task2.parentTaskId=task1.id
-     * 两条 FAILED 任务都可查到，alert 都关联有效 task。
+     * 第一次失败 → task1=FAILED(parentTaskId=null) + alert(taskId=task1)
+     * 第二次重试 → task2=FAILED(parentTaskId=task1) + alert(taskId=task2)
+     * 第三次重试 → task3=FAILED(parentTaskId=task2) + alert(taskId=task3)
+     * 三条任务都可追溯，alert 都关联有效 taskId，不产生唯一键冲突。
      */
     @Test
-    void syncTaskFailedRetryKeepsHistoryWithParentLink() {
-        // 用唯一 scope 避免和其他测试冲突
-        String uniqueSymbol = "SH.999901";
+    void syncTaskThreeConsecutiveRetriesKeepsFullHistory() {
+        String uniqueSymbol = "SH.999907";
         CreateSyncTaskDTO dto = new CreateSyncTaskDTO(
                 MarketDataConstants.TASK_TYPE_DAILY_BAR_SYNC, "LONGPORT",
                 uniqueSymbol, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 7, 1), "NONE");
 
         // 第一次失败
         assertThrows(BusinessException.class, () -> marketQuoteService.createAndExecuteDailyBarSync(dto));
-        var tasksAfter1 = marketQuoteService.listSyncTasks("FAILED", null, 1, 50);
-        MarketDataSyncTaskVO task1 = tasksAfter1.items().stream()
-                .filter(t -> t.scopeJson().contains(uniqueSymbol))
-                .findFirst().orElse(null);
-        assertNotNull(task1, "第一次 FAILED 任务应存在");
-        assertNull(task1.parentTaskId(), "第一次任务 parentTaskId 应为 null");
-
         // 第二次重试
         assertThrows(BusinessException.class, () -> marketQuoteService.createAndExecuteDailyBarSync(dto));
-        var tasksAfter2 = marketQuoteService.listSyncTasks("FAILED", null, 1, 50);
-        // 同 scope 应有 2 条 FAILED
-        var sameScopeTasks = tasksAfter2.items().stream()
+        // 第三次重试
+        assertThrows(BusinessException.class, () -> marketQuoteService.createAndExecuteDailyBarSync(dto));
+
+        // 查询同 scope 所有 FAILED 任务
+        var allTasks = marketQuoteService.listSyncTasks("FAILED", null, 1, 100);
+        var sameScopeTasks = allTasks.items().stream()
                 .filter(t -> t.scopeJson().contains(uniqueSymbol))
+                .sorted((a, b) -> Long.compare(a.id() instanceof Number ? ((Number) a.id()).longValue() : 0,
+                                               b.id() instanceof Number ? ((Number) b.id()).longValue() : 0))
                 .toList();
-        assertTrue(sameScopeTasks.size() >= 2,
-                "同 scope 应有至少 2 条 FAILED（旧+新），实际: " + sameScopeTasks.size());
 
-        // 新任务 parentTaskId 指向旧任务
-        MarketDataSyncTaskVO task2 = sameScopeTasks.get(0); // 最新的在前
-        assertEquals(task1.id(), task2.parentTaskId(),
-                "新 retry 任务 parentTaskId 应指向旧 FAILED 任务");
+        assertTrue(sameScopeTasks.size() >= 3,
+                "同 scope 应有至少 3 条 FAILED，实际: " + sameScopeTasks.size());
 
-        // 旧任务仍可查（未被删除）
-        assertNotNull(taskMapper.selectById(task1.id()),
-                "旧 FAILED 任务不应被删除");
+        // 验证 parentTaskId 链路：task1.parentTaskId=null, task2.parentTaskId=task1, task3.parentTaskId=task2
+        // 按 id 升序排序后验证链
+        var sorted = sameScopeTasks.stream()
+                .sorted((a, b) -> Long.compare(
+                        ((Number) a.id()).longValue(),
+                        ((Number) b.id()).longValue()))
+                .toList();
+        assertNull(sorted.get(0).parentTaskId(), "第一条 parentTaskId 应为 null");
+        for (int i = 1; i < sorted.size(); i++) {
+            assertEquals(sorted.get(i - 1).id(), sorted.get(i).parentTaskId(),
+                    "第 " + (i + 1) + " 条 parentTaskId 应指向前一条");
+        }
 
-        // 两次的 alert 都关联有效 taskId
-        var alerts = marketQuoteService.listAlerts(null, "HIGH", null, 1, 50);
-        assertTrue(alerts.items().stream()
-                .anyMatch(a -> MarketDataConstants.ALERT_TYPE_PROVIDER_NOT_CONFIGURED.equals(a.alertType())
-                        && task2.id().equals(a.taskId())),
-                "新任务的 alert 应关联新 taskId");
+        // 验证 3 条 alert 都关联有效 taskId
+        var alerts = marketQuoteService.listAlerts(null, "HIGH", null, 1, 100);
+        for (var task : sameScopeTasks) {
+            assertTrue(alerts.items().stream()
+                    .anyMatch(a -> task.id().equals(a.taskId())),
+                    "每个 task 都应有对应 alert，task " + task.id() + " 缺失");
+        }
     }
 
     @Test
