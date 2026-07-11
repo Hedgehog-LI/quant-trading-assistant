@@ -104,17 +104,23 @@ canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type
 | GET | `/api/v1/market-data/sync-tasks?taskType=&provider=&status=&page=&size=` | 查询同步任务列表 |
 | GET | `/api/v1/market-data/sync-tasks/{id}` | 查询同步任务详情 |
 
-请求示例：
+请求示例（当前结构化 DTO）：
 
 ```json
 {
+  "taskType": "DAILY_BAR_SYNC",
   "provider": "LONGPORT",
-  "canonicalSymbols": ["SH.600519"],
-  "fromDate": "2026-01-01",
-  "toDate": "2026-07-10",
+  "canonicalSymbol": "SH.600519",
+  "startDate": "2026-06-01",
+  "endDate": "2026-07-01",
   "adjustType": "NONE"
 }
 ```
+
+**重试语义**：
+- PENDING/RUNNING/SUCCEEDED：同 scope 幂等返回已有任务。
+- FAILED/PARTIAL_FAILED：创建新 retry 任务，`parentTaskId` 指向该 scope 最新任务；旧任务保留可追溯。
+- 连续多次重试不会唯一键冲突，每次 retry 的 idempotencyKey 含时间戳保证唯一。
 
 任务状态：
 

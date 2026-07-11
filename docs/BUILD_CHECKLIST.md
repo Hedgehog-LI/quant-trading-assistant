@@ -194,16 +194,18 @@
 - [x] 后端 `/api/v1/market-data/*` 基础接口已实现。
 - [x] 前端 `/market-data` 证券主数据和日 K 页面已实现。
 
-### P1.1 待实现：LongPort 只读行情源
+### P1.1 部分实现：LongPort 只读行情源（provider facade + DB + API + 前端已完成，真实 SDK 待凭据）
 
-- [ ] 新增 LongPort quote-only provider，禁止交易、账户、订单、真实持仓调用。
-- [ ] 新增 provider 状态和健康检查 API。
-- [ ] 新增 `stock_quote_snapshot` 外部最新价快照。
-- [ ] 新增 `market_data_sync_task` 历史日 K 同步任务。
-- [ ] 新增 `market_data_alert` 行情异常提醒。
-- [ ] 前端 `/market-data` 扩展为行情状态、证券主数据、最新价快照、历史同步、异常提醒 5 个 Tab。
-- [ ] 建设看板补充 LongPort provider、最新价快照、历史同步、异常提醒节点。
-- [ ] API Key/token 只在服务端配置，不进入前端、日志和仓库。
+- [x] LongPort quote-only provider 抽象（`MarketDataProvider` 接口 + `DisabledMarketDataProvider` + `FakeMarketDataProvider` + `LongPortSymbolMapper`）。
+- [x] provider 状态和健康检查 API（`GET /providers/LONGPORT/status` + `POST /health-check`）。
+- [x] `stock_quote_snapshot` 外部最新价快照（V7 migration + upsert/query API）。
+- [x] `market_data_sync_task` 历史日 K 同步任务（V7 + V8 parent_task_id + 独立事务留痕 + 连续重试保留历史已验收）。
+- [x] `market_data_alert` 行情异常提醒（V7 + query/resolve API）。
+- [x] 前端 `/market-data` 6 Tab（行情状态/证券主数据/最新价快照/日K数据/历史同步/异常提醒）。
+- [x] 建设看板补充 LongPort provider、最新价快照、历史同步、异常提醒节点。
+- [x] API Key/token 只在服务端配置（默认 `enabled=false`，`DisabledMarketDataProvider` 兜底）。
+- [ ] **接入 LongPort SDK 真实凭据**（需用户提供 app-key/app-secret/access-token 后验证）。
+- [ ] 真实 quote/candlestick SDK 适配和联调验证。
 
 ## 8. 暂缓: 图片识别导入
 

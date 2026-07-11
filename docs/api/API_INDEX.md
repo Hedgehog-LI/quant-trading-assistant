@@ -39,10 +39,10 @@
 | Market Data | GET | `/api/v1/market-data/daily-bars` | 已实现 | `MARKET_DATA_API.md` |
 | Market Data | POST | `/api/v1/market-data/daily-bars/import` | 已实现 | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/daily-bars/template` | 已实现 | `MARKET_DATA_API.md` |
-| Market Data | GET / POST | `/api/v1/market-data/providers/LONGPORT/*` | 设计中（v0.1.2） | `MARKET_DATA_API.md` |
-| Market Data | POST / GET | `/api/v1/market-data/quotes/latest`, `/api/v1/market-data/quote-snapshots` | 设计中（v0.1.2） | `MARKET_DATA_API.md` |
-| Market Data | POST / GET | `/api/v1/market-data/sync-tasks/*` | 设计中（v0.1.2） | `MARKET_DATA_API.md` |
-| Market Data | GET / PATCH | `/api/v1/market-data/alerts/*` | 设计中（v0.1.2） | `MARKET_DATA_API.md` |
+| Market Data | GET / POST | `/api/v1/market-data/providers/LONGPORT/status`、`/health-check` | 已实现（真实 SDK 待凭据） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET | `/api/v1/market-data/quotes/latest`、`/quote-snapshots` | 已实现（真实 SDK 待凭据） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET | `/api/v1/market-data/sync-tasks/daily-bars`、`/sync-tasks`、`/sync-tasks/{id}` | 已实现（真实 SDK 待凭据） | `MARKET_DATA_API.md` |
+| Market Data | GET / PATCH | `/api/v1/market-data/alerts`、`/alerts/{id}/resolve` | 已实现 | `MARKET_DATA_API.md` |
 
 ## 错误码
 
