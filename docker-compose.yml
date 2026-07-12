@@ -5,6 +5,9 @@ services:
       dockerfile: Dockerfile
     container_name: qta-server
     restart: unless-stopped
+    dns:
+      - ${QTA_DNS_SERVER_1:-223.5.5.5}
+      - ${QTA_DNS_SERVER_2:-119.29.29.29}
     environment:
       SPRING_PROFILES_ACTIVE: docker
       TZ: Asia/Shanghai
@@ -14,8 +17,18 @@ services:
       QTA_MYSQL_DATABASE: ${QTA_MYSQL_DATABASE:-quant_trading_assistant}
       QTA_MYSQL_USER: ${QTA_MYSQL_USER:-qta}
       QTA_MYSQL_PASSWORD: ${QTA_MYSQL_PASSWORD:-qta_dev_password}
+      QTA_LONGPORT_ENABLED: ${QTA_LONGPORT_ENABLED:-false}
+      QTA_LONGPORT_TIMEOUT_SECONDS: ${QTA_LONGPORT_TIMEOUT_SECONDS:-10}
+      QTA_LONGPORT_QUOTE_TIME_ZONE: ${QTA_LONGPORT_QUOTE_TIME_ZONE:-Asia/Shanghai}
+      LONGPORT_APP_KEY: ${LONGPORT_APP_KEY:-}
+      LONGPORT_APP_SECRET: ${LONGPORT_APP_SECRET:-}
+      LONGPORT_ACCESS_TOKEN: ${LONGPORT_ACCESS_TOKEN:-}
+      LONGPORT_HTTP_URL: ${LONGPORT_HTTP_URL:-}
+      LONGPORT_QUOTE_WEBSOCKET_URL: ${LONGPORT_QUOTE_WEBSOCKET_URL:-}
     ports:
       - "8080:8080"
+    volumes:
+      - ./runtime-libs:/app/libs:ro
     depends_on:
       mysql:
         condition: service_healthy

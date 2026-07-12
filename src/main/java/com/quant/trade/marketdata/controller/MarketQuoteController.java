@@ -43,7 +43,7 @@ public class MarketQuoteController {
 
     /** 获取最新行情，可选落库。 */
     @PostMapping("/quotes/latest")
-    public ApiResponse<List<StockQuoteSnapshotVO>> fetchLatestQuotes(@RequestBody FetchQuotesRequestDTO dto) {
+    public ApiResponse<List<StockQuoteSnapshotVO>> fetchLatestQuotes(@Valid @RequestBody FetchQuotesRequestDTO dto) {
         return ApiResponse.ok(marketQuoteService.fetchLatestQuotes(dto));
     }
 

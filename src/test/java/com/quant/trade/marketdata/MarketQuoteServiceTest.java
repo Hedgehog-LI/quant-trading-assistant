@@ -1,6 +1,7 @@
 package com.quant.trade.marketdata;
 
 import com.quant.trade.common.exception.BusinessException;
+import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.constant.MarketDataConstants;
 import com.quant.trade.marketdata.dao.MarketDataAlertMapper;
 import com.quant.trade.marketdata.dao.MarketDataSyncTaskMapper;
@@ -56,6 +57,26 @@ class MarketQuoteServiceTest {
         assertThrows(BusinessException.class, () ->
                 marketQuoteService.fetchLatestQuotes(
                         new FetchQuotesRequestDTO(List.of("SH.600519"), true)));
+    }
+
+    @Test
+    void fetchLatestQuotesRejectsEmptySymbolsBeforeProviderCheck() {
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                marketQuoteService.fetchLatestQuotes(
+                        new FetchQuotesRequestDTO(List.of(), true)));
+
+        assertEquals(ErrorCodeEnum.PARAM_ERROR, exception.getErrorCode());
+        assertTrue(exception.getMessage().contains("canonicalSymbols 不能为空"));
+    }
+
+    @Test
+    void fetchLatestQuotesRejectsInvalidSymbolBeforeProviderCheck() {
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                marketQuoteService.fetchLatestQuotes(
+                        new FetchQuotesRequestDTO(List.of("600519.SH"), true)));
+
+        assertEquals(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL, exception.getErrorCode());
+        assertTrue(exception.getMessage().contains("证券代码格式不合法"));
     }
 
     /**

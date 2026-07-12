@@ -1,6 +1,17 @@
 # Feature Design: LongPort 只读行情源接入
 
-> 版本：v0.1.2 · 状态：已实现（facade+DB+API+前端），真实 SDK 待凭据 · 关联：`../BUILD_CHECKLIST.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../decisions/ADR-0008-longport-quote-only-provider.md`
+> 版本：v0.1.3 · 状态：真实外联已验收（2026-07-12，SH.600519 单 symbol 多日 latest quote + daily bar 落库 dataSource=LONGPORT） · 关联：`../BUILD_CHECKLIST.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`、`LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../decisions/ADR-0008-longport-quote-only-provider.md`
+
+## 0. 当前实现事实（2026-07-12 真实外联验收口径）
+
+LongPort 只读行情源已端到端打通并验证数据正确性：
+
+- 已完成：`MarketDataProvider` 抽象、`DisabledMarketDataProvider`、`FakeMarketDataProvider`、`LongPortSymbolMapper`、V7-V9 表结构、行情状态/快照/同步任务/提醒 API、前端 `/market-data` 6 Tab。
+- 已完成：`LongPortProperties`、`LongPortMarketDataProvider`、`LongPortQuoteClient`、`ReflectiveLongPortQuoteClient`、Docker/env 透传和 SDK 缺失安全降级测试。
+- 已完成（2026-07-12）：官方 Java SDK 安装、域名覆盖、真实凭据外联、单 symbol 多日 latest quote + daily bar 落库验收。
+- 启用方式：`qta.market-data.longport.enabled=true`（默认 `false`，安全兜底）。配置项见本文件 §5。
+- 运行态：未启用、SDK 未安装或凭据未配置时，`/providers/LONGPORT/status` 返回 `configured=false`，同步或拉取请求返回 `BUSINESS_RULE_VIOLATION`，这是预期业务拦截，不是系统崩溃。
+- 页面 502 常见原因：本地 Vite `VITE_DEV_PROXY_TARGET` 指向了未运行的端口，例如 `localhost:18081`；当前 Docker 后端默认暴露 `localhost:8080`。
 
 ## 1. 用户目标
 
@@ -55,7 +66,7 @@
 ### P1.1 LongPort Quote Provider MVP
 
 - 新增 provider 抽象：`MarketDataProvider`。
-- 新增 LongPort adapter：`LongPortMarketDataProvider`。
+- 已实现 LongPort adapter：`LongPortMarketDataProvider` + `ReflectiveLongPortQuoteClient`（详见 `LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`）。
 - 支持 `SH.600519` / `SZ.000001` / `BJ.430047` 与 LongPort `600519.SH` / `000001.SZ` / `430047.BJ` 的双向映射。
 - 支持 provider status / health-check，不暴露密钥。
 - 支持按证券列表获取最新行情，按需落库为 `stock_quote_snapshot`。
@@ -123,10 +134,13 @@ qta.market-data.longport.enabled=false
 qta.market-data.longport.app-key=${LONGPORT_APP_KEY:}
 qta.market-data.longport.app-secret=${LONGPORT_APP_SECRET:}
 qta.market-data.longport.access-token=${LONGPORT_ACCESS_TOKEN:}
-qta.market-data.longport.timeout-ms=5000
-qta.market-data.longport.max-batch-size=500
-qta.market-data.longport.max-concurrency=5
+qta.market-data.longport.timeout-seconds=${QTA_LONGPORT_TIMEOUT_SECONDS:10}
+qta.market-data.longport.quote-time-zone=${QTA_LONGPORT_QUOTE_TIME_ZONE:Asia/Shanghai}
+qta.market-data.longport.http-url=${LONGPORT_HTTP_URL:}
+qta.market-data.longport.quote-websocket-url=${LONGPORT_QUOTE_WEBSOCKET_URL:}
 ```
+
+`enabled` 即启用开关：默认 `false` 注入 `DisabledMarketDataProvider`（安全兜底，不连外部）；设为 `true` 且 SDK + 凭据就绪时注入 `LongPortMarketDataProvider`。`http-url` / `quote-websocket-url` 为可选域名覆盖：SDK 4.3.3 默认域名（`openapi.longport.cn` / `openapi-quote.longport.cn`）已废弃，部署必须配为 `https://openapi.longbridge.cn` / `wss://openapi-quote.longbridge.cn/v2`，详见 `../development/LONGPORT_SDK_RUNTIME_INSTALLATION.md` §4.2。
 
 安全要求：
 
@@ -135,6 +149,7 @@ qta.market-data.longport.max-concurrency=5
 - 所有凭据日志脱敏。
 - `.env.example` 只写变量名，不写真实值。
 - CI 和单测使用 Fake provider，不依赖真实 LongPort 凭据。
+- 官方 SDK 通过 `runtime-libs/` 外部 jar 进入运行时 classpath，不写入 `pom.xml`，保持编译期零依赖（正确坐标 `io.github.longportapp:openapi-sdk:4.3.3`，注意 groupId 含 `app`）。
 
 幂等与限流：
 

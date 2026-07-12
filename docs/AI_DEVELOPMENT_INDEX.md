@@ -20,7 +20,8 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 
 1. 启用项目 skill：`.claude/skills/qta-context-bootstrap`（分阶段加载，避免一次读全部 docs）。
 2. 读入口：`AGENTS.md` → `CLAUDE.md` → 本文件 → `AI_HANDOFF.md`。
-3. 按下方"任务类型路由"只读必要文档。
+3. 读 `docs/ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md`，先输出本轮 Task Context Manifest。
+4. 按下方"任务类型路由"只读必要文档；每次额外读取都说明原因。
 
 ## 4. 任务类型路由
 
@@ -48,6 +49,7 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 | 开发历史 | `development/DEVELOPMENT_LOG.md` |
 | 验收历史 | `acceptance/ACCEPTANCE_LOG.md` |
 | 开发流程与同步规则 | `DEVELOPMENT_WORKFLOW.md` |
+| AI 渐进式加载 / 轻量交接协议 | `ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md` |
 | 当前接手事实 | `AI_HANDOFF.md`（精简，历史进 DEVELOPMENT_LOG） |
 
 ## 6. Historical 文档（仅参考，不在主流程）
@@ -62,4 +64,4 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 
 **产品**：明确用户目标、范围、不做什么、数据模型、验收标准、风险。
 
-**所有任务结束**：按 `DEVELOPMENT_WORKFLOW.md` 执行"开发结束文档同步检查"。
+**所有任务结束**：按 `DEVELOPMENT_WORKFLOW.md` 执行"开发结束文档同步检查"；长任务、中断任务或跨会话任务必须按 `docs/templates/TASK_HANDOFF_TEMPLATE.md` 写轻量交接。

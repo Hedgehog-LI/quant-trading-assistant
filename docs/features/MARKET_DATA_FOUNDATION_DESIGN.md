@@ -31,7 +31,7 @@
 - `stock_daily_bar` 已由 `V5__add_market_data_tables.sql` 实现。
 - `stock_daily_bar.fetched_at` 已由 `V6__add_fetched_at_to_daily_bar.sql` 实现。
 - CSV 日 K 幂等导入已实现，`data_source=CSV`。
-- LongPort provider facade、stock_quote_snapshot、market_data_sync_task、market_data_alert 已实现（V7-V9 migration）。真实 LongPort SDK 凭据联调待完成。
+- LongPort provider facade、stock_quote_snapshot、market_data_sync_task、market_data_alert 已实现（V7-V9 migration）。后端反射式 LongPort adapter 已实现；官方 Java SDK 已装入 `runtime-libs/`（`io.github.longportapp:openapi-sdk:4.3.3`，vendor jar 被 gitignore），真实单 symbol 外联已于 2026-07-12 验收通过。部署需配 `LONGPORT_HTTP_URL` / `LONGPORT_QUOTE_WEBSOCKET_URL` 域名覆盖（SDK 默认域名已废弃），详见 `LONGPORT_SDK_RUNTIME_INSTALLATION.md`。
 
 ## 3. 证券主数据
 

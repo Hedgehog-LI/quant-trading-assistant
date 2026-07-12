@@ -2,11 +2,15 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.quant.trade.marketdata.dao.SyncScopeLockMapper">
 
-    <!-- 确保锁行存在。H2 MERGE INTO ... KEY 兼容 MySQL 模式。 -->
+    <!--
+        确保锁行存在。使用 INSERT ON DUPLICATE KEY UPDATE 兼容 MySQL 8.4 和 H2 MySQL 模式。
+        MERGE INTO ... KEY 是 H2 专有语法，MySQL 8.4 不支持，会导致 500。
+        updated_at = CURRENT_TIMESTAMP 触发行更新但不改实质内容，满足幂等语义。
+    -->
     <insert id="upsert">
-        MERGE INTO market_data_sync_scope_lock (provider, task_type, scope_hash)
-        KEY (provider, task_type, scope_hash)
+        INSERT INTO market_data_sync_scope_lock (provider, task_type, scope_hash)
         VALUES (#{provider}, #{taskType}, #{scopeHash})
+        ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
     </insert>
 
     <!-- SELECT FOR UPDATE 行级锁（锁定实际行，而非 COUNT 聚合） -->

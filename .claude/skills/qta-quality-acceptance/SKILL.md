@@ -15,6 +15,7 @@ description: Verify Quant Trading Assistant work before delivery. Use for final 
 3. Review changed files before running checks.
 4. Run the relevant quality gates.
 5. Report findings first, then tests, then next actions.
+6. If the task is incomplete, blocked, or context is becoming large, write a compact handoff using `../../../docs/templates/TASK_HANDOFF_TEMPLATE.md`.
 
 ## Backend Gate
 
@@ -83,3 +84,9 @@ Current State
 Next Actions
 - ...
 ```
+
+## Context Budget
+
+- Do not read all docs for acceptance. Read changed files, acceptance expectations, and directly referenced API/design docs only.
+- Do not inspect generated build artifacts unless the failure points there.
+- If one direct fix and rerun still fails, stop and report the blocker instead of looping.

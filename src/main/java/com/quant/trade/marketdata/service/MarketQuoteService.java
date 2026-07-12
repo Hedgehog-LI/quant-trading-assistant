@@ -58,15 +58,16 @@ public class MarketQuoteService {
 
     @Transactional
     public List<StockQuoteSnapshotVO> fetchLatestQuotes(FetchQuotesRequestDTO dto) {
+        List<String> symbols = validateFetchQuoteRequest(dto);
         if (!provider.isConfigured()) {
+            String unavailableMessage = providerUnavailableMessage("行情 provider 未配置，无法获取最新行情");
             txRequiresNew.executeWithoutResult(s -> createAlert(
                     MarketDataConstants.ALERT_TYPE_PROVIDER_NOT_CONFIGURED,
                     MarketDataConstants.ALERT_SEVERITY_HIGH, null, null, null,
-                    "行情 provider 未配置，获取最新行情请求被拒"));
+                    unavailableMessage));
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
-                    "行情 provider 未配置，无法获取最新行情");
+                    unavailableMessage);
         }
-        List<String> symbols = dto.canonicalSymbols() != null ? dto.canonicalSymbols() : List.of();
         boolean persist = Boolean.TRUE.equals(dto.persist());
 
         List<ProviderQuote> quotes = provider.getLatestQuotes(symbols);
@@ -84,6 +85,29 @@ public class MarketQuoteService {
             result.add(toVO(snapshot));
         }
         return result;
+    }
+
+    private List<String> validateFetchQuoteRequest(FetchQuotesRequestDTO dto) {
+        if (dto == null || dto.canonicalSymbols() == null || dto.canonicalSymbols().isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "canonicalSymbols 不能为空");
+        }
+        if (dto.canonicalSymbols().size() > MarketDataConstants.LONGPORT_MAX_QUOTE_SYMBOLS) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR,
+                    "canonicalSymbols 单次最多支持 " + MarketDataConstants.LONGPORT_MAX_QUOTE_SYMBOLS + " 个标的");
+        }
+        return dto.canonicalSymbols().stream()
+                .map(symbol -> {
+                    if (symbol == null || symbol.isBlank()) {
+                        throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL, "证券代码不能为空");
+                    }
+                    String canonicalSymbol = symbol.trim().toUpperCase(Locale.ROOT);
+                    if (!canonicalSymbol.matches(MarketDataConstants.CANONICAL_SYMBOL_REGEX)) {
+                        throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL,
+                                "证券代码格式不合法: " + symbol);
+                    }
+                    return canonicalSymbol;
+                })
+                .toList();
     }
 
     public PageResultVO<StockQuoteSnapshotVO> listSnapshots(String canonicalSymbol, String dataSource,
@@ -174,13 +198,14 @@ public class MarketQuoteService {
 
         // 2. 检查 provider 配置
         if (!provider.isConfigured()) {
+            String unavailableMessage = providerUnavailableMessage("行情 provider 未配置，同步任务无法执行");
             updateTaskFailed(taskId, ErrorCodeEnum.BUSINESS_RULE_VIOLATION.getCode(),
-                    "行情 provider 未配置", null);
+                    unavailableMessage, null);
             createAlertInNewTx(MarketDataConstants.ALERT_TYPE_PROVIDER_NOT_CONFIGURED,
                     MarketDataConstants.ALERT_SEVERITY_HIGH, dto.canonicalSymbol(), null, taskId,
-                    "行情 provider 未配置，同步任务无法执行");
+                    unavailableMessage);
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
-                    "行情 provider 未配置，同步任务无法执行");
+                    unavailableMessage);
         }
 
         // 3. 转 RUNNING（独立事务）
@@ -292,6 +317,18 @@ public class MarketQuoteService {
                 && a.getLowPrice().compareTo(b.getLowPrice()) == 0
                 && a.getClosePrice().compareTo(b.getClosePrice()) == 0
                 && a.getVolume() != null && a.getVolume().equals(b.getVolume());
+    }
+
+    private String providerUnavailableMessage(String fallbackMessage) {
+        try {
+            var healthStatus = provider.healthCheck();
+            if (healthStatus != null && healthStatus.lastError() != null && !healthStatus.lastError().isBlank()) {
+                return healthStatus.lastError();
+            }
+        } catch (Exception e) {
+            log.warn("Provider health check failed when building unavailable message: {}", e.getMessage());
+        }
+        return fallbackMessage;
     }
 
     /** 独立事务更新任务为 FAILED（同时设 startedAt 兜底，保证有时间范围）。 */

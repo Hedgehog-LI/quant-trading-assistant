@@ -42,7 +42,7 @@
 - 实时行情接口支持批量查询，单次请求标的上限 500。
 - 返回字段包含最新价、昨收、开高低、成交量、成交额、交易状态和时间戳。
 - 实时价格推送包含最新价、开高低、成交量、成交额、交易状态、当前增量成交量/成交额。
-- Java SDK 可通过 Maven 依赖 `io.github.longport:openapi-sdk:4.0.5` 引入。
+- Java SDK 官方 README/Javadoc 给出 Maven 坐标 `io.github.longport:openapi-sdk`；2026-07-11 复核时，Maven Central 对该 group/artifact 查询不到可用 artifact，不能直接把该依赖写入项目 `pom.xml`。
 - LongPort MCP 覆盖行情、账户、资产组合和交易能力，因此本项目必须在提示词和架构上限定只读行情能力。
 
 ## 4. 专家团结论摘要

@@ -12,6 +12,13 @@ public final class MarketDataConstants {
     public static final String DATA_SOURCE_MANUAL = "MANUAL";
     public static final String DATA_SOURCE_LONGPORT = "LONGPORT";
 
+    // Provider
+    public static final String PROVIDER_CODE_LONGPORT = "LONGPORT";
+    public static final int LONGPORT_MAX_QUOTE_SYMBOLS = 500;
+    public static final String LONGPORT_SDK_MISSING_MESSAGE = "LongPort Java SDK 未安装或未进入运行时 classpath";
+    public static final String LONGPORT_CREDENTIALS_MISSING_MESSAGE = "LongPort 凭据未配置";
+    public static final String LONGPORT_PROVIDER_DISABLED_MESSAGE = "LongPort provider 未启用";
+
     // 同步任务
     public static final String TASK_TYPE_DAILY_BAR_SYNC = "DAILY_BAR_SYNC";
     public static final String TASK_TYPE_LATEST_QUOTE_REFRESH = "LATEST_QUOTE_REFRESH";

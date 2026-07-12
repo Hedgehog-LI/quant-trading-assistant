@@ -88,7 +88,7 @@
 
 ### stock_quote_snapshot
 
-状态：已实现（V7 migration）。用途：保存从外部数据源查询到的价格快照。来源为 LongPort（真实 SDK 待凭据），只作为外部行情快照，不替代手工估值。
+状态：已实现（V7 migration）。用途：保存从外部数据源查询到的价格快照。来源为 LongPort（后端反射 adapter 已实现，真实外联待 SDK 包安装），只作为外部行情快照，不替代手工估值。
 
 核心字段：
 

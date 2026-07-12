@@ -4,8 +4,13 @@
 
 ## 1. 流程阶段
 
+### 1.0 上下文加载
+- **读**：`AGENTS.md` + `CLAUDE.md` + `AI_DEVELOPMENT_INDEX.md` + `AI_HANDOFF.md` + `ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md`。
+- **先产出**：本轮 Task Context Manifest，明确任务类型、影响模块、必读文档、禁止读取范围、计划验证命令。
+- **原则**：只按任务路由读取必要文档；不得一次性读取整个 `docs/`、历史提示词或长日志。
+
 ### 1.1 需求
-- **读**：`AI_DEVELOPMENT_INDEX.md` + `AI_HANDOFF.md` + 对应 `docs/features/<设计>.md` + `BUILD_CHECKLIST.md`。
+- **读**：对应 `docs/features/<设计>.md` + `BUILD_CHECKLIST.md`，不重复读取入口文档。
 - **产出**（新功能）：用 `docs/templates/FEATURE_DESIGN_TEMPLATE.md` 起草设计，沉淀到 `docs/features/`。
 
 ### 1.2 设计
@@ -30,6 +35,7 @@
 ### 1.6 交接
 - 更新 `AI_HANDOFF.md`（只保留当前接手事实，历史进 `DEVELOPMENT_LOG`，不无限追加）。
 - 必要时更新 `BUILD_CHECKLIST.md`（**只有实际验收通过才勾选**）。
+- 长任务 / 中断任务 / 跨模型接力任务：用 `docs/templates/TASK_HANDOFF_TEMPLATE.md` 新增 `docs/ai/HANDOFF_YYYY-MM-DD_<topic>.md`，记录当前 git 状态、变更文件、已跑命令、失败点和下一步提示词。
 
 ## 2. 开发结束文档同步检查（必做）
 
@@ -44,6 +50,7 @@
 | 重要架构决策 | 是 | 新增 `decisions/ADR-XXXX-*.md` + 更新 `ADR_INDEX.md` |
 | 重要开发记录 | 产品/架构/功能/缺陷/契约/治理有实质变化时 | `development/DEVELOPMENT_LOG.md` 追加一条（用 `DEVELOPMENT_LOG_TEMPLATE.md`）；普通问答/只读检查/错别字不追加 |
 | 验收执行 | 是 | `acceptance/ACCEPTANCE_LOG.md` 追加 |
+| 跨会话接力 / 任务中断 / 上下文过大 | 是 | `docs/ai/HANDOFF_YYYY-MM-DD_<topic>.md`（用 `TASK_HANDOFF_TEMPLATE.md`） |
 
 ## 3. 禁止
 
@@ -51,3 +58,5 @@
 - 用旧聊天或旧文档覆盖当前代码事实（冲突时按 `AI_DEVELOPMENT_INDEX.md §2` 优先级裁决）。
 - 每轮把所有历史追加到 `AI_HANDOFF.md`（历史进 `DEVELOPMENT_LOG`）。
 - 复制多份接口定义（用 `API_INDEX.md` 链接到唯一详细文档）。
+- 在未确认任务范围前开启专家团、读取全量文档、读取历史 JSONL 或无限重跑验证。
+- 验证失败后无上限地循环修复；一轮直接相关修复仍失败时，写明阻塞原因和下一步。

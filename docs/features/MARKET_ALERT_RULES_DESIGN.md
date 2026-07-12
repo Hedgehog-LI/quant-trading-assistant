@@ -1,6 +1,6 @@
 # Feature Design: 行情异常与量价观察规则
 
-> 版本：v0.1.2 · 状态：设计定稿 / 待实现 · 关联：`LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`
+> 版本：v0.1.2 · 状态：基础数据质量提醒部分实现 / 量价观察规则待实现 · 关联：`LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`
 
 ## 1. 用户目标
 

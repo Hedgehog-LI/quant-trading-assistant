@@ -194,7 +194,7 @@
 - [x] 后端 `/api/v1/market-data/*` 基础接口已实现。
 - [x] 前端 `/market-data` 证券主数据和日 K 页面已实现。
 
-### P1.1 部分实现：LongPort 只读行情源（provider facade + DB + API + 前端已完成，真实 SDK 待凭据）
+### P1.1 已完成：LongPort 只读行情源（真实外联已验收，2026-07-12）
 
 - [x] LongPort quote-only provider 抽象（`MarketDataProvider` 接口 + `DisabledMarketDataProvider` + `FakeMarketDataProvider` + `LongPortSymbolMapper`）。
 - [x] provider 状态和健康检查 API（`GET /providers/LONGPORT/status` + `POST /health-check`）。
@@ -204,8 +204,14 @@
 - [x] 前端 `/market-data` 6 Tab（行情状态/证券主数据/最新价快照/日K数据/历史同步/异常提醒）。
 - [x] 建设看板补充 LongPort provider、最新价快照、历史同步、异常提醒节点。
 - [x] API Key/token 只在服务端配置（默认 `enabled=false`，`DisabledMarketDataProvider` 兜底）。
-- [ ] **接入 LongPort SDK 真实凭据**（需用户提供 app-key/app-secret/access-token 后验证）。
-- [ ] 真实 quote/candlestick SDK 适配和联调验证。
+- [x] 后端 `LongPortProperties` + `LongPortMarketDataProvider` + `ReflectiveLongPortQuoteClient` 已实现；SDK 缺失时应用可启动并返回可解释状态。
+- [x] Docker 运行时已支持 `runtime-libs/` 外部 jar classpath，并已用 fake SDK jar 实测加载成功；不需要把 vendor SDK 提交进 Git。
+- [x] 本地 Docker 后端 `localhost:8080` 已启动，接口壳验收通过；本地前端若 `VITE_DEV_PROXY_TARGET=localhost:18081` 会出现 502，需要改为当前后端端口或重启对应隧道。
+- [x] **获取 LongPort Java SDK jar/native libs**：官方 artifact 坐标 `io.github.longportapp:openapi-sdk:4.3.3`（之前 groupId 写错为 `io.github.longport`），jar 内置全平台 native，已装入 `runtime-libs/`。详见 `development/LONGPORT_SDK_RUNTIME_INSTALLATION.md`。
+- [x] 接入 LongPort SDK 真实凭据并验证（凭据走 `.env.longport` gitignored，不进 Git/文档/日志）。
+- [x] 真实 quote/candlestick 小调用联调验证（2026-07-12，SH.600519 单 symbol 单日，latest quote + daily bar 均落 `dataSource=LONGPORT`）。
+- [x] SDK 默认域名废弃治理：新增 `LONGPORT_HTTP_URL` / `LONGPORT_QUOTE_WEBSOCKET_URL` 可选覆盖，切换到 `openapi.longbridge.cn` / `openapi-quote.longbridge.cn/v2`；docker-compose 加 `dns`。
+- [x] 前端 `/market-data` 小改：状态页展示 SDK/凭据未就绪，历史同步禁用 `HF`。
 
 ## 8. 暂缓: 图片识别导入
 
