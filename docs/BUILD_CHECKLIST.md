@@ -182,7 +182,7 @@
 
 ## 7. P1: 证券主数据与行情基础
 
-设计基线：`docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`、`docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`。
+设计基线：`docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`、`docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`、`docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。
 
 ### P1.0 已实现：证券主数据 + CSV 日 K
 
@@ -213,6 +213,29 @@
 - [x] SDK 默认域名废弃治理：新增 `LONGPORT_HTTP_URL` / `LONGPORT_QUOTE_WEBSOCKET_URL` 可选覆盖，切换到 `openapi.longbridge.cn` / `openapi-quote.longbridge.cn/v2`；docker-compose 加 `dns`。
 - [x] 前端 `/market-data` 小改：状态页展示 SDK/凭据未就绪，历史同步禁用 `HF`。
 
+### P1.2 部分实现：行情工作台、采集任务与分钟线数据资产（后端核心 + 手动执行已闭环，盘中自动调度待补）
+
+- [x] 完成产品/理财/技术架构/量化视角设计：`docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。
+- [x] 工作台下新增行情工作台入口（`/market-workspace`），聚合 provider 状态、提醒统计、交易时段、数据计数（接 DAO 真实查询）。
+- [x] 新增历史补档任务配置（采集计划 CRUD + 启停 + `POST /sync-plans/{id}/run` 手动执行：生成 sync_task + task_item + lastRunAt/lastTaskId）。
+- [x] 手动执行接入 daily bar 写入链路（复用 MarketQuoteService.createAndExecuteDailyBarSync，DAILY_BAR_BACKFILL 可真实落库）。
+- [~] 新增盘中定时监控配置（trigger_type=INTRADAY 配置已支持，自动调度定时器未实现）。
+- [x] 新增 `stock_minute_bar`（V10 migration），支持 1M/5M/15M/30M/60M 分钟 K 落库 + 质量校验 + 交易日/时段校验 + 幂等 + 水位。
+- [x] 分钟 K upsert 接入交易日校验（非交易日 REJECTED + alert）和时段校验（非交易时段 SUSPECT + alert）。
+- [x] 新增采集计划/任务明细/水位表（V10 migration），任务执行过程可查。
+- [x] 新增交易日历和交易时段模型（V10 migration），A 股默认区分集合竞价/上午/下午；启动时 @PostConstruct 幂等初始化（不在 GET 请求里懒初始化防死锁）。
+- [x] 新增板块/自定义分组（V11 migration + CRUD + 前端页面）。
+- [ ] 异动大屏先围绕持仓股、自选股、计划股和自定义板块，不做全市场扫描。
+- [~] 数据质量提醒已落库（VALID/SUSPECT/REJECTED + alert），风险/机会观察待 P1.5。
+- [ ] 盘中自动调度（`@Scheduled`/Quartz）+ 分钟 K 批量拉取接通 LongPort adapter。
+
+### P1.3 已完成：板块/自定义分组
+
+- [x] 新增 `market_segment` + `market_segment_member`（V11 migration）。
+- [x] 板块 CRUD + 成员增删改查 API + service + controller。
+- [x] 前端 `/market-segments` 页面（板块列表 + 成员管理 Drawer，mock/remote 双模式）。
+- [ ] 外部行业/概念数据源预留（后续接入）。
+
 ## 8. 暂缓: 图片识别导入
 
 - [ ] 新增 AI import task 设计。
@@ -225,7 +248,7 @@
 
 ## 9. 后续 P2: 指标、策略、回测
 
-- [ ] 在行情基础阶段完成日 K CSV 导入后，接入指标计算。
+- [ ] 在行情工作台、采集任务、分钟线和数据质量治理完成后，接入指标计算。
 - [ ] 指标计算：MA、MACD、RSI、BOLL。
 - [ ] 策略信号：均线趋势 + 成交量过滤。
 - [ ] 简化回测：手续费、滑点、T+1。

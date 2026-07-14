@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.MarketCalendarMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketCalendarDO">
+        <id column="id" property="id"/>
+        <result column="market_code" property="marketCode"/>
+        <result column="trade_date" property="tradeDate"/>
+        <result column="is_trading_day" property="isTradingDay"/>
+        <result column="is_half_day" property="isHalfDay"/>
+        <result column="remark" property="remark"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, market_code, trade_date, is_trading_day, is_half_day, remark, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO market_calendar (market_code, trade_date, is_trading_day, is_half_day, remark)
+        VALUES (#{marketCode}, #{tradeDate}, #{isTradingDay}, #{isHalfDay}, #{remark})
+    </insert>
+
+    <insert id="batchInsert">
+        INSERT INTO market_calendar (market_code, trade_date, is_trading_day, is_half_day, remark)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.marketCode}, #{item.tradeDate}, #{item.isTradingDay}, #{item.isHalfDay}, #{item.remark})
+        </foreach>
+    </insert>
+
+    <select id="selectByMarketAndDate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_calendar
+        WHERE market_code = #{marketCode} AND trade_date = #{tradeDate}
+    </select>
+
+    <select id="selectByRange" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_calendar
+        WHERE market_code = #{marketCode}
+          AND trade_date &gt;= #{fromDate}
+          AND trade_date &lt;= #{toDate}
+        <if test="isTradingDay != null">AND is_trading_day = #{isTradingDay}</if>
+        ORDER BY trade_date ASC
+    </select>
+
+    <select id="selectLatestTradingDayOnOrBefore" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_calendar
+        WHERE market_code = #{marketCode}
+          AND trade_date &lt;= #{tradeDate}
+          AND is_trading_day = TRUE
+        ORDER BY trade_date DESC
+        LIMIT 1
+    </select>
+
+    <select id="countByMarket" resultType="int">
+        SELECT COUNT(*) FROM market_calendar WHERE market_code = #{marketCode}
+    </select>
+</mapper>

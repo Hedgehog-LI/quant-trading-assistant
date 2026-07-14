@@ -4,6 +4,60 @@
 
 ---
 
+## 2026-07-12 — P1.2 行情工作台 + 分钟线资产 + P1.3 板块/自定义分组
+
+- **目标**：把行情能力从"单次接口验证"升级为"可配置、可追踪、可复用的数据资产建设流程"，完成 P1.2 工作台/采集/分钟线/水位/质量治理 + P1.3 板块管理。
+- **范围**：后端 V10+V11 migration（8 张新表）+ 完整分层代码 + 29 个新单测 + 前端 2 个新页面 + API 层 mock/remote 双模式。不接交易/订单/账户/持仓；不保存密钥；不改历史 migration。
+- **后端改动**：
+  - V10 migration：`stock_minute_bar`、`market_trading_session`、`market_calendar`、`market_data_sync_plan`、`market_data_sync_task_item`、`market_data_watermark`。
+  - V11 migration：`market_segment`、`market_segment_member`。
+  - `MinuteBarQualityManager`：OHLC 合法、volume/amount 非负、时段校验、冲突检测、VALID/SUSPECT/REJECTED。
+  - `TradingSessionManager`：DB 优先 + A 股默认窗口/周末规则回退 + 幂等初始化。
+  - `MarketDataWorkbenchService`：采集计划 CRUD/启停、分钟 K 幂等写入（冲突不覆盖+alert/质量拒绝+alert）、自动水位更新、工作台概览。
+  - `MarketSegmentService`：板块 CRUD + 成员增删改查。
+  - `MarketDataWorkbenchController`（12 个 API）+ `MarketSegmentController`（8 个 API）。
+  - 完整 DO/Mapper/XML/DTO/VO 分层，PageResultVO 补 `of` 工厂方法。
+- **前端改动**：
+  - `/market-workspace` 页面（4 Tab：概览/采集计划/分钟K/水位）。
+  - `/market-segments` 页面（板块列表 + 成员管理 Drawer）。
+  - `workbenchApi.ts` + `segmentApi.ts`（mock/remote 双模式）。
+  - 路由注册 + 侧边栏菜单（行情工作台 + 板块管理）。
+  - mock 测试覆盖。
+- **测试结果**：后端 `./mvnw test` 217 tests / 0 failures；前端 typecheck + lint + 221 tests + build 全绿。
+- **LongPort 真实外联**：跳过（SKIPPED）—— 无凭据/容器，且本轮代码不涉及 LongPort 反射链路。
+- **遗留问题 / 待办**：盘中自动调度未实现（trigger_type 有配置但无定时器）；分钟 K 批量拉取（getMinuteBars）未接通 LongPort adapter；工作台概览聚合计数为占位；日历表无初始化数据。详见 `docs/ai/HANDOFF_2026-07-12_market_data_long_run.md`。
+- **关联文档**：`features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`api/MARKET_DATA_API.md`、`BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`、`ai/HANDOFF_2026-07-12_market_data_long_run.md`。
+
+---
+
+## 2026-07-12 — P1.2 行情工作台与采集任务设计 + 建设看板同步
+
+- **目标**：在 LongPort P1.1 真实外联验收通过后，重新规划下一阶段行情系统建设，避免直接跳到指标/策略/回测导致数据资产地基不足。
+- **范围**：产品/架构设计文档 + 当前事实文档 + 前端建设看板数据与测试；不改后端业务代码、不改 DB migration、不接交易能力。
+- **产品决策**：
+  - 行情能力放到工作台下形成“行情工作台”，高频展示 provider 状态、重点标的、最近同步、失败任务和未处理提醒。
+  - 配置类能力放到“行情数据配置中心”，管理历史补档、盘中定时采集、数据源、标的池、板块池、提醒规则和任务日志。
+  - 异动大屏作为盘中展示模式，先围绕持仓股、自选股、计划股和自定义板块，不做全市场扫描。
+  - 采集频率与 K 线粒度明确拆分；历史 30min K 线不能由最新价快照拼接冒充。
+- **架构决策**：
+  - 保留 `stock_basic`、`stock_daily_bar`、`stock_quote_snapshot`、`market_data_sync_task`、`market_data_alert`。
+  - 下一阶段优先新增 `stock_minute_bar`、交易日历/交易时段、采集计划、任务明细、水位、板块和异动事件。
+  - 行情数据分为原始行情事实、衍生统计、任务/质量治理三层。
+  - LongPort 继续作为主线，同时在 provider 抽象中预留 Tushare、AKShare、BaoStock 和专业数据导入桥。
+- **文档改动**：
+  - 新增 `docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。
+  - 更新 `AI_DEVELOPMENT_INDEX.md`、`AI_HANDOFF.md`、`PRODUCT_BLUEPRINT.md`、`BUILD_CHECKLIST.md`、`CURRENT_ARCHITECTURE_AND_MODULES.md`。
+  - 修正 `MARKET_DATA_FOUNDATION_DESIGN.md` 和 `LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md` 的旧口径，明确 P1.1 已完成，P1.2 才是下一阶段。
+- **前端看板改动**：
+  - `longport-quote-snapshot`、`longport-history-sync` 更新为 DONE/M4。
+  - 新增 `longport-hardening`、`market-ops-workbench`、`market-collection-jobs`、`minute-bar-asset`、`market-movement-dashboard`、`multi-source-provider-research`。
+  - summary 当前最优先改为 `P1.2 行情工作台与采集任务`。
+- **测试结果**：本轮为文档/看板同步，执行 `git diff --check` 和前端建设看板测试；结果见 `../acceptance/ACCEPTANCE_LOG.md` 对应条目。
+- **遗留问题**：P1.2 尚未实现业务代码；下一轮应按新设计开发行情工作台 MVP、采集任务配置和分钟线资产。
+- **关联文档**：`../features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`../BUILD_CHECKLIST.md`、`../AI_HANDOFF.md`。
+
+---
+
 ## 2026-07-12 — LongPort SDK 安装 + 域名覆盖 + 真实外联验收
 
 - **目标**：完成 P1.1 LongPort 单股票手动同步真实外联的最后一公里 —— 安装官方 Java SDK、解决 SDK 默认域名废弃问题、单 symbol 单日真实落库验收。

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.MarketDataSyncPlanMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketDataSyncPlanDO">
+        <id column="id" property="id"/>
+        <result column="plan_name" property="planName"/>
+        <result column="task_type" property="taskType"/>
+        <result column="provider" property="provider"/>
+        <result column="scope_json" property="scopeJson"/>
+        <result column="interval_type" property="intervalType"/>
+        <result column="adjust_type" property="adjustType"/>
+        <result column="trigger_type" property="triggerType"/>
+        <result column="cron_expr" property="cronExpr"/>
+        <result column="include_auction" property="includeAuction"/>
+        <result column="collect_frequency" property="collectFrequency"/>
+        <result column="enabled" property="enabled"/>
+        <result column="description" property="description"/>
+        <result column="last_run_at" property="lastRunAt"/>
+        <result column="last_task_id" property="lastTaskId"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, plan_name, task_type, provider, scope_json, interval_type, adjust_type, trigger_type,
+        cron_expr, include_auction, collect_frequency, enabled, description, last_run_at, last_task_id,
+        created_at, updated_at
+    </sql>
+
+    <sql id="Filter_Clause">
+        <where>
+            <if test="taskType != null and taskType != ''">AND task_type = #{taskType}</if>
+            <if test="provider != null and provider != ''">AND provider = #{provider}</if>
+            <if test="enabled != null">AND enabled = #{enabled}</if>
+        </where>
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO market_data_sync_plan (plan_name, task_type, provider, scope_json, interval_type,
+            adjust_type, trigger_type, cron_expr, include_auction, collect_frequency, enabled, description)
+        VALUES (#{planName}, #{taskType}, #{provider}, #{scopeJson}, #{intervalType},
+            #{adjustType}, #{triggerType}, #{cronExpr}, #{includeAuction}, #{collectFrequency}, #{enabled}, #{description})
+    </insert>
+
+    <update id="updateById">
+        UPDATE market_data_sync_plan
+        SET plan_name = #{planName}, task_type = #{taskType}, provider = #{provider}, scope_json = #{scopeJson},
+            interval_type = #{intervalType}, adjust_type = #{adjustType}, trigger_type = #{triggerType},
+            cron_expr = #{cronExpr}, include_auction = #{includeAuction}, collect_frequency = #{collectFrequency},
+            enabled = #{enabled}, description = #{description}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE market_data_sync_plan SET enabled = #{enabled}, updated_at = #{updatedAt} WHERE id = #{id}
+    </update>
+
+    <update id="updateLastRun">
+        UPDATE market_data_sync_plan SET last_task_id = #{lastTaskId}, last_run_at = #{lastRunAt} WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM market_data_sync_plan WHERE id = #{id}
+    </select>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_data_sync_plan
+        <include refid="Filter_Clause"/>
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(*) FROM market_data_sync_plan <include refid="Filter_Clause"/>
+    </select>
+
+    <select id="selectAutoTriggerPlans" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_data_sync_plan
+        WHERE trigger_type = #{triggerType} AND enabled = #{enabled}
+        ORDER BY created_at ASC
+    </select>
+</mapper>

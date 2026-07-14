@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.MarketSegmentMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketSegmentDO">
+        <id column="id" property="id"/>
+        <result column="segment_code" property="segmentCode"/>
+        <result column="segment_name" property="segmentName"/>
+        <result column="segment_type" property="segmentType"/>
+        <result column="description" property="description"/>
+        <result column="enabled" property="enabled"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, segment_code, segment_name, segment_type, description, enabled, created_at, updated_at
+    </sql>
+
+    <sql id="Filter_Clause">
+        <where>
+            <if test="segmentType != null and segmentType != ''">AND segment_type = #{segmentType}</if>
+            <if test="enabled != null">AND enabled = #{enabled}</if>
+            <if test="keyword != null and keyword != ''">
+                AND (segment_name LIKE CONCAT('%', #{keyword}, '%') OR segment_code LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO market_segment (segment_code, segment_name, segment_type, description, enabled)
+        VALUES (#{segmentCode}, #{segmentName}, #{segmentType}, #{description}, #{enabled})
+    </insert>
+
+    <update id="updateById">
+        UPDATE market_segment
+        SET segment_name = #{segmentName}, segment_type = #{segmentType},
+            description = #{description}, enabled = #{enabled}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE market_segment SET enabled = #{enabled} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM market_segment WHERE id = #{id}
+    </delete>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM market_segment WHERE id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM market_segment WHERE segment_code = #{segmentCode}
+    </select>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_segment
+        <include refid="Filter_Clause"/>
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(*) FROM market_segment <include refid="Filter_Clause"/>
+    </select>
+</mapper>

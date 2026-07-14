@@ -88,7 +88,7 @@
 
 ### stock_quote_snapshot
 
-状态：已实现（V7 migration）。用途：保存从外部数据源查询到的价格快照。来源为 LongPort（后端反射 adapter 已实现，真实外联待 SDK 包安装），只作为外部行情快照，不替代手工估值。
+状态：已实现（V7 migration）。用途：保存从外部数据源查询到的价格快照。来源为 LongPort（后端反射 adapter 已实现，真实外联已于 2026-07-12 验收通过），只作为外部行情快照，不替代手工估值。
 
 核心字段：
 
@@ -176,24 +176,37 @@
 
 ### stock_minute_bar
 
-用途：保存分钟行情，v0.2 后再重点实现。
+状态：P1.2 待实现。用途：保存 1M/5M/15M/30M/60M 分钟 K，支撑历史补档、盘中采集、量价异动和后续指标/回测。详细设计见 `features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。
 
 核心字段：
 
 - `id`
-- `symbol`
-- `trade_time`
+- `canonical_symbol`
+- `trade_date`
+- `bar_start_time`
+- `bar_end_time`
 - `interval_type`
+- `session_type`
 - `open_price`
 - `high_price`
 - `low_price`
 - `close_price`
 - `volume`
 - `amount`
+- `turnover_rate`
+- `adjust_type`
+- `data_source`
+- `fetched_at`
+- `raw_hash`
+- `quality_status`
+- `created_at`
+- `updated_at`
 
 索引：
 
-- unique `uk_minute_symbol_time_interval(symbol, trade_time, interval_type)`
+- unique `uk_minute_bar_key(canonical_symbol, bar_start_time, interval_type, adjust_type, data_source)`
+- index `idx_minute_bar_symbol_time(canonical_symbol, interval_type, adjust_type, data_source, bar_start_time)`
+- index `idx_minute_bar_trade_date(trade_date, interval_type)`
 
 ### technical_indicator_daily
 

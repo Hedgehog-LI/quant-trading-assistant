@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.MarketTradingSessionMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketTradingSessionDO">
+        <id column="id" property="id"/>
+        <result column="market_code" property="marketCode"/>
+        <result column="session_type" property="sessionType"/>
+        <result column="session_name" property="sessionName"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="is_auction" property="isAuction"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="enabled" property="enabled"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, market_code, session_type, session_name, start_time, end_time,
+        is_auction, sort_order, enabled, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO market_trading_session (market_code, session_type, session_name, start_time, end_time,
+            is_auction, sort_order, enabled)
+        VALUES (#{marketCode}, #{sessionType}, #{sessionName}, #{startTime}, #{endTime},
+            #{isAuction}, #{sortOrder}, #{enabled})
+    </insert>
+
+    <insert id="batchInsert">
+        INSERT INTO market_trading_session (market_code, session_type, session_name, start_time, end_time,
+            is_auction, sort_order, enabled)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.marketCode}, #{item.sessionType}, #{item.sessionName}, #{item.startTime}, #{item.endTime},
+             #{item.isAuction}, #{item.sortOrder}, #{item.enabled})
+        </foreach>
+    </insert>
+
+    <update id="updateById">
+        UPDATE market_trading_session
+        SET session_name = #{sessionName}, start_time = #{startTime}, end_time = #{endTime},
+            is_auction = #{isAuction}, sort_order = #{sortOrder}, enabled = #{enabled}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM market_trading_session WHERE id = #{id}
+    </select>
+
+    <select id="selectByMarket" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_trading_session
+        WHERE market_code = #{marketCode}
+        <if test="enabled != null">AND enabled = #{enabled}</if>
+        ORDER BY sort_order ASC
+    </select>
+
+    <select id="countByMarket" resultType="int">
+        SELECT COUNT(*) FROM market_trading_session WHERE market_code = #{marketCode}
+    </select>
+</mapper>

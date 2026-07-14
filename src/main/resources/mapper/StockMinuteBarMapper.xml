@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.StockMinuteBarMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.StockMinuteBarDO">
+        <id column="id" property="id"/>
+        <result column="canonical_symbol" property="canonicalSymbol"/>
+        <result column="trade_date" property="tradeDate"/>
+        <result column="bar_start_time" property="barStartTime"/>
+        <result column="bar_end_time" property="barEndTime"/>
+        <result column="interval_type" property="intervalType"/>
+        <result column="session_type" property="sessionType"/>
+        <result column="open_price" property="openPrice"/>
+        <result column="high_price" property="highPrice"/>
+        <result column="low_price" property="lowPrice"/>
+        <result column="close_price" property="closePrice"/>
+        <result column="volume" property="volume"/>
+        <result column="amount" property="amount"/>
+        <result column="turnover_rate" property="turnoverRate"/>
+        <result column="adjust_type" property="adjustType"/>
+        <result column="data_source" property="dataSource"/>
+        <result column="fetched_at" property="fetchedAt"/>
+        <result column="raw_hash" property="rawHash"/>
+        <result column="quality_status" property="qualityStatus"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, canonical_symbol, trade_date, bar_start_time, bar_end_time, interval_type, session_type,
+        open_price, high_price, low_price, close_price, volume, amount, turnover_rate,
+        adjust_type, data_source, fetched_at, raw_hash, quality_status, created_at, updated_at
+    </sql>
+
+    <sql id="Filter_Clause">
+        <where>
+            <if test="canonicalSymbol != null and canonicalSymbol != ''">AND canonical_symbol = #{canonicalSymbol}</if>
+            <if test="intervalType != null and intervalType != ''">AND interval_type = #{intervalType}</if>
+            <if test="adjustType != null and adjustType != ''">AND adjust_type = #{adjustType}</if>
+            <if test="dataSource != null and dataSource != ''">AND data_source = #{dataSource}</if>
+            <if test="fromTime != null">AND bar_start_time &gt;= #{fromTime}</if>
+            <if test="toTime != null">AND bar_start_time &lt;= #{toTime}</if>
+            <if test="tradeDate != null and tradeDate != ''">AND trade_date = #{tradeDate}</if>
+        </where>
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO stock_minute_bar (canonical_symbol, trade_date, bar_start_time, bar_end_time,
+            interval_type, session_type, open_price, high_price, low_price, close_price,
+            volume, amount, turnover_rate, adjust_type, data_source, fetched_at, raw_hash, quality_status)
+        VALUES (#{canonicalSymbol}, #{tradeDate}, #{barStartTime}, #{barEndTime},
+            #{intervalType}, #{sessionType}, #{openPrice}, #{highPrice}, #{lowPrice}, #{closePrice},
+            #{volume}, #{amount}, #{turnoverRate}, #{adjustType}, #{dataSource}, #{fetchedAt}, #{rawHash}, #{qualityStatus})
+    </insert>
+
+    <insert id="batchInsert">
+        INSERT INTO stock_minute_bar (canonical_symbol, trade_date, bar_start_time, bar_end_time,
+            interval_type, session_type, open_price, high_price, low_price, close_price,
+            volume, amount, turnover_rate, adjust_type, data_source, fetched_at, raw_hash, quality_status)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.canonicalSymbol}, #{item.tradeDate}, #{item.barStartTime}, #{item.barEndTime},
+             #{item.intervalType}, #{item.sessionType}, #{item.openPrice}, #{item.highPrice}, #{item.lowPrice}, #{item.closePrice},
+             #{item.volume}, #{item.amount}, #{item.turnoverRate}, #{item.adjustType}, #{item.dataSource}, #{item.fetchedAt}, #{item.rawHash}, #{item.qualityStatus})
+        </foreach>
+    </insert>
+
+    <select id="selectByUniqueKey" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM stock_minute_bar
+        WHERE canonical_symbol = #{canonicalSymbol}
+          AND bar_start_time = #{barStartTime}
+          AND interval_type = #{intervalType}
+          AND adjust_type = #{adjustType}
+          AND data_source = #{dataSource}
+    </select>
+
+    <update id="updateByUniqueKey">
+        UPDATE stock_minute_bar
+        SET bar_end_time = #{barEndTime}, open_price = #{openPrice}, high_price = #{highPrice},
+            low_price = #{lowPrice}, close_price = #{closePrice}, volume = #{volume}, amount = #{amount},
+            turnover_rate = #{turnoverRate}, session_type = #{sessionType}, fetched_at = #{fetchedAt},
+            raw_hash = #{rawHash}, quality_status = #{qualityStatus}
+        WHERE canonical_symbol = #{canonicalSymbol}
+          AND bar_start_time = #{barStartTime}
+          AND interval_type = #{intervalType}
+          AND adjust_type = #{adjustType}
+          AND data_source = #{dataSource}
+    </update>
+
+    <select id="selectByFilter" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM stock_minute_bar
+        <include refid="Filter_Clause"/>
+        ORDER BY bar_start_time ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(*) FROM stock_minute_bar <include refid="Filter_Clause"/>
+    </select>
+
+    <select id="countByCanonicalSymbol" resultType="long">
+        SELECT COUNT(*) FROM stock_minute_bar WHERE canonical_symbol = #{canonicalSymbol}
+    </select>
+</mapper>

@@ -4,6 +4,50 @@
 
 ---
 
+## 2026-07-12 — P1.2 行情工作台 + P1.3 板块 单元测试验收（通过）
+
+- **范围**：P1.2 行情工作台后端核心（V10 migration 6 表 + 分钟 K 质量/时段/采集计划/水位）+ P1.3 板块（V11 migration 2 表 + CRUD）+ 前端 2 个新页面。
+- **后端门禁（全绿）**：
+  - `./mvnw test`：**217 tests / 0 failures / 0 errors**（新增 29：MinuteBarQualityManagerTest 13 + TradingSessionManagerTest 8 + MarketDataWorkbenchServiceTest 8）。
+  - `./mvnw -q compile` + `./mvnw -q -DskipTests package`：BUILD SUCCESS。
+  - V10/V11 migration 在 H2 `MODE=MySQL` 下正常加载，未触发兼容性问题。
+  - `git diff --check`：通过。
+- **前端门禁（全绿）**：
+  - `npm run typecheck`：通过。
+  - `npm run lint`：通过（0 errors）。
+  - `npm run test`：**221 tests passed**（新增 workbenchApi mock 5 tests）。
+  - `npm run build`：通过。
+- **单测覆盖重点**：
+  - 分钟 K 质量：OHLC 非法 → REJECTED、volume 负 → REJECTED、turnoverRate 负 → SUSPECT、null → REJECTED、内容冲突检测。
+  - 交易时段：空 DB 回退 A 股默认窗口、集合竞价开关、日历覆盖周末规则、幂等初始化。
+  - 工作台 service：分钟 K 幂等（INSERTED/SKIPPED/CONFLICT/REJECTED）、水位 upsert、采集计划 CRUD/启停。
+- **跳过项及原因**：
+  - LongPort 真实外联验收：SKIPPED —— 无凭据/容器，本轮代码不涉及 LongPort 反射链路。
+  - Docker `docker compose up` 联调：SKIPPED —— 代码侧编译+单测已覆盖。
+  - 浏览器 Playwright 验收：SKIPPED —— 新页面 mock 模式测试已覆盖功能逻辑。
+- **关联**：`development/DEVELOPMENT_LOG.md`（2026-07-12 P1.2/P1.3 条）、`ai/HANDOFF_2026-07-12_market_data_long_run.md`。
+
+---
+
+## 2026-07-12 — P1.2 行情工作台设计与建设看板同步验收（文档/看板）
+
+- **范围**：产品架构设计文档、当前事实文档、前端建设看板数据和看板数据测试；未改后端业务代码、未改 DB migration。
+- **设计验收**：
+  - 新增 `docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`，覆盖行情工作台、历史补档、盘中定时采集、分钟线资产、交易日历/交易时段、板块、异动大屏和多数据源策略。
+  - `AI_HANDOFF.md`、`PRODUCT_BLUEPRINT.md`、`BUILD_CHECKLIST.md` 已把下一阶段从“直接 P2 指标/策略/回测”调整为“P1.2 行情工作台、采集任务与分钟线数据资产”。
+  - `CURRENT_ARCHITECTURE_AND_MODULES.md` 已补 V7-V9 和 LongPort 行情当前事实。
+- **看板验收**：
+  - `longport-quote-snapshot`、`longport-history-sync` 已从 `IN_PROGRESS/M2/70` 更新为 `DONE/M4`。
+  - 新增下一阶段节点：`longport-hardening`、`market-ops-workbench`、`market-collection-jobs`、`minute-bar-asset`、`market-movement-dashboard`、`multi-source-provider-research`。
+  - 当前最优先 summary 改为 `P1.2 行情工作台与采集任务`。
+- **实际执行检查**：
+  - `git diff --check`（后端文档仓库）：通过。
+  - `git -C /Users/joker/code/quant-trading-assistant-web diff --check`：通过。
+  - 前端建设看板相关测试：通过。
+- **结论**：P1.2 设计与建设看板同步通过；后续可以进入业务代码开发，但必须先实现数据资产和采集治理，再推进指标/策略/回测。
+
+---
+
 ## 2026-07-12 — LongPort 单股票同步真实外联验收（通过）
 
 - **范围**：P1.1 LongPort 单股票手动同步真实外联最小验收。1 个 A 股 symbol、单日、不复权、不做全量扫描。

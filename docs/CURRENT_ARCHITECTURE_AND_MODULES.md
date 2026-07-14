@@ -61,7 +61,7 @@ convert     # MapStruct 转换器
 | Review | `review` | `/api/v1/reviews` | `review_note` |
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
-| Market Data | `marketdata` | `/api/v1/market-data/*` | `stock_basic`, `stock_daily_bar` |
+| Market Data | `marketdata` | `/api/v1/market-data/*` | `stock_basic`, `stock_daily_bar`, `stock_quote_snapshot`, `market_data_sync_task`, `market_data_alert`, `market_data_sync_scope_lock`, `stock_minute_bar`, `market_trading_session`, `market_calendar`, `market_data_sync_plan`, `market_data_sync_task_item`, `market_data_watermark`, `market_segment`, `market_segment_member` |
 
 ## 4. 当前数据库迁移
 
@@ -73,8 +73,13 @@ convert     # MapStruct 转换器
 | `V4__add_position_snapshot.sql` | 持仓快照主表和明细表 |
 | `V5__add_market_data_tables.sql` | 证券主数据 stock_basic、日 K stock_daily_bar |
 | `V6__add_fetched_at_to_daily_bar.sql` | stock_daily_bar 增加 fetched_at |
+| `V7__add_market_data_provider_tables.sql` | stock_quote_snapshot、market_data_sync_task、market_data_alert |
+| `V8__add_market_data_sync_task_parent.sql` | market_data_sync_task 增加 parent_task_id，支持失败重试留痕 |
+| `V9__add_market_data_sync_scope_lock.sql` | market_data_sync_scope_lock，同 scope 同步锁 |
+| `V10__add_market_data_workbench.sql` | stock_minute_bar、market_trading_session、market_calendar、market_data_sync_plan、market_data_sync_task_item、market_data_watermark |
+| `V11__add_market_segment.sql` | market_segment、market_segment_member |
 
-已发布的 V1-V6 migration 不应修改；后续表结构调整继续新增更高版本 migration。
+已发布的 V1-V11 migration 不应修改；后续表结构调整继续新增更高版本 migration。
 
 ## 5. 交易账本口径
 
@@ -165,11 +170,24 @@ npm run build
 
 新增错误码：`TRADE_PLAN_NOT_FOUND` / `TRADE_PLAN_NOT_LINKABLE` / `TRADE_PLAN_SYMBOL_MISMATCH` / `JOURNAL_REFERENCED_BY_REVIEW` / `POSITION_SNAPSHOT_COMPARISON_INVALID`。新增枚举：`DashboardTodoCodeEnum` / `DashboardTodoLevelEnum`（common.enums）、`SnapshotChangeTypeEnum` / `ReconciliationStatusEnum`（portfolio.enums）。该阶段未新增任何数据库表。
 
-## 11. 后续规划（未实现）
+## 11. 行情基础当前事实
 
-证券主数据和 CSV 日 K 基础已经由 `marketdata` 模块实现。下一步行情 provider、外部价格快照、同步任务和行情异常提醒见：
+证券主数据和 CSV 日 K 基础已经由 `marketdata` 模块实现。LongPort 只读行情 provider 已完成真实外联验收：
+
+- `stock_quote_snapshot` 存外部最新价快照，不覆盖 `portfolio_price_snapshot`。
+- `market_data_sync_task` 存历史日 K 同步任务和失败留痕。
+- `market_data_alert` 存 provider 未配置、同步失败、数据质量等提醒。
+- LongPort SDK 通过 `runtime-libs/` 运行时 jar 方式加载，vendor jar 不入 Git。
+- LongPort 凭据只通过 `.env.longport` / 环境变量注入，不进前端、DB、日志或 Git。
+- LongPort 只用于 Quote 行情，不接交易、订单、账户、真实持仓。
+
+## 12. 后续规划（未实现）
+
+下一阶段是行情工作台、采集任务和分钟线数据资产，不是直接进入策略回测：
 
 - `docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`
+- `docs/features/LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`
+- `docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`
 - `docs/features/MARKET_ALERT_RULES_DESIGN.md`
 - `docs/decisions/ADR-0008-longport-quote-only-provider.md`
 

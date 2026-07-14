@@ -1,6 +1,6 @@
 # Feature Design: LongPort 单股票手动同步最小闭环
 
-> 版本：v0.1.3 · 状态：后端 adapter 已实现 / Docker runtime classpath 已准备 / 前端提示已补 / 真实外联待 SDK 包可获取 · 关联：`LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../BUILD_CHECKLIST.md`、`../development/LONGPORT_SDK_RUNTIME_INSTALLATION.md`
+> 版本：v0.1.3 · 状态：真实外联已验收通过（2026-07-12）；后续扩展见 `MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md` · 关联：`LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../BUILD_CHECKLIST.md`、`../development/LONGPORT_SDK_RUNTIME_INSTALLATION.md`
 
 ## 1. 用户目标
 
@@ -189,13 +189,13 @@ qta.market-data.longport.quote-time-zone=${QTA_LONGPORT_QUOTE_TIME_ZONE:Asia/Sha
 - [x] 启用 LongPort 但 SDK 未安装时：
   - Spring 上下文可启动。
   - `/providers/LONGPORT/status` 返回 200 + configured=false + `LongPort Java SDK 未安装或未进入运行时 classpath`。
-- [ ] SDK jar/native libs 可用并配置 LongPort 凭据后：
+- [x] SDK jar/native libs 可用并配置 LongPort 凭据后：
   - `/providers/LONGPORT/status` 返回 configured=true。
   - 输入 `SH.600519` 可拉取最新价并写入 `stock_quote_snapshot`。
   - 输入 `SH.600519` + 日期区间可同步日 K 并写入 `stock_daily_bar(data_source=LONGPORT)`。
   - 重复同步同一日期范围可解释 inserted / updated / skipped，不重复造脏数据。
-  - 同 scope 并发请求不会创建 sibling retry 冲突。
-- [ ] 前端：
+  - 同 scope 并发请求不会创建 sibling retry 冲突（基础锁和重试留痕已实现；多 symbol/多日压测仍可作为 P1.2 hardening）。
+- [x] 前端：
   - `npm run typecheck` 通过。
   - `npm run lint` 通过。
   - `npm run test` 通过。
@@ -203,7 +203,7 @@ qta.market-data.longport.quote-time-zone=${QTA_LONGPORT_QUOTE_TIME_ZONE:Asia/Sha
   - `/market-data` 页面无 502、无控制台 error。
   - 状态页清晰展示 SDK 未安装 / 凭据未配置。
   - 历史同步禁用 `HF` 后复权。
-- [ ] Docker：
+- [x] Docker：
   - `docker compose up -d --build` 成功。
   - `curl /actuator/health` UP。
   - 长桥凭据通过环境变量注入，不进入 Git。
@@ -211,7 +211,7 @@ qta.market-data.longport.quote-time-zone=${QTA_LONGPORT_QUOTE_TIME_ZONE:Asia/Sha
 
 ## 8. 下轮开发提示词摘要
 
-开发目标：获取 LongPort Java SDK jar/native libs 后做真实外联验收；不做定时任务、不做全量扫描。
+开发目标：本单股票最小闭环已完成。后续不要继续重复做 SDK 获取和单 symbol 验收；下一步读取 `MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`，建设行情工作台、采集任务、分钟线资产和异动大屏；仍然不接交易 API、不做全市场扫描。
 
 必读：
 
@@ -219,6 +219,7 @@ qta.market-data.longport.quote-time-zone=${QTA_LONGPORT_QUOTE_TIME_ZONE:Asia/Sha
 - `docs/AI_DEVELOPMENT_INDEX.md`
 - `docs/AI_HANDOFF.md`
 - 本文档
+- `docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`
 - `docs/api/MARKET_DATA_API.md`
 - `docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`
 
@@ -229,8 +230,8 @@ qta.market-data.longport.quote-time-zone=${QTA_LONGPORT_QUOTE_TIME_ZONE:Asia/Sha
 
 待改：
 
-- 建设看板 LongPort 节点状态。
-- 获取 SDK jar/native libs 与真实外联验收。
+- 建设看板下一阶段节点保持同步。
+- 多 symbol / 多日范围 / 并发边界可作为 P1.2 hardening。
 
 禁止：
 
