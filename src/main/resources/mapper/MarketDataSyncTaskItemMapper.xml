@@ -6,6 +6,7 @@
         <id column="id" property="id"/>
         <result column="task_id" property="taskId"/>
         <result column="plan_id" property="planId"/>
+        <result column="sub_task_id" property="subTaskId"/>
         <result column="canonical_symbol" property="canonicalSymbol"/>
         <result column="scope_detail" property="scopeDetail"/>
         <result column="status" property="status"/>
@@ -22,24 +23,24 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, task_id, plan_id, canonical_symbol, scope_detail, status, row_count,
+        id, task_id, plan_id, sub_task_id, canonical_symbol, scope_detail, status, row_count,
         inserted_count, updated_count, skipped_count, error_code, error_message,
         started_at, finished_at, created_at, updated_at
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO market_data_sync_task_item (task_id, plan_id, canonical_symbol, scope_detail, status,
+        INSERT INTO market_data_sync_task_item (task_id, plan_id, sub_task_id, canonical_symbol, scope_detail, status,
             row_count, inserted_count, updated_count, skipped_count, error_code, error_message, started_at, finished_at)
-        VALUES (#{taskId}, #{planId}, #{canonicalSymbol}, #{scopeDetail}, #{status},
+        VALUES (#{taskId}, #{planId}, #{subTaskId}, #{canonicalSymbol}, #{scopeDetail}, #{status},
             #{rowCount}, #{insertedCount}, #{updatedCount}, #{skippedCount}, #{errorCode}, #{errorMessage}, #{startedAt}, #{finishedAt})
     </insert>
 
     <insert id="batchInsert">
-        INSERT INTO market_data_sync_task_item (task_id, plan_id, canonical_symbol, scope_detail, status,
+        INSERT INTO market_data_sync_task_item (task_id, plan_id, sub_task_id, canonical_symbol, scope_detail, status,
             row_count, inserted_count, updated_count, skipped_count, error_code, error_message, started_at, finished_at)
         VALUES
         <foreach collection="list" item="item" separator=",">
-            (#{item.taskId}, #{item.planId}, #{item.canonicalSymbol}, #{item.scopeDetail}, #{item.status},
+            (#{item.taskId}, #{item.planId}, #{item.subTaskId}, #{item.canonicalSymbol}, #{item.scopeDetail}, #{item.status},
              #{item.rowCount}, #{item.insertedCount}, #{item.updatedCount}, #{item.skippedCount},
              #{item.errorCode}, #{item.errorMessage}, #{item.startedAt}, #{item.finishedAt})
         </foreach>
@@ -47,7 +48,7 @@
 
     <update id="updateById">
         UPDATE market_data_sync_task_item
-        SET status = #{status}, row_count = #{rowCount}, inserted_count = #{insertedCount},
+        SET status = #{status}, sub_task_id = #{subTaskId}, row_count = #{rowCount}, inserted_count = #{insertedCount},
             updated_count = #{updatedCount}, skipped_count = #{skippedCount},
             error_code = #{errorCode}, error_message = #{errorMessage},
             started_at = #{startedAt}, finished_at = #{finishedAt}
@@ -79,5 +80,12 @@
         WHERE plan_id = #{planId}
         ORDER BY created_at DESC
         LIMIT #{limit}
+    </select>
+
+    <select id="selectAllByTaskId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_data_sync_task_item
+        WHERE task_id = #{taskId}
+        ORDER BY id ASC
     </select>
 </mapper>

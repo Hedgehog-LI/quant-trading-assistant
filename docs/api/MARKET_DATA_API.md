@@ -167,7 +167,101 @@ PENDING -> RUNNING -> SUCCEEDED / PARTIAL_FAILED / FAILED /
 | GET | `/api/v1/market-data/alerts?severity=&resolved=&canonicalSymbol=&page=&size=` | 查询行情异常提醒 |
 | PATCH | `/api/v1/market-data/alerts/{id}/resolve` | 标记提醒已处理 |
 
-## 3. 安全约束
+## 3. 行情工作台、采集计划、分钟 K、水位（P1.2）
+
+### 行情工作台概览
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/workbench/overview` | 工作台概览（provider 状态、提醒计数、交易时段、数据计数，接 DAO 真实查询） |
+
+### 采集计划
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/v1/market-data/sync-plans` | 创建采集计划 |
+| GET | `/api/v1/market-data/sync-plans?taskType=&provider=&enabled=&page=&size=` | 分页查询采集计划 |
+| GET | `/api/v1/market-data/sync-plans/{id}` | 查询单个采集计划 |
+| PUT | `/api/v1/market-data/sync-plans/{id}` | 更新采集计划 |
+| POST | `/api/v1/market-data/sync-plans/{id}/toggle?enabled=true` | 启停采集计划 |
+| POST | `/api/v1/market-data/sync-plans/{id}/run` | 手动执行采集计划 |
+
+手动执行说明：
+- 当前仅支持 `DAILY_BAR_BACKFILL`，复用日 K 同步链路（provider → 幂等写入）。
+- 其他任务类型（`MINUTE_BAR_BACKFILL` / `INTRADAY_*`）的手动执行链路尚未接入，调用时返回业务错误"执行链路尚未接入"。
+- scope 用 Jackson 解析，支持 `canonicalSymbol` / `symbols` / `startDate` / `endDate`。
+- 执行生成 `sync_task` + 逐 symbol `task_item`，更新 plan 的 `lastRunAt` / `lastTaskId`。
+
+创建采集计划请求示例：
+
+```json
+{
+  "planName": "茅台日K补档",
+  "taskType": "DAILY_BAR_BACKFILL",
+  "provider": "LONGPORT",
+  "scopeJson": "{\"canonicalSymbol\":\"SH.600519\",\"startDate\":\"2026-01-01\",\"endDate\":\"2026-07-10\"}",
+  "adjustType": "NONE",
+  "triggerType": "MANUAL"
+}
+```
+
+### 任务明细
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/sync-tasks/{taskId}/items?status=&page=&size=` | 查询任务执行明细 |
+| POST | `/api/v1/market-data/sync-tasks/{taskId}/reconcile` | 幂等收敛非终态任务，返回更新后的父任务 |
+
+任务明细响应包含 `subTaskId`、`status`、`rowCount`、`insertedCount`、`updatedCount`、`skippedCount`、`errorCode/errorMessage`、`startedAt/finishedAt`。父任务为 `RUNNING` 时，查询明细会尝试懒收敛；失败时记录警告并降级返回旧明细，不伪装为收敛成功。
+
+主动收敛规则：
+
+- 通过独立事务 Service 执行，避免 Spring 同 Bean 自调用导致事务失效。
+- 子任务终态映射到 item；缺失 `subTaskId` 或子任务不存在时，item 标记 `FAILED` 并记录原因。
+- 父任务六类 count 直接汇总子任务真实字段；存在非终态 item 时父任务保持 `RUNNING` 且不写 `finishedAt`。
+- 接口幂等；已终态父任务直接返回当前状态。
+
+### 分钟 K
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/minute-bars?canonicalSymbol=&intervalType=&adjustType=&dataSource=&fromTime=&toTime=&tradeDate=&page=&size=` | 分页查询分钟 K |
+| POST | `/api/v1/market-data/minute-bars` | 写入分钟 K（带质量校验 + 交易日/时段校验 + 幂等 + 水位） |
+
+分钟 K 写入质量校验：
+- OHLC 非法或 volume/amount 负 → `REJECTED`（不写库 + alert）
+- 非交易日 → `REJECTED`（不写库 + alert）
+- bar 时间不在交易窗口 → `SUSPECT`（写库但标记 + alert）
+- 幂等键冲突且内容不同 → `CONFLICT`（不覆盖 + alert）
+- 幂等键冲突且内容相同 → `SKIPPED`
+
+### 交易时段 / 日历
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/trading-sessions` | A 股交易时段（启动时 @PostConstruct 幂等初始化，GET 只读不写） |
+| GET | `/api/v1/market-data/trading-sessions/is-trading-day?marketCode=&date=` | 判断是否交易日 |
+
+### 水位
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/watermarks?canonicalSymbol=&dataSource=&intervalType=&page=&size=` | 分页查询数据水位 |
+
+### 板块 / 自定义分组（P1.3）
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/api/v1/market-data/segments` | 创建板块 |
+| GET | `/api/v1/market-data/segments?segmentType=&enabled=&keyword=&page=&size=` | 分页查询板块 |
+| GET | `/api/v1/market-data/segments/{id}` | 查询单个板块 |
+| PUT | `/api/v1/market-data/segments/{id}` | 更新板块 |
+| DELETE | `/api/v1/market-data/segments/{id}` | 删除板块 |
+| GET | `/api/v1/market-data/segments/{id}/members` | 查询板块成员 |
+| POST | `/api/v1/market-data/segments/{id}/members` | 添加板块成员 |
+| DELETE | `/api/v1/market-data/segments/{id}/members/{canonicalSymbol}` | 移除板块成员 |
+
+## 4. 安全约束
 
 - 所有 LongPort 相关接口必须只读。
 - 前端不得传递 LongPort token/app secret。

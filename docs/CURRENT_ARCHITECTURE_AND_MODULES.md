@@ -78,8 +78,9 @@ convert     # MapStruct 转换器
 | `V9__add_market_data_sync_scope_lock.sql` | market_data_sync_scope_lock，同 scope 同步锁 |
 | `V10__add_market_data_workbench.sql` | stock_minute_bar、market_trading_session、market_calendar、market_data_sync_plan、market_data_sync_task_item、market_data_watermark |
 | `V11__add_market_segment.sql` | market_segment、market_segment_member |
+| `V12__add_sub_task_id_to_task_item.sql` | market_data_sync_task_item 增加 sub_task_id（主子任务追踪），支持 `POST /sync-tasks/{taskId}/reconcile` 非终态收敛 + `selectAllByTaskId` 全量查询 |
 
-已发布的 V1-V11 migration 不应修改；后续表结构调整继续新增更高版本 migration。
+已发布的 V1-V12 migration 不应修改；后续表结构调整继续新增更高版本 migration。
 
 ## 5. 交易账本口径
 
@@ -183,7 +184,7 @@ npm run build
 
 ## 12. 后续规划（未实现）
 
-下一阶段是行情工作台、采集任务和分钟线数据资产，不是直接进入策略回测：
+行情 P1.2/P1.3 工作台、采集计划、分钟线、板块已实现（后端核心 + 手动执行闭环 + 前端页面），下一步尚未完成的是分钟 K LongPort 批量 adapter（`getMinuteBars`）、盘中自动调度 scheduler 和异动大屏，而不是直接进入策略回测：
 
 - `docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`
 - `docs/features/LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`

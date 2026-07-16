@@ -16,6 +16,7 @@ public class MarketDataSyncTaskItemVO {
     private Long id;
     private Long taskId;
     private Long planId;
+    private Long subTaskId;
     private String canonicalSymbol;
     private String scopeDetail;
     private String status;

@@ -88,6 +88,12 @@ public class MarketDataWorkbenchController {
         return ApiResponse.ok(workbenchService.listTaskItems(taskId, status, page, size));
     }
 
+    /** 收敛非终态任务：查询 RUNNING/PENDING item 子任务最终状态，同步 item 和主任务（幂等）。 */
+    @PostMapping("/sync-tasks/{taskId}/reconcile")
+    public ApiResponse<MarketDataSyncTaskVO> reconcileTask(@PathVariable Long taskId) {
+        return ApiResponse.ok(workbenchService.reconcileTask(taskId));
+    }
+
     // ==================== 分钟 K ====================
 
     @GetMapping("/minute-bars")

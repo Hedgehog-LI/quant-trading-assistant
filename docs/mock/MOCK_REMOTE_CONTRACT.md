@@ -21,6 +21,8 @@
 | Dashboard | ✅ 前端聚合 | ✅ 后端 `/dashboard/today` 聚合 | v0.1.1 remote 直接用后端 todos |
 | Risk Calculator | ✅ 前端纯函数 | ⚠️ 后端 `/risk/calculations/position-size` 已实现但**前端页面未接 remote adapter**，当前用本地纯函数（`features/risk/api/riskCalculator.ts`） | |
 | Build Status | ✅ 静态 | ✅ 静态 | |
+| Market Workbench（行情工作台） | ✅ 前端聚合 | ✅ 后端 `/workbench/overview` 聚合 | remote 直接用后端 provider/提醒/交易时段/数据计数 |
+| Market Segments（板块/自定义分组） | ✅ localStorage | ✅ 后端 `/segments/*` | mock 持久化到 localStorage，规则见 §6 |
 
 ## 3. localStorage 规则
 
@@ -45,3 +47,27 @@
 - mock ID（UUID）与 remote ID（Long）不混用；`String(id)` 比较用于跨模式兼容。
 - 生产部署默认 remote，`apiBaseUrl` 留空走同源 `/api/v1`（Nginx 反代）；公网页面禁止保存 localhost 后端地址（`settingsApi.isLocalhostUrl` 防误配）。
 - mock 模式不触发后端校验（如计划关联/删除保护），仅 remote 模式强制；故 mock 测试通过 ≠ 后端校验通过，关键校验必须后端单测覆盖。
+
+## 6. 行情工作台与板块（P1.2/P1.3）
+
+### localStorage keys
+
+- `marketSegments`：`MarketSegment[]`，板块/自定义分组主表。
+- `marketSegmentMembers:{id}`：`MarketSegmentMember[]`，某板块下的成员列表（按板块 id 分桶存储）。
+
+> 物理 key 同样带 `qta:` 前缀（如 `qta:marketSegments`、`qta:marketSegmentMembers:3`），所有读写必须经 `localStorageClient`。
+
+### mock 模式
+
+- 板块 create / list / get / update / delete 持久化到上述 localStorage keys。
+- 板块 **delete 级联清理成员**：删除板块时同步移除对应 `marketSegmentMembers:{id}` 桶。
+- **addMember 不允许同板块同 symbol 重复**（同 `segmentId + canonicalSymbol` 视为重复，重复添加被拦截）。
+- 板块 `memberCount` 必须与 `marketSegmentMembers:{id}` 数组长度一致（增删成员时同步维护）。
+- 板块成员支持增删查；移除成员按 `canonicalSymbol` 定位。
+- ID 类型沿用 mock UUID string 规则（§3）。
+
+### remote 模式
+
+- 板块 CRUD 与成员管理调用 `/api/v1/market-data/segments/*`（详见 `../api/MARKET_DATA_API.md` §4）。
+- 行情工作台调用 `/api/v1/market-data/workbench/*`（overview 聚合）。
+- remote 由后端强制校验（同板块同 symbol 唯一、级联删除、memberCount 一致等），mock 必须复刻同口径，避免双模式行为分叉。

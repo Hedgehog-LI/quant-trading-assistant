@@ -17,6 +17,8 @@ public interface MarketDataSyncTaskItemMapper {
                                                   @Param("status") String status,
                                                   @Param("limit") int limit, @Param("offset") int offset);
     long countByTaskId(@Param("taskId") Long taskId, @Param("status") String status);
+    /** 查询指定 task 的全部 item（不分页，用于 reconcile 全量统计）。 */
+    List<MarketDataSyncTaskItemDO> selectAllByTaskId(@Param("taskId") Long taskId);
     List<MarketDataSyncTaskItemDO> selectByPlanId(@Param("planId") Long planId,
                                                   @Param("limit") int limit);
 }

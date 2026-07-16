@@ -1,5 +1,7 @@
 package com.quant.trade.marketdata.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.constant.MarketDataConstants;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -47,6 +50,8 @@ public class MarketDataWorkbenchService {
     private final StockDailyBarMapper stockDailyBarMapper;
     private final MinuteBarQualityManager qualityManager;
     private final TradingSessionManager tradingSessionManager;
+    private final ObjectMapper objectMapper;
+    private final TaskReconcileService taskReconcileService;
 
     private static final int MAX_PAGE_SIZE = 500;
 
@@ -145,8 +150,20 @@ public class MarketDataWorkbenchService {
     /**
      * 手动执行采集计划：生成 sync_task + task_item，执行写入链路，更新 lastRunAt/lastTaskId。
      * <p>
-     * 当前支持 DAILY_BAR_BACKFILL（复用 MarketQuoteService 的日 K 同步链路）。
-     * 其他任务类型生成任务记录但标记 SKIPPED（执行链路待后续接入）。
+     * 当前仅支持 DAILY_BAR_BACKFILL（复用 MarketQuoteService 的日 K 同步链路）。
+     * 其他任务类型直接抛 BusinessException，不创建空壳任务误导用户。
+     * <p>
+     * 状态映射（严格）：
+     * <ul>
+     *   <li>子任务 SUCCEEDED → item SUCCEEDED</li>
+     *   <li>子任务 PARTIAL_FAILED → item PARTIAL_FAILED（不是成功）</li>
+     *   <li>子任务 FAILED → item FAILED</li>
+     *   <li>子任务 PENDING/RUNNING → item 保留对应非终态；主任务不写 SUCCEEDED/finishedAt</li>
+     *   <li>子任务未知/null → item FAILED（可解释失败）</li>
+     * </ul>
+     * 计数口径：task 的 total/success/fail/inserted/updated/skipped 全部使用"行情数据行"单位，
+     * 从子任务返回值累加；symbol 维度状态由 task_item 表达，不混入 count 字段。
+     * 主子任务追踪：item 保存 sub_task_id。
      */
     public MarketDataSyncPlanVO runPlan(Long planId) {
         MarketDataSyncPlanDO plan = syncPlanMapper.selectById(planId);
@@ -154,14 +171,16 @@ public class MarketDataWorkbenchService {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, "采集计划不存在: " + planId);
         }
 
-        // 解析 scope 中的 symbols（简单解析 JSON 中的 canonicalSymbol/symbols）
-        List<String> symbols = extractSymbolsFromScope(plan.getScopeJson());
-        if (symbols.isEmpty()) {
+        // 不支持的任务类型：直接抛业务错误，不创建空壳任务误导用户
+        if (!"DAILY_BAR_BACKFILL".equals(plan.getTaskType())) {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
-                    "采集计划 scope 中未找到有效 symbol: " + plan.getScopeJson());
+                    "任务类型 " + plan.getTaskType() + " 的手动执行链路尚未接入，当前仅支持 DAILY_BAR_BACKFILL");
         }
 
-        // 创建 sync_task
+        // 用 Jackson 解析结构化 scope（含校验）
+        PlanScope scope = parseScope(plan.getScopeJson());
+
+        // 创建 sync_task（主任务）
         String idemKey = UUID.nameUUIDFromBytes(
                 (plan.getProvider() + plan.getTaskType() + plan.getScopeJson() + "#plan#" + planId + "#" + System.nanoTime())
                         .getBytes()).toString();
@@ -176,12 +195,22 @@ public class MarketDataWorkbenchService {
         syncTaskMapper.insert(task);
         Long taskId = task.getId();
 
-        int totalSymbols = symbols.size();
-        int successCount = 0;
-        int failCount = 0;
+        // symbol 维度状态计数（仅用于判定主任务状态，不写入 task count 字段）
+        int symbolsSucceeded = 0;
+        int symbolsFailed = 0;
+        int symbolsPartialFailed = 0;
+        int symbolsNonTerminal = 0;
 
-        // 逐 symbol 执行
-        for (String symbol : symbols) {
+        // 行维度计数（写入 task count 字段，全部使用行情数据行单位，逐项从子任务返回值累加）
+        int totalRows = 0;
+        int totalSuccess = 0;
+        int totalFail = 0;
+        int totalInserted = 0;
+        int totalUpdated = 0;
+        int totalSkipped = 0;
+
+        // 逐 symbol 执行 DAILY_BAR_BACKFILL，用子任务返回值汇总
+        for (String symbol : scope.symbols) {
             MarketDataSyncTaskItemDO item = MarketDataSyncTaskItemDO.builder()
                     .taskId(taskId).planId(planId).canonicalSymbol(symbol)
                     .scopeDetail(plan.getScopeJson())
@@ -192,79 +221,213 @@ public class MarketDataWorkbenchService {
             taskItemMapper.insert(item);
 
             try {
-                if ("DAILY_BAR_BACKFILL".equals(plan.getTaskType())) {
-                    // 复用 MarketQuoteService 的日 K 同步链路（provider → 幂等写入）
-                    CreateSyncTaskDTO dto = new CreateSyncTaskDTO(
-                            plan.getTaskType(), plan.getProvider(), symbol,
-                            null, null, plan.getAdjustType());
-                    marketQuoteService.createAndExecuteDailyBarSync(dto);
+                CreateSyncTaskDTO dto = new CreateSyncTaskDTO(
+                        plan.getTaskType(), plan.getProvider(), symbol,
+                        scope.startDate, scope.endDate, plan.getAdjustType());
+                MarketDataSyncTaskVO subTask = marketQuoteService.createAndExecuteDailyBarSync(dto);
+
+                // 保存子任务 ID 到 item（主子任务追踪）
+                item.setSubTaskId(subTask.id());
+
+                // 从子任务返回值逐项累加行维度计数（空值按 0）
+                int subInserted = subTask.insertedCount() != null ? subTask.insertedCount() : 0;
+                int subUpdated = subTask.updatedCount() != null ? subTask.updatedCount() : 0;
+                int subSkipped = subTask.skippedCount() != null ? subTask.skippedCount() : 0;
+                int subTotal = subTask.totalCount() != null ? subTask.totalCount() : 0;
+                int subSuccess = subTask.successCount() != null ? subTask.successCount() : 0;
+                int subFail = subTask.failCount() != null ? subTask.failCount() : 0;
+
+                item.setInsertedCount(subInserted);
+                item.setUpdatedCount(subUpdated);
+                item.setSkippedCount(subSkipped);
+                item.setRowCount(subTotal);
+                totalInserted += subInserted;
+                totalUpdated += subUpdated;
+                totalSkipped += subSkipped;
+                totalRows += subTotal;
+                totalSuccess += subSuccess;
+                totalFail += subFail;
+
+                // 严格状态映射
+                String subStatus = subTask.status();
+                if (MarketDataConstants.TASK_STATUS_SUCCEEDED.equals(subStatus)) {
                     item.setStatus(WorkbenchConstants.ITEM_SUCCEEDED);
-                    item.setInsertedCount(1);
-                    item.setRowCount(1);
-                    successCount++;
+                    symbolsSucceeded++;
+                } else if (MarketDataConstants.TASK_STATUS_PARTIAL_FAILED.equals(subStatus)) {
+                    item.setStatus(WorkbenchConstants.ITEM_PARTIAL_FAILED);
+                    item.setErrorMessage("子任务部分失败");
+                    symbolsPartialFailed++;
+                } else if (MarketDataConstants.TASK_STATUS_PENDING.equals(subStatus)) {
+                    item.setStatus(WorkbenchConstants.ITEM_PENDING);
+                    item.setErrorMessage("子任务仍在排队中（幂等复用）");
+                    symbolsNonTerminal++;
+                } else if (MarketDataConstants.TASK_STATUS_RUNNING.equals(subStatus)) {
+                    item.setStatus(WorkbenchConstants.ITEM_RUNNING);
+                    item.setErrorMessage("子任务仍在运行中（幂等复用）");
+                    symbolsNonTerminal++;
                 } else {
-                    // 其他任务类型：当前标记 SKIPPED，执行链路待后续接入
-                    item.setStatus(WorkbenchConstants.ITEM_SKIPPED);
-                    item.setErrorMessage("任务类型 " + plan.getTaskType() + " 的执行链路尚未接入");
+                    // FAILED 或未知/null 状态 → 可解释失败
+                    item.setStatus(WorkbenchConstants.ITEM_FAILED);
+                    item.setErrorCode(subTask.lastErrorCode() != null ? subTask.lastErrorCode()
+                            : ErrorCodeEnum.INTERNAL_ERROR.getCode());
+                    item.setErrorMessage("子任务状态异常: " + (subStatus != null ? subStatus : "null"));
+                    symbolsFailed++;
                 }
+            } catch (BusinessException e) {
+                // 业务异常保留原错误码，不降级成 INTERNAL_ERROR
+                item.setStatus(WorkbenchConstants.ITEM_FAILED);
+                item.setErrorCode(e.getErrorCode().getCode());
+                item.setErrorMessage(e.getMessage() != null && e.getMessage().length() > 480
+                        ? e.getMessage().substring(0, 480) : e.getMessage());
+                symbolsFailed++;
+                log.warn("采集计划 {} symbol {} 执行业务失败: {} {}", planId, symbol, e.getErrorCode().getCode(), e.getMessage());
             } catch (Exception e) {
                 item.setStatus(WorkbenchConstants.ITEM_FAILED);
                 item.setErrorCode(ErrorCodeEnum.INTERNAL_ERROR.getCode());
                 item.setErrorMessage(e.getMessage() != null && e.getMessage().length() > 480
                         ? e.getMessage().substring(0, 480) : e.getMessage());
-                failCount++;
-                log.warn("采集计划 {} symbol {} 执行失败: {}", planId, symbol, e.getMessage());
+                symbolsFailed++;
+                log.warn("采集计划 {} symbol {} 执行系统异常: {}", planId, symbol, e.getMessage());
             }
-            item.setFinishedAt(LocalDateTime.now());
+
+            // 非终态 item 不设 finishedAt（保留 RUNNING/PENDING 可追踪）
+            if (!WorkbenchConstants.ITEM_PENDING.equals(item.getStatus())
+                    && !WorkbenchConstants.ITEM_RUNNING.equals(item.getStatus())) {
+                item.setFinishedAt(LocalDateTime.now());
+            }
             taskItemMapper.updateById(item);
         }
 
-        // 更新 sync_task 状态
-        task.setStatus(failCount > 0 && successCount > 0
-                ? MarketDataConstants.TASK_STATUS_PARTIAL_FAILED
-                : failCount > 0 ? MarketDataConstants.TASK_STATUS_FAILED
-                : MarketDataConstants.TASK_STATUS_SUCCEEDED);
-        task.setTotalCount(totalSymbols);
-        task.setSuccessCount(successCount);
-        task.setFailCount(failCount);
-        task.setFinishedAt(LocalDateTime.now());
+        // 主任务状态：有非终态子任务 → RUNNING；否则按成功/部分失败/全失败判定
+        String mainStatus;
+        if (symbolsNonTerminal > 0) {
+            mainStatus = MarketDataConstants.TASK_STATUS_RUNNING;
+        } else if (symbolsFailed > 0 || symbolsPartialFailed > 0) {
+            mainStatus = (symbolsSucceeded > 0 || symbolsPartialFailed > 0)
+                    ? MarketDataConstants.TASK_STATUS_PARTIAL_FAILED
+                    : MarketDataConstants.TASK_STATUS_FAILED;
+        } else {
+            mainStatus = MarketDataConstants.TASK_STATUS_SUCCEEDED;
+        }
+
+        task.setStatus(mainStatus);
+        // count 字段全部使用行情数据行单位，逐项从子任务返回值累加，不反推
+        task.setTotalCount(totalRows);
+        task.setSuccessCount(totalSuccess);
+        task.setFailCount(totalFail);
+        task.setInsertedCount(totalInserted);
+        task.setUpdatedCount(totalUpdated);
+        task.setSkippedCount(totalSkipped);
+        // 非终态主任务不设 finishedAt
+        if (!MarketDataConstants.TASK_STATUS_RUNNING.equals(mainStatus)) {
+            task.setFinishedAt(LocalDateTime.now());
+        }
         syncTaskMapper.updateById(task);
 
         // 更新 plan 的 lastRunAt / lastTaskId
         syncPlanMapper.updateLastRun(planId, taskId, LocalDateTime.now());
 
-        log.info("采集计划 {} 手动执行完成: taskId={}, symbols={}, success={}, fail={}",
-                planId, taskId, totalSymbols, successCount, failCount);
+        log.info("采集计划 {} 手动执行完成: taskId={}, status={}, symbols(succ/partial/fail/nonTerm)={}/{}/{}/{}, rows(total/succ/fail/ins/upd/skip)={}/{}/{}/{}/{}/{}",
+                planId, taskId, mainStatus, symbolsSucceeded, symbolsPartialFailed, symbolsFailed, symbolsNonTerminal,
+                totalRows, totalSuccess, totalFail, totalInserted, totalUpdated, totalSkipped);
         return toPlanVO(syncPlanMapper.selectById(planId));
     }
 
-    /** 从 scope JSON 中提取 symbol 列表（支持 {"canonicalSymbol":"SH.600519"} 和 {"symbols":["SH.600519"]} 两种格式）。 */
-    private List<String> extractSymbolsFromScope(String scopeJson) {
-        List<String> symbols = new ArrayList<>();
-        if (scopeJson == null || scopeJson.isBlank()) return symbols;
-        // 简单正则提取，避免引入 JSON 解析依赖（scope 格式固定）
-        java.util.regex.Matcher single = java.util.regex.Pattern
-                .compile("\"canonicalSymbol\"\\s*:\\s*\"([^\"]+)\"").matcher(scopeJson);
-        if (single.find()) {
-            symbols.add(single.group(1));
-            return symbols;
+    /**
+     * 收敛非终态任务。委托到独立 {@link TaskReconcileService}（Spring 代理），确保 {@code @Transactional} 生效。
+     */
+    public MarketDataSyncTaskVO reconcileTask(Long taskId) {
+        return taskReconcileService.reconcileTask(taskId);
+    }
+
+    /**
+     * 用 Jackson 解析 scope JSON，提取 symbols + startDate + endDate。
+     * <p>
+     * 校验规则：
+     * - symbols 从 canonicalSymbol 或 symbols 数组提取，去空白、去重。
+     * - 每个 symbol 按已有 canonical 规则校验（SH/SZ/BJ + 数字）。
+     * - startDate <= endDate（若都存在）。
+     * - 非法 JSON、非法日期、空 symbol 或日期范围非法抛 BusinessException。
+     */
+    private PlanScope parseScope(String scopeJson) {
+        PlanScope scope = new PlanScope();
+        if (scopeJson == null || scopeJson.isBlank()) {
+            throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, "scope 不能为空");
         }
-        java.util.regex.Matcher multi = java.util.regex.Pattern
-                .compile("\"symbols\"\\s*:\\s*\\[([^\\]]+)\\]").matcher(scopeJson);
-        if (multi.find()) {
-            String arr = multi.group(1);
-            java.util.regex.Matcher sm = java.util.regex.Pattern
-                    .compile("\"([^\"]+)\"").matcher(arr);
-            while (sm.find()) {
-                symbols.add(sm.group(1));
+
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(scopeJson);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, "scope JSON 格式不合法: " + e.getMessage());
+        }
+
+        // 提取 symbols（去空白、去重）
+        LinkedHashSet<String> symbolSet = new LinkedHashSet<>();
+        if (root.has("canonicalSymbol") && !root.get("canonicalSymbol").isNull()) {
+            String s = root.get("canonicalSymbol").asText().trim();
+            if (!s.isEmpty()) symbolSet.add(s);
+        }
+        if (root.has("symbols") && root.get("symbols").isArray()) {
+            for (JsonNode sn : root.get("symbols")) {
+                String s = sn.asText().trim();
+                if (!s.isEmpty()) symbolSet.add(s);
             }
         }
-        return symbols;
+
+        // 校验每个 symbol 格式
+        for (String symbol : symbolSet) {
+            if (!symbol.matches(MarketDataConstants.CANONICAL_SYMBOL_REGEX)) {
+                throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL,
+                        "scope 中 symbol 格式不合法: " + symbol);
+            }
+        }
+        scope.symbols.addAll(symbolSet);
+
+        if (scope.symbols.isEmpty()) {
+            throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
+                    "scope 中未找到有效 symbol: " + scopeJson);
+        }
+
+        // 解析并校验日期
+        try {
+            if (root.has("startDate") && !root.get("startDate").isNull()) {
+                scope.startDate = LocalDate.parse(root.get("startDate").asText());
+            }
+            if (root.has("endDate") && !root.get("endDate").isNull()) {
+                scope.endDate = LocalDate.parse(root.get("endDate").asText());
+            }
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
+                    "scope 中日期格式不合法（需要 YYYY-MM-DD）: " + e.getMessage());
+        }
+        if (scope.startDate != null && scope.endDate != null && scope.startDate.isAfter(scope.endDate)) {
+            throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
+                    "scope 中 startDate 不能晚于 endDate");
+        }
+
+        return scope;
+    }
+
+    /** scope 解析中间结构。 */
+    private static class PlanScope {
+        final List<String> symbols = new ArrayList<>();
+        LocalDate startDate;
+        LocalDate endDate;
     }
 
     // ==================== 任务明细 ====================
 
     public PageResultVO<MarketDataSyncTaskItemVO> listTaskItems(Long taskId, String status, int page, int size) {
+        // 懒收敛：如果父任务 RUNNING，通过独立 TaskReconcileService（Spring 代理）触发事务收敛
+        MarketDataSyncTaskDO task = syncTaskMapper.selectById(taskId);
+        if (task != null && MarketDataConstants.TASK_STATUS_RUNNING.equals(task.getStatus())) {
+            try {
+                taskReconcileService.reconcileTask(taskId);
+            } catch (Exception e) {
+                log.warn("懒收敛任务 {} 失败（降级返回旧数据）: {}", taskId, e.getMessage());
+            }
+        }
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         int offset = (Math.max(page, 1) - 1) * safeSize;
         List<MarketDataSyncTaskItemDO> items = taskItemMapper.selectByTaskId(taskId, status, safeSize, offset);
@@ -507,7 +670,7 @@ public class MarketDataWorkbenchService {
 
     private MarketDataSyncTaskItemVO toTaskItemVO(MarketDataSyncTaskItemDO d) {
         return MarketDataSyncTaskItemVO.builder()
-                .id(d.getId()).taskId(d.getTaskId()).planId(d.getPlanId()).canonicalSymbol(d.getCanonicalSymbol())
+                .id(d.getId()).taskId(d.getTaskId()).planId(d.getPlanId()).subTaskId(d.getSubTaskId()).canonicalSymbol(d.getCanonicalSymbol())
                 .scopeDetail(d.getScopeDetail()).status(d.getStatus()).rowCount(d.getRowCount())
                 .insertedCount(d.getInsertedCount()).updatedCount(d.getUpdatedCount()).skippedCount(d.getSkippedCount())
                 .errorCode(d.getErrorCode()).errorMessage(d.getErrorMessage())

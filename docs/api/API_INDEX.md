@@ -41,8 +41,20 @@
 | Market Data | GET | `/api/v1/market-data/daily-bars/template` | 已实现 | `MARKET_DATA_API.md` |
 | Market Data | GET / POST | `/api/v1/market-data/providers/LONGPORT/status`、`/health-check` | 已实现；LongPort 真实外联已验收（2026-07-12） | `MARKET_DATA_API.md` |
 | Market Data | POST / GET | `/api/v1/market-data/quotes/latest`、`/quote-snapshots` | 已实现；latest quote 可落 `stock_quote_snapshot(dataSource=LONGPORT)` | `MARKET_DATA_API.md` |
-| Market Data | POST / GET | `/api/v1/market-data/sync-tasks/daily-bars`、`/sync-tasks`、`/sync-tasks/{id}` | 已实现；daily bar 可落 `stock_daily_bar(data_source=LONGPORT)`，P1.2 待扩展分钟线/采集任务 | `MARKET_DATA_API.md` |
+| Market Data | POST / GET | `/api/v1/market-data/sync-tasks/daily-bars`、`/sync-tasks`、`/sync-tasks/{id}` | 已实现；daily bar 可落 `stock_daily_bar(data_source=LONGPORT)` | `MARKET_DATA_API.md` |
 | Market Data | GET / PATCH | `/api/v1/market-data/alerts`、`/alerts/{id}/resolve` | 已实现 | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/workbench/overview` | 已实现（P1.2 行情工作台概览） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET / PUT / DELETE | `/api/v1/market-data/sync-plans[/{id}]` | 已实现（P1.2 采集计划 CRUD） | `MARKET_DATA_API.md` |
+| Market Data | POST | `/api/v1/market-data/sync-plans/{id}/toggle` | 已实现（启停采集计划） | `MARKET_DATA_API.md` |
+| Market Data | POST | `/api/v1/market-data/sync-plans/{id}/run` | 已实现（手动执行，当前仅 DAILY_BAR_BACKFILL 接入写入链路） | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/sync-tasks/{taskId}/items` | 已实现（任务执行明细） | `MARKET_DATA_API.md` |
+| Market Data | POST | `/api/v1/market-data/sync-tasks/{taskId}/reconcile` | 已实现（幂等收敛主任务与逐标的子任务状态/计数） | `MARKET_DATA_API.md` |
+| Market Data | GET / POST | `/api/v1/market-data/minute-bars` | 已实现（P1.2 分钟 K 查询/写入，带质量 + 交易日/时段校验 + 幂等 + 水位） | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/trading-sessions` | 已实现（A 股交易时段，启动时幂等初始化） | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/trading-sessions/is-trading-day` | 已实现（判断是否交易日） | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/watermarks` | 已实现（数据水位查询） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET / PUT / DELETE | `/api/v1/market-data/segments[/{id}]` | 已实现（P1.3 板块 CRUD） | `MARKET_DATA_API.md` |
+| Market Data | GET / POST / DELETE | `/api/v1/market-data/segments/{id}/members[/{canonicalSymbol}]` | 已实现（板块成员增删查） | `MARKET_DATA_API.md` |
 
 ## 错误码
 

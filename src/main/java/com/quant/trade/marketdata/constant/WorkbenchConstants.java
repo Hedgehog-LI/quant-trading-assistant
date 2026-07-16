@@ -37,6 +37,7 @@ public final class WorkbenchConstants {
     public static final String ITEM_SUCCEEDED = "SUCCEEDED";
     public static final String ITEM_FAILED = "FAILED";
     public static final String ITEM_SKIPPED = "SKIPPED";
+    public static final String ITEM_PARTIAL_FAILED = "PARTIAL_FAILED";
 
     /** 默认 A 股市场代码。 */
     public static final String MARKET_CN_A = "CN_A";

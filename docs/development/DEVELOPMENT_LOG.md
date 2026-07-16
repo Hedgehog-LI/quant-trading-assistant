@@ -4,6 +4,184 @@
 
 ---
 
+## 2026-07-16 — P1.2/P1.3 第六轮 Codex 收口（按任务重建 Drawer + 竞态防护 + 真实交互测试）
+
+- **目标**：修复 TaskItemsDrawer 双 effect 重复请求、切换 task 竞态、缺少时间列展示、板块 3 条伪行为测试。
+- **前端修复（TaskItemsDrawer）**：
+  - 外层按 `lastTaskId` 为内部组件设置 key，任务切换时重建分页状态并自然回到 page=1；内部只保留一个随 task/page 加载的 effect。
+  - request-id + active ref 同时阻止旧请求覆盖、effect 清理后的迟到响应，以及卸载后收敛回调继续刷新旧任务。
+  - 表格补齐 `startedAt`、`finishedAt`，复用 `formatDateTime`，并设置横向滚动防挤压。
+  - `TaskItemsDrawer` 导出以支持组件级行为测试。
+- **前端修复（板块测试）**：
+  - 测试 4（创建失败）：填写表单 → 点击 Drawer 内创建按钮（`findBtnInDrawer`，处理 Antd 空格间距）→ 断言 `createSegment` 调用 1 次 + `message.error` 被调用。
+  - 测试 5（删除失败）：点击删除 → 点击 Popconfirm OK（`findPopconfirmOkBtn`，匹配 "OK"/"确定"）→ 断言 `deleteSegment` 调用 1 次 + `message.error` 被调用 + 数据仍在。
+  - 测试 8（移除 pending）：点击移除并确认，pending 时再次点击 loading 按钮，断言 `removeSegmentMember` 仍只调用 1 次；随后在 `act` 中 resolve 并清理。
+  - 测试 7（添加 pending）：同样加 `act` resolve + `unmount` 清理。
+- **新增组件测试**：`market-workspace.test.tsx`（7 tests）——首次打开与时间格式、先翻到第二页再切换 task 只请求新任务 page=1、翻页单请求、旧响应隔离、收敛 pending 防重复、成功刷新、失败错误。
+- **测试结果**：Codex 实测后端 **250 tests** + package；前端 typecheck + lint + **261 tests**（32 files）+ build；两仓库 diff check 全绿。Docker/浏览器/LongPort 外联 SKIPPED。
+- **关联**：`ai/HANDOFF_2026-07-16_p12_acceptance_round6.md`、`AI_HANDOFF.md`、`acceptance/ACCEPTANCE_LOG.md`。
+
+---
+
+## 2026-07-16 — P1.2/P1.3 第六轮复验与交接
+
+- **范围**：只读复核第五轮实现与测试；未修改业务代码。
+- **已确认**：独立 `TaskReconcileService` 修复了同 Bean 自调用事务问题；任务明细入口和 remote adapter 已接入。
+- **发现问题**：`TaskItemsDrawer` 两个 effect 同时请求明细，首次打开会重复调用，切换计划时旧页码请求可能覆盖新计划首页；表格缺少开始/结束时间；没有 Drawer 组件行为测试。
+- **测试真实性**：`market-segments.test.tsx` 第 4/5/8 项只验证表单或按钮存在，没有提交创建、确认删除、确认移除，也没有断言 API、错误态、pending 防重复，不能计为约定的行为覆盖。
+- **实测门禁**：后端 250 tests + package 通过；前端 lint + 253 tests + build 通过。门禁通过但用户路径与测试闭环不通过。
+- **下一步**：按 `ai/HANDOFF_2026-07-16_p12_acceptance_round6.md` 与对应 ZCode prompt 做最小修复；未完成前不启动分钟 K 下一阶段。
+
+---
+
+## 2026-07-15 — P1.2/P1.3 第五轮收口（事务边界独立 Bean + 任务明细可达 + 8 项行为测试）
+
+- **目标**：修复第五轮复验：reconcile self-invocation 事务失效、任务明细不可达、板块页面行为测试缺口。
+- **后端修复（事务边界）**：
+  - 新增 `TaskReconcileService`（独立 `@Service` + `@Transactional`），将 reconcile 逻辑从 `MarketDataWorkbenchService` 抽出。`listTaskItems` 懒收敛和 `reconcileTask` API 均通过 Spring 代理调用 `TaskReconcileService.reconcileTask`，解决 self-invocation 导致 `@Transactional` 失效。
+  - 新增 `TaskReconcileServiceTest`（12 tests，含 6 count 字段、混合状态、null、child 缺失、501 item、幂等、task 不存在）。
+  - `MarketDataWorkbenchServiceTest` 新增 2 个懒收敛测试（`listTaskItemsLazyReconcileCallsTaskReconcileService`、`listTaskItemsSkipsReconcileForTerminalTask`）。
+- **前端修复（任务明细可达）**：
+  - `/market-workspace` PlansTab 为有 `lastTaskId` 的计划新增"任务明细"按钮，打开 `TaskItemsDrawer`。
+  - `TaskItemsDrawer` 调用 `listTaskItems` 展示 symbol/状态/行数/inserted/updated/skipped/subTaskId/错误/时间/分页；提供"刷新/收敛"按钮调用 `reconcileTask`，展示 loading/success/error + 防重复。
+  - `workbenchApi.ts` 新增 `listTaskItems`/`reconcileTask` remote adapter 测试（2 tests：断言 path/params/body）。
+- **前端修复（板块页面 8 项行为测试）**：
+  - 使用 `vi.hoisted` + `vi.mock` 模块 mock + 可控 Promise，8 个测试覆盖：首次加载渲染、翻页请求、成员 Drawer 加载渲染、创建失败 catch、删除失败不误删、Alert 重试重新请求、添加防重复一次、移除防重复一次。
+- **测试结果**：后端 **250 tests / 0 failures**；前端 typecheck + lint + **253 tests**（31 files）+ build 全绿。
+- **未完成（不在本轮范围）**：分钟 K LongPort adapter + 盘中 scheduler + MINUTE_BAR_BACKFILL 执行链路。
+- **关联**：`ai/HANDOFF_2026-07-15_p12_acceptance_round5.md`、`AI_HANDOFF.md`、`acceptance/ACCEPTANCE_LOG.md`。
+
+---
+
+## 2026-07-15 — P1.2/P1.3 第五轮复验与交接
+
+- 实测后端247 tests/package、前端typecheck/lint/249 tests/build全绿。
+- child count、501 item、null/缺失 child 的后端修复通过静态与单测核对。
+- 发现前端 adapter 无页面调用，普通用户无法触发收敛；懒收敛同类自调用导致事务注解失效；页面关键行为测试仍缺失。
+- 本轮未改业务代码。下一轮最小修复见 `docs/ai/HANDOFF_2026-07-15_p12_acceptance_round5.md`。
+
+---
+
+## 2026-07-15 — P1.2/P1.3 第四轮收口（reconcile 真实 count + 500 截断消除 + 懒收敛可达 + 页面测试补齐）
+
+- **目标**：修复第四轮复验：reconcile count 从 child task 真实字段累加（不推导）；消除 500 item 截断；收敛可达（懒收敛+API+前端）；页面行为测试。
+- **后端修复**：
+  - reconcile 统计改为从 child `market_data_sync_task` 的 `totalCount/successCount/failCount/insertedCount/updatedCount/skippedCount` 直接累加（不推导 success，不固定 fail=0），null 按 0。
+  - 新增 `selectAllByTaskId` Mapper SQL（全量查询无截断），消除 500 条限制；`reconcileTask` 加 `@Transactional` 事务边界。
+  - `reconcileTask` 处理 child 缺失（→ item FAILED + errorCode/message）和 subTaskId 为空（→ item FAILED + 可解释消息）。
+  - `listTaskItems` 查询 RUNNING 父任务时安全懒收敛（用户查看任务明细即触发，不依赖手工 curl）。
+  - 测试从 31 增加到 37 个（新增 6 个：6 count 字段精确断言、混合 SUCCEEDED+FAILED 汇总、null count、child 缺失→FAILED、501 item 不截断、重复 reconcile 幂等）。
+- **前端修复**：
+  - `workbenchApi.ts` 新增 `reconcileTask` API（mock + remote），导出。
+  - 页面测试从 3 增加到 6 个：首次加载渲染预置数据、点击新建打开 Drawer、空列表不崩溃、成员数列、类型标签、停用标签。
+- **测试结果**：后端 **247 tests / 0 failures**；前端 typecheck + lint + **249 tests**（31 files）+ build 全绿。
+- **未完成（不在本轮范围）**：分钟 K LongPort adapter + 盘中 scheduler + MINUTE_BAR_BACKFILL 执行链路。
+- **关联**：`api/MARKET_DATA_API.md`、`DATABASE_DESIGN.md`、`BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`、`AI_HANDOFF.md`、`ai/HANDOFF_2026-07-15_p12_acceptance_round4.md`。
+
+---
+
+## 2026-07-15 — P1.2/P1.3 第四轮复验与交接
+
+- Codex 实测后端 241 tests/package、前端 typecheck/lint/246 tests/build 全绿。
+- 发现 reconcile 仍推导 success、丢失 failCount，并固定只读 500 个 item；显式 API 没有普通用户触发路径。
+- 页面实现已有 adding/removing 状态，但新增的 3 个组件测试未覆盖上一轮规定的关键交互与失败路径。
+- 本轮只更新验收事实和交接文档，未修改业务代码。修复任务见 `docs/ai/HANDOFF_2026-07-15_p12_acceptance_round4.md`。
+
+---
+
+## 2026-07-15 — P1.2/P1.3 第三轮收口（count 逐项累加 + reconcile 收敛 + 前端类型修复 + 页面组件测试）
+
+- **目标**：修复第三轮复验问题：runPlan count 用子任务返回值逐项累加（不反推）；非终态任务有收敛路径；前端 EntityId 类型错误；MembersDrawer 独立操作状态；页面组件测试。
+- **后端修复**：
+  - runPlan count 全部从子任务 `MarketDataSyncTaskVO` 返回值逐项累加：`totalCount/successCount/failCount/insertedCount/updatedCount/skippedCount` 直接累加，不再用 insertedCount 代替 successCount，不反推 failCount。
+  - 新增 `reconcileTask(taskId)` 方法 + `POST /sync-tasks/{taskId}/reconcile` API：查询 RUNNING/PENDING item 的 `sub_task_id` 对应子任务终态，同步 item 状态/计数/finishedAt；全部终态后重新计算主任务 SUCCEEDED/PARTIAL_FAILED/FAILED 并写 finishedAt；部分非终态保持 RUNNING。幂等。
+  - 测试：从 24 增加到 31 个（新增 count 逐项累加、updated/skipped=success、多子任务汇总、reconcile 收敛成功/保持 RUNNING/幂等/收敛失败）。
+- **前端修复**：
+  - segmentApi.test.ts EntityId `.length` 改为类型收窄，修复 typecheck/build 失败。
+  - segmentApi.ts 移除 `id as string` 断言。
+  - MembersDrawer 新增 `adding`/`removingSymbol` 独立状态（添加/移除期间防重复提交）。
+  - 新增 `market-segments.test.tsx`（3 tests：渲染标题/首次加载/Drawer 打开）。
+- **测试结果**：后端 **241 tests / 0 failures**；前端 typecheck + lint + **246 tests**（31 files）+ build 全绿。
+- **上一轮误报更正**：前两轮声称"页面测试完成/前端全绿"实际 typecheck/build 失败；本轮真实全绿。
+- **未完成**：分钟 K LongPort adapter + 盘中 scheduler + MINUTE_BAR_BACKFILL 执行链路。
+- **关联**：`api/MARKET_DATA_API.md`、`DATABASE_DESIGN.md`、`BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`、`AI_HANDOFF.md`、`ai/HANDOFF_2026-07-15_p12_acceptance_round3.md`。
+
+---
+
+## 2026-07-15 — P1.2/P1.3 第三轮复验与交接
+
+- Codex 只读复验第二轮成果，未修改业务代码。
+- 后端 234 tests 和 package 通过；前端 lint、243 tests 通过，但 typecheck/build 因 `EntityId.length` 类型错误失败。
+- 发现 runPlan 父任务 success/fail 行数仍未按子任务返回值汇总，非终态父任务缺收敛机制；板块成员操作缺防重复状态，页面组件测试缺失。
+- 当前状态改为未收口；修复任务见 `docs/ai/HANDOFF_2026-07-15_p12_acceptance_round3.md` 与 `docs/prompts/ZCODE_P12_ACCEPTANCE_FIX_ROUND3_PROMPT_2026-07-15.md`。
+
+---
+
+## 2026-07-15 — P1.2/P1.3 第二轮收口（runPlan 严格状态机 + V12 sub_task_id + 板块 mock UUID/规范化）
+
+- **目标**：修复第二轮复验发现的任务状态机、计数口径、主子任务追踪和板块 mock ID/计数问题。
+- **后端修复（runPlan 严格状态机）**：
+  - V12 migration：`market_data_sync_task_item` 增加 `sub_task_id BIGINT`（含索引），支持 plan execution item → daily bar child task 直接追踪。DO/Mapper XML/VO 同步更新。
+  - 状态映射改为严格模式：子任务 SUCCEEDED→item SUCCEEDED；PARTIAL_FAILED→item PARTIAL_FAILED（不再当成功）；FAILED→item FAILED；PENDING/RUNNING→item 保留非终态（主任务不写 SUCCEEDED/finishedAt）；未知/null→item FAILED。
+  - 计数口径统一为行情数据行单位：task 的 total/success/fail/inserted/updated/skipped 全部从子任务返回值按行累加；symbol 维度状态由 task_item 表达，不混入 count 字段。
+  - 业务异常保留原错误码（BusinessException→原 ErrorCode），不降级成 INTERNAL_ERROR。
+  - 测试：从 19 个增加到 24 个（新增 runPlanPendingSubTaskKeepsNonTerminal、runPlanRunningSubTaskKeepsNonTerminal、runPlanPartialFailedSubTaskMapsToPartialFailed、runPlanSubTaskReturnedFailedStatus、runPlanUnknownSubTaskStatusMapsToFailed、runPlanAllPartialFailedMainIsPartialFailed）。断言 item 和 main 状态、count 行数、sub_task_id 持久化、非终态不设 finishedAt。
+- **前端修复（板块 mock UUID + 计数 + 规范化）**：
+  - segmentApi mock ID 改用 `generateId()` UUID string（不再用时间戳 number）；`segmentId` domain 类型从 `number` 改为 `EntityId`。
+  - addMember 验证板块存在（孤儿拒绝）；canonical symbol 去空格+转大写+格式校验；重复判断使用规范化后的 symbol。
+  - removeMember 先计算 remaining，只有命中时更新，memberCount=remaining.length（绝不使用 members.length-1）。
+  - deleteSegment 使用 `removeItem(memberKey(id))` 真正级联删除桶（不是写空数组）。
+  - 页面：创建/删除捕获 API 错误显示 message.error；创建/删除有 loading/disabled 状态防重复提交；删除当前页最后一条后页码回退。
+  - 测试：从 13 增加到 22 个（新增 UUID 格式、removeMember 不存在不改计数、空成员不出现负数、孤儿成员拒绝、symbol 规范化、非法 symbol、级联 key 真删除检查 null）。remote adapter 补 get/update/listMembers 测试。
+- **测试结果**：后端 `./mvnw test` **234 tests / 0 failures**；前端 typecheck + lint + **243 tests** + build 全绿。Docker curl smoke test 通过。
+- **未完成（不在本轮范围）**：分钟 K LongPort adapter + 盘中 scheduler + MINUTE_BAR_BACKFILL 执行链路。
+- **关联**：`api/MARKET_DATA_API.md`、`api/API_INDEX.md`、`mock/MOCK_REMOTE_CONTRACT.md`、`DATABASE_DESIGN.md`、`BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`、`AI_HANDOFF.md`。
+
+---
+
+## 2026-07-14 — P1.2/P1.3 收口验收修复（mock 持久化 + runPlan 真实汇总 + 文档一致）
+
+- **目标**：修复 P1.2/P1.3 验收问题：板块 mock 不持久化、runPlan 虚报成功、分页不触发加载、成员抽屉错误态缺失、remote 测试空覆盖、文档事实冲突。
+- **前端修复（板块 mock 持久化 + 页面可用性）**：
+  - `segmentApi.ts` mock 实现全部改为 `localStorageClient` 持久化：create/list/get/update/delete + member add/list/remove 有真实存储效果；delete 级联清理成员；addMember 禁止同板块同 symbol 重复；memberCount 与成员数一致；list 支持 segmentType/enabled/keyword 筛选和分页；update 保留未修改字段。
+  - remote 实现用 `unwrapVoid` 处理 DELETE 操作（之前用 `unwrap<void>` 对 data=null 报错）。
+  - `/market-segments` 页面：首次加载 `useEffect` 依赖 `[page]` 实现分页切换自动加载；MembersDrawer 切换板块先清理旧数据再加载，补 error Alert + 重试按钮；handleAdd/handleRemove 捕获异常显示错误。
+  - 测试：`segmentApi.test.ts` 重写为 13 tests（mock 完整生命周期 create→list→get→update→addMember→memberCount→removeMember→delete + 分页 + 筛选 + remote adapter 调用断言）。
+- **后端修复（runPlan 真实汇总 + scope 校验）**：
+  - `runPlan` 不再硬编码 `insertedCount=1/successCount++`；使用 `createAndExecuteDailyBarSync` 返回的 `MarketDataSyncTaskVO` 映射 item 状态和计数（inserted/updated/skipped/total 来自子任务真实结果）。
+  - 子任务状态映射：SUCCEEDED→item SUCCEEDED；PARTIAL_FAILED→item SUCCEEDED（部分数据已写入）；PENDING/RUNNING→item SKIPPED（幂等复用）；FAILED→item FAILED。主 task 状态根据汇总的 success/fail 判定 SUCCEEDED/PARTIAL_FAILED/FAILED。
+  - `parseScope` 用 Jackson（正常 import，不用全限定类名），校验：symbol 格式（SH/SZ/BJ.数字）、去空白去重、startDate<=endDate、非法 JSON/日期/symbol 抛 BusinessException。修正 Javadoc 与代码一致。
+  - 测试：新增 8 个测试（成功链路验证 startDate/endDate/adjustType/symbol 透传 + inserted/updated/skipped 汇总断言；幂等 RUNNING→SKIPPED；子任务 FAILED→主 task FAILED；多 symbol PARTIAL_FAILED；重复 symbol 去重；非法 JSON；非法日期范围；非法 symbol 格式）。
+- **建设看板修复**：删除重复 `market-ops-workbench`；`market-collection-jobs` TODO→IN_PROGRESS（日K手动执行已接入，分钟K/scheduler TODO）；`minute-bar-asset` TODO→IN_PROGRESS（表+质量校验已实现，LongPort adapter 未接入）。
+- **测试结果**：后端 `./mvnw test` **229 tests / 0 failures**；前端 typecheck + lint + **234 tests** + build 全绿。
+- **未完成（不在本轮范围）**：分钟 K LongPort 批量 adapter（`getMinuteBars`）；盘中 scheduler（`@Scheduled`）；`MINUTE_BAR_BACKFILL`/`INTRADAY_*` 执行链路（手动执行返回业务错误）。
+- **关联**：`api/MARKET_DATA_API.md`、`api/API_INDEX.md`、`mock/MOCK_REMOTE_CONTRACT.md`、`BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`、`AI_HANDOFF.md`。
+
+---
+
+## 2026-07-13/14 — P1.2 收口验收修复（页面可用 + 状态真实 + 文档一致）
+
+- **目标**：把 P1.2 从"能编译"修到"页面可用、状态真实、文档一致"，不扩散开发范围。
+- **前端修复（/market-segments 页面）**：
+  - `SegmentListTab` 缺 `useEffect` 导致首次进入不加载列表 → 补 `useEffect` 首次自动调 `listSegments`。
+  - `MembersDrawer` 用 `useCallback` 代替 `useEffect`（只缓存不执行）→ 改为 `useEffect`，打开抽屉自动加载成员。
+  - 新增 `segmentApi.test.ts`（8 tests 覆盖 create/list/delete/members mock）。
+- **后端修复（runPlan 状态 + scope 解析）**：
+  - 非 `DAILY_BAR_BACKFILL` 类型不再标 SKIPPED 蒙混 → 直接抛 `BusinessException`（"执行链路尚未接入"），不创建空壳任务误导用户。
+  - `extractSymbolsFromScope` 正则解析 → 改为 Jackson `ObjectMapper` 结构化解析（`parseScope`），同时提取 `startDate`/`endDate` 传给 `createAndExecuteDailyBarSync`。
+  - 新增 2 个测试：`runPlanRejectsNonDailyTaskType`、`runPlanRejectsEmptyScope`。
+- **建设看板修复**：
+  - 删除重复的 `market-ops-workbench`（IN_PROGRESS/30%）节点（已被 `market-workspace` DONE/80% 取代）。
+  - `market-collection-jobs` 从 TODO/15% 改为 IN_PROGRESS/50%（日K手动执行已接入，分钟K/盘中调度 TODO）。
+  - `minute-bar-asset` 从 TODO/5% 改为 IN_PROGRESS/40%（表+质量校验+API 已实现，LongPort adapter 未接入）。
+  - `market-workspace` risks 修正（"概览聚合计数为占位" → 已接 DAO 真实查询）。
+- **API 文档**：`MARKET_DATA_API.md` 新增 §3（工作台/采集计划/分钟K/水位/板块 API 清单 + 质量校验说明 + 手动执行说明）。
+- **测试结果**：后端 219 tests / 0 failures；前端 229 tests / typecheck / lint / build 全绿。
+- **未完成**：分钟 K LongPort 批量 adapter（`getMinuteBars`）+ 盘中 scheduler（`@Scheduled`）未接入；`MINUTE_BAR_BACKFILL` / `INTRADAY_*` 手动执行返回业务错误。
+- **关联**：`api/MARKET_DATA_API.md`、`BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`、`AI_HANDOFF.md`。
+
+---
+
 ## 2026-07-12 — P1.2 行情工作台 + 分钟线资产 + P1.3 板块/自定义分组
 
 - **目标**：把行情能力从"单次接口验证"升级为"可配置、可追踪、可复用的数据资产建设流程"，完成 P1.2 工作台/采集/分钟线/水位/质量治理 + P1.3 板块管理。

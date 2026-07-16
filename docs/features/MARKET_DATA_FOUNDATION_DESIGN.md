@@ -1,6 +1,6 @@
 # Market Data Foundation Design
 
-> 状态：P1.0 已实现证券主数据 + CSV 日 K；P1.1 LongPort 只读行情源已完成真实外联验收；P1.2 行情工作台与采集任务已完成设计，待开发。
+> 状态：P1.0 已实现证券主数据 + CSV 日 K；P1.1 LongPort 只读行情源已完成真实外联验收；P1.2 行情工作台 / 采集计划 / 分钟线资产 / 板块已实现（后端核心 + 手动执行闭环 + 前端页面）；分钟 K LongPort 批量 adapter（`getMinuteBars`）+ 盘中 scheduler 未完成。
 > 目的：为查询股票价格并落库确定数据边界，避免把手工估值、外部实时快照和历史 K 线混在一起。
 
 ## 1. 产品目标
@@ -32,7 +32,7 @@
 - `stock_daily_bar.fetched_at` 已由 `V6__add_fetched_at_to_daily_bar.sql` 实现。
 - CSV 日 K 幂等导入已实现，`data_source=CSV`。
 - LongPort provider facade、stock_quote_snapshot、market_data_sync_task、market_data_alert 已实现（V7-V9 migration）。后端反射式 LongPort adapter 已实现；官方 Java SDK 已装入 `runtime-libs/`（`io.github.longportapp:openapi-sdk:4.3.3`，vendor jar 被 gitignore），真实单 symbol 外联已于 2026-07-12 验收通过。部署需配 `LONGPORT_HTTP_URL` / `LONGPORT_QUOTE_WEBSOCKET_URL` 域名覆盖（SDK 默认域名已废弃），详见 `../development/LONGPORT_SDK_RUNTIME_INSTALLATION.md`。
-- 下一阶段设计已沉淀到 `MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`：工作台行情聚合、历史/盘中采集任务、分钟线资产、交易时段、板块与异动大屏。
+- P1.2 行情工作台 / 采集计划 / 分钟线资产 / 板块已实现（V10/V11 migration + 后端核心 + 手动执行闭环 + 前端页面），详见 `MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。**分钟 K LongPort 批量 adapter（`getMinuteBars`）和盘中自动调度 scheduler 尚未完成**，当前手动执行仅 `DAILY_BAR_BACKFILL` 接入 daily bar 写入链路。
 
 ## 3. 证券主数据
 
@@ -125,9 +125,10 @@ LongPort 特别约束：
 3. 已完成 CSV 日 K 导入，验证表结构和幂等规则。
 4. 已接入 LongPort 只读行情 provider 的最新价查询。
 5. 已增加 `stock_quote_snapshot`、同步任务、失败重试和数据质量检查。
-6. 下一步建设行情工作台、历史/盘中采集任务、分钟线资产和异动大屏。
-7. 仅在用户明确选择时，让交易账本参考外部最新价展示估值来源；不得自动覆盖手工价。
-8. 最后建设指标、策略和回测。
+6. 已完成行情工作台、历史采集计划（手动执行）、分钟线资产、交易时段、板块（P1.2/P1.3 后端核心 + 前端页面）。
+7. 待完成：分钟 K LongPort 批量 adapter（`getMinuteBars`）+ 盘中自动调度 scheduler + 异动大屏。
+8. 仅在用户明确选择时，让交易账本参考外部最新价展示估值来源；不得自动覆盖手工价。
+9. 最后建设指标、策略和回测。
 
 ## 8. 验收原则
 
@@ -138,4 +139,5 @@ LongPort 特别约束：
 - [x] LongPort API Key 不出现在前端、日志和仓库。
 - [x] 外部最新价快照不覆盖用户手工数据。
 - [x] 行情仅用于辅助分析，不包装成确定性交易建议。
-- [ ] 行情工作台、采集任务和分钟线资产落地。
+- [x] 行情工作台、采集任务和分钟线资产落地（P1.2 后端核心 + 手动执行闭环 + 前端页面）。
+- [ ] 分钟 K LongPort 批量 adapter（`getMinuteBars`）+ 盘中自动调度 scheduler。

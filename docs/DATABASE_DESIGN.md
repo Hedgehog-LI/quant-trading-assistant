@@ -2,7 +2,7 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
-当前已发布 V1-V6，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+当前已发布 V1-V12，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
 
 ## 命名约定
 
@@ -176,7 +176,7 @@
 
 ### stock_minute_bar
 
-状态：P1.2 待实现。用途：保存 1M/5M/15M/30M/60M 分钟 K，支撑历史补档、盘中采集、量价异动和后续指标/回测。详细设计见 `features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。
+状态：已实现（V10 migration）。用途：保存 1M/5M/15M/30M/60M 分钟 K，支撑历史补档、盘中采集、量价异动和后续指标/回测。详细设计见 `features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。
 
 核心字段：
 
@@ -207,6 +207,50 @@
 - unique `uk_minute_bar_key(canonical_symbol, bar_start_time, interval_type, adjust_type, data_source)`
 - index `idx_minute_bar_symbol_time(canonical_symbol, interval_type, adjust_type, data_source, bar_start_time)`
 - index `idx_minute_bar_trade_date(trade_date, interval_type)`
+
+### market_trading_session
+
+状态：已实现（V10 migration）。用途：保存 A 股交易时段定义（集合竞价/上午/下午等），分钟 K 写入时据此做时段校验。
+
+幂等键：`market_code + session_type + trade_date`（启动时 `@PostConstruct` 幂等初始化默认 A 股时段，GET 请求只读不写防死锁）。
+
+### market_calendar
+
+状态：已实现（V10 migration）。用途：交易日历，用于判断某市场某日是否交易日（`/trading-sessions/is-trading-day`）。分钟 K 写入做交易日校验时使用。
+
+幂等键：`market_code + trade_date`。
+
+### market_data_sync_plan
+
+状态：已实现（V10 migration）。用途：行情采集计划（采集任务配置），支持任务类型/provider/scope/enabled/trigger，提供 CRUD + 启停 + 手动执行 `POST /sync-plans/{id}/run`。当前手动执行仅 `DAILY_BAR_BACKFILL` 接入 daily bar 写入链路。
+
+幂等键：`task_type + provider + scope_hash`（同任务同源同 scope 唯一）。
+
+### market_data_sync_task_item
+
+状态：已实现（V10 migration）。用途：单个 sync_task 下按 symbol/范围的执行明细，记录每个标的的成功/失败/跳过/错误码，支撑任务执行过程可查（`GET /sync-tasks/{taskId}/items`）。
+
+V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNING` 时，可通过查询明细触发安全懒收敛，或调用 `POST /sync-tasks/{taskId}/reconcile` 主动收敛；收敛直接汇总子任务六类 count，不从 item 状态反推行数。
+
+幂等键：`task_id + canonical_symbol + scope_key`。
+
+### market_data_watermark
+
+状态：已实现（V10 migration）。用途：按数据源/标的/interval 记录已落库数据的最新时间水位，支撑补档范围判断和重复抓取避免。`GET /watermarks` 查询。
+
+幂等键：`canonical_symbol + data_source + interval_type + adjust_type`。
+
+### market_segment
+
+状态：已实现（V11 migration）。用途：板块/自定义分组主表（行业/概念/自定义），支持 CRUD + 启停 + `memberCount` 冗余字段，与成员表数量保持一致。
+
+幂等键：`segment_type + segment_code`（或名称唯一，按代码为准）。
+
+### market_segment_member
+
+状态：已实现（V11 migration）。用途：板块成员明细，记录某板块下包含的 `canonical_symbol` 及其加入时间/排序。板块删除级联清理成员；同板块同 symbol 不允许重复。
+
+幂等键：`segment_id + canonical_symbol`。
 
 ### technical_indicator_daily
 
@@ -387,6 +431,8 @@
 2. 行情 P1.0 已实现 `stock_basic` 和证券代码规范化。
 3. 行情 P1.0 已实现 CSV 日 K 幂等导入。
 4. LongPort P1.1 外部最新价接入时新增 `stock_quote_snapshot`、`market_data_sync_task`、`market_data_alert`。
-5. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
+5. 行情 P1.2 已实现工作台/采集计划/分钟线/交易时段/水位（V10：`stock_minute_bar`、`market_trading_session`、`market_calendar`、`market_data_sync_plan`、`market_data_sync_task_item`、`market_data_watermark`）。
+6. 行情 P1.3 已实现板块/自定义分组（V11：`market_segment`、`market_segment_member`）。
+7. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。
