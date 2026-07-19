@@ -1,5 +1,7 @@
 package com.quant.trade.marketdata.provider;
 
+import com.quant.trade.common.exception.BusinessException;
+import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.config.LongPortProperties;
 import com.quant.trade.marketdata.constant.MarketDataConstants;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortDailyBar;
@@ -100,6 +102,17 @@ class ReflectiveLongPortQuoteClientTest {
                 LocalDate.of(2026, 7, 10), "NoAdjust", "NONE");
         assertEquals(1, bars.size());
         assertEquals(LocalDate.of(2026, 7, 10), bars.get(0).tradeDate());
+    }
+
+    @Test
+    void invalidTokenIsReportedAsAuthenticationFailure() {
+        ReflectiveLongPortQuoteClient client = new ReflectiveLongPortQuoteClient(enabledProperties());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> client.getSecurityStaticInfo("TOKEN_INVALID"));
+
+        assertEquals(ErrorCodeEnum.MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED, exception.getErrorCode());
+        assertTrue(exception.getMessage().contains("鉴权失败"));
     }
 
     private LongPortProperties enabledProperties() {

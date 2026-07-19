@@ -15,6 +15,7 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 ## 当前状态（2026-07）
 
+- **2026-07-19 Longbridge 外部鉴权故障与本地修复（待重新部署）**：最后一次真实成功为 2026-07-18 09:51:52，首次观察失败为 2026-07-19 14:28:59。原 Legacy 凭据、重新生成的 Legacy 凭据以及 CLI 0.24.0 全新 OAuth 登录均被服务端拒绝（`401004 token invalid` / `401102 token verification failed`），而官方 MCP 仍可读取行情；当前按 Longbridge 外部鉴权故障处理并已提交 Trace ID，停止反复轮换密钥。代码已将凭据失效与 403/301604 行情权限不足分开；盘中 scheduler 只扫描 `INTRADAY_MINUTE_REFRESH + INTRADAY + enabled`，旧非法计划不再每 30 秒告警。后端 **287 tests** 通过。部署与核验见 `development/LONGPORT_TOKEN_INCIDENT_2026-07-19.md`。
 - **v0.1.0** Today MVP + 交易账本 + 持仓快照：已完成。
 - **v0.1.1** 基础交易闭环优化（计划关联 + 复盘一致性 + 快照对比 + FIFO 对账 + 工作台待办 + 连接防呆）及多轮质量收尾：**已完成并验收**。范围与改动见 `development/DEVELOPMENT_LOG.md`。
 - **P1.0 行情基础**：`marketdata` 模块已存在，V5/V6 已实现 `stock_basic`、`stock_daily_bar`、CSV 日 K 导入和 `fetched_at`。

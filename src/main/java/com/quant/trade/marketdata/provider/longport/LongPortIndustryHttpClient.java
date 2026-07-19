@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.config.LongPortProperties;
+import com.quant.trade.marketdata.constant.MarketDataConstants;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.crypto.Mac;
@@ -146,15 +147,19 @@ public class LongPortIndustryHttpClient implements LongPortSectorClient {
     private JsonNode parseResponse(int statusCode, String body) throws IOException {
         JsonNode root = objectMapper.readTree(body);
         int code = root.path("code").asInt(statusCode);
+        String message = root.path("message").asText("unknown error");
         if (statusCode == 429 || code == 301606) {
             throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_RATE_LIMITED, "Longbridge 行业接口限流");
         }
-        if (statusCode == 401 || statusCode == 403 || code == 301604) {
+        if (statusCode == 401 || isAuthenticationFailure(message)) {
+            throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED,
+                    MarketDataConstants.LONGPORT_AUTHENTICATION_FAILED_MESSAGE);
+        }
+        if (statusCode == 403 || code == 301604) {
             throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_PERMISSION_DENIED,
                     "Longbridge 行业接口无权限");
         }
         if (statusCode < 200 || statusCode >= 300 || code != 0) {
-            String message = root.path("message").asText("unknown error");
             log.warn("Longbridge industry API failed: httpStatus={}, code={}, message={}",
                     statusCode, code, message);
             throw new BusinessException(ErrorCodeEnum.MARKET_SECTOR_PROVIDER_UNAVAILABLE,
@@ -165,6 +170,13 @@ public class LongPortIndustryHttpClient implements LongPortSectorClient {
             throw new BusinessException(ErrorCodeEnum.MARKET_DATA_EMPTY_RESULT, "Longbridge 行业接口未返回数据");
         }
         return data;
+    }
+
+    private boolean isAuthenticationFailure(String message) {
+        String lower = message == null ? "" : message.toLowerCase();
+        return lower.contains("token invalid") || lower.contains("invalid token")
+                || lower.contains("token expired") || lower.contains("expired token")
+                || lower.contains("authentication failed") || lower.contains("unauthorized");
     }
 
     private String signature(String path, String query, String timestamp, String appKey,

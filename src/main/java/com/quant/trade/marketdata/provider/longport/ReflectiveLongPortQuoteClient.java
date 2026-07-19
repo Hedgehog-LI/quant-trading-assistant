@@ -349,6 +349,10 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
             return businessException;
         }
         String lower = message.toLowerCase();
+        if (isAuthenticationFailure(lower)) {
+            return new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED,
+                    action + ": " + MarketDataConstants.LONGPORT_AUTHENTICATION_FAILED_MESSAGE);
+        }
         if (lower.contains("301604") || lower.contains("permission") || lower.contains("无权限")) {
             return new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_PERMISSION_DENIED, message);
         }
@@ -359,6 +363,12 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
             return new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_TIMEOUT, message);
         }
         return new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, message);
+    }
+
+    private boolean isAuthenticationFailure(String message) {
+        return message.contains("token invalid") || message.contains("invalid token")
+                || message.contains("token expired") || message.contains("expired token")
+                || message.contains("authentication failed") || message.contains("unauthorized");
     }
 
     /** 官方历史 K 接口限制为 30 秒 60 次；在 client 边界串行取得许可。 */

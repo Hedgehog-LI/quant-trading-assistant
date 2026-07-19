@@ -48,7 +48,8 @@ class MarketDataIntradaySchedulerTest {
                 .provider("LONGPORT").scopeJson("{\"symbols\":[\"SH.603308\"]}")
                 .intervalType("5M").adjustType("NONE").triggerType("INTRADAY")
                 .collectFrequency("60S").includeAuction(false).enabled(true).build();
-        lenient().when(planMapper.selectAutoTriggerPlans("INTRADAY", true)).thenReturn(List.of(plan));
+        lenient().when(planMapper.selectAutoTriggerPlans(
+                "INTRADAY_MINUTE_REFRESH", "INTRADAY", true)).thenReturn(List.of(plan));
         lenient().when(validationManager.inspect(plan)).thenReturn(new SyncPlanValidationManager.ValidationResult(
                 new SyncPlanValidationManager.PlanScope(List.of("SH.603308"), null, null), List.of(), false, true));
         lenient().when(validationManager.frequencySeconds("60S")).thenReturn(60);
@@ -61,6 +62,7 @@ class MarketDataIntradaySchedulerTest {
         when(tradingSessionManager.isTradingDay("CN_A", LocalDate.of(2026, 7, 10))).thenReturn(true);
         scheduler.scanAt(LocalDateTime.of(2026, 7, 10, 10, 0));
         verify(executionService).executeMinutePlan(plan, LocalDateTime.of(2026, 7, 10, 10, 0));
+        verify(planMapper).selectAutoTriggerPlans("INTRADAY_MINUTE_REFRESH", "INTRADAY", true);
     }
 
     @Test

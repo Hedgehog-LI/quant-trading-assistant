@@ -82,7 +82,7 @@
     <select id="selectAutoTriggerPlans" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM market_data_sync_plan
-        WHERE trigger_type = #{triggerType} AND enabled = #{enabled}
+        WHERE task_type = #{taskType} AND trigger_type = #{triggerType} AND enabled = #{enabled}
         ORDER BY created_at ASC
     </select>
 

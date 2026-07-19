@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-07-19 — LongPort 凭据错误分类与 scheduler 查询修复（静态通过，外部鉴权故障阻塞）
+
+- **复现**：本机 `/providers/LONGPORT/status` 返回 `configured=true/reachable=false/lastError=token invalid`；证券验证返回 `PROVIDER_UNAVAILABLE`；行业排行返回旧的 `MARKET_DATA_PROVIDER_PERMISSION_DENIED`。与服务器现象一致。
+- **自动化**：`./mvnw test` 通过，**287 tests / 0 failures / 0 errors / 0 skipped**。新增测试覆盖 SDK token invalid、行业 HTTP 401 凭据失效、403 权限不足，以及 scheduler 只查询合法盘中任务类型。
+- **Docker/MySQL**：本地应用镜像重建并强制重建 app 成功，`qta-mysql` healthy、`qta-server` running，Flyway 校验 14 个 migration，health 返回 `UP`。
+- **应用 API curl**：provider 返回 `configured=true/reachable=false` 并保留上游 `token invalid`；证券验证明确展示鉴权失败；行业排行返回 `MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED`，不再误报权限不足。
+- **scheduler 运行日志**：应用启动后跨越多个 30 秒扫描周期，未再出现旧 `MINUTE_BAR_BACKFILL + INTRADAY` 计划的重复告警。
+- **静态检查**：`git diff --check` 通过。
+- **外部对照**：重新生成 Legacy 凭据后官方 SDK 仍返回 `401004`；CLI 0.24.0 完全退出并重新 OAuth 授权后，CN 节点连通但服务端仍返回 `401102`；官方 MCP 对同一账户仍能读取行情。故障已携 Trace ID 提交 Longbridge。
+- **未执行**：未把外部鉴权失败伪造成真实 provider 恢复；部署后可验证本轮错误分类和 scheduler 降噪，真实行情恢复需等待 Longbridge 处理后再执行故障记录中的三条 curl。
+- **结论**：本地代码缺陷已修复；当前外联阻塞按 Longbridge 外部故障处理，不再要求用户重复轮换密钥。
+
 ## 2026-07-18 — P1.5 市场板块关注与快照（验收通过）
 
 - **后端**：`./mvnw test` 通过，**284 tests / 0 failures / 0 errors / 0 skipped**；Flyway 从空库成功执行 14 个 migration，V14 三张行业表创建成功。

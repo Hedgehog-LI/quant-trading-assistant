@@ -66,6 +66,7 @@ public class MarketDataIntradayScheduler {
     public void scanAt(LocalDateTime now) {
         try {
             List<MarketDataSyncPlanDO> plans = planMapper.selectAutoTriggerPlans(
+                    WorkbenchConstants.TASK_INTRADAY_MINUTE_REFRESH,
                     WorkbenchConstants.TRIGGER_INTRADAY, true);
             for (MarketDataSyncPlanDO plan : plans) {
                 tryRun(plan, now);

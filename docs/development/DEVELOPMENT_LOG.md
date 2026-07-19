@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-07-19 — LongPort Token 失效诊断与盘中调度器降噪
+
+- **线上现象**：证券静态信息报 `token invalid`；行业接口被统一显示为“无权限”；旧计划 `MINUTE_BAR_BACKFILL + INTRADAY` 每 30 秒被 scheduler 重复扫描。
+- **定位**：使用本机同一份 gitignored 凭据复测也返回 `token invalid`，确认并非服务器单点配置差异。JWT 尚未到期、Token 内 App Key 匹配且格式正常，但官方 `.cn` 接口原始响应为 `HTTP 401 / code 401004`；官方新版 Java SDK 4.0.5 使用同一凭据也返回相同错误。重新生成 Legacy 凭据无效，CLI 0.24.0 全新 OAuth 授权也被服务端以 `401102 token verification failed` 拒绝，而官方 MCP 仍能读取行情。当前按 Longbridge 外部鉴权故障处理，不归因于旧 SDK、项目签名、Docker 注入或自然过期。行业 HTTP 客户端把 401、403、301604 合并为权限不足，掩盖了凭据问题；scheduler SQL 只过滤 trigger/enabled，未过滤任务类型。
+- **代码修复**：新增 `MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED`；SDK 与行业 HTTP 客户端统一识别 token invalid/expired/unauthorized，401 返回凭据失效，403/301604 保持权限不足。自动调度 SQL 只选 `INTRADAY_MINUTE_REFRESH + INTRADAY + enabled`。
+- **验证**：本机故障复现完成；新增 SDK token、行业 401/403 和 scheduler 查询条件测试；`./mvnw test` **287 tests / 0 failures / 0 errors / 0 skipped**，package 与 `git diff --check` 通过。本地 Docker/MySQL 重建后 health `UP`，行业 API 返回新鉴权错误码，多个 scheduler 扫描周期内不再出现旧非法计划告警。未使用外部故障状态宣称真实 provider 恢复。
+- **外部操作**：Legacy 凭据轮换和 OAuth 干净重登均已验证无效，已携 Trace ID 向 Longbridge 提交工单；停止继续轮换密钥。时间线、部署边界与恢复后验收步骤见 `LONGPORT_TOKEN_INCIDENT_2026-07-19.md`。
+
 ## 2026-07-18 — P1.5 市场板块关注与快照数据资产
 
 - **目标**：把行业排行从只读展示升级为可关注、可采集、可追溯的个人板块数据资产，并收口 Java SDK 行业 JNI 不可用问题。

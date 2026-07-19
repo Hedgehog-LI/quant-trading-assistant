@@ -43,6 +43,9 @@ public class QuoteContext implements AutoCloseable {
     }
 
     public CompletableFuture<SecurityStaticInfo[]> getStaticInfo(String[] symbols) {
+        if (Arrays.asList(symbols).contains("TOKEN_INVALID")) {
+            return CompletableFuture.failedFuture(new RuntimeException("token invalid"));
+        }
         SecurityStaticInfo[] infos = Arrays.stream(symbols)
                 .map(symbol -> new SecurityStaticInfo(symbol, "贵州茅台", "貴州茅台", "Kweichow Moutai",
                         "SSE", "CNY", 100))

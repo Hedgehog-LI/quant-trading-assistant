@@ -24,7 +24,8 @@ public interface MarketDataSyncPlanMapper {
     long countByFilter(@Param("taskType") String taskType,
                        @Param("provider") String provider,
                        @Param("enabled") Boolean enabled);
-    List<MarketDataSyncPlanDO> selectAutoTriggerPlans(@Param("triggerType") String triggerType,
+    List<MarketDataSyncPlanDO> selectAutoTriggerPlans(@Param("taskType") String taskType,
+                                                      @Param("triggerType") String triggerType,
                                                       @Param("enabled") Boolean enabled);
     int tryClaimRun(@Param("id") Long id, @Param("token") String token,
                     @Param("claimedAt") LocalDateTime claimedAt,

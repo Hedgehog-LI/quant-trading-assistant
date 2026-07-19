@@ -18,6 +18,8 @@ public final class MarketDataConstants {
     public static final String LONGPORT_SDK_MISSING_MESSAGE = "LongPort Java SDK 未安装或未进入运行时 classpath";
     public static final String LONGPORT_CREDENTIALS_MISSING_MESSAGE = "LongPort 凭据未配置";
     public static final String LONGPORT_PROVIDER_DISABLED_MESSAGE = "LongPort provider 未启用";
+    public static final String LONGPORT_AUTHENTICATION_FAILED_MESSAGE =
+            "Longbridge 鉴权失败，请检查凭据状态或联系数据源服务商";
 
     // 同步任务
     public static final String TASK_TYPE_DAILY_BAR_SYNC = "DAILY_BAR_SYNC";

@@ -1,6 +1,8 @@
 package com.quant.trade.marketdata.provider.longport;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.quant.trade.common.exception.BusinessException;
+import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.config.LongPortProperties;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -17,6 +19,7 @@ import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LongPortIndustryHttpClientTest {
@@ -96,6 +99,29 @@ class LongPortIndustryHttpClientTest {
         assertEquals("领涨龙头,成交龙头", result.stocks().get(0).tags());
     }
 
+    @Test
+    void mapsInvalidTokenToAuthenticationFailureInsteadOfPermissionDenied() throws IOException {
+        server = startServer("/v1/quote/industry/rank", exchange ->
+                respond(exchange, 401, "{\"code\":401,\"message\":\"token invalid\"}"));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> client().getIndustryRank("CN", "leading-gainer", "single", 3));
+
+        assertEquals(ErrorCodeEnum.MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED, exception.getErrorCode());
+        assertTrue(exception.getMessage().contains("鉴权失败"));
+    }
+
+    @Test
+    void keepsEntitlementFailureSeparateFromInvalidToken() throws IOException {
+        server = startServer("/v1/quote/industry/rank", exchange ->
+                respond(exchange, 403, "{\"code\":301604,\"message\":\"permission denied\"}"));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> client().getIndustryRank("CN", "leading-gainer", "single", 3));
+
+        assertEquals(ErrorCodeEnum.MARKET_DATA_PROVIDER_PERMISSION_DENIED, exception.getErrorCode());
+    }
+
     private LongPortIndustryHttpClient client() {
         LongPortProperties properties = new LongPortProperties();
         properties.setEnabled(true);
@@ -124,9 +150,13 @@ class LongPortIndustryHttpClientTest {
     }
 
     private void respond(HttpExchange exchange, String body) throws IOException {
+        respond(exchange, 200, body);
+    }
+
+    private void respond(HttpExchange exchange, int status, String body) throws IOException {
         byte[] content = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(200, content.length);
+        exchange.sendResponseHeaders(status, content.length);
         exchange.getResponseBody().write(content);
         exchange.close();
     }
