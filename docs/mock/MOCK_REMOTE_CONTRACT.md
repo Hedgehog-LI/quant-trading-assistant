@@ -21,12 +21,14 @@
 | Dashboard | ✅ 前端聚合 | ✅ 后端 `/dashboard/today` 聚合 | v0.1.1 remote 直接用后端 todos |
 | Risk Calculator | ✅ 前端纯函数 | ⚠️ 后端 `/risk/calculations/position-size` 已实现但**前端页面未接 remote adapter**，当前用本地纯函数（`features/risk/api/riskCalculator.ts`） | |
 | Build Status | ✅ 静态 | ✅ 静态 | |
-| Market Workbench（行情工作台） | ✅ 前端聚合 | ✅ 后端 `/workbench/overview` 聚合 | remote 直接用后端 provider/提醒/交易时段/数据计数 |
-| Market Segments（板块/自定义分组） | ✅ localStorage | ✅ 后端 `/segments/*` | mock 持久化到 localStorage，规则见 §6 |
+| Market Data（证券/日 K/最新价/同步） | ✅ localStorage；不伪造 provider 执行成功 | ✅ 后端 DB + LongPort | canonical 规则必须一致：`SH/SZ/BJ/HK/US` |
+| Market Workbench（行情工作台） | ✅ 计划 CRUD 落 `marketSyncPlans`；`run/getTask` 明确拒绝 | ✅ overview + 手工/盘中执行引擎 | mock 只验表单/状态；真实 task/item/分钟 K/水位必须使用 remote |
+| Security Verification（精确代码验证） | ❌ 明确提示切换后端模式，不伪造 LongPort 结果 | ✅ `/market-data/securities/verify` | 验证只读；确认后才进入计划 scope |
+| Market Segments（市场板块/自定义分组） | ✅ 市场板块仅演示数据；自定义分组 localStorage | ✅ `/sector-catalog/*` + `/segments/*` | 演示数据必须标 `LOCAL_DEMO`，不得冒充 LongPort |
 
 ## 3. localStorage 规则
 
-- **逻辑 key**：`tradeJournals` / `tradePlans` / `watchlist` / `reviews` / `positionSnapshots` / `portfolioPrices` / `settings`。
+- **逻辑 key**：`tradeJournals` / `tradePlans` / `watchlist` / `reviews` / `positionSnapshots` / `portfolioPrices` / `marketSyncPlans` / `settings`。
 - **物理 key**：统一带 `qta:` 前缀（`shared/api/localStorageClient.ts` `fullKey`，如物理 key 为 `qta:tradeJournals`）；所有读写必须经 `localStorageClient`，禁止直接 `window.localStorage`。`settings` 同时被 `shared/api/client.ts` 读取 `apiBaseUrl`。
 - **ID 类型**：mock = `generateId()` UUID **string**；remote = DB **Long**。`EntityId = string | number` 两种兼容，运行时不混用。
 - **初始化**：首次访问无数据（空数组）；`settings` 缺失时按 `VITE_DEFAULT_API_MODE` 兜底（dev=mock，prod=remote）。
@@ -64,6 +66,9 @@
 - **addMember 不允许同板块同 symbol 重复**（同 `segmentId + canonicalSymbol` 视为重复，重复添加被拦截）。
 - 板块 `memberCount` 必须与 `marketSegmentMembers:{id}` 数组长度一致（增删成员时同步维护）。
 - 板块成员支持增删查；移除成员按 `canonicalSymbol` 定位。
+- 市场行业排行在 mock 模式只提供带“演示”名称和 `LOCAL_DEMO` providerCode 的界面样例，不持久化、不声称来自外部行情。
+- remote 模式行业排行/层级调用 `/api/v1/market-data/sector-catalog/*`；provider 不可用时展示错误和重试，不回退为演示数据。
+- 证券与板块成员统一规范化：港股固定五位（`HK.2498 -> HK.02498`），美股统一大写（`us.aapl -> US.AAPL`）；重复判断使用规范化后的标识。
 - ID 类型沿用 mock UUID string 规则（§3）。
 
 ### remote 模式

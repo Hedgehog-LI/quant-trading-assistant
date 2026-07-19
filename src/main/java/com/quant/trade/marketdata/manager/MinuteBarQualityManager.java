@@ -108,6 +108,9 @@ public class MinuteBarQualityManager {
     private boolean safeEquals(Object a, Object b) {
         if (a == null && b == null) return true;
         if (a == null || b == null) return false;
+        if (a instanceof BigDecimal left && b instanceof BigDecimal right) {
+            return left.compareTo(right) == 0;
+        }
         return a.equals(b);
     }
 }

@@ -4,6 +4,7 @@ import com.quant.trade.marketdata.config.LongPortProperties;
 import com.quant.trade.marketdata.constant.MarketDataConstants;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortDailyBar;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortQuote;
+import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortMinuteBar;
 import com.quant.trade.marketdata.provider.longport.ReflectiveLongPortQuoteClient;
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +44,12 @@ class ReflectiveLongPortQuoteClientTest {
         assertTrue(client.healthCheck().configured());
         assertTrue(client.healthCheck().reachable());
 
+        var staticInfo = client.getSecurityStaticInfo("600519.SH");
+        assertEquals("600519.SH", staticInfo.longPortSymbol());
+        assertEquals("贵州茅台", staticInfo.nameCn());
+        assertEquals("SSE", staticInfo.exchange());
+        assertEquals(100, staticInfo.lotSize());
+
         List<LongPortQuote> quotes = client.getLatestQuotes(List.of("600519.SH"));
         assertEquals(1, quotes.size());
         LongPortQuote quote = quotes.get(0);
@@ -60,6 +67,13 @@ class ReflectiveLongPortQuoteClientTest {
         assertEquals(LocalDate.of(2026, 7, 10), bar.tradeDate());
         assertEquals("NONE", bar.adjustType());
         assertEquals(new BigDecimal("1680.120000"), bar.closePrice());
+
+        List<LongPortMinuteBar> minuteBars = client.getMinuteBars("600519.SH", LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 7, 10), "Min_5", "NoAdjust", "5M", "NONE");
+        assertEquals(1, minuteBars.size());
+        assertEquals("5M", minuteBars.get(0).intervalType());
+        assertEquals(LocalDateTime.of(2026, 7, 10, 0, 0), minuteBars.get(0).barStartTime());
+
     }
 
     /**

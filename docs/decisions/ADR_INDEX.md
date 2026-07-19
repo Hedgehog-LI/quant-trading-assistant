@@ -12,3 +12,4 @@
 | [ADR-0006](ADR-0006-no-auto-trading-no-broker.md) | 不自动交易、不连接券商、不保存密钥 | Accepted | 2026-06 |
 | [ADR-0007](ADR-0007-snapshot-reconciliation-readonly.md) | 快照对账只读，不自动修改交易流水 | Accepted | 2026-07 |
 | [ADR-0008](ADR-0008-longport-quote-only-provider.md) | LongPort 只作为只读行情 Provider | Accepted | 2026-07-10 |
+| [ADR-0009](ADR-0009-local-first-security-directory.md) | 证券名称检索采用本地目录优先、外部来源补全 | Accepted | 2026-07-17 |

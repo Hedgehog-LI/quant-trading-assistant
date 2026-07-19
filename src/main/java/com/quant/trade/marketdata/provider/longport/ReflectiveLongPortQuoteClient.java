@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -37,12 +39,15 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
     private static final String SDK_PERIOD_DAY = "Day";
     private static final String SDK_TRADE_SESSIONS_ALL = "All";
     private static final int MAX_ERROR_MESSAGE_LENGTH = 300;
+    private static final int HISTORY_RATE_LIMIT = 60;
+    private static final long HISTORY_RATE_WINDOW_MILLIS = 30_000L;
 
     private final LongPortProperties properties;
     private final ZoneId quoteZoneId;
     private final ClassLoader sdkClassLoader;
     private volatile LocalDateTime lastSuccessAt;
     private volatile String lastError;
+    private final Deque<Long> historyRequestTimes = new ArrayDeque<>();
 
     public ReflectiveLongPortQuoteClient(LongPortProperties properties) {
         this(properties, Thread.currentThread().getContextClassLoader());
@@ -108,6 +113,32 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
     }
 
     @Override
+    public LongPortSecurityInfo getSecurityStaticInfo(String longPortSymbol) {
+        ensureReady();
+        try (SdkSession session = openSession()) {
+            Method getStaticInfo = session.quoteContext().getClass().getMethod("getStaticInfo", String[].class);
+            Object result = waitFuture(getStaticInfo.invoke(session.quoteContext(),
+                    (Object) new String[] {longPortSymbol}));
+            Object[] items = (Object[]) result;
+            if (items.length == 0) {
+                return null;
+            }
+            Object item = items[0];
+            markSuccess();
+            return new LongPortSecurityInfo(
+                    (String) invokeGetter(item, "getSymbol"),
+                    (String) invokeGetter(item, "getNameCn"),
+                    (String) invokeGetter(item, "getNameHk"),
+                    (String) invokeGetter(item, "getNameEn"),
+                    (String) invokeGetter(item, "getExchange"),
+                    (String) invokeGetter(item, "getCurrency"),
+                    ((Number) invokeGetter(item, "getLotSize")).intValue());
+        } catch (Exception e) {
+            throw providerException("获取 LongPort 证券静态信息失败", e);
+        }
+    }
+
+    @Override
     public List<LongPortQuote> getLatestQuotes(List<String> longPortSymbols) {
         ensureReady();
         if (longPortSymbols == null || longPortSymbols.isEmpty()) {
@@ -133,6 +164,7 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
     public List<LongPortDailyBar> getDailyBars(String longPortSymbol, LocalDate startDate, LocalDate endDate,
                                                String sdkAdjustTypeName, String systemAdjustType) {
         ensureReady();
+        acquireHistoryPermit();
         try (SdkSession session = openSession()) {
             Class<?> periodClass = loadClass(CLASS_PERIOD);
             Class<?> adjustTypeClass = loadClass(CLASS_ADJUST_TYPE);
@@ -157,6 +189,33 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
             return bars;
         } catch (Exception e) {
             throw providerException("获取 LongPort 历史日 K 失败", e);
+        }
+    }
+
+    @Override
+    public List<LongPortMinuteBar> getMinuteBars(String longPortSymbol, LocalDate startDate, LocalDate endDate,
+                                                 String sdkPeriodName, String sdkAdjustTypeName,
+                                                 String systemIntervalType, String systemAdjustType) {
+        ensureReady();
+        acquireHistoryPermit();
+        try (SdkSession session = openSession()) {
+            Class<?> periodClass = loadClass(CLASS_PERIOD);
+            Class<?> adjustTypeClass = loadClass(CLASS_ADJUST_TYPE);
+            Class<?> tradeSessionsClass = loadClass(CLASS_TRADE_SESSIONS);
+            Method historyMethod = session.quoteContext().getClass().getMethod(
+                    "getHistoryCandlesticksByDate", String.class, periodClass, adjustTypeClass,
+                    LocalDate.class, LocalDate.class, tradeSessionsClass);
+            Object result = waitFuture(historyMethod.invoke(session.quoteContext(), longPortSymbol,
+                    enumValue(periodClass, sdkPeriodName), enumValue(adjustTypeClass, sdkAdjustTypeName),
+                    startDate, endDate, enumValue(tradeSessionsClass, SDK_TRADE_SESSIONS_ALL)));
+            List<LongPortMinuteBar> bars = new ArrayList<>();
+            for (Object item : (Object[]) result) {
+                bars.add(toLongPortMinuteBar(longPortSymbol, systemIntervalType, systemAdjustType, item));
+            }
+            markSuccess();
+            return bars;
+        } catch (Exception e) {
+            throw providerException("获取 LongPort 历史分钟 K 失败", e);
         }
     }
 
@@ -238,6 +297,22 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
                 (BigDecimal) invokeGetter(item, "getTurnover"));
     }
 
+    private LongPortMinuteBar toLongPortMinuteBar(String longPortSymbol, String intervalType,
+                                                   String adjustType, Object item)
+            throws ReflectiveOperationException {
+        OffsetDateTime timestamp = (OffsetDateTime) invokeGetter(item, "getTimestamp");
+        if (timestamp == null) {
+            throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
+                    "LongPort 分钟 K 返回 timestamp 为空");
+        }
+        return new LongPortMinuteBar(longPortSymbol,
+                timestamp.toInstant().atZone(quoteZoneId).toLocalDateTime(), intervalType, adjustType,
+                (BigDecimal) invokeGetter(item, "getOpen"), (BigDecimal) invokeGetter(item, "getHigh"),
+                (BigDecimal) invokeGetter(item, "getLow"), (BigDecimal) invokeGetter(item, "getClose"),
+                ((Number) invokeGetter(item, "getVolume")).longValue(),
+                (BigDecimal) invokeGetter(item, "getTurnover"));
+    }
+
     private Object invokeGetter(Object target, String methodName) throws ReflectiveOperationException {
         return target.getClass().getMethod(methodName).invoke(target);
     }
@@ -257,7 +332,7 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
         try {
             return future.get(properties.getTimeoutSeconds(), TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
+            throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_TIMEOUT,
                     "LongPort SDK 调用超时");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -266,14 +341,49 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
         }
     }
 
-    private BusinessException providerException(String action, Exception e) {
+    private BusinessException providerException(String action, Throwable e) {
         String message = action + ": " + toSafeMessage(e);
         lastError = message;
         log.warn(message);
         if (e instanceof BusinessException businessException) {
             return businessException;
         }
+        String lower = message.toLowerCase();
+        if (lower.contains("301604") || lower.contains("permission") || lower.contains("无权限")) {
+            return new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_PERMISSION_DENIED, message);
+        }
+        if (lower.contains("301606") || lower.contains("rate limit") || lower.contains("限流")) {
+            return new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_RATE_LIMITED, message);
+        }
+        if (lower.contains("timeout") || lower.contains("超时")) {
+            return new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_TIMEOUT, message);
+        }
         return new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, message);
+    }
+
+    /** 官方历史 K 接口限制为 30 秒 60 次；在 client 边界串行取得许可。 */
+    private void acquireHistoryPermit() {
+        synchronized (historyRequestTimes) {
+            while (true) {
+                long now = System.currentTimeMillis();
+                while (!historyRequestTimes.isEmpty()
+                        && now - historyRequestTimes.peekFirst() >= HISTORY_RATE_WINDOW_MILLIS) {
+                    historyRequestTimes.removeFirst();
+                }
+                if (historyRequestTimes.size() < HISTORY_RATE_LIMIT) {
+                    historyRequestTimes.addLast(now);
+                    return;
+                }
+                long waitMillis = HISTORY_RATE_WINDOW_MILLIS - (now - historyRequestTimes.peekFirst()) + 1L;
+                try {
+                    historyRequestTimes.wait(Math.min(waitMillis, 1000L));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_RATE_LIMITED,
+                            "等待 LongPort 历史 K 限流窗口时被中断");
+                }
+            }
+        }
     }
 
     private void markSuccess() {
@@ -354,4 +464,5 @@ public class ReflectiveLongPortQuoteClient implements LongPortQuoteClient {
             closeQuietly(config);
         }
     }
+
 }

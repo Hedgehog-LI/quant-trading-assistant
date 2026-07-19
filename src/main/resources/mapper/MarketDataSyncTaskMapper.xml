@@ -13,4 +13,5 @@
     <select id="countByFilter" resultType="long">SELECT COUNT(1) FROM market_data_sync_task<where><if test="status!=null and status!=''">AND status=#{status}</if><if test="provider!=null and provider!=''">AND provider=#{provider}</if></where></select>
     <delete id="deleteById">DELETE FROM market_data_sync_task WHERE id=#{id}</delete>
     <select id="selectLatestByScope" resultMap="BaseResultMap">SELECT <include refid="Cols"/> FROM market_data_sync_task WHERE provider=#{provider} AND task_type=#{taskType} AND scope_json=#{scopeJson} ORDER BY id DESC LIMIT 1</select>
+    <update id="markFailedIfNonTerminal">UPDATE market_data_sync_task SET status='FAILED',finished_at=#{finishedAt},last_error_code=#{errorCode},error_summary_json=#{errorSummaryJson} WHERE id=#{id} AND status IN ('PENDING','RUNNING')</update>
 </mapper>

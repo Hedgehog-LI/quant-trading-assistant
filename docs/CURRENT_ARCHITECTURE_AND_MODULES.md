@@ -61,7 +61,7 @@ convert     # MapStruct 转换器
 | Review | `review` | `/api/v1/reviews` | `review_note` |
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
-| Market Data | `marketdata` | `/api/v1/market-data/*` | `stock_basic`, `stock_daily_bar`, `stock_quote_snapshot`, `market_data_sync_task`, `market_data_alert`, `market_data_sync_scope_lock`, `stock_minute_bar`, `market_trading_session`, `market_calendar`, `market_data_sync_plan`, `market_data_sync_task_item`, `market_data_watermark`, `market_segment`, `market_segment_member` |
+| Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V14 新增 `market_sector_watch`, `market_sector_snapshot`, `market_sector_member_snapshot` |
 
 ## 4. 当前数据库迁移
 
@@ -181,10 +181,17 @@ npm run build
 - LongPort SDK 通过 `runtime-libs/` 运行时 jar 方式加载，vendor jar 不入 Git。
 - LongPort 凭据只通过 `.env.longport` / 环境变量注入，不进前端、DB、日志或 Git。
 - LongPort 只用于 Quote 行情，不接交易、订单、账户、真实持仓。
+- 行情 canonical symbol 支持 `SH/SZ/BJ/HK/US`；港股内部固定五位、美股统一大写。LongPort 映射支持 `HK.02498 <-> 2498.HK`、`US.AAPL <-> AAPL.US` 以及含类别分隔符的美股代码。
+- 港美股当前覆盖证券主数据、最新价快照和历史日 K。分钟 K 自动任务仍以交易日历、时区和市场时段补齐为前置条件。
+- LongPort SDK 4.3.3 分钟 K 原生 1M/5M/15M/30M/60M 已接入，provider 只转换领域数据，不操作 DAO。
+- 市场板块与自定义分组已拆分：`MarketSectorProvider` 负责 Longbridge 行业排行、层级和成分只读查询，`market_segment` 仍只承载用户分组。行业接口使用签名 HTTPS 绕开 4.3.3 缺失 JNI；关注、聚合快照和成分快照由 V14 三表持久化。
+- A 股 `5xxxxx` ETF 可由精确代码验证识别为上交所标的；ETF/指数行情复用现有证券报价和采集计划。
+- `MarketDataPlanExecutionService` 在 provider 调用外使用短事务写入 task/item/minute bar/watermark；V13 DB run claim 防止同计划重入。
+- `MarketDataIntradayScheduler` 通过可注入 `Clock` 按 A 股交易日/时段/采集频率扫描，非交易时段不创建空任务；启动时收敛遗留执行。
 
 ## 12. 后续规划（未实现）
 
-行情 P1.2/P1.3 工作台、采集计划、分钟线、板块已实现（后端核心 + 手动执行闭环 + 前端页面），下一步尚未完成的是分钟 K LongPort 批量 adapter（`getMinuteBars`）、盘中自动调度 scheduler 和异动大屏，而不是直接进入策略回测：
+行情 P1.2/P1.3 工作台、采集计划、LongPort 分钟 K、A 股盘中调度、任务明细/水位和板块已实现并通过 Docker MySQL 与最小真实外联验收。下一步尚未完成的是异动观察、港美股盘中时区/日历和多数据源，而不是直接进入策略回测：
 
 - `docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`
 - `docs/features/LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`

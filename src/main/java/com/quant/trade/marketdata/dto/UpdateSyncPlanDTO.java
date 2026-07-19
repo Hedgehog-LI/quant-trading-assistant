@@ -11,6 +11,12 @@ public class UpdateSyncPlanDTO {
     @NotBlank(message = "计划名称不能为空")
     private String planName;
 
+    @NotBlank(message = "任务类型不能为空")
+    private String taskType;
+
+    @NotBlank(message = "provider 不能为空")
+    private String provider;
+
     @NotBlank(message = "scope_json 不能为空")
     private String scopeJson;
 

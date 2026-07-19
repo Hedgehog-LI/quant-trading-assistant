@@ -37,6 +37,9 @@ class StockDataServiceTest {
         assertEquals("SH.600519", stockDataManager.buildCanonicalSymbol("sh", "600519"));
         assertEquals("SZ.000001", stockDataManager.buildCanonicalSymbol("SZ", "000001"));
         assertEquals("BJ.430047", stockDataManager.buildCanonicalSymbol("bj", "430047"));
+        assertEquals("HK.02498", stockDataManager.buildCanonicalSymbol("hk", "2498"));
+        assertEquals("US.AAPL", stockDataManager.buildCanonicalSymbol("us", "aapl"));
+        assertEquals("US.BRK.B", stockDataManager.buildCanonicalSymbol("US", "brk.b"));
     }
 
     @Test

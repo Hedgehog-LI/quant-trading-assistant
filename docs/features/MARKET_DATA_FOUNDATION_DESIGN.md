@@ -1,6 +1,6 @@
 # Market Data Foundation Design
 
-> 状态：P1.0 已实现证券主数据 + CSV 日 K；P1.1 LongPort 只读行情源已完成真实外联验收；P1.2 行情工作台 / 采集计划 / 分钟线资产 / 板块已实现（后端核心 + 手动执行闭环 + 前端页面）；分钟 K LongPort 批量 adapter（`getMinuteBars`）+ 盘中 scheduler 未完成。
+> 状态：P1.0 已实现证券主数据 + CSV 日 K；P1.1 LongPort 只读行情源已完成真实外联验收；P1.2 行情工作台、采集计划、分钟线资产、LongPort 分钟 K adapter、计划执行引擎和 A 股盘中 scheduler 已实现。2026-07-17 自动化、手动重建后的 Docker MySQL curl 链路及 A 股最小真实分钟 K 外联均已通过；浏览器验收按用户要求跳过。
 > 目的：为查询股票价格并落库确定数据边界，避免把手工估值、外部实时快照和历史 K 线混在一起。
 
 ## 1. 产品目标
@@ -32,7 +32,7 @@
 - `stock_daily_bar.fetched_at` 已由 `V6__add_fetched_at_to_daily_bar.sql` 实现。
 - CSV 日 K 幂等导入已实现，`data_source=CSV`。
 - LongPort provider facade、stock_quote_snapshot、market_data_sync_task、market_data_alert 已实现（V7-V9 migration）。后端反射式 LongPort adapter 已实现；官方 Java SDK 已装入 `runtime-libs/`（`io.github.longportapp:openapi-sdk:4.3.3`，vendor jar 被 gitignore），真实单 symbol 外联已于 2026-07-12 验收通过。部署需配 `LONGPORT_HTTP_URL` / `LONGPORT_QUOTE_WEBSOCKET_URL` 域名覆盖（SDK 默认域名已废弃），详见 `../development/LONGPORT_SDK_RUNTIME_INSTALLATION.md`。
-- P1.2 行情工作台 / 采集计划 / 分钟线资产 / 板块已实现（V10/V11 migration + 后端核心 + 手动执行闭环 + 前端页面），详见 `MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。**分钟 K LongPort 批量 adapter（`getMinuteBars`）和盘中自动调度 scheduler 尚未完成**，当前手动执行仅 `DAILY_BAR_BACKFILL` 接入 daily bar 写入链路。
+- P1.2 行情工作台 / 采集计划 / 分钟线资产 / 板块已实现（V10-V13 migration + 后端、前端和执行闭环），详见 `MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。`DAILY_BAR_BACKFILL`、`MINUTE_BAR_BACKFILL`、`INTRADAY_MINUTE_REFRESH` 均已接入计划执行引擎；LongPort 分钟 K adapter 和 A 股交易时段 scheduler 已实现。
 
 ## 3. 证券主数据
 
@@ -43,7 +43,7 @@
 | `id` | 主键 |
 | `symbol` | 原始证券代码，如 `600519` |
 | `exchange` | `SH` / `SZ` / `BJ` / 其他 |
-| `canonical_symbol` | 统一标识，如 `SH.600519` |
+| `canonical_symbol` | 统一标识，如 `SH.600519`、`HK.02498`、`US.AAPL` |
 | `name` | 当前证券名称 |
 | `market` | A 股、港股、美股等市场分类 |
 | `currency` | 币种 |
@@ -115,7 +115,8 @@ LongPort 特别约束：
 
 - LongPort 只作为只读行情 provider，见 `../decisions/ADR-0008-longport-quote-only-provider.md`。
 - 只允许使用 Quote 相关能力，不允许接入交易、订单、账户资金、真实持仓能力。
-- LongPort 标的代码使用 `ticker.region`，系统内部使用 `region.ticker`，例如内部 `SH.600519` 映射为 provider `600519.SH`。
+- LongPort 标的代码使用 `ticker.region`，系统内部使用 `region.ticker`。A 股 `SH.600519 -> 600519.SH`；港股内部固定五位 `HK.02498 -> 2498.HK`；美股 `US.AAPL -> AAPL.US`，并支持 `US.BRK.B -> BRK.B.US`。
+- 最新价和历史日 K 已支持 A 股、港股、美股；分钟 K 自动采集仍须分别补齐港美股交易日历、时区和交易时段后才能启用。
 - LongPort 凭据只存在服务端环境变量或安全配置中，不进入前端、DB、日志或 Git。
 
 ## 7. 推荐实施顺序
@@ -126,9 +127,10 @@ LongPort 特别约束：
 4. 已接入 LongPort 只读行情 provider 的最新价查询。
 5. 已增加 `stock_quote_snapshot`、同步任务、失败重试和数据质量检查。
 6. 已完成行情工作台、历史采集计划（手动执行）、分钟线资产、交易时段、板块（P1.2/P1.3 后端核心 + 前端页面）。
-7. 待完成：分钟 K LongPort 批量 adapter（`getMinuteBars`）+ 盘中自动调度 scheduler + 异动大屏。
-8. 仅在用户明确选择时，让交易账本参考外部最新价展示估值来源；不得自动覆盖手工价。
-9. 最后建设指标、策略和回测。
+7. 已完成证券目录与智能检索设计，待按 `SECURITY_DIRECTORY_SEARCH_DESIGN.md` 增强 `stock_basic`、搜索 API 和共享选择器。
+8. 已完成：分钟 K LongPort adapter（`getMinuteBars`）+ A 股盘中自动调度 scheduler；待完成异动观察。
+9. 仅在用户明确选择时，让交易账本参考外部最新价展示估值来源；不得自动覆盖手工价。
+10. 最后建设指标、策略和回测。
 
 ## 8. 验收原则
 
@@ -140,4 +142,5 @@ LongPort 特别约束：
 - [x] 外部最新价快照不覆盖用户手工数据。
 - [x] 行情仅用于辅助分析，不包装成确定性交易建议。
 - [x] 行情工作台、采集任务和分钟线资产落地（P1.2 后端核心 + 手动执行闭环 + 前端页面）。
-- [ ] 分钟 K LongPort 批量 adapter（`getMinuteBars`）+ 盘中自动调度 scheduler。
+- [x] 证券目录与智能检索产品/架构设计完成（业务实现待 P1.4）。
+- [x] 分钟 K LongPort adapter（`getMinuteBars`）+ A 股盘中自动调度 scheduler（自动化 + Docker MySQL + 最小真实外联验收）。

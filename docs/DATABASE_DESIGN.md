@@ -2,7 +2,7 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
-当前已发布 V1-V12，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+当前已发布 V1-V13，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
 
 ## 命名约定
 
@@ -36,6 +36,8 @@
 - unique `uk_stock_basic_canonical(canonical_symbol)`
 - index `idx_stock_basic_market(market)`
 - index `idx_stock_basic_symbol(symbol)`
+
+统一标识规则：A 股使用 `SH/SZ/BJ + 数字代码`；港股使用五位内部代码（如 `HK.02498`）；美股使用大写 ticker（如 `US.AAPL`、`US.BRK.B`）。现有 `varchar(32)` 字段可容纳这些格式，本轮无需 migration。
 
 ### watchlist
 
@@ -222,7 +224,9 @@
 
 ### market_data_sync_plan
 
-状态：已实现（V10 migration）。用途：行情采集计划（采集任务配置），支持任务类型/provider/scope/enabled/trigger，提供 CRUD + 启停 + 手动执行 `POST /sync-plans/{id}/run`。当前手动执行仅 `DAILY_BAR_BACKFILL` 接入 daily bar 写入链路。
+状态：已实现（V10 + V13 migration）。用途：行情采集计划（采集任务配置），支持任务类型/provider/scope/enabled/trigger，提供 CRUD + 启停 + 手动执行 `POST /sync-plans/{id}/run`。手工执行支持 `DAILY_BAR_BACKFILL` 和 `MINUTE_BAR_BACKFILL`；`INTRADAY_MINUTE_REFRESH` 由 scheduler 触发。
+
+V13 新增 `run_claim_token` / `run_claimed_at` / `running_task_id` 与 claim 索引，用条件 UPDATE 在 DB 层防止同一计划重叠执行。正常终态释放 claim；服务启动时收敛遗留 task/item 后释放。
 
 幂等键：`task_type + provider + scope_hash`（同任务同源同 scope 唯一）。
 
@@ -433,6 +437,7 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 4. LongPort P1.1 外部最新价接入时新增 `stock_quote_snapshot`、`market_data_sync_task`、`market_data_alert`。
 5. 行情 P1.2 已实现工作台/采集计划/分钟线/交易时段/水位（V10：`stock_minute_bar`、`market_trading_session`、`market_calendar`、`market_data_sync_plan`、`market_data_sync_task_item`、`market_data_watermark`）。
 6. 行情 P1.3 已实现板块/自定义分组（V11：`market_segment`、`market_segment_member`）。
-7. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
+7. 行情 P1.5 已实现市场行业关注与不可变快照（V14：`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`）。
+8. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。

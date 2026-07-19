@@ -4,6 +4,81 @@
 
 ---
 
+## 2026-07-18 — P1.5 市场板块关注与快照数据资产
+
+- **目标**：把行业排行从只读展示升级为可关注、可采集、可追溯的个人板块数据资产，并收口 Java SDK 行业 JNI 不可用问题。
+- **后端**：行业排行/层级/成分改用 `LongPortIndustryHttpClient` 签名 HTTPS；支持真实 A/H/US provider ID。V14 新增 `market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`；创建关注会立即保存聚合及成分快照，后续支持手动刷新、启停、删除和历史查询，写入由独立 manager 保证原子性。
+- **数据字段**：成分现价、涨跌、净流入、成交额、成交量、股本、标签、延迟状态；聚合保存资金/成交合计、涨跌家数和领涨标的。资金字段使用 provider 原始口径，不由涨跌额推断。
+- **前端**：板块页升级为“市场板块 / 我的关注 / 自定义分组”，排行行内关注并可关联 ETF/指数；关注页提供采集、启停、删除、历史快照和最新成分明细。
+- **接口**：在 `sector-catalog` 下新增 watches CRUD/refresh/toggle、snapshots、members；完整清单见 `../api/MARKET_DATA_API.md`。
+- **验证**：真实最小调用已验证 CN/HK/US 行业排行，CN 行业层级和成分资金；后端 284 tests 全绿，前端 typecheck/lint/test/build 全绿。Docker 使用 MySQL 8.4 成功应用 V14，health `UP`；应用 API 完成关注创建、刷新、启停、历史和成分查询；浏览器完成真实排行、关注、历史抽屉及建设看板验收。详细数据见本轮验收日志。
+- **产品决策**：默认只手动采集，避免在无配额治理与跨市场交易日历前全行业自动轮询；关联 ETF 复用现有行情计划，不宣称 ETF 等同于行业。
+- **关联**：`../features/MARKET_SECTOR_CATALOG_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../DATABASE_DESIGN.md`、`../acceptance/ACCEPTANCE_LOG.md`。
+
+## 2026-07-17 — P1.5a 市场板块发现与 ETF 跟踪入口
+
+- **目标**：把 provider 市场行业与用户自定义分组拆开，让用户查看 A/H/US 行业排行、领涨标的和层级，并通过 ETF/指数复用现有行情采集。
+- **后端**：新增 `MarketSectorProvider`、LongPort/Disabled 实现、行业排行/层级 service/controller/VO；反射式 SDK client 增加 `FundamentalContext` 行业映射和 JNI 不兼容安全错误；`SecurityCodeManager` 支持 `5xxxxx` 上交所 ETF。
+- **前端**：板块页新增“市场板块 / 自定义分组”双页签，支持市场、排行维度、刷新、领涨标的、层级摘要和涨跌颜色；mock 只返回显式 `LOCAL_DEMO` 数据。
+- **接口**：新增 `GET /api/v1/market-data/sector-catalog/industry-rankings` 与 `/industry-peers`；无 migration、无数据落库。
+- **静态门禁**：后端 280 tests；前端 typecheck/lint、36 files / 273 tests、build 全绿；未启动 Docker。
+- **产品决策**：P1.5a 只做发现；行业排行快照、成分关系、关注和低频刷新归 P1.5b。板块涨跌/热度不得标作资金净流入。
+- **遗留**：官方 SDK 4.3.3 Java 类虽有行业方法，现有 macOS/Linux native 均缺对应 JNI 符号；真实行业外联必须在匹配 SDK native 后重新验收。
+- **关联**：`../features/MARKET_SECTOR_CATALOG_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../ai/HANDOFF_2026-07-17_market_sector_catalog.md`。
+
+## 2026-07-17 — P1.4a 精确证券代码验证与采集计划选股
+
+- **目标**：用户选择 A/H/US 市场并输入精确代码，通过 LongPort 核对证券名称和当前价，确认后加入采集计划，避免手工拼接 canonical symbol。
+- **后端改动**：新增 `SecurityCodeManager`、只读验证 service/controller/DTO/VO；扩展 `MarketDataProvider` 与反射式 LongPort client 的 Static Info 能力。Static Info 与 Quote 分开编排，报价失败不误判证券不存在；未配置、无权限、无报价和非法代码状态可区分。验证过程不调用 DAO。
+- **前端改动**：新增 `SecurityVerificationField`，包含市场分段、精确代码、查询防重复/竞态保护、静态信息与报价展示、显式加入/移除。采集计划仍支持多个标的；编辑旧计划兼容已有 scope。mock 明确不伪造 LongPort 验证。
+- **接口**：新增 `POST /api/v1/market-data/securities/verify`。无 migration、无新增表。
+- **自动化**：后端 **276 tests**、package 通过；前端 typecheck、lint、**35 files / 270 tests**、build 通过；两仓库 diff check 通过。
+- **Docker/真实外联**：重新构建后 health `UP`；使用 gitignored `.env.longport` 最小调用验证 `CN/603308 -> SH.603308 应流股份`、`HK/2498 -> HK.02498 速騰聚創`、`US/NVDA -> US.NVDA NVIDIA`，三者 Static Info + Quote 均成功。
+- **产品边界**：P1.4a 只做精确代码验证；P1.4b 本地全量目录和名称/拼音模糊搜索未开始。港美股分钟采集仍需交易日历、时区和 scheduler，不因本轮验证成功而解锁。
+- **验收限制**：未跑浏览器 E2E；新增控件行为由组件自动化覆盖。报价延迟级别当前无法从该返回稳定判定，展示 `quoteTime`，`quoteDelay=UNKNOWN`。
+- **关联**：`../features/EXACT_SECURITY_VERIFICATION_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../acceptance/ACCEPTANCE_LOG.md`、`../ai/HANDOFF_2026-07-17_exact_security_verification.md`。
+
+---
+
+## 2026-07-17 — 行情采集执行引擎收口（验收完成）
+
+- **目标**：把采集计划从配置资产收口为可校验、可手工执行、可盘中调度、可恢复、可追踪的行情采集执行引擎，并完成前后端产品语义统一。
+- **后端改动**：新增统一计划合法性校验；实现 daily/minute/intraday 三类计划执行编排、分钟 K 幂等入库和水位更新、LongPort 原生 1M/5M/15M/30M/60M adapter、日期分块和客户端限流；新增 A 股交易时段 scheduler、DB claim、重启恢复及可注入 `Clock` 的时段判断。V13 为计划增加运行 claim 字段。
+- **前端改动**：计划表单由原始 JSON 改为结构化字段，仅允许受支持的任务类型和触发方式；旧非法计划显示纠正状态；执行期间防重复；任务摘要和明细可达。mock 保留 CRUD，但执行与任务查询明确拒绝，避免伪造成功。
+- **产品边界**：盘中自动调度仅支持 A 股时段；港股/美股需另补交易日历、时区和时段。LongPort 仍只使用 Quote 能力，不接交易接口。
+- **静态门禁**：后端 `./mvnw test` 和 `./mvnw package` 均通过，**270 tests / 0 failures / 0 errors**；前端 typecheck、lint、**34 files / 267 tests**、production build 全部通过。首次前端测试发现建设看板旧优先级断言，更新为“异动观察”后全绿。
+- **此前运行态证据**：Docker MySQL + fake provider 已验证首次成功、重复执行幂等和受控 `PARTIAL_FAILED`；真实 LongPort `SH.601318 / 2026-07-10 / 5M` 返回 49 根，落库 48 根，15:00 边界根按会话规则 skipped，水位止于 14:55。
+- **重建后联动**：用户手动重建 Docker；Codex 以宿主机/容器内 curl 验证 health、首次执行、幂等复跑、明细/收敛、水位、非法计划拒绝、盘中手工执行拒绝、非交易时段跳过和受控失败留痕。浏览器验收按用户要求停止并跳过。
+- **结论**：本轮执行引擎代码、自动化、Docker MySQL curl 联动和 A 股真实分钟 K 最小外联均通过，任务收口。
+- **关联**：`MARKET_DATA_EXECUTION_ENGINE_DELIVERY_2026-07-17.md`、`../features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`../features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../acceptance/ACCEPTANCE_LOG.md`、`../ai/HANDOFF_2026-07-17_market_data_execution_engine.md`。
+
+---
+
+## 2026-07-17 — 证券目录与智能检索产品/架构设计
+
+- **目标**：解决用户只知道股票名称、不知道统一证券代码时无法便捷创建行情任务或板块成员的问题。
+- **专家评审**：产品、量化数据治理、Java/React 架构三组只读评审达成共识：本地证券目录承担稳定身份和低延迟搜索；外部 provider 承担目录同步、缺失精确查找和已知代码补全；任何自动填充必须以用户明确选择为边界。
+- **核心决策**：扩展现有 `stock_basic`，不新建平行主表；`stock_basic.id` 为稳定内部身份，代码/名称可演进并保留历史；正常 autocomplete 不外联、不拉报价、不创建业务数据；全量维护元数据而非全市场行情。
+- **产品范围**：A/H/US 名称、代码、简称、拼音检索；同名市场区分；退市/目录陈旧/外部失败等状态；首批接入最新价、历史日 K、采集计划和板块成员。
+- **技术计划**：D1 后端目录与搜索、D2 共享选择器、D3 provider 同步与 LongPort 元数据补全、D4 跨模块推广与端到端收口。
+- **实现状态**：本轮仅设计和知识沉淀，未新增 migration、API 或前端业务代码，未运行构建测试；不得把 P1.4 标记为已实现。
+- **关联**：`features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`、`decisions/ADR-0009-local-first-security-directory.md`、`development/SECURITY_DIRECTORY_SEARCH_EXPERT_REVIEW.md`、`development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md`、`ai/HANDOFF_2026-07-17_security_directory_search.md`。
+
+---
+
+## 2026-07-17 — LongPort 港股/美股最新价与历史日 K 支持
+
+- **目标**：解除行情模块仅接受沪深北代码的限制，使港股、美股可以使用现有 LongPort 最新价和历史日 K 链路拉取并落库。
+- **后端改动**：新增 `CanonicalSymbolUtils`，统一支持 `SH/SZ/BJ/HK/US`；港股内部固定五位（`HK.2498 -> HK.02498`），美股统一大写并支持类别分隔符。`LongPortSymbolMapper` 支持 `HK.02498 <-> 2498.HK`、`US.AAPL <-> AAPL.US`、`US.BRK.B <-> BRK.B.US`。证券主数据、latest quote、daily bar sync、工作台 scope、板块成员均接入统一规范化。
+- **前端改动**：新增共享 canonical symbol 工具；证券主数据、批量最新价、历史同步、板块成员和 mock API 支持港美股；建设看板同步港美股代码链路现状。顺带清理板块页本次测试触达的 Ant Design `Space.direction` / `Drawer.width` deprecated 用法。
+- **DB/API**：无 migration、无新 endpoint；沿用 `stock_basic`、`stock_quote_snapshot`、`stock_daily_bar` 和现有 API。现有 `varchar(32)` 足够容纳新格式。
+- **验证**：后端 `258 tests`、package 通过；前端 typecheck（由 build 执行）、lint、`264 tests`（限制 `maxWorkers=2`）、production build 通过；两仓库 `diff --check` 通过。
+- **外联边界**：尝试使用现有 `.env.longport` 做 `HK.02498` 单标的单日真实验收，runtime SDK 检查通过，但 Docker Desktop 首次重建下载 JDK 基础镜像时卡在镜像站，已主动终止；未虚构港美股真实外联结果。部署后仍需分别用港股、美股做最小调用，并区分代码缺陷与账号行情权限。
+- **明确未做**：港美股分钟 K、交易日历/时区/交易时段、盘中 scheduler、交易能力。
+- **关联**：`api/MARKET_DATA_API.md`、`features/MARKET_DATA_FOUNDATION_DESIGN.md`、`CURRENT_ARCHITECTURE_AND_MODULES.md`、`DATABASE_DESIGN.md`、`BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`、前端建设看板。
+
+---
+
 ## 2026-07-16 — P1.2/P1.3 第六轮 Codex 收口（按任务重建 Drawer + 竞态防护 + 真实交互测试）
 
 - **目标**：修复 TaskItemsDrawer 双 effect 重复请求、切换 task 竞态、缺少时间列展示、板块 3 条伪行为测试。

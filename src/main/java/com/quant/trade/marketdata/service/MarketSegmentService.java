@@ -8,6 +8,7 @@ import com.quant.trade.marketdata.dto.SegmentDTO;
 import com.quant.trade.marketdata.dto.SegmentMemberDTO;
 import com.quant.trade.marketdata.model.MarketSegmentDO;
 import com.quant.trade.marketdata.model.MarketSegmentMemberDO;
+import com.quant.trade.marketdata.util.CanonicalSymbolUtils;
 import com.quant.trade.marketdata.vo.MarketSegmentMemberVO;
 import com.quant.trade.marketdata.vo.MarketSegmentVO;
 import com.quant.trade.marketdata.vo.PageResultVO;
@@ -104,9 +105,15 @@ public class MarketSegmentService {
         if (segmentMapper.selectById(segmentId) == null) {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, "板块不存在: " + segmentId);
         }
+        String canonicalSymbol;
+        try {
+            canonicalSymbol = CanonicalSymbolUtils.normalize(dto.getCanonicalSymbol());
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL, exception.getMessage());
+        }
         MarketSegmentMemberDO member = MarketSegmentMemberDO.builder()
                 .segmentId(segmentId)
-                .canonicalSymbol(dto.getCanonicalSymbol())
+                .canonicalSymbol(canonicalSymbol)
                 .sortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0)
                 .remark(dto.getRemark())
                 .build();
@@ -116,7 +123,12 @@ public class MarketSegmentService {
 
     @Transactional
     public void removeMember(Long segmentId, String canonicalSymbol) {
-        memberMapper.deleteBySegmentAndSymbol(segmentId, canonicalSymbol);
+        try {
+            memberMapper.deleteBySegmentAndSymbol(segmentId,
+                    CanonicalSymbolUtils.normalize(canonicalSymbol));
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL, exception.getMessage());
+        }
     }
 
     // ==================== 内部 ====================

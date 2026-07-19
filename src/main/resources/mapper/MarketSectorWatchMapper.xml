@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.MarketSectorWatchMapper">
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketSectorWatchDO">
+        <id column="id" property="id"/><result column="provider_code" property="providerCode"/>
+        <result column="provider_sector_id" property="providerSectorId"/><result column="market_code" property="marketCode"/>
+        <result column="sector_name" property="sectorName"/><result column="top_name" property="topName"/>
+        <result column="tracking_symbol" property="trackingSymbol"/><result column="enabled" property="enabled"/>
+        <result column="last_refreshed_at" property="lastRefreshedAt"/><result column="last_error" property="lastError"/>
+        <result column="created_at" property="createdAt"/><result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="Columns">id, provider_code, provider_sector_id, market_code, sector_name, top_name,
+        tracking_symbol, enabled, last_refreshed_at, last_error, created_at, updated_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO market_sector_watch (provider_code, provider_sector_id, market_code, sector_name,
+            top_name, tracking_symbol, enabled)
+        VALUES (#{providerCode}, #{providerSectorId}, #{marketCode}, #{sectorName},
+            #{topName}, #{trackingSymbol}, #{enabled})
+    </insert>
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Columns"/> FROM market_sector_watch WHERE id = #{id}
+    </select>
+    <select id="selectByProviderSector" resultMap="BaseResultMap">
+        SELECT <include refid="Columns"/> FROM market_sector_watch
+        WHERE provider_code = #{providerCode} AND provider_sector_id = #{providerSectorId}
+    </select>
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Columns"/> FROM market_sector_watch
+        <where><if test="marketCode != null and marketCode != ''">market_code = #{marketCode}</if></where>
+        ORDER BY enabled DESC, updated_at DESC, id DESC
+    </select>
+    <update id="updateEnabled">UPDATE market_sector_watch SET enabled = #{enabled} WHERE id = #{id}</update>
+    <update id="updateRefreshResult">
+        UPDATE market_sector_watch SET last_refreshed_at = #{refreshedAt}, last_error = #{lastError} WHERE id = #{id}
+    </update>
+    <delete id="deleteById">DELETE FROM market_sector_watch WHERE id = #{id}</delete>
+</mapper>

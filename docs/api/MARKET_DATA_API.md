@@ -14,6 +14,22 @@
 | PUT | `/api/v1/market-data/stocks/{id}` | 已实现 | 更新名称、上市日期、退市状态 |
 | DELETE | `/api/v1/market-data/stocks/{canonicalSymbol}` | 已实现 | 无日 K 关联时删除证券 |
 
+### 精确证券代码验证
+
+| 方法 | 路径 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/market-data/securities/verify` | 已实现 | 选择 CN/HK/US 并输入精确代码，读取 LongPort Static Info + Quote；只读、不落库 |
+
+请求示例：
+
+```json
+{"market":"HK","code":"2498"}
+```
+
+返回 `canonicalSymbol/providerSymbol/displayName/exchange/currency/lotSize`，报价可用时还返回 `lastPrice/quoteTime/tradeStatus`。`verificationStatus` 为 `VERIFIED_QUOTE_AVAILABLE`、`VERIFIED_NO_QUOTE`、`INVALID_SYMBOL`、`PROVIDER_UNAVAILABLE` 或 `NO_PERMISSION` 等明确状态。Static Info 已成功但 Quote 不可用时，不能把证券误判为不存在。
+
+当前精确转换：`CN + 603308 -> SH.603308`、`HK + 2498 -> HK.02498`、`US + NVDA -> US.NVDA`。该接口不做名称模糊搜索，也不创建采集计划；前端必须等用户确认后才把代码加入计划 scope。
+
 ### 日 K 数据
 
 | 方法 | 路径 | 状态 | 说明 |
@@ -30,7 +46,7 @@ canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type
 
 当前 CSV 导入规则：
 
-- `canonical_symbol` 使用 `SH.600519` / `SZ.000001` / `BJ.430047`。
+- `canonical_symbol` 支持 A 股、港股和美股：`SH.600519` / `HK.02498` / `US.AAPL`。港股不足五位会补零，美股代码统一大写。
 - `adjust_type` 支持 `NONE` / `QF` / `HF`。
 - `data_source` 固定为 `CSV`。
 - 幂等键：`canonical_symbol + trade_date + adjust_type + data_source`。
@@ -91,7 +107,7 @@ canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type
 
 ```json
 {
-  "canonicalSymbols": ["SH.600519", "SZ.000001"],
+  "canonicalSymbols": ["SH.600519", "HK.02498", "US.AAPL"],
   "persist": true
 }
 ```
@@ -100,7 +116,8 @@ canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type
 
 - `canonicalSymbols` 必填且不能为空。
 - 单次最多 500 个证券代码。
-- 代码格式为 `SH.600519` / `SZ.000001` / `BJ.430047`，后端会统一转大写。
+- 代码格式为 `SH.600519` / `SZ.000001` / `BJ.430047` / `HK.02498` / `US.AAPL`；后端统一转大写，并将 `HK.2498` 规范化为 `HK.02498`。
+- LongPort provider 映射示例：`HK.02498 -> 2498.HK`、`US.AAPL -> AAPL.US`、`US.BRK.B -> BRK.B.US`。
 - `persist=true` 时写入 `stock_quote_snapshot`；`persist=false` 只返回本次请求结果。
 
 响应项实际结构：
@@ -108,17 +125,17 @@ canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type
 ```json
 {
   "id": 1,
-  "canonicalSymbol": "SH.600519",
-  "currentPrice": "1680.000000",
-  "preClosePrice": "1670.000000",
-  "openPrice": "1675.000000",
-  "highPrice": "1690.000000",
-  "lowPrice": "1668.000000",
-  "volume": 25000,
-  "amount": "42000000.000000",
-  "quoteTime": "2026-07-10T14:55:00",
+  "canonicalSymbol": "HK.02498",
+  "currentPrice": "22.500000",
+  "preClosePrice": "22.000000",
+  "openPrice": "22.100000",
+  "highPrice": "22.800000",
+  "lowPrice": "21.900000",
+  "volume": 1000,
+  "amount": "22500.000000",
+  "quoteTime": "2026-07-16T15:55:00",
   "dataSource": "LONGPORT",
-  "fetchedAt": "2026-07-10T14:55:03"
+  "fetchedAt": "2026-07-16T15:55:03"
 }
 ```
 
@@ -136,7 +153,7 @@ canonical_symbol,trade_date,open,high,low,close,volume,amount,adjust_type
 {
   "taskType": "DAILY_BAR_SYNC",
   "provider": "LONGPORT",
-  "canonicalSymbol": "SH.600519",
+  "canonicalSymbol": "US.AAPL",
   "startDate": "2026-06-01",
   "endDate": "2026-07-01",
   "adjustType": "NONE"
@@ -187,10 +204,13 @@ PENDING -> RUNNING -> SUCCEEDED / PARTIAL_FAILED / FAILED /
 | POST | `/api/v1/market-data/sync-plans/{id}/run` | 手动执行采集计划 |
 
 手动执行说明：
-- 当前仅支持 `DAILY_BAR_BACKFILL`，复用日 K 同步链路（provider → 幂等写入）。
-- 其他任务类型（`MINUTE_BAR_BACKFILL` / `INTRADAY_*`）的手动执行链路尚未接入，调用时返回业务错误"执行链路尚未接入"。
+- 支持 `DAILY_BAR_BACKFILL` 和 `MINUTE_BAR_BACKFILL`；`INTRADAY_MINUTE_REFRESH` 只由 scheduler 触发，不伪装成手工执行。
+- `MINUTE_BAR_BACKFILL` 必须使用 `triggerType=MANUAL`，并配置 symbols、startDate、endDate、intervalType。
+- `INTRADAY_MINUTE_REFRESH` 必须使用 `triggerType=INTRADAY` 且配置 collectFrequency；当前只开放 A 股，港美股会在创建/更新时明确拒绝。
 - scope 用 Jackson 解析，支持 `canonicalSymbol` / `symbols` / `startDate` / `endDate`。
-- 执行生成 `sync_task` + 逐 symbol `task_item`，更新 plan 的 `lastRunAt` / `lastTaskId`。
+- 执行生成 `sync_task` + 逐 symbol `task_item`，短事务幂等写入 `stock_minute_bar`、更新 watermark 和 plan 的 `lastRunAt` / `lastTaskId`。provider 网络调用不在 DB 长事务中。
+- 同一计划使用 V13 DB run claim 防重入；服务重启时将遗留 task/item 收敛为 `FAILED` 并释放 claim。
+- provider 无权限、限流、超时、空数据和未知异常分别记录错误码，不留永久 `RUNNING`。
 
 创建采集计划请求示例：
 
@@ -204,6 +224,29 @@ PENDING -> RUNNING -> SUCCEEDED / PARTIAL_FAILED / FAILED /
   "triggerType": "MANUAL"
 }
 ```
+
+历史分钟补档请求示例：
+
+```json
+{
+  "planName": "茅台 5M 单日补档",
+  "taskType": "MINUTE_BAR_BACKFILL",
+  "provider": "LONGPORT",
+  "scopeJson": "{\"symbols\":[\"SH.600519\"],\"startDate\":\"2026-07-10\",\"endDate\":\"2026-07-10\"}",
+  "intervalType": "5M",
+  "adjustType": "NONE",
+  "triggerType": "MANUAL",
+  "includeAuction": false
+}
+```
+
+计划响应包含 `configurationStatus` / `validationErrors` / `manuallyRunnable` / `automaticallyRunnable`，用于将历史非法计划标记为“需要修正”。
+
+### 盘中调度语义
+
+- Spring Scheduler 默认每 30 秒扫描已启用、`triggerType=INTRADAY` 且通过统一校验的计划。
+- A 股连续竞价窗口为 09:30-11:30、13:00-15:00；是否允许集合竞价由 `includeAuction` 决定。首根 bar 闭合前不请求。
+- 非交易日、午休、收盘后、未到 collectFrequency 或上次任务未完成时直接跳过，不创建空任务。
 
 ### 任务明细
 
@@ -234,6 +277,9 @@ PENDING -> RUNNING -> SUCCEEDED / PARTIAL_FAILED / FAILED /
 - bar 时间不在交易窗口 → `SUSPECT`（写库但标记 + alert）
 - 幂等键冲突且内容不同 → `CONFLICT`（不覆盖 + alert）
 - 幂等键冲突且内容相同 → `SKIPPED`
+- 计划执行链路还会过滤未闭合 bar 和计划交易时段外 bar；后者计入 task `skippedCount` 但不落库。
+
+LongPort SDK 4.3.3 分钟粒度使用原生 `Min_1/Min_5/Min_15/Min_30/Min_60`，不伪造聚合。历史日期区间按官方单次最多 1000 条限制分段，并在 client 边界遵守 30 秒 60 次限流。
 
 ### 交易时段 / 日历
 
@@ -260,6 +306,37 @@ PENDING -> RUNNING -> SUCCEEDED / PARTIAL_FAILED / FAILED /
 | GET | `/api/v1/market-data/segments/{id}/members` | 查询板块成员 |
 | POST | `/api/v1/market-data/segments/{id}/members` | 添加板块成员 |
 | DELETE | `/api/v1/market-data/segments/{id}/members/{canonicalSymbol}` | 移除板块成员 |
+
+### 市场板块目录与关注快照（P1.5）
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/sector-catalog/industry-rankings?market=CN&indicator=leading-gainer&sortType=single&limit=20` | 查询 A/H/US 行业排行 |
+| GET | `/api/v1/market-data/sector-catalog/industry-peers?market=CN&providerSectorId=BK/SH/IN40159` | 查询行业层级摘要 |
+| POST | `/api/v1/market-data/sector-catalog/watches` | 关注行业并立即保存首份聚合/成分快照 |
+| GET | `/api/v1/market-data/sector-catalog/watches?market=CN` | 查询行业关注及最新快照 |
+| GET | `/api/v1/market-data/sector-catalog/watches/{id}` | 查询单个行业关注 |
+| POST | `/api/v1/market-data/sector-catalog/watches/{id}/refresh` | 手动采集新快照 |
+| POST | `/api/v1/market-data/sector-catalog/watches/{id}/toggle?enabled=false` | 启停关注 |
+| DELETE | `/api/v1/market-data/sector-catalog/watches/{id}` | 删除关注及其历史快照 |
+| GET | `/api/v1/market-data/sector-catalog/watches/{id}/snapshots?page=1&size=30` | 查询聚合历史 |
+| GET | `/api/v1/market-data/sector-catalog/snapshots/{snapshotId}/members` | 查询某次成分快照 |
+
+`market` 仅支持 `CN/HK/US`；排行指标支持 `leading-gainer`、`today-trend`、`popularity`、`market-cap`、`revenue`、`revenue-growth`、`net-profit`、`net-profit-growth`。返回字段包含 provider 板块 ID、涨跌幅、领涨标的和指标值。
+
+关注请求示例：
+
+```json
+{
+  "market": "CN",
+  "providerSectorId": "BK/SH/IN40159",
+  "trackingSymbol": "SH.512480"
+}
+```
+
+`trackingSymbol` 可不填。行业成分快照中的 `netInflow`、`turnoverAmount`、`volume` 分别聚合到行业快照；`delayed` 原样保存 provider 延迟标记。
+
+接口只读且 P1.5a 不落库。provider 未配置或 SDK native 不支持时返回 `MARKET_SECTOR_PROVIDER_UNAVAILABLE` 或可解释的 provider 业务错误，不伪造空数据。ETF/指数继续作为普通证券使用报价与采集计划；A 股 `5xxxxx` ETF 已支持精确代码验证。
 
 ## 4. 安全约束
 

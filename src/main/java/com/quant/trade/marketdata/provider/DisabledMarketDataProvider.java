@@ -15,6 +15,9 @@ public class DisabledMarketDataProvider implements MarketDataProvider {
     @Override public ProviderHealthStatus healthCheck() {
         return new ProviderHealthStatus(false, false, MarketDataConstants.LONGPORT_PROVIDER_DISABLED_MESSAGE, null);
     }
+    @Override public ProviderSecurityInfo getSecurityStaticInfo(String canonicalSymbol) {
+        throw new UnsupportedOperationException("LongPort provider 未配置，无法验证证券");
+    }
     @Override public List<ProviderQuote> getLatestQuotes(List<String> canonicalSymbols) {
         throw new UnsupportedOperationException("LongPort provider 未配置，无法获取行情");
     }
@@ -22,5 +25,11 @@ public class DisabledMarketDataProvider implements MarketDataProvider {
     @Override
     public List<ProviderDailyBar> getDailyBars(String canonicalSymbol, LocalDate startDate, LocalDate endDate, String adjustType) {
         throw new UnsupportedOperationException("LongPort provider 未配置，无法获取历史日 K");
+    }
+
+    @Override
+    public List<ProviderMinuteBar> getMinuteBars(String canonicalSymbol, LocalDate startDate, LocalDate endDate,
+                                                 String intervalType, String adjustType) {
+        throw new UnsupportedOperationException("LongPort provider 未配置，无法获取历史分钟 K");
     }
 }

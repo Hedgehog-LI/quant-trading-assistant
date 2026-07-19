@@ -7,8 +7,13 @@ import com.quant.trade.marketdata.constant.MarketDataConstants;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortDailyBar;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortQuote;
+import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortMinuteBar;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 /** LongPort 只读行情 provider，负责系统代码、SDK 代码和领域模型转换。 */
@@ -51,6 +56,19 @@ public class LongPortMarketDataProvider implements MarketDataProvider {
     }
 
     @Override
+    public ProviderSecurityInfo getSecurityStaticInfo(String canonicalSymbol) {
+        ensureConfigured();
+        String longPortSymbol = toLongPortSymbol(canonicalSymbol);
+        var info = quoteClient.getSecurityStaticInfo(longPortSymbol);
+        if (info == null) {
+            return null;
+        }
+        String normalized = symbolMapper.fromLongPort(info.longPortSymbol());
+        return new ProviderSecurityInfo(normalized, info.longPortSymbol(), info.nameCn(), info.nameHk(),
+                info.nameEn(), info.exchange(), info.currency(), info.lotSize());
+    }
+
+    @Override
     public List<ProviderQuote> getLatestQuotes(List<String> canonicalSymbols) {
         ensureConfigured();
         if (canonicalSymbols == null || canonicalSymbols.isEmpty()) {
@@ -76,11 +94,54 @@ public class LongPortMarketDataProvider implements MarketDataProvider {
                                                String adjustType) {
         ensureConfigured();
         String longPortSymbol = toLongPortSymbol(canonicalSymbol);
+        String normalizedCanonicalSymbol = symbolMapper.fromLongPort(longPortSymbol);
         String sdkAdjustType = toSdkAdjustType(adjustType);
         String systemAdjustType = normalizeAdjustType(adjustType);
         return quoteClient.getDailyBars(longPortSymbol, startDate, endDate, sdkAdjustType, systemAdjustType)
                 .stream()
-                .map(bar -> toProviderDailyBar(canonicalSymbol, bar))
+                .map(bar -> toProviderDailyBar(normalizedCanonicalSymbol, bar))
+                .toList();
+    }
+
+    @Override
+    public List<ProviderMinuteBar> getMinuteBars(String canonicalSymbol, LocalDate startDate, LocalDate endDate,
+                                                 String intervalType, String adjustType) {
+        ensureConfigured();
+        if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "分钟 K 日期范围不合法");
+        }
+        String longPortSymbol = toLongPortSymbol(canonicalSymbol);
+        String normalizedCanonicalSymbol = symbolMapper.fromLongPort(longPortSymbol);
+        String normalizedInterval = normalizeIntervalType(intervalType);
+        String sdkPeriod = toSdkPeriod(normalizedInterval);
+        String sdkAdjustType = toSdkAdjustType(adjustType);
+        String systemAdjustType = normalizeAdjustType(adjustType);
+
+        // 官方日期区间接口单次最多 1000 根。按 A 股每日最大 bar 数保守切段，避免静默丢失区间前部。
+        int chunkDays = switch (normalizedInterval) {
+            case "1M" -> 4;
+            case "5M" -> 20;
+            case "15M" -> 62;
+            case "30M" -> 125;
+            case "60M" -> 250;
+            default -> throw new BusinessException(ErrorCodeEnum.INVALID_ENUM_CODE,
+                    "分钟 K 粒度不合法: " + intervalType);
+        };
+        LinkedHashMap<LocalDateTime, ProviderMinuteBar> deduplicated = new LinkedHashMap<>();
+        for (LocalDate chunkStart = startDate; !chunkStart.isAfter(endDate); chunkStart = chunkStart.plusDays(chunkDays)) {
+            LocalDate chunkEnd = chunkStart.plusDays(chunkDays - 1L);
+            if (chunkEnd.isAfter(endDate)) chunkEnd = endDate;
+            List<LongPortMinuteBar> bars = quoteClient.getMinuteBars(longPortSymbol, chunkStart, chunkEnd,
+                    sdkPeriod, sdkAdjustType, normalizedInterval, systemAdjustType);
+            for (LongPortMinuteBar bar : bars) {
+                ProviderMinuteBar converted = new ProviderMinuteBar(normalizedCanonicalSymbol, bar.barStartTime(),
+                        normalizedInterval, systemAdjustType, bar.openPrice(), bar.highPrice(), bar.lowPrice(),
+                        bar.closePrice(), bar.volume(), bar.amount());
+                deduplicated.put(converted.barStartTime(), converted);
+            }
+        }
+        return new ArrayList<>(deduplicated.values()).stream()
+                .sorted(Comparator.comparing(ProviderMinuteBar::barStartTime))
                 .toList();
     }
 
@@ -120,6 +181,22 @@ public class LongPortMarketDataProvider implements MarketDataProvider {
         }
         throw new BusinessException(ErrorCodeEnum.INVALID_ENUM_CODE,
                 "复权类型不合法: " + adjustType);
+    }
+
+    private String normalizeIntervalType(String intervalType) {
+        return intervalType == null ? "" : intervalType.trim().toUpperCase();
+    }
+
+    private String toSdkPeriod(String intervalType) {
+        return switch (intervalType) {
+            case "1M" -> "Min_1";
+            case "5M" -> "Min_5";
+            case "15M" -> "Min_15";
+            case "30M" -> "Min_30";
+            case "60M" -> "Min_60";
+            default -> throw new BusinessException(ErrorCodeEnum.INVALID_ENUM_CODE,
+                    "LongPort 不支持的分钟 K 粒度: " + intervalType);
+        };
     }
 
     private ProviderQuote toProviderQuote(LongPortQuote quote) {

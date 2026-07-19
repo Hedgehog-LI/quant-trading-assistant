@@ -13,7 +13,9 @@ import com.quant.trade.marketdata.dto.UpdateSyncPlanDTO;
 import com.quant.trade.marketdata.dto.CreateSyncTaskDTO;
 import com.quant.trade.marketdata.manager.MinuteBarQualityManager;
 import com.quant.trade.marketdata.manager.TradingSessionManager;
+import com.quant.trade.marketdata.manager.SyncPlanValidationManager;
 import com.quant.trade.marketdata.model.*;
+import com.quant.trade.marketdata.util.CanonicalSymbolUtils;
 import com.quant.trade.marketdata.vo.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +54,8 @@ public class MarketDataWorkbenchService {
     private final TradingSessionManager tradingSessionManager;
     private final ObjectMapper objectMapper;
     private final TaskReconcileService taskReconcileService;
+    private final SyncPlanValidationManager syncPlanValidationManager;
+    private final MarketDataPlanExecutionService planExecutionService;
 
     private static final int MAX_PAGE_SIZE = 500;
 
@@ -92,6 +96,7 @@ public class MarketDataWorkbenchService {
                 .enabled(true)
                 .description(dto.getDescription())
                 .build();
+        syncPlanValidationManager.validate(plan);
         syncPlanMapper.insert(plan);
         log.info("创建采集计划: id={}, name={}, type={}", plan.getId(), plan.getPlanName(), plan.getTaskType());
         return toPlanVO(plan);
@@ -121,6 +126,8 @@ public class MarketDataWorkbenchService {
         if (existing == null) {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, "采集计划不存在: " + id);
         }
+        if (dto.getTaskType() != null) existing.setTaskType(dto.getTaskType());
+        if (dto.getProvider() != null) existing.setProvider(dto.getProvider());
         existing.setPlanName(dto.getPlanName());
         existing.setScopeJson(dto.getScopeJson());
         if (dto.getIntervalType() != null) existing.setIntervalType(dto.getIntervalType());
@@ -130,6 +137,8 @@ public class MarketDataWorkbenchService {
         if (dto.getIncludeAuction() != null) existing.setIncludeAuction(dto.getIncludeAuction());
         existing.setCollectFrequency(dto.getCollectFrequency());
         existing.setDescription(dto.getDescription());
+        validateTaskType(existing.getTaskType());
+        syncPlanValidationManager.validate(existing);
         syncPlanMapper.updateById(existing);
         return toPlanVO(existing);
     }
@@ -140,6 +149,7 @@ public class MarketDataWorkbenchService {
         if (existing == null) {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, "采集计划不存在: " + id);
         }
+        if (enabled) syncPlanValidationManager.validate(existing);
         syncPlanMapper.updateEnabled(id, enabled, LocalDateTime.now());
         existing.setEnabled(enabled);
         return toPlanVO(existing);
@@ -171,10 +181,16 @@ public class MarketDataWorkbenchService {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, "采集计划不存在: " + planId);
         }
 
-        // 不支持的任务类型：直接抛业务错误，不创建空壳任务误导用户
-        if (!"DAILY_BAR_BACKFILL".equals(plan.getTaskType())) {
+        var validation = syncPlanValidationManager.validate(plan);
+        if (WorkbenchConstants.TASK_MINUTE_BAR_BACKFILL.equals(plan.getTaskType())) {
+            planExecutionService.executeMinutePlan(plan, LocalDateTime.now());
+            return toPlanVO(syncPlanMapper.selectById(planId));
+        }
+
+        // 盘中刷新只允许 scheduler 触发；页面不把它伪装成手工补档。
+        if (!WorkbenchConstants.TASK_DAILY_BAR_BACKFILL.equals(plan.getTaskType())) {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
-                    "任务类型 " + plan.getTaskType() + " 的手动执行链路尚未接入，当前仅支持 DAILY_BAR_BACKFILL");
+                    "任务类型 " + plan.getTaskType() + " 不支持立即执行；盘中刷新由交易时段 scheduler 触发");
         }
 
         // 用 Jackson 解析结构化 scope（含校验）
@@ -345,7 +361,7 @@ public class MarketDataWorkbenchService {
      * <p>
      * 校验规则：
      * - symbols 从 canonicalSymbol 或 symbols 数组提取，去空白、去重。
-     * - 每个 symbol 按已有 canonical 规则校验（SH/SZ/BJ + 数字）。
+     * - 每个 symbol 按统一 canonical 规则规范化并校验。
      * - startDate <= endDate（若都存在）。
      * - 非法 JSON、非法日期、空 symbol 或日期范围非法抛 BusinessException。
      */
@@ -375,14 +391,17 @@ public class MarketDataWorkbenchService {
             }
         }
 
-        // 校验每个 symbol 格式
+        // 规范化并校验每个 symbol
+        LinkedHashSet<String> normalizedSymbols = new LinkedHashSet<>();
         for (String symbol : symbolSet) {
-            if (!symbol.matches(MarketDataConstants.CANONICAL_SYMBOL_REGEX)) {
+            try {
+                normalizedSymbols.add(CanonicalSymbolUtils.normalize(symbol));
+            } catch (IllegalArgumentException exception) {
                 throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL,
-                        "scope 中 symbol 格式不合法: " + symbol);
+                        "scope 中 symbol 格式不合法: " + symbol + "，" + exception.getMessage());
             }
         }
-        scope.symbols.addAll(symbolSet);
+        scope.symbols.addAll(normalizedSymbols);
 
         if (scope.symbols.isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
@@ -658,12 +677,17 @@ public class MarketDataWorkbenchService {
     }
 
     private MarketDataSyncPlanVO toPlanVO(MarketDataSyncPlanDO d) {
+        var validation = syncPlanValidationManager.inspect(d);
         return MarketDataSyncPlanVO.builder()
                 .id(d.getId()).planName(d.getPlanName()).taskType(d.getTaskType()).provider(d.getProvider())
                 .scopeJson(d.getScopeJson()).intervalType(d.getIntervalType()).adjustType(d.getAdjustType())
                 .triggerType(d.getTriggerType()).cronExpr(d.getCronExpr()).includeAuction(d.getIncludeAuction())
                 .collectFrequency(d.getCollectFrequency()).enabled(d.getEnabled()).description(d.getDescription())
                 .lastRunAt(d.getLastRunAt()).lastTaskId(d.getLastTaskId())
+                .configurationStatus(validation.errors().isEmpty() ? "VALID" : "NEEDS_ATTENTION")
+                .validationErrors(validation.errors())
+                .manuallyRunnable(validation.manuallyRunnable())
+                .automaticallyRunnable(validation.automaticallyRunnable())
                 .createdAt(d.getCreatedAt()).updatedAt(d.getUpdatedAt())
                 .build();
     }

@@ -7,6 +7,7 @@ import com.quant.trade.marketdata.dto.MinuteBarUpsertDTO;
 import com.quant.trade.marketdata.dto.UpdateSyncPlanDTO;
 import com.quant.trade.marketdata.manager.MinuteBarQualityManager;
 import com.quant.trade.marketdata.manager.TradingSessionManager;
+import com.quant.trade.marketdata.manager.SyncPlanValidationManager;
 import com.quant.trade.marketdata.model.MarketDataSyncPlanDO;
 import com.quant.trade.marketdata.model.MarketDataSyncTaskDO;
 import com.quant.trade.marketdata.model.MarketDataSyncTaskItemDO;
@@ -50,6 +51,8 @@ class MarketDataWorkbenchServiceTest {
     @Mock private TradingSessionManager tradingSessionManager;
     @Spy private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
     @Mock private TaskReconcileService taskReconcileService;
+    @Mock private SyncPlanValidationManager syncPlanValidationManager;
+    @Mock private MarketDataPlanExecutionService planExecutionService;
 
     @InjectMocks private MarketDataWorkbenchService service;
 
@@ -59,6 +62,12 @@ class MarketDataWorkbenchServiceTest {
         lenient().when(tradingSessionManager.isTradingDay(anyString(), any())).thenReturn(true);
         lenient().when(tradingSessionManager.getSessionWindows(anyString(), anyBoolean()))
                 .thenReturn(List.of(new int[]{930, 1130, 0}, new int[]{1300, 1500, 0}));
+        var valid = new SyncPlanValidationManager.ValidationResult(
+                new SyncPlanValidationManager.PlanScope(List.of("SH.600519"),
+                        LocalDate.of(2026, 1, 1), LocalDate.of(2026, 7, 10)),
+                List.of(), true, false);
+        lenient().when(syncPlanValidationManager.validate(any())).thenReturn(valid);
+        lenient().when(syncPlanValidationManager.inspect(any())).thenReturn(valid);
     }
 
     @Test
@@ -185,14 +194,14 @@ class MarketDataWorkbenchServiceTest {
     }
 
     @Test
-    void runPlanRejectsNonDailyTaskType() {
+    void runPlanExecutesMinuteBackfill() {
         MarketDataSyncPlanDO plan = MarketDataSyncPlanDO.builder()
                 .id(1L).taskType("MINUTE_BAR_BACKFILL").provider("LONGPORT")
                 .scopeJson("{\"symbols\":[\"SH.600519\"]}").adjustType("NONE").build();
         when(syncPlanMapper.selectById(1L)).thenReturn(plan);
 
-        assertThrows(com.quant.trade.common.exception.BusinessException.class,
-                () -> service.runPlan(1L));
+        service.runPlan(1L);
+        verify(planExecutionService).executeMinutePlan(eq(plan), any());
     }
 
     @Test

@@ -4,6 +4,81 @@
 
 ---
 
+## 2026-07-18 — P1.5 市场板块关注与快照（验收通过）
+
+- **后端**：`./mvnw test` 通过，**284 tests / 0 failures / 0 errors / 0 skipped**；Flyway 从空库成功执行 14 个 migration，V14 三张行业表创建成功。
+- **前端**：`npm run typecheck`、`npm run lint`、`npm run test` 通过；新增 API 测试覆盖 mock 关注持久化和 remote 刷新路由。
+- **真实 provider**：使用 gitignored 只读凭据和签名 HTTPS，CN/HK/US `industry/rank` 均成功；CN `industries/peers` 成功；`BK/SH/IN40159` 调用成分接口返回中国石油、中国石化、广汇能源及现价、涨跌、净流入、成交额等字段。
+- **Docker/MySQL**：应用镜像重新构建成功，`qta-mysql` healthy、`qta-server` running，health 返回 `UP`。首次真实 MySQL 8.4 迁移发现 `delayed` 为保留字；已将 V14 列名修正为 `is_delayed`，仅清理本轮失败迁移产生的三张空表和失败记录后重跑，V14 成功应用，既有业务表和数据未改动。
+- **应用 API curl**：真实创建并保留关注 `BK/SH/IN40159 / 综合油气公司`，创建、列表、手工刷新、启停、历史和成分查询均成功。最新快照涨跌幅 `2.40%`、领涨 `SH.601857 / 中国石油`、3 个成分、2 涨 1 跌、净流入合计 `445,509,680`、成交额 `4,980,441,706`、成交量 `7,123,684`；历史返回 3 期快照。
+- **浏览器**：remote 模式下 `/market-segments` 成功加载 20 个真实 A 股行业；“我的关注”展示上述聚合数据，历史抽屉展示 3 期快照和 3 个成分明细；建设看板显示“市场板块目录 / P1 / 已完成 / M4 / 已验收可用 / 92”。
+- **安全**：调用脚本和日志不输出密钥；代码不接交易、账户、订单或持仓接口。
+- **结论**：自动化、真实 provider、Docker/MySQL、应用 API 和页面主路径均通过；本轮功能可以提交并进入部署。
+
+## 2026-07-17 — P1.5a 市场板块发现（静态验收通过）
+
+- **后端**：`./mvnw test` 通过，**280 tests / 0 failures / 0 errors**。覆盖 ETF 代码识别、CN/HK/US 参数、行业排行/层级反射字段映射、provider 未配置降级。
+- **前端**：`npm run typecheck`、`npm run lint`、`npm run test`（**36 files / 273 tests**）、`npm run build` 全部通过。
+- **契约检查**：mock 行业数据明确使用 `LOCAL_DEMO`；remote 不在 provider 失败时回退演示数据；市场行业和自定义分组分开。
+- **未执行**：按用户要求未启动/重建 Docker，未执行 curl、真实 LongPort 行业调用和浏览器验收。
+- **已知阻塞**：当前 LongPort SDK 4.3.3 native 缺少行业 JNI 符号，因此本条只代表代码和静态契约通过，不代表生产行业接口已连通。
+- **结论**：P1.5a 可进入提交评审；部署后市场板块 remote 页面仍依赖 P1.5b SDK native 修复，自定义分组与 ETF 行情能力不受影响。
+
+## 2026-07-17 — P1.4a 精确证券代码验证（通过）
+
+- **后端**：`./mvnw -q test` 全绿，共 **276 tests / 0 failures / 0 errors**；目标测试覆盖 CN/HK/US 转换、Static Info 反射、报价权限降级和 provider disabled；package 成功。
+- **前端**：typecheck、lint、production build 通过；全量 **35 files / 270 tests passed**。新增组件测试覆盖验证后显式加入、移除、输入变化使旧结果失效和 mock 禁用。
+- **Docker**：镜像重新构建成功，MySQL healthy，应用 health `UP`。使用 `.env + .env.longport` 只读配置最小调用。
+- **真实 LongPort curl**：`CN/603308 -> SH.603308 / 应流股份 / 44.34 CNY`；`HK/2498 -> HK.02498 / 速騰聚創 / 21.860 HKD`；`US/NVDA -> US.NVDA / NVIDIA / 202.980 USD`。三者均返回 Static Info、Quote、报价时间和 `VERIFIED_QUOTE_AVAILABLE`。
+- **只读性**：验证接口不调用 DAO、不创建采集计划、不写 `stock_basic` 或报价事实表；只有用户在前端点击“加入计划”后代码才进入表单 scope。
+- **未执行**：浏览器 E2E 未执行；组件行为由自动化测试覆盖。
+- **边界**：`quoteDelay` 当前返回 `UNKNOWN`，以 `quoteTime` 为核对事实；港美股分钟任务仍被现有产品校验阻断。
+- **结论**：精确代码验证和采集计划选股入口通过，可提交部署。P1.4b 全量目录与模糊搜索仍未开始。
+
+---
+
+## 2026-07-17 — 行情采集执行引擎独立复核（通过，浏览器验收除外）
+
+- **冻结基线**：后端 HEAD `cede09805a9ba5a45391934932a1be07addcf9e7`；前端 HEAD `13baa3383a674a4b8eb21ab7ea4b634ab4525537`。本条复核完成前未修改业务代码。
+- **静态门禁**：前后端 `git diff --check` 均通过。
+- **后端目标复测**：`SyncPlanValidationManagerTest`、`MarketDataIntradaySchedulerTest`、`MinutePlanExecutionIntegrationTest` 全部通过；覆盖配置校验、占锁/重启恢复、成功、部分失败、时段边界和幂等复跑。
+- **前端目标复测**：`syncPlanForm.test.ts` 与 `canonicalSymbol.test.ts` 共 2 files / 6 tests passed。
+- **Docker 独立复核**：`qta-mysql` healthy、`qta-server` running，`GET /actuator/health` 返回 `UP`；重新读取 task 51/52/48/50，分别验证 fake 首次成功、fake 幂等复跑、部分失败留痕和真实 LongPort A 股分钟 K 成功。
+- **数据一致性**：`SH.603986 / FAKE / 5M / 2026-07-10` 仍为 2 根；水位 `lastBarTime=10:05`、`totalRows=2`，与复跑 inserted=0/skipped=4 一致。
+- **未执行**：浏览器页面 E2E 按用户决定跳过，因此本结论不宣称完成页面交互验收。
+- **残余风险**：运行超过 60 分钟的计划可能被 stale-claim 规则允许再次占锁；当前 A 股小范围采集不阻断验收，后续长区间/多标的压力测试时应改为续租或更保守的过期恢复策略。
+- **结论**：上一轮“行情采集执行引擎”的后端、数据链路和前端表单约束通过；浏览器体验仍需在后续页面功能联调时补验。
+
+---
+
+## 2026-07-17 — 行情采集执行引擎最终验收（通过）
+
+- **后端门禁**：`./mvnw test` = **270 tests / 0 failures / 0 errors / 0 skipped**；`./mvnw package` 再次执行 270 tests 并 BUILD SUCCESS。
+- **前端门禁**：typecheck 通过；lint 通过；`npm run test` = **34 files / 267 tests passed**；production build 通过。仅有 Node experimental localStorage warning，无失败。
+- **静态事实**：计划合法性校验、daily/minute/intraday 执行、分钟 K 幂等/水位、LongPort 分块/限流/异常分类、A 股 scheduler/claim/恢复、前端结构化表单与 mock 禁止伪执行均有实现和测试覆盖。
+- **此前 Docker fake 证据**：首次执行 task 46 `SUCCEEDED`、4 根落库；重跑 task 47 `SUCCEEDED`、inserted=0/skipped=4 且总行数不变；受控失败 task 48 `PARTIAL_FAILED`，成功标的落库、失败标的保留 `MARKET_DATA_PROVIDER_TIMEOUT`。
+- **此前真实 LongPort 证据**：task 50，`SH.601318 / 2026-07-10 / 5M`，任务 `SUCCEEDED`；provider/任务 total=49、inserted=48、skipped=1；分钟表共 48 根并止于 14:55，水位与之相符。
+- **手动重建后健康**：`qta-mysql` healthy、`qta-server` 持续运行；Flyway 校验 13 migrations，schema version=13；宿主机 `GET /actuator/health` 返回 `UP`。启动后无 ERROR/Exception，只有 Flyway 对 MySQL 8.4 支持版本提示。
+- **重建后首次执行**：计划 11 → task 51 `SUCCEEDED`，两个标的各 2 根，total/success/inserted=4；分钟表和水位各为 2。
+- **重建后幂等复跑**：task 52 `SUCCEEDED`，inserted=0、skipped=4；每个 item skipped=2；分钟表仍为 2 根/标的，水位 `totalRows=2`；重复 reconcile 不改变终态与计数。
+- **产品语义**：缺少日期的分钟补档创建返回 `MARKET_DATA_PLAN_INVALID`；盘中计划返回 `automaticallyRunnable=true / manuallyRunnable=false`，手工运行返回 `BUSINESS_RULE_VIOLATION`；21:16 创建后至 21:19 非交易时段没有生成 task。
+- **失败留痕持久化**：重建后 task 48 仍为 `PARTIAL_FAILED`，成功标的 inserted=2，失败标的保留 `MARKET_DATA_PROVIDER_TIMEOUT` 和错误消息。
+- **浏览器**：按用户要求停止页面验收，最终结论只采用自动化、Docker 和 curl 证据。
+- **结论**：验收通过，行情采集执行引擎收口完成。
+- **最终报告**：`../development/MARKET_DATA_EXECUTION_ENGINE_DELIVERY_2026-07-17.md`。
+
+---
+
+## 2026-07-17 — LongPort 港股/美股代码链路验收（代码通过，真实外联待部署验证）
+
+- **后端门禁**：`./mvnw -q test` = **258 tests / 0 failures / 0 errors**；`./mvnw -q -DskipTests package` 成功；`git diff --check` 通过。
+- **前端门禁**：typecheck/production build 成功；lint 通过；`npm run test -- --run --maxWorkers=2` = **33 files / 264 tests passed**；`git diff --check` 通过。
+- **功能证据**：后端单测覆盖 A/HK/US 规范化、港股补零/LongPort 去零映射、美股及 `BRK.B` 双向映射、港股 latest quote 转换、美股 daily bar 转换；前端测试覆盖规范化、去重和非法代码。
+- **真实外联**：未完成。`runtime-libs` SDK/native 结构检查通过；Docker 重建因首次下载 `eclipse-temurin:17-jdk` 基础镜像在镜像站卡住而终止，未调用 LongPort 港股/美股接口，未产生外部调用验收结论。
+- **结论**：代码可提交部署；部署后分别以 `HK.02498`（速腾聚创）和 `US.AAPL` 做 latest quote + 单日日 K 最小验收。若返回行情权限错误，应记录为账号订阅边界，不视为证券代码映射失败。
+
+---
+
 ## 2026-07-16 — P1.2/P1.3 第六轮 Codex 收口验收（通过）
 
 - **范围**：修复 TaskItemsDrawer 双 effect/竞态/时间列、板块 3 条伪行为测试改真实交互、Drawer 组件测试。

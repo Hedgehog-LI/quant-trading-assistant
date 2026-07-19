@@ -1,32 +1,44 @@
 package com.quant.trade.marketdata.provider;
 
 import com.quant.trade.marketdata.constant.MarketDataConstants;
+import com.quant.trade.marketdata.util.CanonicalSymbolUtils;
 import org.springframework.stereotype.Component;
 import java.util.Locale;
-import java.util.Set;
 
-/** 内部 canonical_symbol <-> LongPort symbol 双向映射。 SH.600519 <-> 600519.SH */
+/** 内部 canonical_symbol 与 LongPort symbol 双向映射。 */
 @Component
 public class LongPortSymbolMapper {
-    private static final Set<String> VALID = MarketDataConstants.VALID_MARKETS;
 
     public String toLongPort(String canonical) {
-        String upper = canonical.trim().toUpperCase(Locale.ROOT);
-        int dot = upper.indexOf('.');
-        if (dot <= 0 || dot >= upper.length() - 1) return null;
-        String market = upper.substring(0, dot);
-        String code = upper.substring(dot + 1);
-        if (!VALID.contains(market) || !code.matches("\\d{4,6}")) return null;
-        return code + "." + market;
+        try {
+            String normalized = CanonicalSymbolUtils.normalize(canonical);
+            int separator = normalized.indexOf('.');
+            String market = normalized.substring(0, separator);
+            String symbol = normalized.substring(separator + 1);
+            if (MarketDataConstants.MARKET_HK.equals(market)) {
+                symbol = String.valueOf(Integer.parseInt(symbol));
+            }
+            return symbol + "." + market;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     public String fromLongPort(String longPortSymbol) {
+        if (longPortSymbol == null || longPortSymbol.isBlank()) {
+            return null;
+        }
         String s = longPortSymbol.trim().toUpperCase(Locale.ROOT);
-        int dot = s.indexOf('.');
-        if (dot <= 0 || dot >= s.length() - 1) return null;
-        String code = s.substring(0, dot);
-        String market = s.substring(dot + 1);
-        if (!VALID.contains(market) || !code.matches("\\d{4,6}")) return null;
-        return market + "." + code;
+        int separator = s.lastIndexOf('.');
+        if (separator <= 0 || separator >= s.length() - 1) {
+            return null;
+        }
+        String symbol = s.substring(0, separator);
+        String market = s.substring(separator + 1);
+        try {
+            return CanonicalSymbolUtils.normalize(market + "." + symbol);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 }

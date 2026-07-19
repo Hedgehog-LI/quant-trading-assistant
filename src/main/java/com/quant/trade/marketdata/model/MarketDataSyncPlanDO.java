@@ -28,6 +28,9 @@ public class MarketDataSyncPlanDO {
     private String description;
     private LocalDateTime lastRunAt;
     private Long lastTaskId;
+    private String runClaimToken;
+    private LocalDateTime runClaimedAt;
+    private Long runningTaskId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -18,6 +18,9 @@
         <result column="description" property="description"/>
         <result column="last_run_at" property="lastRunAt"/>
         <result column="last_task_id" property="lastTaskId"/>
+        <result column="run_claim_token" property="runClaimToken"/>
+        <result column="run_claimed_at" property="runClaimedAt"/>
+        <result column="running_task_id" property="runningTaskId"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
@@ -25,7 +28,7 @@
     <sql id="Base_Column_List">
         id, plan_name, task_type, provider, scope_json, interval_type, adjust_type, trigger_type,
         cron_expr, include_auction, collect_frequency, enabled, description, last_run_at, last_task_id,
-        created_at, updated_at
+        run_claim_token, run_claimed_at, running_task_id, created_at, updated_at
     </sql>
 
     <sql id="Filter_Clause">
@@ -81,5 +84,25 @@
         FROM market_data_sync_plan
         WHERE trigger_type = #{triggerType} AND enabled = #{enabled}
         ORDER BY created_at ASC
+    </select>
+
+    <update id="tryClaimRun">
+        UPDATE market_data_sync_plan
+        SET run_claim_token = #{token}, run_claimed_at = #{claimedAt}, running_task_id = NULL
+        WHERE id = #{id}
+          AND (run_claim_token IS NULL OR run_claimed_at IS NULL OR run_claimed_at &lt; #{staleBefore})
+    </update>
+    <update id="setRunningTask">
+        UPDATE market_data_sync_plan SET running_task_id = #{taskId}
+        WHERE id = #{id} AND run_claim_token = #{token}
+    </update>
+    <update id="releaseRunClaim">
+        UPDATE market_data_sync_plan
+        SET run_claim_token = NULL, run_claimed_at = NULL, running_task_id = NULL
+        WHERE id = #{id} AND run_claim_token = #{token}
+    </update>
+    <select id="selectClaimedPlans" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM market_data_sync_plan
+        WHERE run_claim_token IS NOT NULL ORDER BY id ASC
     </select>
 </mapper>

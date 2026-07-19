@@ -76,7 +76,7 @@ class MarketQuoteServiceTest {
                         new FetchQuotesRequestDTO(List.of("600519.SH"), true)));
 
         assertEquals(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL, exception.getErrorCode());
-        assertTrue(exception.getMessage().contains("证券代码格式不合法"));
+        assertTrue(exception.getMessage().contains("市场必须为 SH/SZ/BJ/HK/US"));
     }
 
     /**

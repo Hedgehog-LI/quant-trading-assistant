@@ -36,6 +36,7 @@
 | Market Data | GET / POST | `/api/v1/market-data/stocks` | 已实现 | `MARKET_DATA_API.md` |
 | Market Data | GET / DELETE | `/api/v1/market-data/stocks/{canonicalSymbol}` | 已实现 | `MARKET_DATA_API.md` |
 | Market Data | PUT | `/api/v1/market-data/stocks/{id}` | 已实现 | `MARKET_DATA_API.md` |
+| Market Data | POST | `/api/v1/market-data/securities/verify` | 已实现（A/H/US 精确代码 + LongPort 静态信息/报价只读验证） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/daily-bars` | 已实现 | `MARKET_DATA_API.md` |
 | Market Data | POST | `/api/v1/market-data/daily-bars/import` | 已实现 | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/daily-bars/template` | 已实现 | `MARKET_DATA_API.md` |
@@ -46,7 +47,7 @@
 | Market Data | GET | `/api/v1/market-data/workbench/overview` | 已实现（P1.2 行情工作台概览） | `MARKET_DATA_API.md` |
 | Market Data | POST / GET / PUT / DELETE | `/api/v1/market-data/sync-plans[/{id}]` | 已实现（P1.2 采集计划 CRUD） | `MARKET_DATA_API.md` |
 | Market Data | POST | `/api/v1/market-data/sync-plans/{id}/toggle` | 已实现（启停采集计划） | `MARKET_DATA_API.md` |
-| Market Data | POST | `/api/v1/market-data/sync-plans/{id}/run` | 已实现（手动执行，当前仅 DAILY_BAR_BACKFILL 接入写入链路） | `MARKET_DATA_API.md` |
+| Market Data | POST | `/api/v1/market-data/sync-plans/{id}/run` | 已实现（`DAILY_BAR_BACKFILL` + `MINUTE_BAR_BACKFILL`；父任务/item/水位/计数闭环） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/sync-tasks/{taskId}/items` | 已实现（任务执行明细） | `MARKET_DATA_API.md` |
 | Market Data | POST | `/api/v1/market-data/sync-tasks/{taskId}/reconcile` | 已实现（幂等收敛主任务与逐标的子任务状态/计数） | `MARKET_DATA_API.md` |
 | Market Data | GET / POST | `/api/v1/market-data/minute-bars` | 已实现（P1.2 分钟 K 查询/写入，带质量 + 交易日/时段校验 + 幂等 + 水位） | `MARKET_DATA_API.md` |
@@ -55,6 +56,8 @@
 | Market Data | GET | `/api/v1/market-data/watermarks` | 已实现（数据水位查询） | `MARKET_DATA_API.md` |
 | Market Data | POST / GET / PUT / DELETE | `/api/v1/market-data/segments[/{id}]` | 已实现（P1.3 板块 CRUD） | `MARKET_DATA_API.md` |
 | Market Data | GET / POST / DELETE | `/api/v1/market-data/segments/{id}/members[/{canonicalSymbol}]` | 已实现（板块成员增删查） | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/sector-catalog/industry-rankings` | 已实现（LongPort 行业排行，只读） | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/sector-catalog/industry-peers` | 已实现（LongPort 行业层级摘要，只读） | `MARKET_DATA_API.md` |
 
 ## 错误码
 

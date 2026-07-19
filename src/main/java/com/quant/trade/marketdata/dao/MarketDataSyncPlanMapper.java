@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 /** 采集计划 Mapper。 */
 @Mapper
@@ -25,4 +26,10 @@ public interface MarketDataSyncPlanMapper {
                        @Param("enabled") Boolean enabled);
     List<MarketDataSyncPlanDO> selectAutoTriggerPlans(@Param("triggerType") String triggerType,
                                                       @Param("enabled") Boolean enabled);
+    int tryClaimRun(@Param("id") Long id, @Param("token") String token,
+                    @Param("claimedAt") LocalDateTime claimedAt,
+                    @Param("staleBefore") LocalDateTime staleBefore);
+    int setRunningTask(@Param("id") Long id, @Param("token") String token, @Param("taskId") Long taskId);
+    int releaseRunClaim(@Param("id") Long id, @Param("token") String token);
+    List<MarketDataSyncPlanDO> selectClaimedPlans();
 }

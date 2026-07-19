@@ -21,4 +21,7 @@ public interface MarketDataSyncTaskItemMapper {
     List<MarketDataSyncTaskItemDO> selectAllByTaskId(@Param("taskId") Long taskId);
     List<MarketDataSyncTaskItemDO> selectByPlanId(@Param("planId") Long planId,
                                                   @Param("limit") int limit);
+    int markFailedIfNonTerminal(@Param("taskId") Long taskId, @Param("errorCode") String errorCode,
+                                @Param("errorMessage") String errorMessage,
+                                @Param("finishedAt") java.time.LocalDateTime finishedAt);
 }

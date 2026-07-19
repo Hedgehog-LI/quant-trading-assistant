@@ -30,7 +30,10 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 | 任意开发 | `BUILD_CHECKLIST.md`、`CURRENT_ARCHITECTURE_AND_MODULES.md`、`DEVELOPMENT_WORKFLOW.md` |
 | 产品 / 功能设计 | `PRODUCT_BLUEPRINT.md`、`docs/features/<对应设计>.md`、`BUILD_CHECKLIST.md`；新功能用 `docs/templates/FEATURE_DESIGN_TEMPLATE.md` |
 | LongPort / 行情 provider | `features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`、`features/LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`、`features/MARKET_ALERT_RULES_DESIGN.md`、`api/MARKET_DATA_API.md`、`decisions/ADR-0008-longport-quote-only-provider.md` |
+| 市场板块 / 行业排行 / ETF 跟踪 | `features/MARKET_SECTOR_CATALOG_DESIGN.md`、`features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`api/MARKET_DATA_API.md`、`mock/MOCK_REMOTE_CONTRACT.md` |
 | 行情工作台 / 采集任务 / 分钟线 | `features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`features/MARKET_DATA_FOUNDATION_DESIGN.md`、`features/MARKET_ALERT_RULES_DESIGN.md`、`api/MARKET_DATA_API.md`、`DATABASE_DESIGN.md` |
+| 证券精确代码验证 / 采集计划选股 | `features/EXACT_SECURITY_VERIFICATION_DESIGN.md`、`features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`、`development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md` |
+| 证券目录 / 名称模糊搜索 / 自动填充 | `features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`、`decisions/ADR-0009-local-first-security-directory.md`、`development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md` |
 | 后端开发 | `api/API_INDEX.md`、对应 `api/*.md`、`DATABASE_DESIGN.md`、`decisions/ADR_INDEX.md`；启用 `qta-backend-implementation` skill |
 | 前端开发 | `FRONTEND_ARCHITECTURE.md`、`mock/MOCK_REMOTE_CONTRACT.md`、对应 feature 设计；启用 `qta-frontend-implementation` skill |
 | API 联调 | `api/API_INDEX.md`、对应 `api/*.md`、`mock/MOCK_REMOTE_CONTRACT.md` |

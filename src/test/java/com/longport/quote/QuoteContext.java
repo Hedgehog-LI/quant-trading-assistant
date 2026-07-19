@@ -42,6 +42,14 @@ public class QuoteContext implements AutoCloseable {
         return CompletableFuture.completedFuture(quotes);
     }
 
+    public CompletableFuture<SecurityStaticInfo[]> getStaticInfo(String[] symbols) {
+        SecurityStaticInfo[] infos = Arrays.stream(symbols)
+                .map(symbol -> new SecurityStaticInfo(symbol, "贵州茅台", "貴州茅台", "Kweichow Moutai",
+                        "SSE", "CNY", 100))
+                .toArray(SecurityStaticInfo[]::new);
+        return CompletableFuture.completedFuture(infos);
+    }
+
     public CompletableFuture<Candlestick[]> getHistoryCandlesticksByDate(String symbol, Period period,
                                                                          AdjustType adjustType, LocalDate start,
                                                                          LocalDate end,

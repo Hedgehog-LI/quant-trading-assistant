@@ -15,4 +15,7 @@ public interface MarketDataSyncTaskMapper {
     long countByFilter(@Param("status") String status, @Param("provider") String provider);
     int deleteById(@Param("id") Long id);
     MarketDataSyncTaskDO selectLatestByScope(@Param("provider") String provider, @Param("taskType") String taskType, @Param("scopeJson") String scopeJson);
+    int markFailedIfNonTerminal(@Param("id") Long id, @Param("errorCode") String errorCode,
+                                @Param("errorSummaryJson") String errorSummaryJson,
+                                @Param("finishedAt") java.time.LocalDateTime finishedAt);
 }

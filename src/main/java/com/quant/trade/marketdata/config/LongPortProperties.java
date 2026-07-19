@@ -137,6 +137,18 @@ public class LongPortProperties {
         return hasExplicitCredentials() || hasEnvironmentCredentials();
     }
 
+    public String effectiveAppKey() {
+        return hasText(appKey) ? appKey : System.getenv("LONGPORT_APP_KEY");
+    }
+
+    public String effectiveAppSecret() {
+        return hasText(appSecret) ? appSecret : System.getenv("LONGPORT_APP_SECRET");
+    }
+
+    public String effectiveAccessToken() {
+        return hasText(accessToken) ? accessToken : System.getenv("LONGPORT_ACCESS_TOKEN");
+    }
+
     private boolean hasText(String value) {
         return StringUtils.hasText(value);
     }

@@ -88,4 +88,9 @@
         WHERE task_id = #{taskId}
         ORDER BY id ASC
     </select>
+    <update id="markFailedIfNonTerminal">
+        UPDATE market_data_sync_task_item SET status='FAILED', error_code=#{errorCode},
+            error_message=#{errorMessage}, finished_at=#{finishedAt}
+        WHERE task_id=#{taskId} AND status IN ('PENDING','RUNNING')
+    </update>
 </mapper>

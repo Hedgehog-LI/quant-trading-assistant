@@ -15,6 +15,7 @@ import com.quant.trade.marketdata.model.*;
 import com.quant.trade.marketdata.provider.MarketDataProvider;
 import com.quant.trade.marketdata.provider.MarketDataProvider.ProviderDailyBar;
 import com.quant.trade.marketdata.provider.MarketDataProvider.ProviderQuote;
+import com.quant.trade.marketdata.util.CanonicalSymbolUtils;
 import com.quant.trade.marketdata.vo.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -100,13 +101,14 @@ public class MarketQuoteService {
                     if (symbol == null || symbol.isBlank()) {
                         throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL, "证券代码不能为空");
                     }
-                    String canonicalSymbol = symbol.trim().toUpperCase(Locale.ROOT);
-                    if (!canonicalSymbol.matches(MarketDataConstants.CANONICAL_SYMBOL_REGEX)) {
+                    try {
+                        return CanonicalSymbolUtils.normalize(symbol);
+                    } catch (IllegalArgumentException exception) {
                         throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL,
-                                "证券代码格式不合法: " + symbol);
+                                exception.getMessage());
                     }
-                    return canonicalSymbol;
                 })
+                .distinct()
                 .toList();
     }
 
@@ -128,9 +130,15 @@ public class MarketQuoteService {
      * 保证即使 provider 调用失败或外层回滚，DB 仍可查到任务状态和 alert。
      */
     public MarketDataSyncTaskVO createAndExecuteDailyBarSync(CreateSyncTaskDTO dto) {
+        String canonicalSymbol;
+        try {
+            canonicalSymbol = CanonicalSymbolUtils.normalize(dto.canonicalSymbol());
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL, exception.getMessage());
+        }
         // 结构化 scope -> JSON（Jackson 序列化）
         Map<String, Object> scopeMap = new LinkedHashMap<>();
-        scopeMap.put("canonicalSymbol", dto.canonicalSymbol());
+        scopeMap.put("canonicalSymbol", canonicalSymbol);
         scopeMap.put("startDate", dto.startDate());
         scopeMap.put("endDate", dto.endDate());
         scopeMap.put("adjustType", dto.adjustType());
@@ -202,7 +210,7 @@ public class MarketQuoteService {
             updateTaskFailed(taskId, ErrorCodeEnum.BUSINESS_RULE_VIOLATION.getCode(),
                     unavailableMessage, null);
             createAlertInNewTx(MarketDataConstants.ALERT_TYPE_PROVIDER_NOT_CONFIGURED,
-                    MarketDataConstants.ALERT_SEVERITY_HIGH, dto.canonicalSymbol(), null, taskId,
+                    MarketDataConstants.ALERT_SEVERITY_HIGH, canonicalSymbol, null, taskId,
                     unavailableMessage);
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION,
                     unavailableMessage);
@@ -224,14 +232,14 @@ public class MarketQuoteService {
         } catch (BusinessException e) {
             updateTaskFailed(taskId, e.getErrorCode().getCode(), e.getMessage(), null);
             createAlertInNewTx(MarketDataConstants.ALERT_TYPE_SYNC_FAILED,
-                    MarketDataConstants.ALERT_SEVERITY_HIGH, dto.canonicalSymbol(), null, taskId,
+                    MarketDataConstants.ALERT_SEVERITY_HIGH, canonicalSymbol, null, taskId,
                     "日 K 同步失败: " + e.getMessage());
             throw e;
         } catch (Exception e) {
             updateTaskFailed(taskId, ErrorCodeEnum.INTERNAL_ERROR.getCode(), e.getMessage(),
                     "{\"error\":\"" + e.getMessage() + "\"}");
             createAlertInNewTx(MarketDataConstants.ALERT_TYPE_SYNC_FAILED,
-                    MarketDataConstants.ALERT_SEVERITY_HIGH, dto.canonicalSymbol(), null, taskId,
+                    MarketDataConstants.ALERT_SEVERITY_HIGH, canonicalSymbol, null, taskId,
                     "日 K 同步异常: " + e.getMessage());
             throw new BusinessException(ErrorCodeEnum.INTERNAL_ERROR, "日 K 同步异常: " + e.getMessage());
         }
@@ -256,7 +264,7 @@ public class MarketQuoteService {
         // 空数据提醒
         if (sr.total > 0 && sr.inserted == 0 && sr.updated == 0 && sr.skipped == sr.total) {
             createAlertInNewTx(MarketDataConstants.ALERT_TYPE_EMPTY_DAILY_BARS,
-                    MarketDataConstants.ALERT_SEVERITY_INFO, dto.canonicalSymbol(), null, taskId,
+                    MarketDataConstants.ALERT_SEVERITY_INFO, canonicalSymbol, null, taskId,
                     "同步完成但未写入新数据，可能数据已存在或范围为空");
         }
 

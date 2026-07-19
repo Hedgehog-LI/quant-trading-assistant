@@ -44,9 +44,19 @@ public final class MarketDataConstants {
     public static final String ALERT_TYPE_STALE_QUOTE = "STALE_QUOTE";
 
     // 通用
-    public static final Set<String> VALID_MARKETS = Set.of("SH", "SZ", "BJ");
+    public static final String MARKET_SH = "SH";
+    public static final String MARKET_SZ = "SZ";
+    public static final String MARKET_BJ = "BJ";
+    public static final String MARKET_HK = "HK";
+    public static final String MARKET_US = "US";
+    public static final Set<String> VALID_MARKETS = Set.of(
+            MARKET_SH, MARKET_SZ, MARKET_BJ, MARKET_HK, MARKET_US);
     public static final Set<String> VALID_ADJUST_TYPES = Set.of("NONE", "QF", "HF");
-    public static final String CANONICAL_SYMBOL_REGEX = "^(SH|SZ|BJ)\\.\\d{4,6}$";
+    public static final String A_SHARE_SYMBOL_REGEX = "\\d{4,6}";
+    public static final String HK_SYMBOL_REGEX = "\\d{5}";
+    public static final String US_SYMBOL_REGEX = "[A-Z0-9]+(?:[.-][A-Z0-9]+)*";
+    public static final String CANONICAL_SYMBOL_REGEX =
+            "^(?:(?:SH|SZ|BJ)\\.\\d{4,6}|HK\\.\\d{5}|US\\.[A-Z0-9]+(?:[.-][A-Z0-9]+)*)$";
 
     // CSV
     public static final String[] CSV_HEADERS = {

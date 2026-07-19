@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 采集计划 VO。 */
 @Data
@@ -28,6 +29,11 @@ public class MarketDataSyncPlanVO {
     private String description;
     private LocalDateTime lastRunAt;
     private Long lastTaskId;
+    /** VALID / NEEDS_ATTENTION，用于历史非法计划的页面治理。 */
+    private String configurationStatus;
+    private List<String> validationErrors;
+    private Boolean manuallyRunnable;
+    private Boolean automaticallyRunnable;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

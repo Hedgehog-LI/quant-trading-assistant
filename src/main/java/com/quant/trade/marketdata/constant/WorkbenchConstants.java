@@ -31,6 +31,18 @@ public final class WorkbenchConstants {
     public static final String TRIGGER_SCHEDULED = "SCHEDULED";
     public static final String TRIGGER_INTRADAY = "INTRADAY";
 
+    /** 当前已经接通执行引擎的计划类型。 */
+    public static final String TASK_DAILY_BAR_BACKFILL = "DAILY_BAR_BACKFILL";
+    public static final String TASK_MINUTE_BAR_BACKFILL = "MINUTE_BAR_BACKFILL";
+    public static final String TASK_INTRADAY_MINUTE_REFRESH = "INTRADAY_MINUTE_REFRESH";
+
+    /** 盘中采集频率。 */
+    public static final String FREQUENCY_30S = "30S";
+    public static final String FREQUENCY_60S = "60S";
+    public static final String FREQUENCY_5M = "5M";
+
+    public static final int MAX_PLAN_SYMBOLS = 50;
+
     /** 任务明细状态。 */
     public static final String ITEM_PENDING = "PENDING";
     public static final String ITEM_RUNNING = "RUNNING";

@@ -48,6 +48,16 @@
 - [~] 每个新增接口都要补 API 示例。
 - [x] 前端“建设看板”已完成并通过 typecheck/lint/test/build 验收。
 
+### P1.4a 精确证券代码验证
+
+- [x] A 股、港股、美股市场 + 精确代码归一化。
+- [x] LongPort Static Info + Quote 只读验证 API，不写证券、报价或计划表。
+- [x] 采集计划支持“查询并验证 -> 展示名称/价格/时间 -> 确认加入”。
+- [x] mock 模式明确拒绝伪造外部验证；编辑旧计划仍兼容已有 scope。
+- [x] Docker 真实验证 `SH.603308`、`HK.02498`、`US.NVDA` 均成功。
+- [ ] P1.4b 本地证券目录、名称/拼音模糊检索和目录同步。
+- [ ] 港美股分钟采集的交易日历、时区和 scheduler；精确验证成功不等于分钟任务已支持。
+
 ## 4. 已完成 P0: 建设看板
 
 ### 产品设计
@@ -212,14 +222,16 @@
 - [x] 真实 quote/candlestick 小调用联调验证（2026-07-12，SH.600519 单 symbol 单日，latest quote + daily bar 均落 `dataSource=LONGPORT`）。
 - [x] SDK 默认域名废弃治理：新增 `LONGPORT_HTTP_URL` / `LONGPORT_QUOTE_WEBSOCKET_URL` 可选覆盖，切换到 `openapi.longbridge.cn` / `openapi-quote.longbridge.cn/v2`；docker-compose 加 `dns`。
 - [x] 前端 `/market-data` 小改：状态页展示 SDK/凭据未就绪，历史同步禁用 `HF`。
+- [x] 统一证券标识扩展到港股/美股：`HK.02498`、`US.AAPL`；LongPort 双向映射、证券主数据、最新价、历史日 K、板块成员和前端录入均已接入。
+- [ ] 使用真实只读账号分别完成港股、美股单标的最新价 + 单日日 K 小调用验收；行情权限不足时记录为账号权限边界，不回退代码支持。
 
-### P1.2 部分实现：行情工作台、采集任务与分钟线数据资产（后端核心 + 手动执行已闭环，盘中自动调度待补）
+### P1.2 已完成：行情工作台、采集执行引擎与分钟线数据资产
 
 - [x] 完成产品/理财/技术架构/量化视角设计：`docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。
 - [x] 工作台下新增行情工作台入口（`/market-workspace`），聚合 provider 状态、提醒统计、交易时段、数据计数（接 DAO 真实查询）。
 - [x] 新增历史补档任务配置（采集计划 CRUD + 启停 + `POST /sync-plans/{id}/run` 手动执行：生成 sync_task + task_item + lastRunAt/lastTaskId）。
 - [x] 手动执行接入 daily bar 写入链路（复用 MarketQuoteService.createAndExecuteDailyBarSync，DAILY_BAR_BACKFILL 可真实落库）。
-- [~] 新增盘中定时监控配置（trigger_type=INTRADAY 配置已支持，自动调度定时器未实现）。
+- [x] 新增 `INTRADAY_MINUTE_REFRESH` 盘中定时采集：可注入 Clock、A 股交易日/时段/频率过滤、DB claim 防重入、重启遗留任务收敛。
 - [x] 新增 `stock_minute_bar`（V10 migration），支持 1M/5M/15M/30M/60M 分钟 K 落库 + 质量校验 + 交易日/时段校验 + 幂等 + 水位。
 - [x] 分钟 K upsert 接入交易日校验（非交易日 REJECTED + alert）和时段校验（非交易时段 SUSPECT + alert）。
 - [x] 新增采集计划/任务明细/水位表（V10 migration），任务执行过程可查。
@@ -227,7 +239,10 @@
 - [x] 新增板块/自定义分组（V11 migration + CRUD + 前端页面）。
 - [ ] 异动大屏先围绕持仓股、自选股、计划股和自定义板块，不做全市场扫描。
 - [~] 数据质量提醒已落库（VALID/SUSPECT/REJECTED + alert），风险/机会观察待 P1.5。
-- [ ] 盘中自动调度（`@Scheduled`/Quartz）+ 分钟 K 批量拉取接通 LongPort adapter。
+- [x] LongPort SDK 4.3.3 原生 1M/5M/15M/30M/60M 分钟 K adapter、分段/限流、已闭合/时段过滤与 task/item/watermark 闭环。
+- [x] Docker MySQL Fake E2E：首次落库、重复幂等、多标的部分失败均通过。
+- [x] 最小真实 LongPort E2E（2026-07-17）：SH.601318 单日 5M，provider 49 条、落库 48、越界跳过 1、watermark=14:55。
+- [x] 港美股盘中自动任务在时区/日历未闭环前明确拒绝，不套用 A 股时段。
 
 ### P1.3 已完成：板块/自定义分组
 
@@ -235,6 +250,30 @@
 - [x] 板块 CRUD + 成员增删改查 API + service + controller。
 - [x] 前端 `/market-segments` 页面（板块列表 + 成员管理 Drawer，mock/remote 双模式）。
 - [ ] 外部行业/概念数据源预留（后续接入）。
+
+### P1.4 已设计、待开发：证券目录与智能检索
+
+- [x] 产品、数据治理和前后端架构设计已沉淀：`docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`。
+- [x] 本地目录优先、外部来源补全的架构决策已沉淀：`docs/decisions/ADR-0009-local-first-security-directory.md`。
+- [x] 技术实施分期与接手清单已沉淀：`docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md`。
+- [ ] D1：扩展 `stock_basic`、新增别名/历史标识、CSV 目录幂等导入和确定性搜索 API。
+- [ ] D2：建设共享 `SecuritySelector`，首批接入最新价、历史日 K、采集计划和板块成员。
+
+### P1.5 已完成：市场板块发现与关注快照
+
+- [x] 市场板块与自定义分组产品边界拆分。
+- [x] 新增 LongPort 行业排行、行业层级只读 provider 与 API。
+- [x] 前端支持 A/H/US、排行维度、刷新、领涨标的和层级摘要。
+- [x] mock 模式明确标注 `LOCAL_DEMO`，remote provider 失败不伪造成功。
+- [x] A 股 `5xxxxx` ETF 精确代码识别并复用行情采集。
+- [x] P1.5a 静态门禁曾通过；P1.5b 已进一步完成真实行业接口与落库闭环。
+- [x] 行业链路改用官方签名 HTTPS，CN/HK/US 最小真实排行及 CN 层级/成分调用通过。
+- [x] V14：行业关注、聚合快照、成分快照三表及 MyBatis XML。
+- [x] 关注、手动采集、启停、删除、历史和成分 REST API。
+- [x] 前端“市场板块 / 我的关注 / 自定义分组”，支持关联 ETF/指数、采集和历史查看。
+- [ ] 后续分析：板块相对强弱、资金趋势、龙头贡献和异动提醒（不属于 P1.5 原始数据闭环）。
+- [ ] D3：接入可审计的目录 provider、同步状态和 LongPort Static Info 按需补全。
+- [ ] D4：推广到自选/计划/交易/风控/快照，完成 A/H/US E2E 与建设看板同步。
 
 ## 8. 暂缓: 图片识别导入
 

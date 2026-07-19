@@ -6,6 +6,7 @@ import com.quant.trade.marketdata.provider.MarketDataProvider.ProviderHealthStat
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortDailyBar;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortQuote;
+import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient.LongPortMinuteBar;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -48,6 +49,19 @@ class LongPortMarketDataProviderTest {
     }
 
     @Test
+    void minuteBarsUseNativeFiveMinutePeriod() {
+        client.minuteBars = List.of(new LongPortMinuteBar("603308.SH",
+                LocalDateTime.of(2026, 7, 10, 10, 0), "5M", "NONE",
+                new BigDecimal("10"), new BigDecimal("11"), new BigDecimal("9"),
+                new BigDecimal("10.5"), 100L, new BigDecimal("1000")));
+        var bars = provider.getMinuteBars("SH.603308", LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 7, 10), "5M", "NONE");
+        assertEquals(1, bars.size());
+        assertEquals("SH.603308", bars.get(0).canonicalSymbol());
+        assertEquals("5M", bars.get(0).intervalType());
+    }
+
+    @Test
     void dailyBarsMapNoneAdjustType() {
         client.dailyBars = List.of(new LongPortQuoteClient.LongPortDailyBar(
                 "600519.SH",
@@ -71,6 +85,35 @@ class LongPortMarketDataProviderTest {
     }
 
     @Test
+    void latestQuoteSupportsHongKongSymbol() {
+        client.quotes = List.of(new LongPortQuoteClient.LongPortQuote(
+                "2498.HK", LocalDateTime.of(2026, 7, 16, 16, 0),
+                new BigDecimal("22.50"), new BigDecimal("22.10"),
+                new BigDecimal("22.80"), new BigDecimal("21.90"),
+                new BigDecimal("22.00"), 1000L, new BigDecimal("22500"), "Normal"));
+
+        List<MarketDataProvider.ProviderQuote> quotes = provider.getLatestQuotes(List.of("HK.02498"));
+
+        assertEquals(List.of("2498.HK"), client.lastQuoteSymbols);
+        assertEquals("HK.02498", quotes.get(0).canonicalSymbol());
+    }
+
+    @Test
+    void dailyBarsSupportUsSymbol() {
+        client.dailyBars = List.of(new LongPortQuoteClient.LongPortDailyBar(
+                "AAPL.US", LocalDate.of(2026, 7, 16), "NONE",
+                new BigDecimal("210"), new BigDecimal("214"),
+                new BigDecimal("209"), new BigDecimal("213"),
+                1000L, new BigDecimal("213000")));
+
+        List<MarketDataProvider.ProviderDailyBar> bars = provider.getDailyBars(
+                "US.aapl", LocalDate.of(2026, 7, 16), LocalDate.of(2026, 7, 16), "NONE");
+
+        assertEquals("AAPL.US", client.lastDailySymbol);
+        assertEquals("US.AAPL", bars.get(0).canonicalSymbol());
+    }
+
+    @Test
     void dailyBarsRejectUnsupportedBackwardAdjust() {
         BusinessException exception = assertThrows(BusinessException.class, () ->
                 provider.getDailyBars("SH.600519", LocalDate.of(2026, 7, 1),
@@ -81,7 +124,7 @@ class LongPortMarketDataProviderTest {
 
     @Test
     void invalidCanonicalSymbolRejectedBeforeCallingClient() {
-        assertThrows(BusinessException.class, () -> provider.getLatestQuotes(List.of("HK.00700")));
+        assertThrows(BusinessException.class, () -> provider.getLatestQuotes(List.of("XX.00700")));
         assertNull(client.lastQuoteSymbols);
     }
 
@@ -100,12 +143,19 @@ class LongPortMarketDataProviderTest {
         private String lastSdkAdjustType;
         private List<LongPortQuote> quotes = List.of();
         private List<LongPortDailyBar> dailyBars = List.of();
+        private List<LongPortMinuteBar> minuteBars = List.of();
 
         @Override public boolean isSdkAvailable() { return true; }
         @Override public boolean hasCredentials() { return true; }
         @Override public String unavailableReason() { return null; }
         @Override public ProviderHealthStatus healthCheck() {
             return new ProviderHealthStatus(true, true, null, LocalDateTime.now());
+        }
+
+        @Override
+        public LongPortSecurityInfo getSecurityStaticInfo(String longPortSymbol) {
+            return new LongPortSecurityInfo(longPortSymbol, "测试证券", "測試證券", "Test Security",
+                    "TEST", "CNY", 100);
         }
 
         @Override
@@ -122,5 +172,14 @@ class LongPortMarketDataProviderTest {
             lastSdkAdjustType = sdkAdjustTypeName;
             return dailyBars;
         }
+
+        @Override
+        public List<LongPortMinuteBar> getMinuteBars(String longPortSymbol, LocalDate startDate,
+                                                      LocalDate endDate, String sdkPeriodName,
+                                                      String sdkAdjustTypeName, String systemIntervalType,
+                                                      String systemAdjustType) {
+            return minuteBars;
+        }
+
     }
 }

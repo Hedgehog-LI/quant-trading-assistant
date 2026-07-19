@@ -1,14 +1,16 @@
 # Feature Design: LongPort 只读行情源接入
 
-> 版本：v0.1.3 · 状态：真实外联已验收（2026-07-12，SH.600519 单 symbol 多日 latest quote + daily bar 落库 dataSource=LONGPORT） · 关联：`../BUILD_CHECKLIST.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`、`LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../decisions/ADR-0008-longport-quote-only-provider.md`
+> 版本：v0.1.4 · 状态：真实外联已验收（2026-07-12 latest quote + daily bar；2026-07-17 A 股分钟 K 最小链路） · 关联：`../BUILD_CHECKLIST.md`、`MARKET_DATA_FOUNDATION_DESIGN.md`、`LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`、`../api/MARKET_DATA_API.md`、`../decisions/ADR-0008-longport-quote-only-provider.md`
 
-## 0. 当前实现事实（2026-07-12 真实外联验收口径）
+## 0. 当前实现事实（2026-07-17 验收口径）
 
 LongPort 只读行情源已端到端打通并验证数据正确性：
 
 - 已完成：`MarketDataProvider` 抽象、`DisabledMarketDataProvider`、`FakeMarketDataProvider`、`LongPortSymbolMapper`、V7-V9 表结构、行情状态/快照/同步任务/提醒 API、前端 `/market-data` 6 Tab。
 - 已完成：`LongPortProperties`、`LongPortMarketDataProvider`、`LongPortQuoteClient`、`ReflectiveLongPortQuoteClient`、Docker/env 透传和 SDK 缺失安全降级测试。
 - 已完成（2026-07-12）：官方 Java SDK 安装、域名覆盖、真实凭据外联、单 symbol 多日 latest quote + daily bar 落库验收。
+- 已完成（2026-07-17）：分钟 K adapter 使用 SDK 4.3.3 原生 1M/5M/15M/30M/60M 周期，按单次 1000 根上限做日期分块，并通过客户端 60 次/30 秒限流器统一约束调用。
+- 已完成（2026-07-17）：采集计划执行引擎、A 股交易时段 scheduler、DB claim 与重启恢复。真实最小验收 `SH.601318 / 2026-07-10 / 5M`：provider 返回 49 根，落库 48 根，15:00 边界根按会话规则计入 skipped，水位止于 14:55。
 - 启用方式：`qta.market-data.longport.enabled=true`（默认 `false`，安全兜底）。配置项见本文件 §5。
 - 运行态：未启用、SDK 未安装或凭据未配置时，`/providers/LONGPORT/status` 返回 `configured=false`，同步或拉取请求返回 `BUSINESS_RULE_VIOLATION`，这是预期业务拦截，不是系统崩溃。
 - 页面 502 常见原因：本地 Vite `VITE_DEV_PROXY_TARGET` 指向了未运行的端口，例如 `localhost:18081`；当前 Docker 后端默认暴露 `localhost:8080`。

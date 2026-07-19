@@ -7,6 +7,7 @@ import com.quant.trade.marketdata.dao.StockBasicMapper;
 import com.quant.trade.marketdata.dao.StockDailyBarMapper;
 import com.quant.trade.marketdata.model.StockBasicDO;
 import com.quant.trade.marketdata.model.StockDailyBarDO;
+import com.quant.trade.marketdata.util.CanonicalSymbolUtils;
 import com.quant.trade.marketdata.vo.DailyBarImportResultVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,19 +34,14 @@ public class StockDataManager {
     private final StockBasicMapper stockBasicMapper;
     private final StockDailyBarMapper stockDailyBarMapper;
 
-    /** 规范化 canonical_symbol：SH.600519 / SZ.000001 / BJ.430047 */
+    /** 规范化 canonical_symbol，支持 A 股、港股与美股。 */
     public String buildCanonicalSymbol(String market, String symbol) {
-        String m = market.trim().toUpperCase(Locale.ROOT);
-        String s = symbol.trim();
-        if (!MarketDataConstants.VALID_MARKETS.contains(m)) {
+        try {
+            return CanonicalSymbolUtils.normalize(market + "." + symbol);
+        } catch (IllegalArgumentException exception) {
             throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL,
-                    "市场必须为 SH/SZ/BJ: " + market);
+                    exception.getMessage());
         }
-        if (!s.matches("\\d{4,6}")) {
-            throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL,
-                    "证券代码必须为 4-6 位数字: " + symbol);
-        }
-        return m + "." + s;
     }
 
     /**
@@ -197,7 +193,7 @@ public class StockDataManager {
 
     private StockDailyBarDO parseAndValidateRow(CSVRecord record, int rowNum,
                                                   Map<String, StockBasicDO> stockMap) {
-        String canonicalSymbol = record.get("canonical_symbol").trim().toUpperCase();
+        String canonicalSymbol = CanonicalSymbolUtils.normalize(record.get("canonical_symbol"));
         String tradeDateStr = record.get("trade_date").trim();
         String adjustType = record.get("adjust_type").trim().toUpperCase();
         BigDecimal open = new BigDecimal(record.get("open").trim());
@@ -232,7 +228,7 @@ public class StockDataManager {
     }
 
     private void validateCanonicalSymbol(String symbol) {
-        if (!symbol.matches(MarketDataConstants.CANONICAL_SYMBOL_REGEX)) {
+        if (!CanonicalSymbolUtils.isValid(symbol)) {
             throw new IllegalArgumentException("canonical_symbol 格式不合法: " + symbol);
         }
     }
