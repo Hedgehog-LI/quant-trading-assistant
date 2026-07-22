@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-07-22 — P1.6 板块双层自动采集（自动化通过，部署验收待执行）
+
+- **后端**：Flyway 从空 H2 库成功执行 V1-V15；新增集成测试实际读写排行配置、claim、批次和明细，单元测试覆盖 CN/HK/US 时区、以每段开市为锚点的频率时间桶、收盘单次、周末和交易日历休市跳过；`./mvnw test` **299 tests / 0 failures / 0 errors / 0 skipped**，package 通过。
+- **交易窗口回归**：新增测试覆盖 CN 09:14 不采、09:15 起采、09:25 末次竞价采样、09:26-09:29 停止、09:30 恢复；15:01 不采、15:05 单次收盘、成功后停止；scheduler 层验证收盘后不调用排行或关注板块 service；已有批次修复水位时不调用 provider。
+- **前端**：`npm run typecheck`、`npm run lint`、`npm run test -- --run`（**36 files / 277 tests**）、`npm run build` 通过；API 测试覆盖排行配置/立即采集/历史与关注板块频率路由。
+- **静态检查**：前后端 `git diff --check` 通过；未发现密钥、交易、订单或账户能力引入。
+- **浏览器**：本地 Vite mock 模式检查 `/market-segments`；桌面和 390px 窄屏均能显示“自动采集”配置与历史区域，表格在自身容器横向滚动，页面无横向溢出，console error 为 0。顺带修复全局 Layout flex 子项缺少 `min-width: 0` 导致的窄屏压缩问题。
+- **未执行**：本轮未重建 Docker、未调用真实 Longbridge、未做 remote 数据交互；这些不计为已通过。
+- **部署验收门槛**：V15 在 MySQL 8.4 成功应用；至少一个具备行业权限的市场立即采集返回批次；启用 5 或 15 分钟频率后跨两个时间桶仅各写一批；重复执行同一桶不重复；权限错误进入 `BLOCKED_PERMISSION` 且不高频重试。
+- **结论**：代码与自动化门禁可交付部署，真实外联与 scheduler 时间推进仍需部署后验收。
+
 ## 2026-07-19 — LongPort 凭据错误分类与 scheduler 查询修复（静态通过，外部鉴权故障阻塞）
 
 - **复现**：本机 `/providers/LONGPORT/status` 返回 `configured=true/reachable=false/lastError=token invalid`；证券验证返回 `PROVIDER_UNAVAILABLE`；行业排行返回旧的 `MARKET_DATA_PROVIDER_PERMISSION_DENIED`。与服务器现象一致。

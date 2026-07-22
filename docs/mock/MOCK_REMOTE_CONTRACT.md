@@ -67,6 +67,7 @@
 - 板块 `memberCount` 必须与 `marketSegmentMembers:{id}` 数组长度一致（增删成员时同步维护）。
 - 板块成员支持增删查；移除成员按 `canonicalSymbol` 定位。
 - 市场行业排行在 mock 模式只提供带“演示”名称和 `LOCAL_DEMO` providerCode 的界面样例，不持久化、不声称来自外部行情。
+- 板块自动采集配置在 mock 模式只用于界面演示；立即采集明确拒绝，历史榜单返回空集合，不伪造 scheduler 或 provider 成功。真实时间桶、排行批次、成分快照和错误状态必须使用 remote 模式。
 - remote 模式行业排行/层级调用 `/api/v1/market-data/sector-catalog/*`；provider 不可用时展示错误和重试，不回退为演示数据。
 - 证券与板块成员统一规范化：港股固定五位（`HK.2498 -> HK.02498`），美股统一大写（`us.aapl -> US.AAPL`）；重复判断使用规范化后的标识。
 - ID 类型沿用 mock UUID string 规则（§3）。

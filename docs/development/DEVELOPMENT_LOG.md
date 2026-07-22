@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-07-22 — P1.6 板块双层自动采集与历史榜单
+
+- **目标**：不再要求用户逐板块手工采集；低成本持续保存全市场领涨/领跌事实，并对用户关注板块保存更细的成分资金快照。
+- **产品决策**：采用“全市场排行批次 + 关注板块明细”双层模型。盘中频率是受控选项 `5/10/15/30/60` 分钟，也可只采收盘；收盘快照独立开关。CN/HK/US 按各自时区和常规交易窗口判断。
+- **后端**：V15 新增排行 config/batch/item 三表，扩展 watch/snapshot 自动采集、claim、时间桶、质量和错误字段；新增排行 service/persistence manager/schedule manager/scheduler 与 7 个 REST 操作；支持立即采集、历史批次和完整榜单。
+- **可靠性**：DB claim 防并发，唯一时间桶防重复；鉴权/权限/配置错误进入阻断态，临时错误按 1/2/5/10/30 分钟退避；修改配置会清除阻断状态。
+- **交易窗口收口**：专家复核后，CN 增加 09:15-09:25 集合竞价采集并保留 09:25 末次采样，09:26-09:29/午休/收盘后停止周期采集；HK 收盘快照推迟至 16:15，US 等待 10 分钟。排行与关注采集统一按每段开市时间对齐频率桶，并复用 `market_calendar` 跳过已配置休市日；已有批次会修复成功水位，避免重启后每 30 秒重复查同一桶。
+- **前端**：板块管理新增“自动采集”页签，支持三市场启停、频率、收盘快照、运行状态、立即采集、历史领涨领跌和完整排名；我的关注支持独立自动采集频率与质量状态。
+- **验证**：Flyway V15 在 H2 从空库实际迁移；新 MyBatis config/batch/item 实际读写；CN/HK/US 时间桶单测；后端 293 tests + package、前端 typecheck/lint/36 files 277 tests/build 全绿。真实 Longbridge 与 Docker/MySQL 留给部署后最小验收，不虚构外联结果。
+- **关联**：`../features/MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`、`../decisions/ADR-0010-sector-ranking-dual-layer-collection.md`、`../ai/HANDOFF_2026-07-22_sector_automation.md`。
+
 ## 2026-07-19 — LongPort Token 失效诊断与盘中调度器降噪
 
 - **线上现象**：证券静态信息报 `token invalid`；行业接口被统一显示为“无权限”；旧计划 `MINUTE_BAR_BACKFILL + INTRADAY` 每 30 秒被 scheduler 重复扫描。

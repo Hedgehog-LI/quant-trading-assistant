@@ -6,6 +6,8 @@ import com.quant.trade.marketdata.dao.MarketSectorMemberSnapshotMapper;
 import com.quant.trade.marketdata.dao.MarketSectorSnapshotMapper;
 import com.quant.trade.marketdata.dao.MarketSectorWatchMapper;
 import com.quant.trade.marketdata.dto.CreateMarketSectorWatchDTO;
+import com.quant.trade.marketdata.dto.UpdateMarketSectorWatchCollectionDTO;
+import com.quant.trade.marketdata.constant.MarketSectorCollectionConstants;
 import com.quant.trade.marketdata.manager.MarketSectorPersistenceManager;
 import com.quant.trade.marketdata.model.MarketSectorMemberSnapshotDO;
 import com.quant.trade.marketdata.model.MarketSectorSnapshotDO;
@@ -27,6 +29,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 /** 行业关注、手动刷新和历史查询应用服务。 */
 @Service
@@ -55,7 +58,7 @@ public class MarketSectorWatchService {
                 .marketCode(peer.market()).sectorName(peer.name()).topName(peer.topName())
                 .trackingSymbol(trackingSymbol).enabled(true).build();
         SnapshotBundle bundle = fetchSnapshot(null, peer.market(), peer.providerSectorId(), peer.changeRate(),
-                peer.yearToDateChangeRate());
+                peer.yearToDateChangeRate(), null, MarketSectorCollectionConstants.TRIGGER_MANUAL);
         try {
             persistenceManager.createWithSnapshot(watch, bundle.snapshot(), bundle.members());
         } catch (DuplicateKeyException exception) {
@@ -77,16 +80,48 @@ public class MarketSectorWatchService {
     }
 
     public MarketSectorWatchVO refresh(Long id) {
-        MarketSectorWatchDO watch = requireWatch(id);
+        return collect(requireWatch(id), null, false);
+    }
+
+    public MarketSectorWatchVO collectAuto(MarketSectorWatchDO watch, LocalDateTime bucketTime) {
+        return collect(watch, bucketTime, true);
+    }
+
+    public MarketSectorWatchVO updateCollection(Long id, UpdateMarketSectorWatchCollectionDTO dto) {
+        requireWatch(id);
+        if (!MarketSectorCollectionConstants.WATCH_INTERVAL_MINUTES.contains(dto.collectIntervalMinutes())) {
+            throw new BusinessException(ErrorCodeEnum.PARAM_ERROR, "关注板块频率仅支持 5、10、15、30、60 分钟");
+        }
+        watchMapper.updateCollectionConfig(id, dto.autoCollectEnabled(), dto.collectIntervalMinutes());
+        return get(id);
+    }
+
+    private MarketSectorWatchVO collect(MarketSectorWatchDO watch, LocalDateTime bucketTime, boolean automatic) {
+        if (bucketTime != null && snapshotMapper.selectByWatchAndBucket(watch.getId(), bucketTime) != null) {
+            return get(watch.getId());
+        }
+        LocalDateTime now = LocalDateTime.now(marketDataClock);
+        String token = UUID.randomUUID().toString();
+        if (watchMapper.tryClaim(watch.getId(), token, now,
+                now.minusMinutes(MarketSectorCollectionConstants.CLAIM_STALE_MINUTES)) == 0) {
+            throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PLAN_RUNNING, "该关注板块正在采集");
+        }
         try {
             var peer = catalogService.getIndustryPeers(watch.getMarketCode(), watch.getProviderSectorId());
-            SnapshotBundle bundle = fetchSnapshot(id, watch.getMarketCode(), watch.getProviderSectorId(),
-                    peer.changeRate(), peer.yearToDateChangeRate());
+            SnapshotBundle bundle = fetchSnapshot(watch.getId(), watch.getMarketCode(), watch.getProviderSectorId(),
+                    peer.changeRate(), peer.yearToDateChangeRate(), bucketTime,
+                    automatic ? MarketSectorCollectionConstants.TRIGGER_AUTO
+                            : MarketSectorCollectionConstants.TRIGGER_MANUAL);
             persistenceManager.appendSnapshot(bundle.snapshot(), bundle.members());
-            return get(id);
+            watchMapper.markCollectionSuccess(watch.getId(), bundle.snapshot().getSnapshotTime(), automatic, token);
+            return get(watch.getId());
         } catch (RuntimeException exception) {
-            watchMapper.updateRefreshResult(id, watch.getLastRefreshedAt(), abbreviate(exception.getMessage()));
+            CollectionFailure failure = classify(exception, watch.getConsecutiveFailures());
+            watchMapper.markCollectionFailure(watch.getId(), failure.state(), failure.nextRetryAt(now),
+                    failure.errorCode(), abbreviate(exception.getMessage()), token);
             throw exception;
+        } finally {
+            watchMapper.releaseClaim(watch.getId(), token);
         }
     }
 
@@ -122,7 +157,8 @@ public class MarketSectorWatchService {
     }
 
     private SnapshotBundle fetchSnapshot(Long watchId, String market, String providerSectorId,
-                                         BigDecimal changeRate, BigDecimal yearToDateChangeRate) {
+                                         BigDecimal changeRate, BigDecimal yearToDateChangeRate,
+                                         LocalDateTime bucketTime, String triggerType) {
         var constituents = provider.getIndustryConstituents(providerSectorId);
         SectorRank rank = provider.getIndustryRank(market, "leading-gainer", "single", 100).stream()
                 .filter(item -> providerSectorId.equals(item.providerSectorId())).findFirst().orElse(null);
@@ -138,8 +174,15 @@ public class MarketSectorWatchService {
         BigDecimal leadingChangeRate = rank != null ? rank.leadingChangeRate()
                 : constituentLeader == null ? null : constituentLeader.changeRate();
         LocalDateTime now = LocalDateTime.ofInstant(marketDataClock.instant(), marketDataClock.getZone());
+        int expectedCount = nullSafeCount(constituents.riseCount()) + nullSafeCount(constituents.fallCount())
+                + nullSafeCount(constituents.flatCount());
+        if (expectedCount <= 0) expectedCount = stocks.size();
+        int delayedCount = (int) stocks.stream().filter(item -> Boolean.TRUE.equals(item.delayed())).count();
+        int unmappedCount = Math.max(expectedCount - stocks.size(), 0);
+        int coverage = expectedCount == 0 ? 100 : stocks.size() * 100 / expectedCount;
         MarketSectorSnapshotDO snapshot = MarketSectorSnapshotDO.builder()
-                .watchId(watchId).snapshotTime(now).rankIndicator(SNAPSHOT_INDICATOR)
+                .watchId(watchId).snapshotTime(now).snapshotBucketTime(bucketTime).triggerType(triggerType)
+                .fetchedAt(now).rankIndicator(SNAPSHOT_INDICATOR)
                 .changeRate(rank == null ? changeRate : rank.changeRate())
                 .yearToDateChangeRate(yearToDateChangeRate)
                 .leadingName(leadingName).leadingSymbol(leadingSymbol).leadingChangeRate(leadingChangeRate)
@@ -147,7 +190,12 @@ public class MarketSectorWatchService {
                 .fallCount(countByChange(stocks, -1)).flatCount(countByChange(stocks, 0))
                 .totalNetInflow(sum(stocks, ValueType.INFLOW))
                 .totalTurnoverAmount(sum(stocks, ValueType.TURNOVER))
-                .totalVolume(sum(stocks, ValueType.VOLUME)).dataSource(constituents.providerCode()).build();
+                .totalVolume(sum(stocks, ValueType.VOLUME)).dataSource(constituents.providerCode())
+                .expectedMemberCount(expectedCount).validMemberCount(stocks.size())
+                .delayedMemberCount(delayedCount).unmappedMemberCount(unmappedCount)
+                .qualityStatus(coverage >= MarketSectorCollectionConstants.MIN_VALID_MEMBER_COVERAGE_PERCENT
+                        ? MarketSectorCollectionConstants.QUALITY_VALID
+                        : MarketSectorCollectionConstants.QUALITY_SUSPECT).build();
         List<MarketSectorMemberSnapshotDO> members = stocks.stream().map(this::toMemberDO).toList();
         return new SnapshotBundle(snapshot, members);
     }
@@ -174,20 +222,30 @@ public class MarketSectorWatchService {
                 .filter(item -> Integer.signum(item.changeRate().compareTo(BigDecimal.ZERO)) == direction).count();
     }
 
+    private int nullSafeCount(Integer value) {
+        return value == null ? 0 : value;
+    }
+
     private MarketSectorWatchVO toWatchVO(MarketSectorWatchDO watch) {
         MarketSectorSnapshotDO latest = snapshotMapper.selectLatestByWatchId(watch.getId());
         return new MarketSectorWatchVO(watch.getId(), watch.getProviderCode(), watch.getProviderSectorId(),
                 watch.getMarketCode(), watch.getSectorName(), watch.getTopName(), watch.getTrackingSymbol(),
-                watch.getEnabled(), watch.getLastRefreshedAt(), watch.getLastError(), watch.getCreatedAt(),
-                watch.getUpdatedAt(), latest == null ? null : toSnapshotVO(latest));
+                watch.getEnabled(), watch.getAutoCollectEnabled(), watch.getCollectIntervalMinutes(),
+                watch.getLastRefreshedAt(), watch.getLastAutoCollectedAt(), watch.getCollectionState(),
+                watch.getNextRetryAt(), watch.getConsecutiveFailures(), watch.getLastErrorCode(),
+                watch.getLastError(), watch.getCreatedAt(), watch.getUpdatedAt(),
+                latest == null ? null : toSnapshotVO(latest));
     }
 
     private MarketSectorSnapshotVO toSnapshotVO(MarketSectorSnapshotDO item) {
         return new MarketSectorSnapshotVO(item.getId(), item.getWatchId(), item.getSnapshotTime(),
+                item.getSnapshotBucketTime(), item.getTriggerType(), item.getFetchedAt(),
                 item.getRankIndicator(), item.getChangeRate(), item.getYearToDateChangeRate(), item.getLeadingName(),
                 item.getLeadingSymbol(), item.getLeadingChangeRate(), item.getConstituentCount(), item.getRiseCount(),
                 item.getFallCount(), item.getFlatCount(), item.getTotalNetInflow(), item.getTotalTurnoverAmount(),
-                item.getTotalVolume(), item.getDataSource());
+                item.getTotalVolume(), item.getDataSource(), item.getExpectedMemberCount(),
+                item.getValidMemberCount(), item.getDelayedMemberCount(), item.getUnmappedMemberCount(),
+                item.getQualityStatus());
     }
 
     private MarketSectorWatchDO requireWatch(Long id) {
@@ -214,8 +272,31 @@ public class MarketSectorWatchService {
         return message.length() <= 500 ? message : message.substring(0, 500);
     }
 
+    private CollectionFailure classify(RuntimeException exception, Integer failures) {
+        ErrorCodeEnum code = exception instanceof BusinessException business ? business.getErrorCode()
+                : ErrorCodeEnum.INTERNAL_ERROR;
+        return switch (code) {
+            case MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED -> new CollectionFailure(
+                    MarketSectorCollectionConstants.STATE_BLOCKED_AUTH, code.getCode(), null);
+            case MARKET_DATA_PROVIDER_PERMISSION_DENIED -> new CollectionFailure(
+                    MarketSectorCollectionConstants.STATE_BLOCKED_PERMISSION, code.getCode(), null);
+            case MARKET_SECTOR_PROVIDER_UNAVAILABLE -> new CollectionFailure(
+                    MarketSectorCollectionConstants.STATE_BLOCKED_CONFIG, code.getCode(), null);
+            default -> new CollectionFailure(MarketSectorCollectionConstants.STATE_BACKOFF, code.getCode(),
+                    switch (Math.min(failures == null ? 0 : failures, 4)) {
+                        case 0 -> 1; case 1 -> 2; case 2 -> 5; case 3 -> 10; default -> 30;
+                    });
+        };
+    }
+
     private enum ValueType { INFLOW, TURNOVER, VOLUME }
 
     private record SnapshotBundle(MarketSectorSnapshotDO snapshot,
                                   List<MarketSectorMemberSnapshotDO> members) {}
+
+    private record CollectionFailure(String state, String errorCode, Integer backoffMinutes) {
+        LocalDateTime nextRetryAt(LocalDateTime now) {
+            return backoffMinutes == null ? null : now.plusMinutes(backoffMinutes);
+        }
+    }
 }

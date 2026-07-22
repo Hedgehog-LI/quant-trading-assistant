@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.MarketSectorRankingItemMapper">
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketSectorRankingItemDO">
+        <id column="id" property="id"/><result column="batch_id" property="batchId"/>
+        <result column="rank_no" property="rankNo"/><result column="provider_sector_id" property="providerSectorId"/>
+        <result column="sector_name" property="sectorName"/><result column="change_rate" property="changeRate"/>
+        <result column="leading_name" property="leadingName"/><result column="leading_symbol" property="leadingSymbol"/>
+        <result column="leading_change_rate" property="leadingChangeRate"/><result column="indicator_name" property="indicatorName"/>
+        <result column="indicator_value" property="indicatorValue"/><result column="created_at" property="createdAt"/>
+    </resultMap>
+    <insert id="insertBatch">
+        INSERT INTO market_sector_ranking_item (batch_id, rank_no, provider_sector_id, sector_name,
+            change_rate, leading_name, leading_symbol, leading_change_rate, indicator_name, indicator_value)
+        VALUES
+        <foreach collection="records" item="item" separator=",">
+            (#{item.batchId}, #{item.rankNo}, #{item.providerSectorId}, #{item.sectorName},
+             #{item.changeRate}, #{item.leadingName}, #{item.leadingSymbol}, #{item.leadingChangeRate},
+             #{item.indicatorName}, #{item.indicatorValue})
+        </foreach>
+    </insert>
+    <select id="selectByBatchId" resultMap="BaseResultMap">
+        SELECT id, batch_id, rank_no, provider_sector_id, sector_name, change_rate, leading_name,
+            leading_symbol, leading_change_rate, indicator_name, indicator_value, created_at
+        FROM market_sector_ranking_item WHERE batch_id = #{batchId} ORDER BY rank_no ASC
+    </select>
+</mapper>

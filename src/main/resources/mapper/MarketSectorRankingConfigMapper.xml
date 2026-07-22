@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.MarketSectorRankingConfigMapper">
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketSectorRankingConfigDO">
+        <id column="id" property="id"/>
+        <result column="provider_code" property="providerCode"/>
+        <result column="market_code" property="marketCode"/>
+        <result column="enabled" property="enabled"/>
+        <result column="intraday_interval_minutes" property="intradayIntervalMinutes"/>
+        <result column="close_snapshot_enabled" property="closeSnapshotEnabled"/>
+        <result column="rank_limit" property="rankLimit"/>
+        <result column="execution_state" property="executionState"/>
+        <result column="last_intraday_at" property="lastIntradayAt"/>
+        <result column="last_close_trade_date" property="lastCloseTradeDate"/>
+        <result column="last_success_at" property="lastSuccessAt"/>
+        <result column="next_retry_at" property="nextRetryAt"/>
+        <result column="consecutive_failures" property="consecutiveFailures"/>
+        <result column="last_error_code" property="lastErrorCode"/>
+        <result column="last_error_message" property="lastErrorMessage"/>
+        <result column="run_claim_token" property="runClaimToken"/>
+        <result column="run_claimed_at" property="runClaimedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="Columns">id, provider_code, market_code, enabled, intraday_interval_minutes,
+        close_snapshot_enabled, rank_limit, execution_state, last_intraday_at, last_close_trade_date,
+        last_success_at, next_retry_at, consecutive_failures, last_error_code, last_error_message,
+        run_claim_token, run_claimed_at, created_at, updated_at</sql>
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Columns"/> FROM market_sector_ranking_config ORDER BY market_code
+    </select>
+    <select id="selectRunnable" resultMap="BaseResultMap">
+        SELECT <include refid="Columns"/> FROM market_sector_ranking_config
+        WHERE enabled = TRUE
+          AND execution_state NOT IN ('BLOCKED_AUTH', 'BLOCKED_PERMISSION', 'BLOCKED_CONFIG')
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now})
+        ORDER BY market_code
+    </select>
+    <select id="selectByMarket" resultMap="BaseResultMap">
+        SELECT <include refid="Columns"/> FROM market_sector_ranking_config WHERE market_code = #{marketCode}
+    </select>
+    <update id="updateConfig">
+        UPDATE market_sector_ranking_config
+        SET enabled = #{enabled}, intraday_interval_minutes = #{intradayIntervalMinutes},
+            close_snapshot_enabled = #{closeSnapshotEnabled}, rank_limit = #{rankLimit},
+            execution_state = 'IDLE', next_retry_at = NULL, consecutive_failures = 0,
+            last_error_code = NULL, last_error_message = NULL
+        WHERE id = #{id}
+    </update>
+    <update id="tryClaim">
+        UPDATE market_sector_ranking_config
+        SET run_claim_token = #{token}, run_claimed_at = #{claimedAt}, execution_state = 'ACTIVE'
+        WHERE id = #{id}
+          AND (run_claim_token IS NULL OR run_claimed_at IS NULL OR run_claimed_at &lt; #{staleBefore})
+    </update>
+    <update id="releaseClaim">
+        UPDATE market_sector_ranking_config
+        SET run_claim_token = NULL, run_claimed_at = NULL
+        WHERE id = #{id} AND run_claim_token = #{token}
+    </update>
+    <update id="markSuccess">
+        UPDATE market_sector_ranking_config
+        SET execution_state = 'IDLE', last_success_at = #{successAt}, next_retry_at = NULL,
+            consecutive_failures = 0, last_error_code = NULL, last_error_message = NULL,
+            last_intraday_at = CASE WHEN #{snapshotType} = 'INTRADAY' THEN #{successAt} ELSE last_intraday_at END,
+            last_close_trade_date = CASE WHEN #{snapshotType} = 'CLOSE' THEN #{tradeDate} ELSE last_close_trade_date END
+        WHERE id = #{id} AND run_claim_token = #{token}
+    </update>
+    <update id="markFailure">
+        UPDATE market_sector_ranking_config
+        SET execution_state = #{state}, next_retry_at = #{nextRetryAt},
+            consecutive_failures = consecutive_failures + 1,
+            last_error_code = #{errorCode}, last_error_message = #{errorMessage}
+        WHERE id = #{id} AND run_claim_token = #{token}
+    </update>
+</mapper>

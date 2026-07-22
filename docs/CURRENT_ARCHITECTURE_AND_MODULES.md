@@ -61,7 +61,7 @@ convert     # MapStruct 转换器
 | Review | `review` | `/api/v1/reviews` | `review_note` |
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
-| Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V14 新增 `market_sector_watch`, `market_sector_snapshot`, `market_sector_member_snapshot` |
+| Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V15 新增全市场板块排行自动采集和关注板块自动采集 |
 
 ## 4. 当前数据库迁移
 
@@ -185,6 +185,8 @@ npm run build
 - 港美股当前覆盖证券主数据、最新价快照和历史日 K。分钟 K 自动任务仍以交易日历、时区和市场时段补齐为前置条件。
 - LongPort SDK 4.3.3 分钟 K 原生 1M/5M/15M/30M/60M 已接入，provider 只转换领域数据，不操作 DAO。
 - 市场板块与自定义分组已拆分：`MarketSectorProvider` 负责 Longbridge 行业排行、层级和成分只读查询，`market_segment` 仍只承载用户分组。行业接口使用签名 HTTPS 绕开 4.3.3 缺失 JNI；关注、聚合快照和成分快照由 V14 三表持久化。
+- P1.6 采用双层采集：`market_sector_ranking_*` 低成本保存全市场排序事实；用户明确关注的板块才进一步保存成分资金明细。`MarketSectorCollectionScheduler` 以 DB claim、时间桶唯一键、错误阻断/退避保证单实例或多实例下不重复采集。
+- 板块 scheduler 按 `Asia/Shanghai`、`Asia/Hong_Kong`、`America/New_York` 判断有效窗口；CN 包含 09:15-09:25 开盘集合竞价并保留 09:25 最终采样，09:26-09:29/午休/收盘后停止周期采集。HK/US 默认只采常规时段，收盘快照分别等待 15/10 分钟。频率为受控选项而非任意数字；节假日精确日历仍属于部署数据治理，周末会直接跳过。
 - A 股 `5xxxxx` ETF 可由精确代码验证识别为上交所标的；ETF/指数行情复用现有证券报价和采集计划。
 - `MarketDataPlanExecutionService` 在 provider 调用外使用短事务写入 task/item/minute bar/watermark；V13 DB run claim 防止同计划重入。
 - `MarketDataIntradayScheduler` 通过可注入 `Clock` 按 A 股交易日/时段/采集频率扫描，非交易时段不创建空任务；启动时收敛遗留执行。

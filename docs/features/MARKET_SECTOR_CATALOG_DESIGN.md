@@ -1,5 +1,8 @@
 # 市场板块目录、关注与快照设计
 
+> P1.6 自动采集、全市场历史榜单、频率和可靠性设计见
+> `MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`。本文保留 P1.5 目录发现与手工快照基线。
+
 ## 1. 目标与边界
 
 板块能力分成三个互不混用的对象：
@@ -34,7 +37,7 @@
 | 表 | 责任 | 关键约束 |
 | --- | --- | --- |
 | `market_sector_watch` | provider 行业身份、市场、名称、可选跟踪证券、启停和最后结果 | `provider_code + provider_sector_id` 唯一 |
-| `market_sector_snapshot` | 某次采集的行业涨跌、年内涨跌、龙头、宽度、资金和成交聚合 | `watch_id + snapshot_time` 唯一；只追加 |
+| `market_sector_snapshot` | 某次采集的行业涨跌、年内涨跌、龙头、宽度、资金和成交聚合 | P1.6 按 `watch_id + snapshot_bucket_time` 保证自动采集时间桶幂等；手工快照桶可空 |
 | `market_sector_member_snapshot` | 某次采集的成分证券行情和资金事实 | `snapshot_id + canonical_symbol` 唯一；随快照级联删除 |
 
 provider 行业 ID 是外部稳定身份，示例：A 股 `BK/SH/IN40159`、港股 `BK/HK/...`、美股 `BK/US/...`。A 股不能假设为 `BK/CN/...`。

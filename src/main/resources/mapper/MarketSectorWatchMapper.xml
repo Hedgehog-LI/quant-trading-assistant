@@ -6,11 +6,22 @@
         <result column="provider_sector_id" property="providerSectorId"/><result column="market_code" property="marketCode"/>
         <result column="sector_name" property="sectorName"/><result column="top_name" property="topName"/>
         <result column="tracking_symbol" property="trackingSymbol"/><result column="enabled" property="enabled"/>
+        <result column="auto_collect_enabled" property="autoCollectEnabled"/>
+        <result column="collect_interval_minutes" property="collectIntervalMinutes"/>
         <result column="last_refreshed_at" property="lastRefreshedAt"/><result column="last_error" property="lastError"/>
+        <result column="last_auto_collected_at" property="lastAutoCollectedAt"/>
+        <result column="collection_state" property="collectionState"/>
+        <result column="next_retry_at" property="nextRetryAt"/>
+        <result column="consecutive_failures" property="consecutiveFailures"/>
+        <result column="last_error_code" property="lastErrorCode"/>
+        <result column="run_claim_token" property="runClaimToken"/>
+        <result column="run_claimed_at" property="runClaimedAt"/>
         <result column="created_at" property="createdAt"/><result column="updated_at" property="updatedAt"/>
     </resultMap>
     <sql id="Columns">id, provider_code, provider_sector_id, market_code, sector_name, top_name,
-        tracking_symbol, enabled, last_refreshed_at, last_error, created_at, updated_at</sql>
+        tracking_symbol, enabled, auto_collect_enabled, collect_interval_minutes, last_refreshed_at,
+        last_auto_collected_at, collection_state, next_retry_at, consecutive_failures, last_error_code,
+        run_claim_token, run_claimed_at, last_error, created_at, updated_at</sql>
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO market_sector_watch (provider_code, provider_sector_id, market_code, sector_name,
             top_name, tracking_symbol, enabled)
@@ -30,6 +41,45 @@
         ORDER BY enabled DESC, updated_at DESC, id DESC
     </select>
     <update id="updateEnabled">UPDATE market_sector_watch SET enabled = #{enabled} WHERE id = #{id}</update>
+    <update id="updateCollectionConfig">
+        UPDATE market_sector_watch
+        SET auto_collect_enabled = #{autoCollectEnabled}, collect_interval_minutes = #{collectIntervalMinutes},
+            collection_state = 'IDLE', next_retry_at = NULL, consecutive_failures = 0,
+            last_error_code = NULL, last_error = NULL
+        WHERE id = #{id}
+    </update>
+    <select id="selectAutoRunnable" resultMap="BaseResultMap">
+        SELECT <include refid="Columns"/> FROM market_sector_watch
+        WHERE enabled = TRUE AND auto_collect_enabled = TRUE
+          AND collection_state NOT IN ('BLOCKED_AUTH', 'BLOCKED_PERMISSION', 'BLOCKED_CONFIG')
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now})
+        ORDER BY id
+    </select>
+    <update id="tryClaim">
+        UPDATE market_sector_watch
+        SET run_claim_token = #{token}, run_claimed_at = #{claimedAt}, collection_state = 'ACTIVE'
+        WHERE id = #{id}
+          AND (run_claim_token IS NULL OR run_claimed_at IS NULL OR run_claimed_at &lt; #{staleBefore})
+    </update>
+    <update id="releaseClaim">
+        UPDATE market_sector_watch SET run_claim_token = NULL, run_claimed_at = NULL
+        WHERE id = #{id} AND run_claim_token = #{token}
+    </update>
+    <update id="markCollectionSuccess">
+        UPDATE market_sector_watch
+        SET last_refreshed_at = #{refreshedAt},
+            last_auto_collected_at = CASE WHEN #{autoCollected} = TRUE THEN #{refreshedAt} ELSE last_auto_collected_at END,
+            collection_state = 'IDLE', next_retry_at = NULL, consecutive_failures = 0,
+            last_error_code = NULL, last_error = NULL
+        WHERE id = #{id} AND run_claim_token = #{token}
+    </update>
+    <update id="markCollectionFailure">
+        UPDATE market_sector_watch
+        SET collection_state = #{state}, next_retry_at = #{nextRetryAt},
+            consecutive_failures = consecutive_failures + 1,
+            last_error_code = #{errorCode}, last_error = #{lastError}
+        WHERE id = #{id} AND run_claim_token = #{token}
+    </update>
     <update id="updateRefreshResult">
         UPDATE market_sector_watch SET last_refreshed_at = #{refreshedAt}, last_error = #{lastError} WHERE id = #{id}
     </update>

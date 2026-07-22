@@ -15,6 +15,7 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 ## 当前状态（2026-07）
 
+- **P1.6 板块双层自动采集（2026-07-22 代码与静态验收完成）**：V15 新增 CN/HK/US 全市场排行配置、批次和明细，并扩展关注板块自动采集。频率支持仅收盘或 5/10/15/30/60 分钟；各市场独立时区/常规交易窗口，具备 DB claim、时间桶幂等、鉴权/权限阻断、临时失败退避和质量字段。前端新增“自动采集”页签、立即采集、状态、历史榜单和关注板块独立频率。后端 293 tests + package、前端 277 tests + typecheck/lint/build 全绿；部署后的真实 provider 两时间桶验收尚未执行。入口：`docs/features/MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`、`docs/ai/HANDOFF_2026-07-22_sector_automation.md`。
 - **2026-07-19 Longbridge 外部鉴权故障与本地修复（待重新部署）**：最后一次真实成功为 2026-07-18 09:51:52，首次观察失败为 2026-07-19 14:28:59。原 Legacy 凭据、重新生成的 Legacy 凭据以及 CLI 0.24.0 全新 OAuth 登录均被服务端拒绝（`401004 token invalid` / `401102 token verification failed`），而官方 MCP 仍可读取行情；当前按 Longbridge 外部鉴权故障处理并已提交 Trace ID，停止反复轮换密钥。代码已将凭据失效与 403/301604 行情权限不足分开；盘中 scheduler 只扫描 `INTRADAY_MINUTE_REFRESH + INTRADAY + enabled`，旧非法计划不再每 30 秒告警。后端 **287 tests** 通过。部署与核验见 `development/LONGPORT_TOKEN_INCIDENT_2026-07-19.md`。
 - **v0.1.0** Today MVP + 交易账本 + 持仓快照：已完成。
 - **v0.1.1** 基础交易闭环优化（计划关联 + 复盘一致性 + 快照对比 + FIFO 对账 + 工作台待办 + 连接防呆）及多轮质量收尾：**已完成并验收**。范围与改动见 `development/DEVELOPMENT_LOG.md`。
@@ -41,9 +42,9 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 P1.0 证券主数据和 CSV 日 K 基础已由 `marketdata` 模块实现（V5/V6）。P1.1 LongPort provider facade + V7-V9 migration + 9 API + 6 Tab 前端已实现；后端反射式 SDK adapter 已实现。**P1.1 单股票手动同步真实外联已于 2026-07-12 全流程验收通过**（SDK 安装 + 域名覆盖 + 凭据 + 单 symbol 落库）。
 
-P1.2 行情采集执行引擎已经完成代码、自动化、Docker MySQL curl 联动和 A 股真实分钟 K 最小外联验收。本轮已收口，不再扩展范围。后续 P1 主线：
+P1.2 行情采集执行引擎和 P1.6 板块双层自动采集已完成代码与自动化门禁。P1.6 部署后仍需最小真实采集验收。后续 P1 主线：
 
-1. 建设异动观察页面和第一批可解释量价统计；只扫描用户自选、持仓、计划与自定义板块，不做全市场扫描。
+1. 基于已落库的全市场板块排行和关注成分快照，建设相对强弱、轮动持续性、龙头贡献和异动提醒；分析不直接生成交易指令。
 2. P1.4a 精确证券代码验证已完成；后续按 D1-D4 实施 **P1.4b 证券目录与模糊检索**，先后端本地目录/search API，再共享选择器，再 provider 同步，最后跨业务推广。
 3. 港股、美股分钟自动采集必须先补齐各市场交易日历、时区和交易时段，不能直接复用 A 股 scheduler。
 4. 数据资产稳定后再推进指标、策略和回测；信号必须经过风险模块。

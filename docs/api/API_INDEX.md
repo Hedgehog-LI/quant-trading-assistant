@@ -58,6 +58,11 @@
 | Market Data | GET / POST / DELETE | `/api/v1/market-data/segments/{id}/members[/{canonicalSymbol}]` | 已实现（板块成员增删查） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/sector-catalog/industry-rankings` | 已实现（LongPort 行业排行，只读） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/sector-catalog/industry-peers` | 已实现（LongPort 行业层级摘要，只读） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET / DELETE | `/api/v1/market-data/sector-catalog/watches[/{id}]` | 已实现（行业关注、手工快照和历史） | `MARKET_DATA_API.md` |
+| Market Data | PUT | `/api/v1/market-data/sector-catalog/watches/{id}/collection` | 已实现（关注板块自动采集频率） | `MARKET_DATA_API.md` |
+| Market Data | GET / PUT | `/api/v1/market-data/sector-catalog/ranking-configs[/{market}]` | 已实现（CN/HK/US 全市场榜单采集配置） | `MARKET_DATA_API.md` |
+| Market Data | POST | `/api/v1/market-data/sector-catalog/ranking-configs/{market}/run` | 已实现（立即采集全市场榜单） | `MARKET_DATA_API.md` |
+| Market Data | GET | `/api/v1/market-data/sector-catalog/ranking-history[/{batchId}/items]` | 已实现（历史榜单批次和明细） | `MARKET_DATA_API.md` |
 
 ## 错误码
 

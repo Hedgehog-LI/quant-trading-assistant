@@ -22,6 +22,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +43,7 @@ class MarketSectorWatchServiceTest {
                 .providerSectorId("BK/SH/IN40159").marketCode("CN").sectorName("综合油气公司")
                 .enabled(true).build();
         when(watchMapper.selectById(7L)).thenReturn(watch);
+        when(watchMapper.tryClaim(eq(7L), any(), any(), any())).thenReturn(1);
         when(catalogService.getIndustryPeers("CN", "BK/SH/IN40159"))
                 .thenReturn(new MarketSectorPeerVO("CN", "能源", "综合油气公司", "BK/SH/IN40159",
                         2, new BigDecimal("0.024"), new BigDecimal("0.115"), false, "LONGPORT"));

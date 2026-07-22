@@ -4,6 +4,8 @@
     <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketSectorSnapshotDO">
         <id column="id" property="id"/><result column="watch_id" property="watchId"/>
         <result column="snapshot_time" property="snapshotTime"/><result column="rank_indicator" property="rankIndicator"/>
+        <result column="snapshot_bucket_time" property="snapshotBucketTime"/>
+        <result column="trigger_type" property="triggerType"/><result column="fetched_at" property="fetchedAt"/>
         <result column="change_rate" property="changeRate"/><result column="year_to_date_change_rate" property="yearToDateChangeRate"/>
         <result column="leading_name" property="leadingName"/><result column="leading_symbol" property="leadingSymbol"/>
         <result column="leading_change_rate" property="leadingChangeRate"/><result column="constituent_count" property="constituentCount"/>
@@ -11,17 +13,28 @@
         <result column="flat_count" property="flatCount"/><result column="total_net_inflow" property="totalNetInflow"/>
         <result column="total_turnover_amount" property="totalTurnoverAmount"/><result column="total_volume" property="totalVolume"/>
         <result column="data_source" property="dataSource"/><result column="created_at" property="createdAt"/>
+        <result column="expected_member_count" property="expectedMemberCount"/>
+        <result column="valid_member_count" property="validMemberCount"/>
+        <result column="delayed_member_count" property="delayedMemberCount"/>
+        <result column="unmapped_member_count" property="unmappedMemberCount"/>
+        <result column="quality_status" property="qualityStatus"/>
     </resultMap>
     <sql id="Columns">id, watch_id, snapshot_time, rank_indicator, change_rate, year_to_date_change_rate,
         leading_name, leading_symbol, leading_change_rate, constituent_count, rise_count, fall_count, flat_count,
-        total_net_inflow, total_turnover_amount, total_volume, data_source, created_at</sql>
+        total_net_inflow, total_turnover_amount, total_volume, data_source, snapshot_bucket_time,
+        trigger_type, fetched_at, expected_member_count, valid_member_count, delayed_member_count,
+        unmapped_member_count, quality_status, created_at</sql>
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO market_sector_snapshot (watch_id, snapshot_time, rank_indicator, change_rate,
             year_to_date_change_rate, leading_name, leading_symbol, leading_change_rate, constituent_count,
-            rise_count, fall_count, flat_count, total_net_inflow, total_turnover_amount, total_volume, data_source)
+            rise_count, fall_count, flat_count, total_net_inflow, total_turnover_amount, total_volume, data_source,
+            snapshot_bucket_time, trigger_type, fetched_at, expected_member_count, valid_member_count,
+            delayed_member_count, unmapped_member_count, quality_status)
         VALUES (#{watchId}, #{snapshotTime}, #{rankIndicator}, #{changeRate}, #{yearToDateChangeRate},
             #{leadingName}, #{leadingSymbol}, #{leadingChangeRate}, #{constituentCount}, #{riseCount},
-            #{fallCount}, #{flatCount}, #{totalNetInflow}, #{totalTurnoverAmount}, #{totalVolume}, #{dataSource})
+            #{fallCount}, #{flatCount}, #{totalNetInflow}, #{totalTurnoverAmount}, #{totalVolume}, #{dataSource},
+            #{snapshotBucketTime}, #{triggerType}, #{fetchedAt}, #{expectedMemberCount}, #{validMemberCount},
+            #{delayedMemberCount}, #{unmappedMemberCount}, #{qualityStatus})
     </insert>
     <select id="selectLatestByWatchId" resultMap="BaseResultMap">
         SELECT <include refid="Columns"/> FROM market_sector_snapshot WHERE watch_id = #{watchId}
@@ -29,6 +42,10 @@
     </select>
     <select id="selectById" resultMap="BaseResultMap">
         SELECT <include refid="Columns"/> FROM market_sector_snapshot WHERE id = #{id}
+    </select>
+    <select id="selectByWatchAndBucket" resultMap="BaseResultMap">
+        SELECT <include refid="Columns"/> FROM market_sector_snapshot
+        WHERE watch_id = #{watchId} AND snapshot_bucket_time = #{bucketTime}
     </select>
     <select id="selectByWatchId" resultMap="BaseResultMap">
         SELECT <include refid="Columns"/> FROM market_sector_snapshot WHERE watch_id = #{watchId}

@@ -2,7 +2,7 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
-当前已发布 V1-V13，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+当前已发布 V1-V15，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
 
 ## 命名约定
 
@@ -256,6 +256,18 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 
 幂等键：`segment_id + canonical_symbol`。
 
+### market_sector_watch / market_sector_snapshot / market_sector_member_snapshot
+
+状态：已实现（V14，V15 扩展）。用途：保存用户明确关注的 provider 行业、聚合快照和逐成分行情资金事实。V15 增加自动采集开关/频率、运行 claim、失败状态、时间桶、触发类型和质量覆盖字段。自动快照以 `watch_id + snapshot_bucket_time` 幂等；手工快照的桶可为空。
+
+### market_sector_ranking_config
+
+状态：已实现（V15）。用途：按 provider + CN/HK/US 保存全市场行业榜单采集配置与运行状态。盘中频率只允许 `0/5/10/15/30/60`，并单独控制收盘快照；保存 claim、最近成功、失败次数、下次重试及结构化错误。
+
+### market_sector_ranking_batch / market_sector_ranking_item
+
+状态：已实现（V15）。用途：批次保存某市场某时间桶的全行业宽度、领涨/领跌和质量，明细保存完整排名及领涨标的。`provider_code + market_code + snapshot_type + snapshot_bucket_time` 唯一，明细以 `batch_id + provider_sector_id` 唯一并随批次级联删除。
+
 ### technical_indicator_daily
 
 用途：保存日线技术指标快照。
@@ -438,6 +450,7 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 5. 行情 P1.2 已实现工作台/采集计划/分钟线/交易时段/水位（V10：`stock_minute_bar`、`market_trading_session`、`market_calendar`、`market_data_sync_plan`、`market_data_sync_task_item`、`market_data_watermark`）。
 6. 行情 P1.3 已实现板块/自定义分组（V11：`market_segment`、`market_segment_member`）。
 7. 行情 P1.5 已实现市场行业关注与不可变快照（V14：`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`）。
-8. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
+8. 行情 P1.6 已实现全市场板块历史榜单与自动采集（V15：`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item`），并扩展关注/快照表的采集频率、claim、质量和错误状态。
+9. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。

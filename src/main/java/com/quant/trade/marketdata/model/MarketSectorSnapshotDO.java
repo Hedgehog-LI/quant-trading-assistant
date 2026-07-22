@@ -13,6 +13,9 @@ public class MarketSectorSnapshotDO {
     private Long id;
     private Long watchId;
     private LocalDateTime snapshotTime;
+    private LocalDateTime snapshotBucketTime;
+    private String triggerType;
+    private LocalDateTime fetchedAt;
     private String rankIndicator;
     private BigDecimal changeRate;
     private BigDecimal yearToDateChangeRate;
@@ -27,5 +30,10 @@ public class MarketSectorSnapshotDO {
     private BigDecimal totalTurnoverAmount;
     private BigDecimal totalVolume;
     private String dataSource;
+    private Integer expectedMemberCount;
+    private Integer validMemberCount;
+    private Integer delayedMemberCount;
+    private Integer unmappedMemberCount;
+    private String qualityStatus;
     private LocalDateTime createdAt;
 }
