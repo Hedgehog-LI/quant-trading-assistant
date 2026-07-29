@@ -10,19 +10,31 @@ import com.quant.trade.marketdata.provider.longport.LongPortIndustryHttpClient;
 import com.quant.trade.marketdata.provider.longport.LongPortSectorClient;
 import com.quant.trade.marketdata.provider.longport.ReflectiveLongPortQuoteClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.MultipartConfigElement;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.MultipartConfigFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.unit.DataSize;
 
 /** 行情数据模块配置。 */
 @Configuration
 @EnableScheduling
 @EnableConfigurationProperties(LongPortProperties.class)
 public class MarketDataConfig {
+
+    /** 目录导入允许 50 MiB；业务服务仍负责精确文件上限和稳定错误码。 */
+    @Bean
+    public MultipartConfigElement marketDataMultipartConfig() {
+        MultipartConfigFactory factory = new MultipartConfigFactory();
+        factory.setMaxFileSize(DataSize.ofMegabytes(50));
+        factory.setMaxRequestSize(DataSize.ofMegabytes(51));
+        return factory.createMultipartConfig();
+    }
 
     /** 行情调度统一使用上海时区；测试可覆盖为固定 Clock。 */
     @Bean

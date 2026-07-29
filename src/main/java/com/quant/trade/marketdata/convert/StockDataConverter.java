@@ -18,6 +18,19 @@ public interface StockDataConverter {
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "canonicalSymbol", ignore = true)
     @Mapping(target = "delisted", ignore = true)
+    @Mapping(target = "nameCn", ignore = true)
+    @Mapping(target = "nameHk", ignore = true)
+    @Mapping(target = "nameEn", ignore = true)
+    @Mapping(target = "shortName", ignore = true)
+    @Mapping(target = "pinyinFull", ignore = true)
+    @Mapping(target = "pinyinAbbr", ignore = true)
+    @Mapping(target = "exchange", ignore = true)
+    @Mapping(target = "currency", ignore = true)
+    @Mapping(target = "securityType", ignore = true)
+    @Mapping(target = "listStatus", ignore = true)
+    @Mapping(target = "dataSource", ignore = true)
+    @Mapping(target = "sourceUpdatedAt", ignore = true)
+    @Mapping(target = "sourceHash", ignore = true)
     StockBasicDO toDO(CreateStockBasicDTO dto);
 
     StockBasicVO toVO(StockBasicDO record);

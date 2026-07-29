@@ -8,14 +8,38 @@
         <result column="symbol" property="symbol"/>
         <result column="name" property="name"/>
         <result column="market" property="market"/>
+        <result column="name_cn" property="nameCn"/>
+        <result column="name_hk" property="nameHk"/>
+        <result column="name_en" property="nameEn"/>
+        <result column="short_name" property="shortName"/>
+        <result column="pinyin_full" property="pinyinFull"/>
+        <result column="pinyin_abbr" property="pinyinAbbr"/>
+        <result column="exchange" property="exchange"/>
+        <result column="currency" property="currency"/>
+        <result column="security_type" property="securityType"/>
+        <result column="list_status" property="listStatus"/>
+        <result column="data_source" property="dataSource"/>
+        <result column="source_updated_at" property="sourceUpdatedAt"/>
+        <result column="source_hash" property="sourceHash"/>
         <result column="list_date" property="listDate"/>
         <result column="delisted" property="delisted"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
+    <resultMap id="SearchCandidateResultMap"
+               type="com.quant.trade.marketdata.model.SecuritySearchCandidateDO"
+               extends="BaseResultMap">
+        <result column="alias_exact" property="aliasExact"/>
+        <result column="alias_prefix" property="aliasPrefix"/>
+        <result column="alias_contains" property="aliasContains"/>
+    </resultMap>
+
     <sql id="Base_Column_List">
-        id, canonical_symbol, symbol, name, market, list_date, delisted, created_at, updated_at
+        id, canonical_symbol, symbol, name, market,
+        name_cn, name_hk, name_en, short_name, pinyin_full, pinyin_abbr,
+        exchange, currency, security_type, list_status, data_source, source_updated_at, source_hash,
+        list_date, delisted, created_at, updated_at
     </sql>
 
     <sql id="Filter_Clause">
@@ -28,8 +52,26 @@
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO stock_basic (canonical_symbol, symbol, name, market, list_date, delisted)
-        VALUES (#{canonicalSymbol}, #{symbol}, #{name}, #{market}, #{listDate}, #{delisted})
+        INSERT INTO stock_basic (
+            canonical_symbol, symbol, name, market, list_date, delisted, list_status
+        ) VALUES (
+            #{canonicalSymbol}, #{symbol}, #{name}, #{market}, #{listDate}, #{delisted},
+            CASE WHEN #{delisted} = TRUE THEN 'DELISTED' ELSE 'UNKNOWN' END
+        )
+    </insert>
+
+    <insert id="insertDirectory" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO stock_basic (
+            canonical_symbol, symbol, name, market,
+            name_cn, name_hk, name_en, short_name, pinyin_full, pinyin_abbr,
+            exchange, currency, security_type, list_status, data_source, source_updated_at, source_hash,
+            list_date, delisted
+        ) VALUES (
+            #{canonicalSymbol}, #{symbol}, #{name}, #{market},
+            #{nameCn}, #{nameHk}, #{nameEn}, #{shortName}, #{pinyinFull}, #{pinyinAbbr},
+            #{exchange}, #{currency}, #{securityType}, #{listStatus}, #{dataSource},
+            #{sourceUpdatedAt}, #{sourceHash}, #{listDate}, #{delisted}
+        )
     </insert>
 
     <update id="updateById">
@@ -37,8 +79,38 @@
         <set>
             <if test="name != null">name = #{name},</if>
             <if test="listDate != null">list_date = #{listDate},</if>
-            <if test="delisted != null">delisted = #{delisted},</if>
+            <if test="delisted != null">
+                delisted = #{delisted},
+                list_status = CASE
+                    WHEN #{delisted} = TRUE THEN 'DELISTED'
+                    WHEN list_status = 'DELISTED' THEN 'UNKNOWN'
+                    ELSE list_status
+                END,
+            </if>
         </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateDirectoryById">
+        UPDATE stock_basic
+        SET name = #{name},
+            market = #{market},
+            symbol = #{symbol},
+            name_cn = #{nameCn},
+            name_hk = #{nameHk},
+            name_en = #{nameEn},
+            short_name = #{shortName},
+            pinyin_full = #{pinyinFull},
+            pinyin_abbr = #{pinyinAbbr},
+            exchange = #{exchange},
+            currency = #{currency},
+            security_type = #{securityType},
+            list_status = #{listStatus},
+            data_source = #{dataSource},
+            source_updated_at = #{sourceUpdatedAt},
+            source_hash = #{sourceHash},
+            list_date = #{listDate},
+            delisted = #{delisted}
         WHERE id = #{id}
     </update>
 
@@ -65,6 +137,76 @@
         SELECT <include refid="Base_Column_List"/> FROM stock_basic
         WHERE canonical_symbol IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <select id="searchCandidates" resultMap="SearchCandidateResultMap">
+        SELECT
+            s.id, s.canonical_symbol, s.symbol, s.name, s.market,
+            s.name_cn, s.name_hk, s.name_en, s.short_name, s.pinyin_full, s.pinyin_abbr,
+            s.exchange, s.currency, s.security_type, s.list_status, s.data_source,
+            s.source_updated_at, s.source_hash, s.list_date, s.delisted, s.created_at, s.updated_at,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM stock_alias ae
+                WHERE ae.stock_basic_id = s.id AND ae.normalized_alias = #{query}
+            ) THEN TRUE ELSE FALSE END AS alias_exact,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM stock_alias ap
+                WHERE ap.stock_basic_id = s.id
+                  AND ap.normalized_alias LIKE CONCAT(#{query}, '%')
+            ) THEN TRUE ELSE FALSE END AS alias_prefix,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM stock_alias ac
+                WHERE ac.stock_basic_id = s.id
+                  AND ac.normalized_alias LIKE CONCAT('%', #{query}, '%')
+            ) THEN TRUE ELSE FALSE END AS alias_contains
+        FROM stock_basic s
+        <where>
+            <if test="!includeDelisted">
+                AND s.delisted = FALSE AND s.list_status != 'DELISTED'
+            </if>
+            <if test="markets != null and !markets.isEmpty()">
+                AND s.market IN
+                <foreach collection="markets" item="market" open="(" separator="," close=")">
+                    #{market}
+                </foreach>
+            </if>
+            <if test="types != null and !types.isEmpty()">
+                AND s.security_type IN
+                <foreach collection="types" item="type" open="(" separator="," close=")">
+                    #{type}
+                </foreach>
+            </if>
+            AND (
+                UPPER(s.canonical_symbol) = #{queryUpper}
+                <if test="canonicalQuery != null">
+                    OR s.canonical_symbol = #{canonicalQuery}
+                </if>
+                OR UPPER(s.symbol) = #{queryUpper}
+                <if test="hkSymbol != null">
+                    OR (s.market = 'HK' AND s.symbol = #{hkSymbol})
+                </if>
+                OR LOWER(COALESCE(s.name, '')) LIKE CONCAT('%', #{query}, '%')
+                OR LOWER(COALESCE(s.name_cn, '')) LIKE CONCAT('%', #{query}, '%')
+                OR LOWER(COALESCE(s.name_hk, '')) LIKE CONCAT('%', #{query}, '%')
+                OR LOWER(COALESCE(s.name_en, '')) LIKE CONCAT('%', #{query}, '%')
+                OR LOWER(COALESCE(s.short_name, '')) LIKE CONCAT('%', #{query}, '%')
+                OR LOWER(COALESCE(s.pinyin_full, '')) LIKE CONCAT(#{query}, '%')
+                OR LOWER(COALESCE(s.pinyin_abbr, '')) LIKE CONCAT(#{query}, '%')
+                OR EXISTS (
+                    SELECT 1 FROM stock_alias ax
+                    WHERE ax.stock_basic_id = s.id
+                      AND ax.normalized_alias LIKE CONCAT('%', #{query}, '%')
+                )
+            )
+        </where>
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1) FROM stock_basic
+    </select>
+
+    <select id="selectMaxSourceUpdatedAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(source_updated_at) FROM stock_basic
     </select>
 
     <delete id="deleteByCanonicalSymbol">

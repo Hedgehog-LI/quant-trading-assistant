@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.StockAliasMapper">
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.StockAliasDO">
+        <id column="id" property="id"/>
+        <result column="stock_basic_id" property="stockBasicId"/>
+        <result column="alias" property="alias"/>
+        <result column="normalized_alias" property="normalizedAlias"/>
+        <result column="alias_type" property="aliasType"/>
+        <result column="language" property="language"/>
+        <result column="data_source" property="dataSource"/>
+        <result column="effective_from" property="effectiveFrom"/>
+        <result column="effective_to" property="effectiveTo"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, stock_basic_id, alias, normalized_alias, alias_type, language, data_source,
+        effective_from, effective_to, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO stock_alias (
+            stock_basic_id, alias, normalized_alias, alias_type, language, data_source,
+            effective_from, effective_to
+        ) VALUES (
+            #{stockBasicId}, #{alias}, #{normalizedAlias}, #{aliasType}, #{language}, #{dataSource},
+            #{effectiveFrom}, #{effectiveTo}
+        )
+    </insert>
+
+    <select id="selectByIdentity" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM stock_alias
+        WHERE stock_basic_id = #{stockBasicId}
+          AND normalized_alias = #{normalizedAlias}
+          AND alias_type = #{aliasType}
+    </select>
+
+    <select id="selectByStockBasicId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM stock_alias
+        WHERE stock_basic_id = #{stockBasicId}
+        ORDER BY alias_type, normalized_alias, id
+    </select>
+
+    <select id="selectByStockBasicIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM stock_alias
+        WHERE stock_basic_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY stock_basic_id, alias_type, normalized_alias, id
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1) FROM stock_alias
+    </select>
+</mapper>
