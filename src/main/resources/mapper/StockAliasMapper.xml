@@ -6,6 +6,7 @@
         <result column="stock_basic_id" property="stockBasicId"/>
         <result column="alias" property="alias"/>
         <result column="normalized_alias" property="normalizedAlias"/>
+        <result column="normalized_alias_key" property="normalizedAliasKey"/>
         <result column="alias_type" property="aliasType"/>
         <result column="language" property="language"/>
         <result column="data_source" property="dataSource"/>
@@ -16,17 +17,17 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, stock_basic_id, alias, normalized_alias, alias_type, language, data_source,
+        id, stock_basic_id, alias, normalized_alias, normalized_alias_key, alias_type, language, data_source,
         effective_from, effective_to, created_at, updated_at
     </sql>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO stock_alias (
-            stock_basic_id, alias, normalized_alias, alias_type, language, data_source,
+            stock_basic_id, alias, normalized_alias, normalized_alias_key, alias_type, language, data_source,
             effective_from, effective_to
         ) VALUES (
-            #{stockBasicId}, #{alias}, #{normalizedAlias}, #{aliasType}, #{language}, #{dataSource},
-            #{effectiveFrom}, #{effectiveTo}
+            #{stockBasicId}, #{alias}, #{normalizedAlias}, #{normalizedAliasKey}, #{aliasType},
+            #{language}, #{dataSource}, #{effectiveFrom}, #{effectiveTo}
         )
     </insert>
 
@@ -34,7 +35,7 @@
         SELECT <include refid="Base_Column_List"/>
         FROM stock_alias
         WHERE stock_basic_id = #{stockBasicId}
-          AND normalized_alias = #{normalizedAlias}
+          AND normalized_alias_key = #{normalizedAliasKey}
           AND alias_type = #{aliasType}
     </select>
 

@@ -30,9 +30,6 @@
     <resultMap id="SearchCandidateResultMap"
                type="com.quant.trade.marketdata.model.SecuritySearchCandidateDO"
                extends="BaseResultMap">
-        <result column="alias_exact" property="aliasExact"/>
-        <result column="alias_prefix" property="aliasPrefix"/>
-        <result column="alias_contains" property="aliasContains"/>
     </resultMap>
 
     <sql id="Base_Column_List">
@@ -144,21 +141,7 @@
             s.id, s.canonical_symbol, s.symbol, s.name, s.market,
             s.name_cn, s.name_hk, s.name_en, s.short_name, s.pinyin_full, s.pinyin_abbr,
             s.exchange, s.currency, s.security_type, s.list_status, s.data_source,
-            s.source_updated_at, s.source_hash, s.list_date, s.delisted, s.created_at, s.updated_at,
-            CASE WHEN EXISTS (
-                SELECT 1 FROM stock_alias ae
-                WHERE ae.stock_basic_id = s.id AND ae.normalized_alias = #{query}
-            ) THEN TRUE ELSE FALSE END AS alias_exact,
-            CASE WHEN EXISTS (
-                SELECT 1 FROM stock_alias ap
-                WHERE ap.stock_basic_id = s.id
-                  AND ap.normalized_alias LIKE CONCAT(#{likeQuery}, '%') ESCAPE '!'
-            ) THEN TRUE ELSE FALSE END AS alias_prefix,
-            CASE WHEN EXISTS (
-                SELECT 1 FROM stock_alias ac
-                WHERE ac.stock_basic_id = s.id
-                  AND ac.normalized_alias LIKE CONCAT('%', #{likeQuery}, '%') ESCAPE '!'
-            ) THEN TRUE ELSE FALSE END AS alias_contains
+            s.source_updated_at, s.source_hash, s.list_date, s.delisted, s.created_at, s.updated_at
         FROM stock_basic s
         <where>
             <if test="!includeDelisted">

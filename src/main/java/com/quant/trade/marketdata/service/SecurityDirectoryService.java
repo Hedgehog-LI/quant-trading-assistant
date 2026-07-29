@@ -118,12 +118,16 @@ public class SecurityDirectoryService {
         String hkSymbol = normalizeHkNumericQuery(query);
         List<SecuritySearchCandidateDO> candidates = stockBasicMapper.searchCandidates(
                 query, likeQuery, queryUpper, canonicalQuery, hkSymbol, markets, types, includeDelisted);
+        Map<Long, List<StockAliasDO>> aliasesByStockId = loadAliasesByStockId(
+                candidates.stream().map(StockBasicDO::getId).toList());
         Map<String, Integer> marketOrder = new HashMap<>();
         for (int index = 0; index < markets.size(); index++) {
             marketOrder.put(markets.get(index), index);
         }
         List<ScoredSecurity> scored = candidates.stream()
-                .map(candidate -> score(candidate, query, queryUpper, canonicalQuery, hkSymbol))
+                .map(candidate -> score(candidate,
+                        aliasesByStockId.getOrDefault(candidate.getId(), List.of()),
+                        query, queryUpper, canonicalQuery, hkSymbol))
                 .filter(Objects::nonNull)
                 .sorted(searchComparator(marketOrder))
                 .limit(limit)
@@ -145,7 +149,12 @@ public class SecurityDirectoryService {
         if (stock == null) {
             throw new SecurityDirectoryNotFoundException(canonicalSymbol);
         }
-        List<StockAliasVO> aliases = stockAliasMapper.selectByStockBasicId(stock.getId()).stream()
+        List<StockAliasDO> aliasRecords = new ArrayList<>(stockAliasMapper.selectByStockBasicId(stock.getId()));
+        aliasRecords.sort(Comparator.comparing(StockAliasDO::getAliasType,
+                        SecurityDirectoryService::compareCodePoints)
+                .thenComparing(StockAliasDO::getNormalizedAlias, SecurityDirectoryService::compareCodePoints)
+                .thenComparing(StockAliasDO::getId));
+        List<StockAliasVO> aliases = aliasRecords.stream()
                 .map(alias -> new StockAliasVO(alias.getAlias(), alias.getNormalizedAlias(), alias.getAliasType(),
                         alias.getLanguage(), alias.getDataSource(), alias.getEffectiveFrom(), alias.getEffectiveTo()))
                 .toList();
@@ -234,6 +243,14 @@ public class SecurityDirectoryService {
                         uniqueRows.put(row.stock().getCanonicalSymbol(), row);
                     } else if (sameRow(first, row)) {
                         duplicateUnchanged++;
+                    } else if (sameDirectoryData(first.stock(), row.stock())
+                            && hasAliasMetadataConflict(first.aliases(), row.aliases())) {
+                        addError(errors, first.line(), "aliases", "CONFLICTING_ALIAS_METADATA",
+                                "与第 " + line + " 行的同一 alias identity 元数据冲突");
+                        addError(errors, line, "aliases", "CONFLICTING_ALIAS_METADATA",
+                                "与第 " + first.line() + " 行的同一 alias identity 元数据冲突");
+                        failedLines.add(first.line());
+                        failedLines.add(line);
                     } else {
                         addError(errors, first.line(), "canonical_symbol", "CONFLICTING_DUPLICATE",
                                 "与第 " + line + " 行的同一证券内容冲突");
@@ -354,20 +371,26 @@ public class SecurityDirectoryService {
             }
             String normalized = SecurityTextNormalizer.normalize(aliasValue);
             String key = type + "|" + normalized;
-            aliases.putIfAbsent(key, StockAliasDO.builder()
+            StockAliasDO incoming = StockAliasDO.builder()
                     .alias(aliasValue)
                     .normalizedAlias(normalized)
+                    .normalizedAliasKey(SecurityTextNormalizer.identityKey(normalized))
                     .aliasType(type)
                     .language(language)
                     .dataSource(dataSource)
-                    .build());
+                    .build();
+            StockAliasDO existing = aliases.putIfAbsent(key, incoming);
+            if (existing != null && !sameAliasMetadata(existing, incoming)) {
+                throw rowError("aliases", "CONFLICTING_ALIAS_METADATA",
+                        "同一 alias identity 的 language 或 display metadata 冲突");
+            }
         }
         return List.copyOf(aliases.values());
     }
 
     private SecurityDirectoryImportResultVO persist(ParsedBatch batch) {
         Map<String, StockBasicDO> existingStocks = preloadStocks(batch.rows());
-        Map<Long, Set<String>> existingAliasKeys = preloadAliases(existingStocks.values());
+        Map<Long, Map<String, StockAliasDO>> existingAliases = preloadAliases(existingStocks.values());
         long inserted = 0;
         long updated = 0;
         long unchanged = batch.duplicateUnchanged();
@@ -381,7 +404,7 @@ public class SecurityDirectoryService {
                 stockBasicMapper.insertDirectory(incoming);
                 existing = incoming;
                 inserted++;
-                existingAliasKeys.put(existing.getId(), new LinkedHashSet<>());
+                existingAliases.put(existing.getId(), new LinkedHashMap<>());
             } else if (sameDirectoryData(existing, incoming)) {
                 unchanged++;
             } else {
@@ -392,10 +415,11 @@ public class SecurityDirectoryService {
                             .stockBasicId(existing.getId())
                             .alias(cleanDisplay(existing.getName()))
                             .normalizedAlias(SecurityTextNormalizer.normalize(existing.getName()))
+                            .normalizedAliasKey(SecurityTextNormalizer.identityKey(existing.getName()))
                             .aliasType(StockAliasTypeEnum.FORMER_NAME.name())
                             .dataSource(incoming.getDataSource())
                             .build();
-                    if (insertAliasIfAbsent(former, existingAliasKeys)) {
+                    if (insertAliasIfAbsent(former, existingAliases, row.line(), batch.totalRows())) {
                         aliasesInserted++;
                         formerNamesAdded++;
                     } else {
@@ -408,7 +432,7 @@ public class SecurityDirectoryService {
             }
             for (StockAliasDO alias : row.aliases()) {
                 alias.setStockBasicId(existing.getId());
-                if (insertAliasIfAbsent(alias, existingAliasKeys)) {
+                if (insertAliasIfAbsent(alias, existingAliases, row.line(), batch.totalRows())) {
                     aliasesInserted++;
                 } else {
                     aliasesUnchanged++;
@@ -430,27 +454,47 @@ public class SecurityDirectoryService {
         return result;
     }
 
-    private Map<Long, Set<String>> preloadAliases(Iterable<StockBasicDO> stocks) {
+    private Map<Long, Map<String, StockAliasDO>> preloadAliases(Iterable<StockBasicDO> stocks) {
         List<Long> ids = new ArrayList<>();
         stocks.forEach(stock -> ids.add(stock.getId()));
-        Map<Long, Set<String>> result = new HashMap<>();
-        ids.forEach(id -> result.put(id, new LinkedHashSet<>()));
+        Map<Long, Map<String, StockAliasDO>> result = new HashMap<>();
+        ids.forEach(id -> result.put(id, new LinkedHashMap<>()));
+        loadAliasesByStockId(ids).forEach((stockId, aliases) -> aliases.forEach(alias ->
+                result.computeIfAbsent(stockId, ignored -> new LinkedHashMap<>())
+                        .put(aliasKey(alias), alias)));
+        return result;
+    }
+
+    private Map<Long, List<StockAliasDO>> loadAliasesByStockId(List<Long> ids) {
+        Map<Long, List<StockAliasDO>> result = new HashMap<>();
         for (int start = 0; start < ids.size(); start += 500) {
             List<Long> part = ids.subList(start, Math.min(start + 500, ids.size()));
             stockAliasMapper.selectByStockBasicIds(part).forEach(alias ->
-                    result.computeIfAbsent(alias.getStockBasicId(), ignored -> new LinkedHashSet<>())
-                            .add(aliasKey(alias)));
+                    result.computeIfAbsent(alias.getStockBasicId(), ignored -> new ArrayList<>()).add(alias));
         }
         return result;
     }
 
-    private boolean insertAliasIfAbsent(StockAliasDO alias, Map<Long, Set<String>> existingAliasKeys) {
-        Set<String> keys = existingAliasKeys.computeIfAbsent(alias.getStockBasicId(),
-                ignored -> new LinkedHashSet<>());
-        if (!keys.add(aliasKey(alias))) {
+    private boolean insertAliasIfAbsent(
+            StockAliasDO alias,
+            Map<Long, Map<String, StockAliasDO>> existingAliases,
+            long line,
+            long totalRows) {
+        alias.setNormalizedAliasKey(SecurityTextNormalizer.identityKey(alias.getNormalizedAlias()));
+        Map<String, StockAliasDO> aliases = existingAliases.computeIfAbsent(
+                alias.getStockBasicId(), ignored -> new LinkedHashMap<>());
+        StockAliasDO existing = aliases.get(aliasKey(alias));
+        if (existing != null) {
+            if (!sameAliasMetadata(existing, alias)) {
+                SecurityDirectoryImportErrorVO error = new SecurityDirectoryImportErrorVO(
+                        line, "aliases", "CONFLICTING_ALIAS_METADATA",
+                        "同一 alias identity 的 persisted metadata 冲突");
+                throw validationFailure(totalRows, 1, List.of(error));
+            }
             return false;
         }
         stockAliasMapper.insert(alias);
+        aliases.put(aliasKey(alias), alias);
         return true;
     }
 
@@ -458,10 +502,16 @@ public class SecurityDirectoryService {
         return alias.getAliasType() + "|" + alias.getNormalizedAlias();
     }
 
-    private ScoredSecurity score(SecuritySearchCandidateDO stock, String query, String queryUpper,
+    private ScoredSecurity score(SecuritySearchCandidateDO stock, List<StockAliasDO> aliases,
+                                 String query, String queryUpper,
                                  String canonicalQuery, String hkSymbol) {
         SecurityMatchedByEnum matchedBy = null;
         int score = 0;
+        List<String> normalizedAliases = aliases.stream()
+                .map(StockAliasDO::getNormalizedAlias)
+                .map(SecurityTextNormalizer::normalize)
+                .filter(Objects::nonNull)
+                .toList();
         if (stock.getCanonicalSymbol().equalsIgnoreCase(queryUpper)
                 || Objects.equals(stock.getCanonicalSymbol(), canonicalQuery)) {
             matchedBy = SecurityMatchedByEnum.CANONICAL_SYMBOL_EXACT;
@@ -476,10 +526,10 @@ public class SecurityDirectoryService {
         } else if (formalNames(stock).stream().anyMatch(name -> name.startsWith(query))) {
             matchedBy = SecurityMatchedByEnum.FORMAL_NAME_PREFIX;
             score = 80;
-        } else if (Boolean.TRUE.equals(stock.getAliasExact())) {
+        } else if (normalizedAliases.stream().anyMatch(alias -> alias.equals(query))) {
             matchedBy = SecurityMatchedByEnum.ALIAS_EXACT;
             score = 75;
-        } else if (Boolean.TRUE.equals(stock.getAliasPrefix())) {
+        } else if (normalizedAliases.stream().anyMatch(alias -> alias.startsWith(query))) {
             matchedBy = SecurityMatchedByEnum.ALIAS_PREFIX;
             score = 75;
         } else if (startsWithNormalized(stock.getPinyinFull(), query)) {
@@ -491,7 +541,7 @@ public class SecurityDirectoryService {
         } else if (formalNames(stock).stream().anyMatch(name -> name.contains(query))) {
             matchedBy = SecurityMatchedByEnum.NAME_CONTAINS;
             score = 50;
-        } else if (Boolean.TRUE.equals(stock.getAliasContains())) {
+        } else if (normalizedAliases.stream().anyMatch(alias -> alias.contains(query))) {
             matchedBy = SecurityMatchedByEnum.ALIAS_CONTAINS;
             score = 50;
         }
@@ -512,8 +562,9 @@ public class SecurityDirectoryService {
                 .thenComparing(ScoredSecurity::listed, Comparator.reverseOrder())
                 .thenComparingInt(scored -> marketOrder.isEmpty()
                         ? 0 : marketOrder.getOrDefault(scored.item().market(), Integer.MAX_VALUE))
-                .thenComparing(ScoredSecurity::normalizedName)
-                .thenComparing(scored -> scored.item().canonicalSymbol());
+                .thenComparing(ScoredSecurity::normalizedName, SecurityDirectoryService::compareCodePoints)
+                .thenComparing(scored -> scored.item().canonicalSymbol(),
+                        SecurityDirectoryService::compareCodePoints);
     }
 
     private List<String> formalNames(StockBasicDO stock) {
@@ -615,8 +666,54 @@ public class SecurityDirectoryService {
         if (!sameDirectoryData(first.stock(), second.stock())) {
             return false;
         }
-        return first.aliases().stream().map(this::aliasKey).collect(Collectors.toSet())
-                .equals(second.aliases().stream().map(this::aliasKey).collect(Collectors.toSet()));
+        return aliasMetadataByIdentity(first.aliases()).equals(aliasMetadataByIdentity(second.aliases()));
+    }
+
+    private boolean hasAliasMetadataConflict(List<StockAliasDO> first, List<StockAliasDO> second) {
+        Map<String, String> firstMetadata = aliasMetadataByIdentity(first);
+        Map<String, String> secondMetadata = aliasMetadataByIdentity(second);
+        return firstMetadata.entrySet().stream().anyMatch(entry ->
+                secondMetadata.containsKey(entry.getKey())
+                        && !Objects.equals(entry.getValue(), secondMetadata.get(entry.getKey())));
+    }
+
+    private Map<String, String> aliasMetadataByIdentity(List<StockAliasDO> aliases) {
+        return aliases.stream().collect(Collectors.toMap(
+                this::aliasKey,
+                this::aliasMetadataKey,
+                (left, right) -> left,
+                LinkedHashMap::new));
+    }
+
+    private String aliasMetadataKey(StockAliasDO alias) {
+        return String.join("\u0000",
+                Objects.toString(alias.getAlias(), ""),
+                Objects.toString(alias.getNormalizedAlias(), ""),
+                Objects.toString(alias.getAliasType(), ""),
+                Objects.toString(alias.getLanguage(), ""),
+                Objects.toString(alias.getDataSource(), ""),
+                Objects.toString(alias.getEffectiveFrom(), ""),
+                Objects.toString(alias.getEffectiveTo(), ""));
+    }
+
+    private boolean sameAliasMetadata(StockAliasDO left, StockAliasDO right) {
+        return aliasMetadataKey(left).equals(aliasMetadataKey(right));
+    }
+
+    private static int compareCodePoints(String left, String right) {
+        int leftOffset = 0;
+        int rightOffset = 0;
+        while (leftOffset < left.length() && rightOffset < right.length()) {
+            int leftPoint = left.codePointAt(leftOffset);
+            int rightPoint = right.codePointAt(rightOffset);
+            if (leftPoint != rightPoint) {
+                return Integer.compare(leftPoint, rightPoint);
+            }
+            leftOffset += Character.charCount(leftPoint);
+            rightOffset += Character.charCount(rightPoint);
+        }
+        return Integer.compare(left.codePointCount(0, left.length()),
+                right.codePointCount(0, right.length()));
     }
 
     private boolean sameDirectoryData(StockBasicDO left, StockBasicDO right) {

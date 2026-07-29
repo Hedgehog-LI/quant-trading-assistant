@@ -33,6 +33,7 @@ CREATE TABLE stock_alias (
     stock_basic_id   BIGINT       NOT NULL,
     alias            VARCHAR(256) NOT NULL,
     normalized_alias VARCHAR(256) NOT NULL,
+    normalized_alias_key VARBINARY(1024) NOT NULL,
     alias_type       VARCHAR(32)  NOT NULL,
     language         VARCHAR(16),
     data_source      VARCHAR(32)  NOT NULL,
@@ -41,10 +42,11 @@ CREATE TABLE stock_alias (
     created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT uk_stock_alias_identity
-        UNIQUE (stock_basic_id, normalized_alias, alias_type),
+        UNIQUE (stock_basic_id, normalized_alias_key, alias_type),
     CONSTRAINT fk_stock_alias_stock_basic
         FOREIGN KEY (stock_basic_id) REFERENCES stock_basic(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_stock_alias_normalized ON stock_alias (normalized_alias);
+CREATE INDEX idx_stock_alias_normalized_key ON stock_alias (normalized_alias_key);
 CREATE INDEX idx_stock_alias_stock ON stock_alias (stock_basic_id);

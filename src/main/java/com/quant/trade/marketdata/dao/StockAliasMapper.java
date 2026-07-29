@@ -10,7 +10,7 @@ import java.util.List;
 public interface StockAliasMapper {
     int insert(StockAliasDO record);
     StockAliasDO selectByIdentity(@Param("stockBasicId") Long stockBasicId,
-                                  @Param("normalizedAlias") String normalizedAlias,
+                                  @Param("normalizedAliasKey") byte[] normalizedAliasKey,
                                   @Param("aliasType") String aliasType);
     List<StockAliasDO> selectByStockBasicId(@Param("stockBasicId") Long stockBasicId);
     List<StockAliasDO> selectByStockBasicIds(@Param("ids") List<Long> stockBasicIds);

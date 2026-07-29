@@ -17,8 +17,14 @@ import com.quant.trade.marketdata.util.SecurityTextNormalizer;
 import com.quant.trade.marketdata.vo.SecurityDirectoryImportResultVO;
 import com.quant.trade.marketdata.vo.SecuritySearchItemVO;
 import com.quant.trade.marketdata.vo.SecuritySearchResultVO;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +41,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,6 +55,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SecurityDirectoryIntegrationTest {
 
     @Autowired
@@ -70,7 +78,14 @@ class SecurityDirectoryIntegrationTest {
         jdbcTemplate.update("DELETE FROM stock_daily_bar");
         jdbcTemplate.update("DELETE FROM stock_quote_snapshot");
         jdbcTemplate.update("DELETE FROM market_data_sync_task");
+        jdbcTemplate.update("DELETE FROM market_data_sync_plan");
+        jdbcTemplate.update("DELETE FROM portfolio_price_snapshot");
         jdbcTemplate.update("DELETE FROM stock_basic");
+    }
+
+    @AfterEach
+    void cleanDirectoryAfterTest() {
+        cleanDirectory();
     }
 
     @Test
@@ -184,6 +199,47 @@ class SecurityDirectoryIntegrationTest {
                 stockBasicMapper.selectByCanonicalSymbol("US.MICRO").getSourceUpdatedAt());
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("isolatedCsvNegativeCases")
+    void isolatedCsvDefectsReturnStableEvidenceAndRollback(
+            String ignoredName,
+            String csv,
+            String expectedCode,
+            long expectedLine,
+            String expectedField,
+            String expectedReason) {
+        SecurityDirectoryImportException exception = assertThrows(
+                SecurityDirectoryImportException.class, () -> importCsv(csv));
+        assertEquals(expectedCode, exception.getErrorCode().getCode());
+        assertEquals(expectedLine, exception.getResult().errors().get(0).line());
+        assertEquals(expectedField, exception.getResult().errors().get(0).field());
+        assertEquals(expectedReason, exception.getResult().errors().get(0).reasonCode());
+        assertEquals(0, stockBasicMapper.countAll());
+        assertEquals(0, stockAliasMapper.countAll());
+    }
+
+    @Test
+    void rowLimitRejectsActualTwoHundredThousandAndFirstRowWithoutWrites() {
+        StringBuilder csv = new StringBuilder("""
+                canonical_symbol,name,market,exchange,currency,security_type,list_status,data_source,source_updated_at
+                """);
+        for (int index = 0; index < 200_001; index++) {
+            csv.append("US.R").append(index)
+                    .append(",N,US,NYSE,USD,STOCK,LISTED,T,2026-07-01T00:00:00Z\n");
+        }
+
+        SecurityDirectoryImportException exception = assertThrows(
+                SecurityDirectoryImportException.class, () -> importCsv(csv.toString()));
+        assertEquals("DAILY_BAR_VALIDATION_ERROR", exception.getErrorCode().getCode());
+        assertEquals(200_001, exception.getResult().totalRows());
+        assertEquals(1, exception.getResult().failed());
+        assertEquals(200_002, exception.getResult().errors().get(0).line());
+        assertEquals("file", exception.getResult().errors().get(0).field());
+        assertEquals("TOO_MANY_ROWS", exception.getResult().errors().get(0).reasonCode());
+        assertEquals(0, stockBasicMapper.countAll());
+        assertEquals(0, stockAliasMapper.countAll());
+    }
+
     @Test
     void duplicateAndUnknownHeadersHaveStableReasons() {
         String duplicate = "canonical_symbol,name,name,market,exchange,currency,security_type,"
@@ -215,6 +271,79 @@ class SecurityDirectoryIntegrationTest {
     }
 
     @Test
+    void accentDistinctAliasesRemainUniqueAndMatchedByCodePointIdentity() {
+        SecurityDirectoryImportResultVO result = importCsv(header()
+                + row("US.PLAIN", "Plain Security", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "plainsecurity", "plain", "USER:en:resume")
+                + row("US.ACCENT", "Accent Security", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "accentsecurity", "accent", "USER:fr:résumé"));
+        assertEquals(2, result.aliasesInserted());
+        assertEquals(2, stockAliasMapper.countAll());
+
+        SecuritySearchItemVO plain = directoryService.search("resume", null, null, false, 20).items().get(0);
+        assertEquals("US.PLAIN", plain.canonicalSymbol());
+        assertEquals(SecurityMatchedByEnum.ALIAS_EXACT, plain.matchedBy());
+        assertEquals(1, directoryService.search("resume", null, null, false, 20).items().size());
+
+        SecuritySearchItemVO accent = directoryService.search("résumé", null, null, false, 20).items().get(0);
+        assertEquals("US.ACCENT", accent.canonicalSymbol());
+        assertEquals(SecurityMatchedByEnum.ALIAS_EXACT, accent.matchedBy());
+        assertEquals(1, directoryService.search("résumé", null, null, false, 20).items().size());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "USER:en:Resume|USER:en:resume",
+            "USER:en:Resume|USER:fr:Resume"
+    })
+    void conflictingAliasMetadataWithinOneRowIsRejected(String aliases) {
+        SecurityDirectoryImportException exception = assertThrows(
+                SecurityDirectoryImportException.class,
+                () -> importCsv(header() + row("US.ALIAS", "Alias Security", "US", "NYSE", "USD",
+                        "STOCK", "LISTED", "aliassecurity", "alias", aliases)));
+        assertEquals(2, exception.getResult().errors().get(0).line());
+        assertEquals("aliases", exception.getResult().errors().get(0).field());
+        assertEquals("CONFLICTING_ALIAS_METADATA", exception.getResult().errors().get(0).reasonCode());
+        assertEquals(0, stockBasicMapper.countAll());
+        assertEquals(0, stockAliasMapper.countAll());
+    }
+
+    @Test
+    void conflictingAliasMetadataAcrossDuplicateRowsIsRejectedAtomically() {
+        String csv = header()
+                + row("US.ALIAS", "Alias Security", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "aliassecurity", "alias", "USER:en:Resume")
+                + row("US.ALIAS", "Alias Security", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "aliassecurity", "alias", "USER:fr:Resume");
+        SecurityDirectoryImportException exception = assertThrows(
+                SecurityDirectoryImportException.class, () -> importCsv(csv));
+        assertEquals(2, exception.getResult().failed());
+        assertEquals(List.of(2L, 3L), exception.getResult().errors().stream()
+                .map(error -> error.line()).toList());
+        assertTrue(exception.getResult().errors().stream()
+                .allMatch(error -> "CONFLICTING_ALIAS_METADATA".equals(error.reasonCode())));
+        assertEquals(0, stockBasicMapper.countAll());
+        assertEquals(0, stockAliasMapper.countAll());
+    }
+
+    @Test
+    void conflictingAliasMetadataAgainstPersistedIdentityRollsBack() {
+        String english = header() + row("US.ALIAS", "Alias Security", "US", "NYSE", "USD",
+                "STOCK", "LISTED", "aliassecurity", "alias", "USER:en:Resume");
+        importCsv(english);
+        StockBasicDO stock = stockBasicMapper.selectByCanonicalSymbol("US.ALIAS");
+        List<StockAliasDO> before = stockAliasMapper.selectByStockBasicId(stock.getId());
+
+        String french = english.replace("USER:en:Resume", "USER:fr:Resume");
+        SecurityDirectoryImportException exception = assertThrows(
+                SecurityDirectoryImportException.class, () -> importCsv(french));
+        assertEquals("CONFLICTING_ALIAS_METADATA", exception.getResult().errors().get(0).reasonCode());
+        assertEquals(2, exception.getResult().errors().get(0).line());
+        assertEquals(1, stockBasicMapper.countAll());
+        assertEquals(before, stockAliasMapper.selectByStockBasicId(stock.getId()));
+    }
+
+    @Test
     void literalLikeMetacharactersDoNotExpandCandidateSets() {
         StringBuilder csv = new StringBuilder(header())
                 .append(row("US.PCT", "Percent %% Fund", "US", "NYSE", "USD", "ETF", "LISTED",
@@ -238,12 +367,50 @@ class SecurityDirectoryIntegrationTest {
     }
 
     @Test
+    void rankingComparatorLevelsAndMatchedByPrecedenceAreIsolatedAndRepeatable() {
+        importCsv(header()
+                + row("US.SCOREHIGH", "Score Duel", "US", "NYSE", "USD", "STOCK", "UNKNOWN",
+                "scorehigh", "sch", "")
+                + row("US.SCORELOW", "Score Duel Plus", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "scorelow", "scl", "")
+                + row("US.LISTED", "Listed Duel", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "listed", "lis", "")
+                + row("US.UNKNOWN", "Listed Duel", "US", "NYSE", "USD", "STOCK", "UNKNOWN",
+                "unknown", "unk", "")
+                + row("US.MARKET", "Market Duel", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "marketus", "mus", "")
+                + row("SH.600099", "Market Duel", "SH", "SSE", "CNY", "STOCK", "LISTED",
+                "marketsh", "msh", "")
+                + row("US.ZNAME", "Ｎａｍｅ Ｄｕｅｌ Ａ", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "namea", "na", "")
+                + row("US.ANAME", "Name Duel B", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "nameb", "nb", "")
+                + row("US.ACANON", "Canon Duel", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "canona", "ca", "")
+                + row("US.ZCANON", "Canon Duel", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "canonz", "cz", "")
+                + row("US.OMNI", "Omni Match", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "omni match", "om", "USER:en:Omni Match"));
+
+        assertRepeatedOrder("Score Duel", null, List.of("US.SCOREHIGH", "US.SCORELOW"));
+        assertRepeatedOrder("Listed Duel", null, List.of("US.LISTED", "US.UNKNOWN"));
+        assertRepeatedOrder("Market Duel", List.of("US", "SH"), List.of("US.MARKET", "SH.600099"));
+        assertRepeatedOrder("Name Duel", null, List.of("US.ZNAME", "US.ANAME"));
+        assertRepeatedOrder("Canon Duel", null, List.of("US.ACANON", "US.ZCANON"));
+        SecuritySearchItemVO omni = directoryService.search("Omni Match", null, null, false, 20).items().get(0);
+        assertEquals("US.OMNI", omni.canonicalSymbol());
+        assertEquals(SecurityMatchedByEnum.FORMAL_NAME_EXACT, omni.matchedBy());
+    }
+
+    @Test
     void searchCoversChannelsRankingFiltersHkPaddingAndProviderIsolation() {
         seedProtectedTables();
         ProtectedTablesSnapshot protectedBefore = protectedSnapshot();
         assertFalse(protectedBefore.dailyBars().isEmpty());
         assertFalse(protectedBefore.quoteSnapshots().isEmpty());
         assertFalse(protectedBefore.syncTasks().isEmpty());
+        assertFalse(protectedBefore.syncPlans().isEmpty());
+        assertFalse(protectedBefore.portfolioPrices().isEmpty());
         importCsv(header()
                 + row("SH.603308", "应流股份", "SH", "SSE", "CNY", "STOCK", "LISTED",
                 "yingliugufen", "ylgf", "FORMER_NAME:zh:应流科技")
@@ -339,7 +506,8 @@ class SecurityDirectoryIntegrationTest {
         directory.setDataSource("TEST");
         stockBasicMapper.updateDirectoryById(directory);
         stockAliasMapper.insert(StockAliasDO.builder().stockBasicId(id).alias("old")
-                .normalizedAlias("old").aliasType("FORMER_NAME").dataSource("TEST").build());
+                .normalizedAlias("old").normalizedAliasKey(SecurityTextNormalizer.identityKey("old"))
+                .aliasType("FORMER_NAME").dataSource("TEST").build());
 
         stockDataService.updateStock(id, new UpdateStockBasicDTO("legacy2", null, true));
         StockBasicDO delisted = stockBasicMapper.selectById(id);
@@ -372,6 +540,12 @@ class SecurityDirectoryIntegrationTest {
         SecuritySearchItemVO first = directoryService.search(query, null, null, false, 20).items().get(0);
         assertEquals(expectedSymbol, first.canonicalSymbol());
         assertEquals(matchedBy, first.matchedBy());
+    }
+
+    private void assertRepeatedOrder(String query, List<String> markets, List<String> expected) {
+        for (int repetition = 0; repetition < 3; repetition++) {
+            assertEquals(expected, symbols(directoryService.search(query, markets, null, false, 20)));
+        }
     }
 
     private List<String> symbols(SecuritySearchResultVO result) {
@@ -414,6 +588,26 @@ class SecurityDirectoryIntegrationTest {
                 ) VALUES (900001, 'QUOTE', 'TEST', '{"symbols":["US.PROTECTED"]}', 'SUCCESS',
                           'D1-PROTECTED-TASK', 1, 1, 0, 1, 0, 0)
                 """);
+        jdbcTemplate.update("""
+                INSERT INTO market_data_sync_plan (
+                    id, plan_name, task_type, provider, scope_json, interval_type, adjust_type,
+                    trigger_type, cron_expr, include_auction, collect_frequency, enabled, description,
+                    last_run_at, last_task_id, run_claim_token, run_claimed_at, running_task_id
+                ) VALUES (
+                    900001, 'D1 protected collection', 'DAILY_BAR', 'TEST',
+                    '{"symbols":["US.PROTECTED"]}', '1D', 'NONE', 'CRON', '0 0 18 * * ?',
+                    FALSE, 'DAILY', TRUE, 'must remain unchanged', '2026-07-01 10:00:00',
+                    900001, 'protected-claim', '2026-07-01 09:59:00', 900001
+                )
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO portfolio_price_snapshot (
+                    id, symbol, name, current_price, price_date, note
+                ) VALUES (
+                    900001, 'US.PROTECTED', 'Protected Price', 10.700000,
+                    '2026-07-01', 'must remain unchanged'
+                )
+                """);
     }
 
     private ProtectedTablesSnapshot protectedSnapshot() {
@@ -423,7 +617,11 @@ class SecurityDirectoryIntegrationTest {
                 jdbcTemplate.queryForList("SELECT * FROM stock_quote_snapshot ORDER BY id");
         List<Map<String, Object>> syncTasks =
                 jdbcTemplate.queryForList("SELECT * FROM market_data_sync_task ORDER BY id");
-        return new ProtectedTablesSnapshot(dailyBars, quoteSnapshots, syncTasks);
+        List<Map<String, Object>> syncPlans =
+                jdbcTemplate.queryForList("SELECT * FROM market_data_sync_plan ORDER BY id");
+        List<Map<String, Object>> portfolioPrices =
+                jdbcTemplate.queryForList("SELECT * FROM portfolio_price_snapshot ORDER BY id");
+        return new ProtectedTablesSnapshot(dailyBars, quoteSnapshots, syncTasks, syncPlans, portfolioPrices);
     }
 
     private SecurityDirectoryImportResultVO importCsv(String csv) {
@@ -444,9 +642,40 @@ class SecurityDirectoryIntegrationTest {
                 "2020-01-01", "hash-" + canonical.replace('.', '-'), aliases) + "\n";
     }
 
+    private Stream<Arguments> isolatedCsvNegativeCases() {
+        String valid = row("US.NEG", "Negative", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "negative", "neg", "");
+        return Stream.of(
+                Arguments.of("missing required header",
+                        "canonical_symbol,name,market,exchange,currency,security_type,list_status,data_source\n",
+                        "CSV_WRONG_HEADER", 1L, "header", "MISSING_REQUIRED_HEADER"),
+                Arguments.of("invalid canonical", header() + valid.replace("US.NEG", "BAD"),
+                        "DAILY_BAR_VALIDATION_ERROR", 2L, "canonical_symbol", "INVALID_SYMBOL"),
+                Arguments.of("invalid market enum", header() + valid.replace(",US,NYSE,", ",XX,NYSE,"),
+                        "DAILY_BAR_VALIDATION_ERROR", 2L, "market", "INVALID_ENUM"),
+                Arguments.of("invalid security type", header() + valid.replace(",STOCK,LISTED,", ",CRYPTO,LISTED,"),
+                        "DAILY_BAR_VALIDATION_ERROR", 2L, "security_type", "INVALID_ENUM"),
+                Arguments.of("invalid list status", header() + valid.replace(",LISTED,TEST,", ",ACTIVE,TEST,"),
+                        "DAILY_BAR_VALIDATION_ERROR", 2L, "list_status", "INVALID_ENUM"),
+                Arguments.of("invalid list date", header() + valid.replace("2020-01-01", "bad-date"),
+                        "DAILY_BAR_VALIDATION_ERROR", 2L, "list_date", "INVALID_DATE"),
+                Arguments.of("invalid offset timestamp",
+                        header() + valid.replace("2026-07-01T00:00:00+08:00", "2026-07-01T00:00:00"),
+                        "DAILY_BAR_VALIDATION_ERROR", 2L, "source_updated_at", "INVALID_TIMESTAMP"),
+                Arguments.of("invalid alias grammar",
+                        header() + valid.replace(",hash-US-NEG,\n", ",hash-US-NEG,USER:missing\n"),
+                        "DAILY_BAR_VALIDATION_ERROR", 2L, "aliases", "INVALID_ALIAS_FORMAT"),
+                Arguments.of("invalid alias type",
+                        header() + valid.replace(",hash-US-NEG,\n", ",hash-US-NEG,UNKNOWN:en:value\n"),
+                        "DAILY_BAR_VALIDATION_ERROR", 2L, "aliases", "INVALID_ALIAS_TYPE")
+        );
+    }
+
     private record ProtectedTablesSnapshot(
             List<Map<String, Object>> dailyBars,
             List<Map<String, Object>> quoteSnapshots,
-            List<Map<String, Object>> syncTasks) {
+            List<Map<String, Object>> syncTasks,
+            List<Map<String, Object>> syncPlans,
+            List<Map<String, Object>> portfolioPrices) {
     }
 }

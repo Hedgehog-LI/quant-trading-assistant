@@ -1,13 +1,8 @@
 package com.quant.trade.marketdata.model;
 
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-/** 搜索候选及 SQL 已判定的别名命中标志。 */
-@Data
+/** 搜索候选；最终命中渠道由 Java 以 Unicode code-point 语义复核。 */
 @EqualsAndHashCode(callSuper = true)
 public class SecuritySearchCandidateDO extends StockBasicDO {
-    private Boolean aliasExact;
-    private Boolean aliasPrefix;
-    private Boolean aliasContains;
 }

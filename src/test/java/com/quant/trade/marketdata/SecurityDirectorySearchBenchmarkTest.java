@@ -138,17 +138,19 @@ class SecurityDirectorySearchBenchmarkTest {
         });
         jdbcTemplate.update("""
                 INSERT INTO stock_alias (
-                    stock_basic_id, alias, normalized_alias, alias_type, data_source
+                    stock_basic_id, alias, normalized_alias, normalized_alias_key, alias_type, data_source
                 )
                 SELECT id, CONCAT('Alias One ', symbol), CONCAT('alias-one-', LOWER(symbol)),
+                       CAST(CONCAT('alias-one-', LOWER(symbol)) AS VARBINARY),
                        'USER', 'BENCHMARK_FIXED_SEED_20260729'
                 FROM stock_basic
                 """);
         jdbcTemplate.update("""
                 INSERT INTO stock_alias (
-                    stock_basic_id, alias, normalized_alias, alias_type, data_source
+                    stock_basic_id, alias, normalized_alias, normalized_alias_key, alias_type, data_source
                 )
                 SELECT id, CONCAT('Alias Two ', symbol), CONCAT('alias-two-', LOWER(symbol)),
+                       CAST(CONCAT('alias-two-', LOWER(symbol)) AS VARBINARY),
                        'ENGLISH', 'BENCHMARK_FIXED_SEED_20260729'
                 FROM stock_basic
                 """);

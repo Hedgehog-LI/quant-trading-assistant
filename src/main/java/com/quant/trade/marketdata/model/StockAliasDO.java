@@ -18,6 +18,7 @@ public class StockAliasDO {
     private Long stockBasicId;
     private String alias;
     private String normalizedAlias;
+    private byte[] normalizedAliasKey;
     private String aliasType;
     private String language;
     private String dataSource;
