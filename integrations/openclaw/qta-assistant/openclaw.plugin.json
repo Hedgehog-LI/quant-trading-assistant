@@ -1,0 +1,86 @@
+{
+  "id": "qta-assistant",
+  "name": "QTA Read-Only Assistant",
+  "description": "Quant Trading Assistant 远程只读工具集 — 系统健康、今日待办、持仓摘要、行情采集、失败任务、数据质量、板块排行、单证券摘要。禁止写操作和自动交易。",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "required": [
+      "baseUrl",
+      "token"
+    ],
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "description": "QTA API base URL, e.g. http://127.0.0.1:8080"
+      },
+      "token": {
+        "type": "string",
+        "description": "Agent Bearer Token (from env, never in manifest)"
+      },
+      "allowedOpenIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "QQ OpenID allowlist; empty = deny all"
+      },
+      "connectTimeoutMs": {
+        "type": "number",
+        "description": "Connect timeout ms, default 2000",
+        "default": 2000
+      },
+      "totalTimeoutMs": {
+        "type": "number",
+        "description": "Total timeout ms, default 10000",
+        "default": 10000
+      },
+      "maxResults": {
+        "type": "number",
+        "description": "Default max results, default 10",
+        "default": 10
+      }
+    }
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "qta_system_health",
+      "qta_today_overview",
+      "qta_portfolio_summary",
+      "qta_collection_overview",
+      "qta_collection_failures",
+      "qta_data_quality_alerts",
+      "qta_sector_ranking_summary",
+      "qta_security_market_summary"
+    ]
+  },
+  "toolMetadata": {
+    "qta_system_health": {
+      "replaySafe": true
+    },
+    "qta_today_overview": {
+      "replaySafe": true
+    },
+    "qta_portfolio_summary": {
+      "replaySafe": true
+    },
+    "qta_collection_overview": {
+      "replaySafe": true
+    },
+    "qta_collection_failures": {
+      "replaySafe": true
+    },
+    "qta_data_quality_alerts": {
+      "replaySafe": true
+    },
+    "qta_sector_ranking_summary": {
+      "replaySafe": true
+    },
+    "qta_security_market_summary": {
+      "replaySafe": true
+    }
+  }
+}

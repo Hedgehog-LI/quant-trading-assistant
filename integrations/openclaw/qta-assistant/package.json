@@ -1,0 +1,44 @@
+{
+  "name": "@qta/openclaw-assistant",
+  "version": "0.1.0",
+  "description": "QTA OpenClaw 远程只读助手 — 8 类只读行情/持仓/采集诊断工具",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test test/plugin.test.js test/client.test.js test/execute.test.js test/timeout.test.js",
+    "plugin:build": "tsc && openclaw plugins build --entry ./dist/index.js --root . --check",
+    "plugin:validate": "openclaw plugins validate --entry ./dist/index.js --root .",
+    "import-check": "node -e \"import('./dist/index.js').then(m => console.log('IMPORT OK, default export type:', typeof m.default)).catch(e => { console.error('IMPORT FAILED:', e.message); process.exit(1); })\""
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "dependencies": {
+    "typebox": "^1.0.0"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.0.0"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "openclaw": "^2026.7.1-2",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "openclaw",
+    "quant",
+    "trading",
+    "read-only",
+    "market-data"
+  ],
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,71 @@
+# OpenClaw 远程只读助手设计
+
+> 状态：第一期已实现，本地门禁全绿。外部部署验收为待办。
+
+## 1. 目标
+
+为 Quant Trading Assistant 提供一个安全的远程只读查询接口，使 AI Agent（通过 OpenClaw 平台）能够在不接触写操作的前提下，查询行情快照、日K、分钟K、持仓、自选股、提醒、板块和工作台概览。
+
+## 2. 安全边界
+
+- **只读**：所有 8 个工具仅调用 Service 的 GET 方法，不暴露任何 POST/PUT/DELETE。
+- **无自动交易**：不接入交易、订单、账户 API。
+- **API Key 鉴权**：通过 `X-OpenClaw-Key` header 验证，key 在 `qta.openclaw.api-key` 配置。
+- **限流**：per-key 每分钟限流（可配置，默认 60）。
+- **审计**：每次调用记录 toolName/key/success/duration/timestamp。
+- **默认关闭**：`qta.openclaw.enabled=false`，需显式启用。
+
+## 3. 架构
+
+```
+Agent (OpenClaw)
+  → POST /api/v1/openclaw/tools/{toolName}
+    → OpenClawAuthFilter (鉴权 + 限流)
+      → OpenClawController
+        → OpenClawAgentFacade
+          → OpenClawTool (8 个实现)
+            → 现有 Service (只读方法)
+```
+
+## 4. 8 类只读工具
+
+| # | 工具名 | 说明 |
+|---|--------|------|
+| 1 | `quote_snapshot` | 持久化最新价快照 |
+| 2 | `daily_bar` | 日K数据 |
+| 3 | `minute_bar` | 分钟K数据（1M/5M/15M/30M/60M） |
+| 4 | `portfolio_summary` | 持仓汇总+当前持仓 |
+| 5 | `watchlist` | 自选股列表 |
+| 6 | `market_alert` | 行情异常提醒 |
+| 7 | `market_segment` | 板块/自定义分组+成员 |
+| 8 | `workbench_overview` | 行情工作台概览 |
+
+## 5. 配置
+
+```properties
+qta.openclaw.enabled=true
+qta.openclaw.api-key=your-secure-key
+qta.openclaw.rate-limit-per-minute=60
+qta.openclaw.audit-log-capacity=1000
+```
+
+## 6. OpenClaw 原生 Tool Plugin
+
+位于 `openclaw-plugin/qta-openclaw/`，包含：
+- `openclaw.plugin.json` — 插件 manifest（8 tools discovery contract）
+- `package.json` — npm 包定义
+- `index.ts` — `defineToolPlugin` 实现，每个 tool 的 `execute()` 通过 `fetch()` 调用 QTA REST API
+
+## 7. 测试覆盖
+
+- `OpenClawAgentFacadeTest` — 分发、成功、未知工具、异常
+- `OpenClawAuthServiceTest` — 启用/关闭、key 正确/错误/null
+- `OpenClawRateLimitServiceTest` — 限内/超限/不同 key 独立
+- `OpenClawAuditServiceTest` — 记录/查询/容量截断/limit
+
+## 8. 待办（外部部署验收）
+
+- [ ] 服务器部署 + 配置真实 API Key
+- [ ] OpenClaw 插件 `npm install` + 运行时验证
+- [ ] 真实 Longbridge 行情数据联调
+- [ ] QQ/IM 渠道通知集成

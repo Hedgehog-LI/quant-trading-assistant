@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.agent.dao.AgentApiAuditLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.agent.model.AgentApiAuditLogDO">
+        <id column="id" property="id"/>
+        <result column="request_id" property="requestId"/>
+        <result column="client_id" property="clientId"/>
+        <result column="sender_hash" property="senderHash"/>
+        <result column="operation_code" property="operationCode"/>
+        <result column="method" property="method"/>
+        <result column="path" property="path"/>
+        <result column="param_summary" property="paramSummary"/>
+        <result column="http_status" property="httpStatus"/>
+        <result column="error_code" property="errorCode"/>
+        <result column="result_count" property="resultCount"/>
+        <result column="duration_ms" property="durationMs"/>
+        <result column="requested_at" property="requestedAt"/>
+        <result column="completed_at" property="completedAt"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, request_id, client_id, sender_hash, operation_code, method, path,
+        param_summary, http_status, error_code, result_count, duration_ms,
+        requested_at, completed_at, created_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO agent_api_audit_log (request_id, client_id, sender_hash, operation_code,
+            method, path, param_summary, http_status, error_code, result_count, duration_ms,
+            requested_at, completed_at)
+        VALUES (#{requestId}, #{clientId}, #{senderHash}, #{operationCode},
+            #{method}, #{path}, #{paramSummary}, #{httpStatus}, #{errorCode}, #{resultCount}, #{durationMs},
+            #{requestedAt}, #{completedAt})
+    </insert>
+
+    <select id="selectRecent" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM agent_api_audit_log
+        ORDER BY id DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

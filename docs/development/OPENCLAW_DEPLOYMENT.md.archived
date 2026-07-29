@@ -1,0 +1,54 @@
+# OpenClaw 部署说明
+
+## 前提条件
+
+- QTA 后端已部署且可访问（`http://<host>:8080`）
+- 已生成一个安全的 API Key（建议 UUID 或 32+ 字符随机串）
+
+## 后端配置
+
+在 `.env` 或环境变量中设置：
+
+```bash
+QTA_OPENCLAW_ENABLED=true
+QTA_OPENCLAW_API_KEY=<your-secure-random-key>
+QTA_OPENCLAW_RATE_LIMIT_PER_MINUTE=60
+QTA_OPENCLAW_AUDIT_LOG_CAPACITY=1000
+```
+
+重启后端后验证：
+
+```bash
+curl -s -H "X-OpenClaw-Key: <key>" http://localhost:8080/api/v1/openclaw/tools | jq .
+```
+
+## OpenClaw 插件安装
+
+```bash
+cd openclaw-plugin/qta-openclaw
+npm install
+npm run build
+
+# 安装到 OpenClaw
+openclaw plugins install . --config apiBaseUrl=http://<host>:8080,apiKey=<key>
+```
+
+或开发模式：
+
+```bash
+openclaw plugins install . --link --config apiBaseUrl=http://localhost:8080,apiKey=<key>
+```
+
+## 验证
+
+1. `GET /api/v1/openclaw/tools` 返回 8 个工具
+2. `POST /api/v1/openclaw/tools/workbench_overview` 返回概览数据
+3. 无 API Key 的请求返回 401
+4. 超限请求返回 429
+
+## 待办（外部部署验收）
+
+- [ ] 服务器部署 + 真实 API Key 配置
+- [ ] OpenClaw 运行时插件加载验证
+- [ ] 真实 Longbridge 行情数据联调
+- [ ] QQ/IM 渠道通知集成

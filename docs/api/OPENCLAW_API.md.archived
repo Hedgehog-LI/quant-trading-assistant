@@ -1,0 +1,94 @@
+# OpenClaw 远程只读助手 API
+
+> 统一前缀：`/api/v1/openclaw`。所有接口需要 `X-OpenClaw-Key` header 鉴权。
+
+## 1. 工具列表
+
+### 列出可用工具
+
+```
+GET /api/v1/openclaw/tools
+```
+
+**Header**: `X-OpenClaw-Key: <your-key>`
+
+**响应**: `ApiResponse<List<OpenClawToolDefinitionVO>>`
+
+```json
+{
+  "success": true,
+  "code": "SUCCESS",
+  "data": [
+    {
+      "name": "quote_snapshot",
+      "description": "查询最新价快照",
+      "category": "行情数据",
+      "requiredParams": [],
+      "optionalParams": ["canonicalSymbol", "dataSource", "page", "size"]
+    }
+  ]
+}
+```
+
+## 2. 调用工具
+
+```
+POST /api/v1/openclaw/tools/{toolName}
+```
+
+**Header**: `X-OpenClaw-Key: <your-key>`
+
+**Body**:
+```json
+{
+  "params": {
+    "canonicalSymbol": "SH.600519",
+    "page": 1,
+    "size": 20
+  }
+}
+```
+
+**响应**: `ApiResponse<OpenClawToolResponse>`
+
+```json
+{
+  "success": true,
+  "code": "SUCCESS",
+  "data": {
+    "toolName": "quote_snapshot",
+    "success": true,
+    "data": { "items": [...], "total": 5, "page": 1, "size": 20 },
+    "timestamp": "2026-07-16T15:00:00"
+  }
+}
+```
+
+## 3. 审计日志
+
+```
+GET /api/v1/openclaw/audit?limit=50
+```
+
+**响应**: 最近 N 条调用记录（keyHash, toolName, success, durationMs, error, timestamp）
+
+## 4. 错误响应
+
+| HTTP | 原因 |
+|------|------|
+| 401 | Missing/Invalid API Key |
+| 404 | OpenClaw disabled / Unknown tool |
+| 429 | Rate limit exceeded |
+
+## 5. 8 类工具参数说明
+
+| 工具 | 必填 | 可选 |
+|------|------|------|
+| `quote_snapshot` | — | canonicalSymbol, dataSource, page, size |
+| `daily_bar` | — | canonicalSymbol, fromDate, toDate, adjustType, dataSource, page, size |
+| `minute_bar` | — | canonicalSymbol, intervalType, adjustType, dataSource, fromTime, toTime, tradeDate, page, size |
+| `portfolio_summary` | — | — |
+| `watchlist` | — | enabled, keyword, tradeStyle |
+| `market_alert` | — | resolved, severity, canonicalSymbol, page, size |
+| `market_segment` | — | segmentType, enabled, keyword, segmentId, page, size |
+| `workbench_overview` | — | — |
