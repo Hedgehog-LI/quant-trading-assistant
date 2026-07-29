@@ -3,16 +3,21 @@
 
 ## 新会话流程（必读）
 
-1. 启用 skill `.claude/skills/qta-context-bootstrap`（分阶段加载上下文）。
+1. 启用 skill `qta-context-bootstrap`（规范源 `.agents/skills/`，Claude 兼容镜像 `.claude/skills/`）。
 2. 读 `docs/AI_DEVELOPMENT_INDEX.md`（路由）+ `docs/DEVELOPMENT_WORKFLOW.md`（流程与文档同步规则）。
 3. 冲突裁决按 `AI_DEVELOPMENT_INDEX.md §2`：migration+代码+测试 > 架构事实 > API/DB > 开发/验收日志 > 历史交接。
+4. 非简单任务先启用 `qta-task-contract`；实现者只做自检，独立验收使用干净上下文和 `qta-independent-verification`。
+5. 标准、跨仓或长任务由父上下文启用 `qta-development-orchestration`，固定角色只接收 TaskPacket。
 
 ## 开发结束必做
 
 - 执行 `DEVELOPMENT_WORKFLOW.md §2` 文档同步检查（API/DB/Mock/产品/ADR/DEVELOPMENT_LOG/ACCEPTANCE_LOG）。
 - API 变化必须同步 `docs/api/API_INDEX.md` + `docs/mock/MOCK_REMOTE_CONTRACT.md`。
 - 重要架构决策必须新增 ADR（`docs/decisions/`）。
-- 只有实际验收通过才能勾选 `docs/BUILD_CHECKLIST.md`；不自动 commit/push。
+- 只有实际验收通过才能勾选 `docs/BUILD_CHECKLIST.md`。父协调者按 contract、candidate、
+  repair-N、finalization 建阶段提交；子角色不操作 Git。checkpoint push 仅备份任务分支，
+  delivery push 必须绑定 accepted revision。
+- 固定角色使用 `.zcode/agents/`，不得让同一角色同时实现、修复并给出最终验收结论。
 
 入口与路由统一在 `docs/AI_DEVELOPMENT_INDEX.md`（含 Historical 文档清单与任务类型路由）；本文件不再维护重复必读列表。Historical 文档（`CONVERSATION_HANDOFF.md`、`docs/claude/*`、`docs/prompts/*` 等）**不在主流程**，无需读取。
 

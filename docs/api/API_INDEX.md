@@ -63,6 +63,15 @@
 | Market Data | GET / PUT | `/api/v1/market-data/sector-catalog/ranking-configs[/{market}]` | 已实现（CN/HK/US 全市场榜单采集配置） | `MARKET_DATA_API.md` |
 | Market Data | POST | `/api/v1/market-data/sector-catalog/ranking-configs/{market}/run` | 已实现（立即采集全市场榜单） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/sector-catalog/ranking-history[/{batchId}/items]` | 已实现（历史榜单批次和明细） | `MARKET_DATA_API.md` |
+| Agent | GET | `/api/v1/agent/capabilities` | 已实现（P1.8 Agent 能力查询，Bearer Token 鉴权） | `AGENT_ASSISTANT_API.md` |
+| Agent | GET | `/api/v1/agent/system/health` | 已实现（系统健康摘要） | `AGENT_ASSISTANT_API.md` |
+| Agent | GET | `/api/v1/agent/trading/today?date=` | 已实现（今日待办概览） | `AGENT_ASSISTANT_API.md` |
+| Agent | GET | `/api/v1/agent/portfolio/summary` | 已实现（持仓摘要，不构成投资建议） | `AGENT_ASSISTANT_API.md` |
+| Agent | GET | `/api/v1/agent/market-data/collection-overview?market=&date=` | 已实现（行情采集概览） | `AGENT_ASSISTANT_API.md` |
+| Agent | GET | `/api/v1/agent/market-data/failures?market=&since=&limit=` | 已实现（采集失败查询） | `AGENT_ASSISTANT_API.md` |
+| Agent | GET | `/api/v1/agent/market-data/alerts?status=&since=&limit=` | 已实现（数据质量提醒） | `AGENT_ASSISTANT_API.md` |
+| Agent | GET | `/api/v1/agent/market-sectors/ranking-summary?market=&limit=` | 已实现（板块排行摘要） | `AGENT_ASSISTANT_API.md` |
+| Agent | GET | `/api/v1/agent/securities/{canonicalSymbol}/market-summary` | 已实现（单证券行情摘要） | `AGENT_ASSISTANT_API.md` |
 
 ## 错误码
 

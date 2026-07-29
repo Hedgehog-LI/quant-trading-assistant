@@ -1,0 +1,184 @@
+{
+  "version": 2,
+  "cases": [
+    {
+      "id": "bootstrap-fresh",
+      "contextState": "fresh",
+      "prompt": "这是一个新的对话，先读取当前项目事实。",
+      "expectedSkills": ["qta-context-bootstrap"]
+    },
+    {
+      "id": "bootstrap-continuing-negative",
+      "contextState": "continuing",
+      "prompt": "同一任务已经接手，上下文仍然完整、范围未变，无需重新加载，继续工作。",
+      "expectedSkills": [],
+      "negativeRuleSkills": ["qta-context-bootstrap"]
+    },
+    {
+      "id": "orchestration-autonomous",
+      "contextState": "fresh",
+      "prompt": "请按固定角色完成端到端开发闭环，自己执行到交付。",
+      "expectedSkills": ["qta-context-bootstrap", "qta-development-orchestration"]
+    },
+    {
+      "id": "orchestration-readonly-negative",
+      "contextState": "fresh",
+      "prompt": "只读分析端到端闭环流程，不要改代码。",
+      "expectedSkills": ["qta-context-bootstrap"],
+      "negativeRuleSkills": ["qta-development-orchestration"]
+    },
+    {
+      "id": "product-design",
+      "contextState": "fresh",
+      "prompt": "从产品经理角度做产品设计，明确持仓风险预警用户流程。",
+      "expectedSkills": ["qta-context-bootstrap", "qta-product-design"]
+    },
+    {
+      "id": "product-design-negative",
+      "contextState": "fresh",
+      "prompt": "产品设计已经完成且需求已经明确，不要做产品设计，只回答当前状态。",
+      "expectedSkills": ["qta-context-bootstrap"],
+      "negativeRuleSkills": ["qta-product-design"]
+    },
+    {
+      "id": "task-contract",
+      "contextState": "fresh",
+      "prompt": "这是跨仓高风险任务，先建立任务契约并冻结 AC。",
+      "expectedSkills": ["qta-context-bootstrap", "qta-task-contract"]
+    },
+    {
+      "id": "task-contract-trivial-negative",
+      "contextState": "fresh",
+      "prompt": "这是单文件微小修复，明确无需任务契约，只修正文案。",
+      "expectedSkills": ["qta-context-bootstrap"],
+      "negativeRuleSkills": ["qta-task-contract"]
+    },
+    {
+      "id": "backend-implementation",
+      "contextState": "continuing",
+      "prompt": "按照冻结 AC 实现 Spring Boot Controller、Service 和 MyBatis Mapper。",
+      "expectedSkills": ["qta-backend-implementation"]
+    },
+    {
+      "id": "backend-readonly-negative",
+      "contextState": "fresh",
+      "prompt": "只读审查 Spring Boot 后端代码，不要改代码。",
+      "expectedSkills": ["qta-context-bootstrap"],
+      "negativeRuleSkills": ["qta-backend-implementation"]
+    },
+    {
+      "id": "frontend-implementation",
+      "contextState": "continuing",
+      "prompt": "按照冻结 AC 实现 React TypeScript 表单、空状态和错误重试。",
+      "expectedSkills": ["qta-frontend-implementation"]
+    },
+    {
+      "id": "frontend-readonly-negative",
+      "contextState": "fresh",
+      "prompt": "只读审查 React 前端页面，不要改代码。",
+      "expectedSkills": ["qta-context-bootstrap"],
+      "negativeRuleSkills": ["qta-frontend-implementation"]
+    },
+    {
+      "id": "fullstack-implementation",
+      "contextState": "continuing",
+      "prompt": "按照冻结 AC 同时修改 Spring Boot 后端和 React 前端。",
+      "expectedSkills": ["qta-backend-implementation", "qta-frontend-implementation"]
+    },
+    {
+      "id": "checkpoint",
+      "contextState": "continuing",
+      "prompt": "上下文已经很大，先 checkpoint 并存档当前证据和下一步。",
+      "expectedSkills": ["qta-task-checkpoint"]
+    },
+    {
+      "id": "checkpoint-negative",
+      "contextState": "continuing",
+      "prompt": "Spring Boot 刚改完自检后继续当前实现，无需存档 checkpoint。",
+      "expectedSkills": ["qta-backend-implementation"],
+      "negativeRuleSkills": ["qta-task-checkpoint"]
+    },
+    {
+      "id": "independent-verification",
+      "contextState": "continuing",
+      "prompt": "请在干净上下文对 frozen diff 做独立验收和最终核验。",
+      "expectedSkills": ["qta-independent-verification"]
+    },
+    {
+      "id": "verification-self-check-negative",
+      "contextState": "continuing",
+      "prompt": "实现者刚改完自检，现在不是独立验收，只运行后端测试。",
+      "expectedSkills": ["qta-backend-implementation"],
+      "negativeRuleSkills": ["qta-independent-verification"]
+    },
+    {
+      "id": "delivery-finalization",
+      "contextState": "continuing",
+      "prompt": "独立验收已经 ACCEPTED，请更新开发日志和建设看板完成交付收口。",
+      "expectedSkills": ["qta-delivery-finalization"]
+    },
+    {
+      "id": "finalization-self-check-negative",
+      "contextState": "continuing",
+      "prompt": "仅 SELF_CHECKED，尚未独立验收，但想更新开发日志做交付。",
+      "expectedSkills": [],
+      "negativeRuleSkills": ["qta-delivery-finalization"]
+    },
+    {
+      "id": "openclaw-design-overlay",
+      "contextState": "fresh",
+      "prompt": "为 OpenClaw 的 /api/v1/agent 做产品设计和鉴权审计流程。",
+      "expectedSkills": ["qta-context-bootstrap", "qta-product-design", "qta-openclaw-integration"]
+    },
+    {
+      "id": "openclaw-backend-overlay",
+      "contextState": "continuing",
+      "prompt": "按照冻结 AC 修改 OpenClaw Agent API 的 Spring Boot 后端。",
+      "expectedSkills": ["qta-backend-implementation", "qta-openclaw-integration"]
+    },
+    {
+      "id": "openclaw-controller-overlay",
+      "contextState": "fresh",
+      "prompt": "请自主完成 OpenClaw 远程助手端到端开发闭环。",
+      "expectedSkills": ["qta-context-bootstrap", "qta-development-orchestration", "qta-openclaw-integration"]
+    },
+    {
+      "id": "openclaw-generic-negative",
+      "contextState": "fresh",
+      "prompt": "这不是 OpenClaw，只是通用 Agent 和 React 页面，只做产品设计。",
+      "expectedSkills": ["qta-context-bootstrap", "qta-product-design"],
+      "negativeRuleSkills": ["qta-openclaw-integration"]
+    },
+    {
+      "id": "agent-api-generic-negative",
+      "contextState": "fresh",
+      "prompt": "只讨论为内部助手新增通用 Agent API 的可行性，不是 OpenClaw。",
+      "expectedSkills": ["qta-context-bootstrap"],
+      "negativeRuleSkills": ["qta-openclaw-integration"]
+    },
+    {
+      "id": "agent-api-generic-without-negation",
+      "contextState": "fresh",
+      "prompt": "为公司内部助手新增通用 Agent API，先分析现有接口。",
+      "expectedSkills": ["qta-context-bootstrap"]
+    },
+    {
+      "id": "finalization-wins-over-verification-history",
+      "contextState": "continuing",
+      "prompt": "独立验收结果为 ACCEPTED，现在执行 finalization 更新验收日志交付。",
+      "expectedSkills": ["qta-delivery-finalization"]
+    },
+    {
+      "id": "checkpoint-wins-over-implementation",
+      "contextState": "continuing",
+      "prompt": "Spring Boot 实现进行到一半但马上关闭工具，请暂停并存档交接。",
+      "expectedSkills": ["qta-task-checkpoint"]
+    },
+    {
+      "id": "contract-wins-before-implementation",
+      "contextState": "fresh",
+      "prompt": "跨仓修改 Spring Boot 和 React，先建立任务契约冻结 AC。",
+      "expectedSkills": ["qta-context-bootstrap", "qta-task-contract"]
+    }
+  ]
+}

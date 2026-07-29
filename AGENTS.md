@@ -5,7 +5,7 @@
 
 启用项目 skill `qta-context-bootstrap`（分阶段加载，避免一次读全部 docs）。信息真实性优先级与任务路由见 `docs/AI_DEVELOPMENT_INDEX.md` §2/§4；开发结束文档同步见 `docs/DEVELOPMENT_WORKFLOW.md`。
 
-本文件是给 Codex 读取的项目级开发指南。新对话接手时按 `.claude/skills/qta-context-bootstrap` 分阶段加载，入口顺序见 `docs/AI_DEVELOPMENT_INDEX.md`；当前事实见 `docs/AI_HANDOFF.md`。Historical 文档（清单见 `AI_DEVELOPMENT_INDEX §6`）不在主流程，无需读取。
+本文件是给 Codex 读取的项目级开发指南。新对话接手时启用 `qta-context-bootstrap` 分阶段加载；Skill 规范源在 `.agents/skills/`，`.claude/skills/` 是 Claude 兼容镜像。入口顺序见 `docs/AI_DEVELOPMENT_INDEX.md`；当前事实见 `docs/AI_HANDOFF.md`。Historical 文档（清单见 `AI_DEVELOPMENT_INDEX §6`）不在主流程，无需读取。
 
 ## 项目定位
 
@@ -95,6 +95,12 @@ docker compose down
 
 ## AI 协作要求
 
+- 非简单任务先用 `qta-task-contract` 冻结范围、验收标准和证据；长任务按 `qta-task-checkpoint` 主动存档，禁止等到上下文耗尽才压缩。
+- 标准、跨仓或长任务由父上下文启用 `qta-development-orchestration`，也可用 `/qta-run` 显式启动。父协调者负责 lane、TaskPacket、角色顺序、候选哈希和 Git；子角色不得操作 Git。
+- 实现者只可把任务标记为 `SELF_CHECKED`。独立验收必须由未参与实现的干净上下文使用 `qta-independent-verification` 完成，验收者不得同时修代码。
+- 只有独立验收允许交付后，才能使用 `qta-delivery-finalization` 更新建设看板、交接、接口和验收记录。
+- 固定 ZCode 角色在 `.zcode/agents/`：测试设计者、实施者、代码审查者、最终核验者。各角色禁止递归创建子代理。
+- Git 使用任务分支和阶段提交：contract、candidate、repair-N、finalization。checkpoint push 仅作备份；只有独立验收允许交付后才能 delivery push。
 - 修改代码前先查看现有结构。
 - 不要引入复杂平台化设计，v0.1 保持简单可运行。
 - 不要添加真实交易、券商接口或密钥读取功能。
@@ -102,3 +108,4 @@ docker compose down
 - 新增 DB 访问优先沿用 MyBatis Mapper + XML SQL。
 - 新增 REST API 时补充请求/响应示例到文档。
 - 涉及策略、信号、风控时必须写明假设和失效场景。
+- Skill/Agent 的职责、触发和维护规则以 `docs/ai/SKILL_AND_AGENT_GOVERNANCE.md` 为准。

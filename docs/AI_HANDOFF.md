@@ -15,7 +15,8 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 ## 当前状态（2026-07）
 
-- **P1.6 板块双层自动采集（2026-07-22 代码与静态验收完成）**：V15 新增 CN/HK/US 全市场排行配置、批次和明细，并扩展关注板块自动采集。频率支持仅收盘或 5/10/15/30/60 分钟；各市场独立时区/常规交易窗口，具备 DB claim、时间桶幂等、鉴权/权限阻断、临时失败退避和质量字段。前端新增“自动采集”页签、立即采集、状态、历史榜单和关注板块独立频率。后端 293 tests + package、前端 277 tests + typecheck/lint/build 全绿；部署后的真实 provider 两时间桶验收尚未执行。入口：`docs/features/MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`、`docs/ai/HANDOFF_2026-07-22_sector_automation.md`。
+- **P1.6 板块双层自动采集（2026-07-22 代码与静态验收完成）**：V15 新增 CN/HK/US 全市场排行配置、批次和明细，并扩展关注板块自动采集。频率支持仅收盘或 5/10/15/30/60 分钟；各市场独立时区/常规交易窗口，具备 DB claim、时间桶幂等、鉴权/权限阻断、临时失败退避和质量字段。前端新增“自动采集”页签、立即采集、状态、历史榜单和关注板块独立频率。后端 299 tests + package、前端 277 tests + typecheck/lint/build 全绿；部署后的真实 provider 两时间桶验收尚未执行。入口：`docs/features/MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`、`docs/ai/HANDOFF_2026-07-22_sector_automation.md`。
+- **P1.8 Agent 只读助手第一期（2026-07-26 代码交付完成、待部署验收）**：按 `OPENCLAW_AGENT_ASSISTANT_DESIGN.md` + ADR-0011 实现。`com.quant.trade.agent` 模块：Spring Security `AgentSecurityConfig`（保护 `/api/v1/agent/**` + 自定义 401 `AuthenticationEntryPoint`）、**单一审计入口 `AgentAuditFilter`**（servlet 级 `OncePerRequestFilter`，经 `FilterRegistrationBean` 注册为最外层 filter，覆盖整个 FilterChain；无论请求被 token/限流 filter 短路、被 Security entry point 拒绝、还是被 Controller 处理/抛异常，都只产生一条审计记录，覆盖 200/401/403/404/429/500；**requestId 单一来源**：由该 filter 生成并写入 request 属性 `agentRequestId` + 响应头 `X-Request-ID`，下游 token/限流 filter、`AuthenticationEntryPoint`、Controller 全部复用，不再各自生成）、`AgentTokenAuthFilter`（SHA-256 + `MessageDigest.isEqual` 恒定时间比较；token/限流 filter 已禁用 servlet 自动注册，仅在 Security chain 内运行）、`AgentRateLimitFilter`（per-IP 滑动窗口 + `Retry-After`；使用 `request.getRemoteAddr()` 不用 Authorization hash 防绕过）、`AgentAuditService`（V16 `agent_api_audit_log` 持久化脱敏审计；禁止记录 Token/凭据/完整请求）、`AgentQueryService`（复用现有 Service；8 端点基于 `Duration.between` 计算 freshness；空库/null 不抛异常；collectionFailures/dataQualityAlerts/collectionOverview 的 market/since/date 参数真实过滤结果）、`AgentController`（9 GET + `@Operation`/`@SecurityRequirement(bearerAuth)` + `ResponseEntity.status()` 真实 HTTP 状态码；**500 返回 `ApiResponse.fail(INTERNAL_ERROR)` 即 `success=false`/`code=INTERNAL_ERROR`，body 含 requestId 供关联，不泄露内部异常类名/堆栈**；移除 `/agent/audit` 与 Controller 手动审计调用）、`AgentOpenApiConfig`（GroupedOpenApi `agent` 分组 + `@SecurityRequirement`）。OpenClaw 插件 `integrations/openclaw/qta-assistant/`（`defineToolPlugin` **factory 模式**；`AnyAgentTool.execute(toolCallId, params, signal)` 官方签名；返回 `jsonResult()` `AgentToolResult`；`toolContext.requesterSenderId` fail-closed（allowlist 为空即拒绝所有）；QtaClient 双超时：`connectTimeoutMs` 仅约束到响应头到达为止（之后清除，不误杀大响应体）、`totalTimeoutMs` 覆盖响应头 + `resp.json()` body 解析全链路（仅在 body 解析完成后清除）；外部 `AbortSignal` 触发立即终止且不重试；所有计时器在 `finally` 清理；URLSearchParams+encodeURIComponent 编码；仅 502/503/timeout 重试一次；参数差异测试 CN vs HK 返回不同板块排行、limit=2 vs limit=5 返回不同计数。后端 **342 tests / 0 failures / 0 errors**（含 Agent 审计 D3 once-per-request 集成测试、D4 500 语义测试）、插件 **49 tests**（含 D5 totalTimeoutMs 覆盖 body 解析、connectTimeoutMs 不误杀慢 body、外部 signal 不重试、计时器无泄漏测试）、前端 **277 tests** 全绿。**待办**：服务器部署 + Nginx deny + 真实 QQ OpenID + OpenClaw 运行时 install/enable。
 - **2026-07-19 Longbridge 外部鉴权故障与本地修复（待重新部署）**：最后一次真实成功为 2026-07-18 09:51:52，首次观察失败为 2026-07-19 14:28:59。原 Legacy 凭据、重新生成的 Legacy 凭据以及 CLI 0.24.0 全新 OAuth 登录均被服务端拒绝（`401004 token invalid` / `401102 token verification failed`），而官方 MCP 仍可读取行情；当前按 Longbridge 外部鉴权故障处理并已提交 Trace ID，停止反复轮换密钥。代码已将凭据失效与 403/301604 行情权限不足分开；盘中 scheduler 只扫描 `INTRADAY_MINUTE_REFRESH + INTRADAY + enabled`，旧非法计划不再每 30 秒告警。后端 **287 tests** 通过。部署与核验见 `development/LONGPORT_TOKEN_INCIDENT_2026-07-19.md`。
 - **v0.1.0** Today MVP + 交易账本 + 持仓快照：已完成。
 - **v0.1.1** 基础交易闭环优化（计划关联 + 复盘一致性 + 快照对比 + FIFO 对账 + 工作台待办 + 连接防呆）及多轮质量收尾：**已完成并验收**。范围与改动见 `development/DEVELOPMENT_LOG.md`。
@@ -44,14 +45,15 @@ P1.0 证券主数据和 CSV 日 K 基础已由 `marketdata` 模块实现（V5/V6
 
 P1.2 行情采集执行引擎和 P1.6 板块双层自动采集已完成代码与自动化门禁。P1.6 部署后仍需最小真实采集验收。后续 P1 主线：
 
-1. 基于已落库的全市场板块排行和关注成分快照，建设相对强弱、轮动持续性、龙头贡献和异动提醒；分析不直接生成交易指令。
-2. P1.4a 精确证券代码验证已完成；后续按 D1-D4 实施 **P1.4b 证券目录与模糊检索**，先后端本地目录/search API，再共享选择器，再 provider 同步，最后跨业务推广。
-3. 港股、美股分钟自动采集必须先补齐各市场交易日历、时区和交易时段，不能直接复用 A 股 scheduler。
-4. 数据资产稳定后再推进指标、策略和回测；信号必须经过风险模块。
+1. 按 P1.8 实施 OpenClaw 远程只读助手，使用户可从 QQ 安全查询系统、采集和业务摘要；服务器真实 QQ 与公网阻断单独验收。
+2. 基于已落库的全市场板块排行和关注成分快照，建设相对强弱、轮动持续性、龙头贡献和异动提醒；分析不直接生成交易指令。
+3. P1.4a 精确证券代码验证已完成；后续按 D1-D4 实施 **P1.4b 证券目录与模糊检索**。
+4. 港股、美股分钟自动采集必须先补齐各市场交易日历、时区和交易时段，不能直接复用 A 股 scheduler。
+5. 数据资产稳定后再推进指标、策略和回测；信号必须经过风险模块。
 
 ## 接手顺序（新会话）
 
-1. 启用 skill `.claude/skills/qta-context-bootstrap`（分阶段加载上下文）。
+1. 启用 skill `qta-context-bootstrap`（规范源 `.agents/skills/`，分阶段加载上下文）。
 2. `AGENTS.md` → `CLAUDE.md` → `docs/AI_DEVELOPMENT_INDEX.md` → 本文件。
 3. 按任务类型路由（`AI_DEVELOPMENT_INDEX.md §4`）只读必要文档；Historical 文档（§6）不必读。
 

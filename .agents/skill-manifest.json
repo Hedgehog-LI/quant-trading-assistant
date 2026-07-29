@@ -1,0 +1,85 @@
+{
+  "version": 2,
+  "skills": [
+    {
+      "id": "qta-context-bootstrap",
+      "kind": "bootstrap",
+      "stage": "bootstrap",
+      "priority": 1000,
+      "positivePatterns": ["新(的)?对话", "新会话", "接手", "读取当前项目事实", "上下文.*(重置|丢失|压缩)", "resume.*handoff"],
+      "negativePatterns": ["同一任务.*(上下文|范围).*(完整|未变)", "无需重新加载", "不要重新加载"]
+    },
+    {
+      "id": "qta-development-orchestration",
+      "kind": "controller",
+      "stage": "orchestration",
+      "priority": 900,
+      "positivePatterns": ["端到端.*闭环", "自主.*(开发|交付)", "一整晚", "长线任务", "goal.?模式", "固定角色.*(开发|验收)", "完整开发生命周期", "orchestrat"],
+      "negativePatterns": ["只读", "不要改代码", "仅咨询", "只做设计", "子代理.*内部"]
+    },
+    {
+      "id": "qta-product-design",
+      "kind": "lifecycle",
+      "stage": "design",
+      "priority": 100,
+      "positivePatterns": ["产品经理", "产品设计", "需求设计", "功能设计", "怎么规划", "应该开发", "用户流程", "页面布局", "financial semantics"],
+      "negativePatterns": ["需求已经明确", "已确认的?\\s*AC", "不要做产品设计", "仅修复明确", "frozen contract"]
+    },
+    {
+      "id": "qta-task-contract",
+      "kind": "lifecycle",
+      "stage": "contract",
+      "priority": 400,
+      "positivePatterns": ["跨仓", "高风险", "任务契约", "先.*冻结.*AC", "前后端.*(联调|验收|闭环)", "数据库.*调度", "provider.*deployment"],
+      "negativePatterns": ["单文件.*微小", "低风险.*拼写", "tiny fix", "明确无需任务契约"]
+    },
+    {
+      "id": "qta-backend-implementation",
+      "kind": "lifecycle",
+      "stage": "implementation",
+      "priority": 300,
+      "positivePatterns": ["Spring Boot", "MyBatis", "Flyway", "后端", "Controller", "Service", "Mapper", "数据库.*落库"],
+      "negativePatterns": ["不要改代码", "只做产品设计", "只读审查", "文档审查"]
+    },
+    {
+      "id": "qta-frontend-implementation",
+      "kind": "lifecycle",
+      "stage": "implementation",
+      "priority": 300,
+      "positivePatterns": ["React", "TypeScript", "前端", "页面", "表单", "路由", "浏览器"],
+      "negativePatterns": ["不要改代码", "只做产品设计", "独立验收.*前端", "只读审查", "文档审查"]
+    },
+    {
+      "id": "qta-task-checkpoint",
+      "kind": "lifecycle",
+      "stage": "checkpoint",
+      "priority": 600,
+      "positivePatterns": ["关闭工具", "暂停", "存档", "交接", "上下文.*(大|压缩|预算|满)", "切换.*(工具|对话)", "阻塞.*记录", "checkpoint"],
+      "negativePatterns": ["刚改完.*(测试|自检).*继续", "继续当前实现.*无需存档", "独立验收.*通过"]
+    },
+    {
+      "id": "qta-independent-verification",
+      "kind": "lifecycle",
+      "stage": "verification",
+      "priority": 700,
+      "positivePatterns": ["独立验收", "干净上下文.*(验收|验证)", "frozen diff", "最终核验", "只给 findings", "candidate.*review.clear"],
+      "negativePatterns": ["刚改完.*自检", "实现者.*(测试|验证)", "尚未独立验收", "普通代码审查", "文档审查", "设计审查"]
+    },
+    {
+      "id": "qta-delivery-finalization",
+      "kind": "lifecycle",
+      "stage": "finalization",
+      "priority": 800,
+      "positivePatterns": ["ACCEPTED.*(更新|收口|交付)", "独立验收(报告)?(已经|已|结果为)?\\s*(通过|允许交付)", "更新.*(建设看板|验收日志|开发日志).*交付", "finalization"],
+      "negativePatterns": ["仅.*SELF_CHECKED", "仅.*自检完成", "尚未独立验收", "验收失败", "REJECTED", "BLOCKED"]
+    },
+    {
+      "id": "qta-openclaw-integration",
+      "kind": "overlay",
+      "stage": "domain-overlay",
+      "priority": 50,
+      "positivePatterns": ["OpenClaw", "QQ.*远程助手", "/api/v1/agent", "OpenClaw.*Agent API", "能力清单.*审计"],
+      "negativePatterns": ["不是\\s*OpenClaw", "非\\s*OpenClaw", "通用.*Agent", "generic agent", "仅.*(subagent|子代理|专家团)"]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "QTA Task Checkpoint"
+  short_description: "Persist resumable QTA progress before context loss"
+  default_prompt: "Use $qta-task-checkpoint to save exact progress, evidence, blockers, and the next executable step."
+policy:
+  allow_implicit_invocation: true

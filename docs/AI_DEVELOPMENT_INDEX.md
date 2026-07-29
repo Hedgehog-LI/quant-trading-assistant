@@ -18,9 +18,9 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 
 ## 3. 新会话推荐阅读顺序
 
-1. 启用项目 skill：`.claude/skills/qta-context-bootstrap`（分阶段加载，避免一次读全部 docs）。
+1. 启用项目 skill：`qta-context-bootstrap`（规范源 `.agents/skills/`，Claude 兼容镜像 `.claude/skills/`）。
 2. 读入口：`AGENTS.md` → `CLAUDE.md` → 本文件 → `AI_HANDOFF.md`。
-3. 读 `docs/ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md`，先输出本轮 Task Context Manifest。
+3. 长任务、恢复任务或上下文风险任务再读 `docs/ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md`。
 4. 按下方"任务类型路由"只读必要文档；每次额外读取都说明原因。
 
 ## 4. 任务类型路由
@@ -29,16 +29,20 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 | --- | --- |
 | 任意开发 | `BUILD_CHECKLIST.md`、`CURRENT_ARCHITECTURE_AND_MODULES.md`、`DEVELOPMENT_WORKFLOW.md` |
 | 产品 / 功能设计 | `PRODUCT_BLUEPRINT.md`、`docs/features/<对应设计>.md`、`BUILD_CHECKLIST.md`；新功能用 `docs/templates/FEATURE_DESIGN_TEMPLATE.md` |
+| 标准 / 长任务 / 跨仓库 / 高风险闭环 | 对应产品/API 文档、当前 git baseline；父上下文启用 `qta-development-orchestration`（或 `/qta-run`），并用 `qta-task-contract` 冻结契约 |
 | LongPort / 行情 provider | `features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`、`features/LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`、`features/MARKET_ALERT_RULES_DESIGN.md`、`api/MARKET_DATA_API.md`、`decisions/ADR-0008-longport-quote-only-provider.md` |
 | 市场板块 / 行业排行 / ETF 跟踪 | `features/MARKET_SECTOR_CATALOG_DESIGN.md`、`features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`api/MARKET_DATA_API.md`、`mock/MOCK_REMOTE_CONTRACT.md` |
 | 行情工作台 / 采集任务 / 分钟线 | `features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`features/MARKET_DATA_FOUNDATION_DESIGN.md`、`features/MARKET_ALERT_RULES_DESIGN.md`、`api/MARKET_DATA_API.md`、`DATABASE_DESIGN.md` |
 | 证券精确代码验证 / 采集计划选股 | `features/EXACT_SECURITY_VERIFICATION_DESIGN.md`、`features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`、`development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md` |
 | 证券目录 / 名称模糊搜索 / 自动填充 | `features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`、`decisions/ADR-0009-local-first-security-directory.md`、`development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md` |
+| OpenClaw / QQ 远程助手 / OpenClaw Agent API | `features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`、`api/AGENT_ASSISTANT_API.md`、`decisions/ADR-0011-openclaw-agent-facade-and-tool-boundary.md`、`development/OPENCLAW_AGENT_ASSISTANT_IMPLEMENTATION_PLAN.md`、`ai/HANDOFF_2026-07-26_openclaw_agent_assistant.md`；只有明确属于 OpenClaw/QQ 时才启用 `qta-openclaw-integration` skill |
 | 后端开发 | `api/API_INDEX.md`、对应 `api/*.md`、`DATABASE_DESIGN.md`、`decisions/ADR_INDEX.md`；启用 `qta-backend-implementation` skill |
 | 前端开发 | `FRONTEND_ARCHITECTURE.md`、`mock/MOCK_REMOTE_CONTRACT.md`、对应 feature 设计；启用 `qta-frontend-implementation` skill |
 | API 联调 | `api/API_INDEX.md`、对应 `api/*.md`、`mock/MOCK_REMOTE_CONTRACT.md` |
 | Mock 开发 | `mock/MOCK_REMOTE_CONTRACT.md`、对应 `features/*/api/*Api.ts` |
-| 测试验收 | `BUILD_CHECKLIST.md`、`acceptance/ACCEPTANCE_LOG.md`；启用 `qta-quality-acceptance` skill |
+| 长任务断点 / 上下文压缩 / 跨工具交接 | 当前任务契约、diff、验证证据；启用 `qta-task-checkpoint` skill |
+| 独立测试验收 | 当前任务契约、冻结 diff、实现者自检证据、`acceptance/ACCEPTANCE_LOG.md`；在未参与实现的干净上下文启用 `qta-independent-verification` skill |
+| 交付与文档收口 | 独立验收报告、最终 diff、受影响的唯一事实来源；启用 `qta-delivery-finalization` skill |
 | 部署 / 修复 | `DEVELOPMENT_WORKFLOW.md`（部署段）、`docker-compose.yml`、`src/main/resources/application-*.properties` |
 
 ## 5. 单一事实来源映射（避免多份维护同一事实）
@@ -54,6 +58,7 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 | 验收历史 | `acceptance/ACCEPTANCE_LOG.md` |
 | 开发流程与同步规则 | `DEVELOPMENT_WORKFLOW.md` |
 | AI 渐进式加载 / 轻量交接协议 | `ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md` |
+| Skill / Agent 职责、触发、权限与维护 | `ai/SKILL_AND_AGENT_GOVERNANCE.md` |
 | 当前接手事实 | `AI_HANDOFF.md`（精简，历史进 DEVELOPMENT_LOG） |
 
 ## 6. Historical 文档（仅参考，不在主流程）
@@ -68,4 +73,4 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 
 **产品**：明确用户目标、范围、不做什么、数据模型、验收标准、风险。
 
-**所有任务结束**：按 `DEVELOPMENT_WORKFLOW.md` 执行"开发结束文档同步检查"；长任务、中断任务或跨会话任务必须按 `docs/templates/TASK_HANDOFF_TEMPLATE.md` 写轻量交接。
+**所有任务结束**：实现结束只记为 `SELF_CHECKED`；独立验收通过后才按 `DEVELOPMENT_WORKFLOW.md` 执行交付文档同步。长任务、中断任务或跨会话任务必须使用 `qta-task-checkpoint` 写轻量交接。

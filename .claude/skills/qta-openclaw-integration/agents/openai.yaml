@@ -1,0 +1,6 @@
+interface:
+  display_name: "QTA OpenClaw Integration"
+  short_description: "Apply QTA OpenClaw API and security boundaries"
+  default_prompt: "Use $qta-openclaw-integration as the domain overlay for this explicit OpenClaw integration task."
+policy:
+  allow_implicit_invocation: true

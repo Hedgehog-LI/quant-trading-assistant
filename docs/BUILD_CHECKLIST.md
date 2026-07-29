@@ -288,6 +288,22 @@
 - [ ] D3：接入可审计的目录 provider、同步状态和 LongPort Static Info 按需补全。
 - [ ] D4：推广到自选/计划/交易/风控/快照，完成 A/H/US E2E 与建设看板同步。
 
+### P1.8 代码交付完成、待部署验收：Agent 只读远程助手
+
+- [x] 产品、安全、后端、OpenClaw 和 QA 专家评审已完成。
+- [x] 专用 Agent Facade + 固定 Tool Plugin 架构决策已沉淀（ADR-0011）。
+- [x] 第一期只读工具、可信回答契约、安全边界和分阶段门禁已设计。
+- [x] ZCode Goal Mode 实施计划、交接和执行提示词已沉淀。
+- [x] Agent Bearer 鉴权（Spring Security）、限流（滑动窗口）、requestId 和持久化脱敏审计（Flyway V16）。
+- [x] 只读 Agent 聚合 API（9 个固定 GET 端点 + TrustedAnswer）与 springdoc agent-v1 OpenAPI。
+- [x] OpenClaw 原生 Tool Plugin（8 tools，TypeBox，超时重试，裁剪，OpenID allowlist，SKILL.md）、Nginx deny 示例。
+- [x] D3 统一审计：单一 servlet 级 `AgentAuditFilter`（最外层 filter）覆盖整个 FilterChain，每次请求恰好一条审计记录；requestId 单一来源（X-Request-ID header）。
+- [x] D4 错误语义：500 返回 `ApiResponse.fail(INTERNAL_ERROR)`（success=false）+ requestId，不泄露内部异常。
+- [x] D5 QtaClient 双超时：connectTimeoutMs 仅约束到响应头、totalTimeoutMs 覆盖 body 解析、外部 AbortSignal 不重试、计时器 finally 清理。
+- [x] 后端 342 tests、插件 49 tests + plugin:build + plugin:validate、前端 277 tests + build 全绿。
+- [ ] 服务器公网阻断、真实 QQ 私聊和 P1.6 两时间桶部署验收。
+- [ ] 第二阶段受控写操作仅保留设计，第一期不得实现。
+
 ## 8. 暂缓: 图片识别导入
 
 - [ ] 新增 AI import task 设计。

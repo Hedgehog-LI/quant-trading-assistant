@@ -4,6 +4,74 @@
 
 ---
 
+## 2026-07-29 — Skill 与 Agent 生命周期治理验收（通过）
+
+- **范围**：9 个项目 Skill、4 个 ZCode 固定角色、规范源/兼容镜像、可执行触发回归、同步/治理脚本及 AI 生命周期文档。
+- **触发门禁**：`node scripts/evaluate-skill-triggers.mjs` 通过，**20 cases**；9 个 Skill 均有正向用例和真实负向规则用例，负例必须满足“移除排除规则会触发、应用排除规则后不触发”。
+- **治理门禁**：`node scripts/validate-ai-governance.mjs` 通过，**9 skills / 4 agents**；覆盖目录全集、镜像逐文件一致、元数据、真实文档引用、角色工具/permissionMode/Skill 组合、禁止嵌套代理及触发回归调用。
+- **格式门禁**：3 个 Node 脚本 `node --check` 通过；Ruby `YAML.safe_load` 成功解析 **22** 个 Skill/Agent frontmatter 或 `openai.yaml`；治理范围 `git diff --check` 通过。
+- **独立验收**：第一轮只读审查发现 7 项边界缺陷并拒绝；修正后第二轮发现负例未实际锻炼排除规则、OpenClaw API 路由不明确并拒绝；再次修正后由恢复的干净核验上下文实际运行门禁并逐项核对，A/B 均 PASS，无 P0-P2，最终 `ACCEPTED`。
+- **关键结论**：
+  - 实现、自检、代码审查、最终核验和交付收口已分离。
+  - checkpoint 不得提前改项目级完成/验收状态。
+  - OpenClaw 仅在显式 OpenClaw/QQ `/api/v1/agent` 场景触发，正式 API 路由为 `docs/api/AGENT_ASSISTANT_API.md`。
+  - `.agents/skills/` 是规范源，`.claude/skills/` 为同步镜像。
+- **未执行**：Maven、npm、Docker、curl、浏览器均 `NOT_REQUIRED`，本轮未改业务实现。系统 `quick_validate.py` 因环境缺少 PyYAML 为 `BLOCKED_ENVIRONMENT`，其规则由项目 validator 与 Ruby YAML 解析覆盖。
+
+---
+
+## 2026-07-26 — Agent 只读助手最终收口验收（通过）
+
+- **范围**：按官方 TypeScript 类型重构插件，修复全部验收阻断项；含 D3/D4/D5 缺陷修复（统一审计 filter、500 错误语义、QtaClient 超时）。
+- **后端门禁**：`./mvnw test` **342 tests / 0 failures / 0 errors**；**日志扫描无 Agent ERROR/Exception/NPE**；`package` BUILD SUCCESS；`git diff --check` 通过。
+- **插件门禁**：`npm test` **49 tests / 0 failed**；`openclaw plugins build --entry ./dist/index.js --root . --check` → "Plugin metadata is up to date"；`openclaw plugins validate --entry ./dist/index.js --root .` → "Plugin qta-assistant is valid"；`import-check` → "IMPORT OK"。
+- **前端门禁**：typecheck + lint 通过；`test` **277 tests passed**；`build` 通过；`git diff --check` 通过。
+- **关键验证**：
+  - 插件 `register()` → `registerTool(factory)` → `factory(toolContext)` → `AnyAgentTool.execute(toolCallId, params, signal)` 官方签名真实链路。
+  - 返回 `jsonResult()` `AgentToolResult`（content + details），不返回任意对象。
+  - 8 工具逐一 smoke test，断言 `content` 数组和 `details`。
+  - `qta_security_market_summary` URL 含 `SH.600519`，不含 `undefined`。
+  - Sender 缺失/非法/allowlist 为空时 throw，fetch count = 0（fail-closed）。
+  - `dataQualityAlerts` NPE 已修复（显式 if/else 替代三元 autoboxing）。
+  - `/agent/audit` 公共端点已移除。
+  - **D5 QtaClient 双超时**：`connectTimeoutMs` 仅约束到响应头到达为止（之后清除，不误杀大响应体）；`totalTimeoutMs` 覆盖响应头 + `resp.json()` body 解析全链路（仅 body 解析完成后清除）；外部 `AbortSignal` 触发立即终止且不重试；所有计时器在 `finally` 清理。URLSearchParams+encodeURIComponent 编码；仅 502/503/timeout 重试一次。（D5 新增 4 测试：totalTimeoutMs 覆盖 body 解析、connectTimeoutMs 不误杀慢 body、外部 signal 不重试、计时器无泄漏。）
+  - **参数差异测试**：CN vs HK 板块排行返回不同 leaderSectorName；limit=2 vs limit=5 返回不同 failedTaskCount；resolved vs unresolved 返回不同 alert 集合。
+  - **限流修复**：`AgentRateLimitFilter` 使用 `request.getRemoteAddr()` 不用 Authorization hash，防止伪造值绕过。
+  - **D3 统一审计**：删除 `AgentAuditInterceptor`（MVC 拦截器）与 Controller 手动审计；改为单一 `AgentAuditFilter`（servlet 级 `OncePerRequestFilter`，经 `FilterRegistrationBean` 注册为最外层 filter）。无论请求被 token/限流 filter 短路、被 Security entry point 拒绝、还是 Controller 抛异常，都只产生**恰好一条**审计记录，覆盖 200/401/403/404/429/500。**requestId 单一来源**：由 `AgentAuditFilter` 生成并写入 request 属性 + `X-Request-ID` 响应头，下游全部复用。（D3 新增 once-per-request 集成测试：成功路径、token 401、限流 429、非 agent 路径各恰好一条审计行，requestId 在 header/body/审计行三者一致。）
+  - **D4 错误语义**：500 返回 `ApiResponse.fail(INTERNAL_ERROR)` 即 `success=false`/`code=INTERNAL_ERROR`，body 含 requestId 供关联，不泄露内部异常类名/堆栈；requestId 在 X-Request-ID header / body / 审计行三者一致。（D4 新增 3 测试：service 抛异常→500 success=false 且无内部泄露、handled failure→500、成功→success=true。）
+- **Docker/浏览器/LongPort**：SKIPPED。
+- **部署验收待办**：Nginx deny、QQ OpenID allowlist、OpenClaw install/enable、真实 Longbridge 联调。
+
+---
+
+## 2026-07-26 — Agent 只读助手重构验收（通过）
+
+- **范围**：删除旧 openclaw 模块，按 ADR-0011 重构为 agent 模块 + Spring Security + Flyway V16 + TrustedAnswer + OpenClaw 插件。
+- **后端门禁（全绿）**：`./mvnw test` **313 tests / 0 failures / 0 errors**（AgentControllerIntegrationTest 3 + AgentEnabledIntegrationTest 11）；`./mvnw -DskipTests package` BUILD SUCCESS；`git diff --check` 通过。
+- **插件门禁（全绿）**：`npm test` **12 tests passed**（manifest 4 + read-tools 2 + formatter 2 + sender-policy 4）；`npm run plugin:build` OK（tsc + manifest 检查）；`npm run plugin:validate` OK（8 tools 验证）。
+- **集成测试覆盖**：
+  - Disabled 模式：GET /agent/** → 404；带 Token → 404；非 Agent 路径不受影响。
+  - Enabled 模式：无 Token → 401；错 Token → 401；正确 Token → capabilities/system-health/today/portfolio/collection-overview/failures/alerts/sector-ranking/security-summary 全 200。
+- **Docker/curl/浏览器**：SKIPPED — 本轮未执行。
+- **LongPort 真实外联**：SKIPPED — 本轮不依赖真实密钥。
+- **部署验收待办**：服务器部署 + Nginx deny、真实 QQ OpenID、OpenClaw install/enable、真实 Longbridge 联调。
+- **关联**：`development/DEVELOPMENT_LOG.md`（2026-07-26 条）、`AI_HANDOFF.md`。
+
+---
+
+## 2026-07-26 — OpenClaw 远程只读助手第一期验收（通过）
+
+- **范围**：OpenClaw 模块（config/filter/controller/facade/service/8 tools/plugin），单元测试 13 + MockMvc 集成测试 11。
+- **后端门禁（全绿）**：`./mvnw test` **325 tests / 0 failures / 0 errors**（新增 24 tests：OpenClawAgentFacadeTest 4 + OpenClawAuthServiceTest 5 + OpenClawRateLimitServiceTest 3 + OpenClawAuditServiceTest 3 + OpenClawControllerIntegrationTest 3 + OpenClawEnabledIntegrationTest 8）；`./mvnw -DskipTests package` BUILD SUCCESS；`git diff --check` 通过。
+- **集成测试覆盖（MockMvc）**：
+  - Disabled 模式：GET /tools → 404；POST /tools/{toolName} → 404；非 OpenClaw 路径不受影响（actuator/health → 200）。
+  - Enabled 模式：无 key → 401；空 key → 401；错 key → 401；正确 key → GET /tools 返回 8 个工具；POST workbench_overview 返回数据；POST 未知 tool 返回 fail；POST 无 body 正常工作；审计日志包含调用记录。
+- **Docker/curl/浏览器**：SKIPPED — 本轮不执行（外部部署验收待办）。
+- **LongPort 真实外联**：SKIPPED — 本轮不依赖真实密钥。
+- **关联**：`development/DEVELOPMENT_LOG.md`（2026-07-26 条）、`AI_HANDOFF.md`、`features/OPENCLAW_REMOTE_ASSISTANT_DESIGN.md`。
+
+---
+
 ## 2026-07-22 — P1.6 板块双层自动采集（自动化通过，部署验收待执行）
 
 - **后端**：Flyway 从空 H2 库成功执行 V1-V15；新增集成测试实际读写排行配置、claim、批次和明细，单元测试覆盖 CN/HK/US 时区、以每段开市为锚点的频率时间桶、收盘单次、周末和交易日历休市跳过；`./mvnw test` **299 tests / 0 failures / 0 errors / 0 skipped**，package 通过。

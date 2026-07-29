@@ -1,0 +1,363 @@
+{
+  "version": 1,
+  "algorithm": "sha256(sorted JSON entries: path,type,sha256)",
+  "root": ".",
+  "entrySetSha256": "984a2599e0bd562c071b6937affb6974c776172c9a737f02c06bf3a27780785d",
+  "entries": [
+    {
+      "path": ".agents/skill-evals/trigger-cases.json",
+      "type": "file",
+      "sha256": "c1793ff3fd8648f2e1d9405a0671648d555f6f4ef1572861d3f057685d47acc4"
+    },
+    {
+      "path": ".agents/skill-manifest.json",
+      "type": "file",
+      "sha256": "1efcb41ccfa993244f3dc0c606405faeddd70c07452f77ffe6b08265371e1c86"
+    },
+    {
+      "path": ".agents/skills/qta-backend-implementation/agents/openai.yaml",
+      "type": "file",
+      "sha256": "6d2125a2297d419f618f695eefb57078e38af7738f328494961903a6eeb0e454"
+    },
+    {
+      "path": ".agents/skills/qta-backend-implementation/SKILL.md",
+      "type": "file",
+      "sha256": "41d656d866f9ff730d847301528693b59198624a6e651b61f49292aa9bb8f100"
+    },
+    {
+      "path": ".agents/skills/qta-context-bootstrap/agents/openai.yaml",
+      "type": "file",
+      "sha256": "c3b67e6ee61e782cd807486d9b929fd842c2761561d089c22a8d53da08afc466"
+    },
+    {
+      "path": ".agents/skills/qta-context-bootstrap/SKILL.md",
+      "type": "file",
+      "sha256": "33bab3cda60a8c8a61ba9bb2cc7677ad5ebe9ae2c75e5c971937b4265f88a124"
+    },
+    {
+      "path": ".agents/skills/qta-delivery-finalization/agents/openai.yaml",
+      "type": "file",
+      "sha256": "99b24126bf1ab5afe06758e40a905b90d25f5a542a2d804dc886f162515e029d"
+    },
+    {
+      "path": ".agents/skills/qta-delivery-finalization/assets/FINALIZATION_CHECKLIST.md",
+      "type": "file",
+      "sha256": "cc8538686b18b3562aa207d70038e0c57a46de3f81cce9e02c78f2d326f8aa39"
+    },
+    {
+      "path": ".agents/skills/qta-delivery-finalization/SKILL.md",
+      "type": "file",
+      "sha256": "14d671ebeae8158e6faf2d2c77fbc69a43bf733c804cbb3488724474be629a4f"
+    },
+    {
+      "path": ".agents/skills/qta-development-orchestration/agents/openai.yaml",
+      "type": "file",
+      "sha256": "348c3b78396748e317443532a57852f2a61fa4fb14f9a2e63684f9e028f3e7b7"
+    },
+    {
+      "path": ".agents/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md",
+      "type": "file",
+      "sha256": "4773cf6e1b8441920e61ea82d2f94247855ebb881aec43710b0584682eba87a7"
+    },
+    {
+      "path": ".agents/skills/qta-development-orchestration/SKILL.md",
+      "type": "file",
+      "sha256": "29ced6f1e6b222ac1643ee3440f8c48e5c2007a4b31caba88e4811091b25c127"
+    },
+    {
+      "path": ".agents/skills/qta-frontend-implementation/agents/openai.yaml",
+      "type": "file",
+      "sha256": "0cd2fdf23e4e0f12c4069038b79ecec6995ce63cc5305d788d570f14f3cd7507"
+    },
+    {
+      "path": ".agents/skills/qta-frontend-implementation/SKILL.md",
+      "type": "file",
+      "sha256": "c50dc0156ca4e29ae7b5b55eb26a0d3ac0378cd2694b8bbc2cfab28ddce82475"
+    },
+    {
+      "path": ".agents/skills/qta-independent-verification/agents/openai.yaml",
+      "type": "file",
+      "sha256": "4d429a59697b1c5e581022ea169d223b34cb0f83760d79aba545ad1b236f5b06"
+    },
+    {
+      "path": ".agents/skills/qta-independent-verification/assets/INDEPENDENT_VERIFICATION_TEMPLATE.md",
+      "type": "file",
+      "sha256": "a84dda7425411d8f24b091b0d42107046d10c541530aa1b04fd64e44e44de88c"
+    },
+    {
+      "path": ".agents/skills/qta-independent-verification/SKILL.md",
+      "type": "file",
+      "sha256": "d44b2161e5e605dbc75eccad9b8f7db6788409c4fce2d5d42958fbcd4804c9d3"
+    },
+    {
+      "path": ".agents/skills/qta-openclaw-integration/agents/openai.yaml",
+      "type": "file",
+      "sha256": "ecc813f4a6b785486c2757860800d0d9af05a035c88eef6d9dd0cbc8ef940578"
+    },
+    {
+      "path": ".agents/skills/qta-openclaw-integration/SKILL.md",
+      "type": "file",
+      "sha256": "552f68780da667a1e48beb58e66a83930a61c702d15ceff1ae944eb683daf80a"
+    },
+    {
+      "path": ".agents/skills/qta-product-design/agents/openai.yaml",
+      "type": "file",
+      "sha256": "037eb94284853ea928a9d5848fa73f61f836bc0cae86510433b6c6c8793e25a7"
+    },
+    {
+      "path": ".agents/skills/qta-product-design/SKILL.md",
+      "type": "file",
+      "sha256": "af7fd671fd3ed8526e8a5ea615c878a68fa55c7f7decad993c57b1ef4a946a2f"
+    },
+    {
+      "path": ".agents/skills/qta-task-checkpoint/agents/openai.yaml",
+      "type": "file",
+      "sha256": "51a75cda304ed2059f17b56e076c5fdecb12a6ab212f449b31a4ec727fb2a38b"
+    },
+    {
+      "path": ".agents/skills/qta-task-checkpoint/assets/HANDOFF_TEMPLATE.md",
+      "type": "file",
+      "sha256": "cda5aa3794ac973dfe0aa56f08602c80e58443daaf1e26250fca5c163b11fe4a"
+    },
+    {
+      "path": ".agents/skills/qta-task-checkpoint/assets/TASK_STATE_TEMPLATE.md",
+      "type": "file",
+      "sha256": "af5e8ab7547a970035d1016a3a76b176a58107a56107d29994830cb373387fd4"
+    },
+    {
+      "path": ".agents/skills/qta-task-checkpoint/SKILL.md",
+      "type": "file",
+      "sha256": "822b149b6ea30ff16cd877d9273adee01a4c4319bfbcaca96e830b42bef99cc1"
+    },
+    {
+      "path": ".agents/skills/qta-task-contract/agents/openai.yaml",
+      "type": "file",
+      "sha256": "15d44826cf4cb258e2219bfe8359d468109c5168b9424147f78fcaf3cb42b920"
+    },
+    {
+      "path": ".agents/skills/qta-task-contract/assets/TASK_CONTRACT_TEMPLATE.md",
+      "type": "file",
+      "sha256": "b938914297b2cf41c2d1b0259ce550cb32d4654b6c18b864c1ede3a4a56da090"
+    },
+    {
+      "path": ".agents/skills/qta-task-contract/SKILL.md",
+      "type": "file",
+      "sha256": "c65001db4c4bbdcba91ee6cc0d2f2b7a7baa91f6ff378c2e830220b09b9c3f57"
+    },
+    {
+      "path": ".claude/skills/qta-backend-implementation/agents/openai.yaml",
+      "type": "file",
+      "sha256": "6d2125a2297d419f618f695eefb57078e38af7738f328494961903a6eeb0e454"
+    },
+    {
+      "path": ".claude/skills/qta-backend-implementation/SKILL.md",
+      "type": "file",
+      "sha256": "41d656d866f9ff730d847301528693b59198624a6e651b61f49292aa9bb8f100"
+    },
+    {
+      "path": ".claude/skills/qta-context-bootstrap/agents/openai.yaml",
+      "type": "file",
+      "sha256": "c3b67e6ee61e782cd807486d9b929fd842c2761561d089c22a8d53da08afc466"
+    },
+    {
+      "path": ".claude/skills/qta-context-bootstrap/SKILL.md",
+      "type": "file",
+      "sha256": "33bab3cda60a8c8a61ba9bb2cc7677ad5ebe9ae2c75e5c971937b4265f88a124"
+    },
+    {
+      "path": ".claude/skills/qta-delivery-finalization/agents/openai.yaml",
+      "type": "file",
+      "sha256": "99b24126bf1ab5afe06758e40a905b90d25f5a542a2d804dc886f162515e029d"
+    },
+    {
+      "path": ".claude/skills/qta-delivery-finalization/assets/FINALIZATION_CHECKLIST.md",
+      "type": "file",
+      "sha256": "cc8538686b18b3562aa207d70038e0c57a46de3f81cce9e02c78f2d326f8aa39"
+    },
+    {
+      "path": ".claude/skills/qta-delivery-finalization/SKILL.md",
+      "type": "file",
+      "sha256": "14d671ebeae8158e6faf2d2c77fbc69a43bf733c804cbb3488724474be629a4f"
+    },
+    {
+      "path": ".claude/skills/qta-development-orchestration/agents/openai.yaml",
+      "type": "file",
+      "sha256": "348c3b78396748e317443532a57852f2a61fa4fb14f9a2e63684f9e028f3e7b7"
+    },
+    {
+      "path": ".claude/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md",
+      "type": "file",
+      "sha256": "4773cf6e1b8441920e61ea82d2f94247855ebb881aec43710b0584682eba87a7"
+    },
+    {
+      "path": ".claude/skills/qta-development-orchestration/SKILL.md",
+      "type": "file",
+      "sha256": "29ced6f1e6b222ac1643ee3440f8c48e5c2007a4b31caba88e4811091b25c127"
+    },
+    {
+      "path": ".claude/skills/qta-frontend-implementation/agents/openai.yaml",
+      "type": "file",
+      "sha256": "0cd2fdf23e4e0f12c4069038b79ecec6995ce63cc5305d788d570f14f3cd7507"
+    },
+    {
+      "path": ".claude/skills/qta-frontend-implementation/SKILL.md",
+      "type": "file",
+      "sha256": "c50dc0156ca4e29ae7b5b55eb26a0d3ac0378cd2694b8bbc2cfab28ddce82475"
+    },
+    {
+      "path": ".claude/skills/qta-independent-verification/agents/openai.yaml",
+      "type": "file",
+      "sha256": "4d429a59697b1c5e581022ea169d223b34cb0f83760d79aba545ad1b236f5b06"
+    },
+    {
+      "path": ".claude/skills/qta-independent-verification/assets/INDEPENDENT_VERIFICATION_TEMPLATE.md",
+      "type": "file",
+      "sha256": "a84dda7425411d8f24b091b0d42107046d10c541530aa1b04fd64e44e44de88c"
+    },
+    {
+      "path": ".claude/skills/qta-independent-verification/SKILL.md",
+      "type": "file",
+      "sha256": "d44b2161e5e605dbc75eccad9b8f7db6788409c4fce2d5d42958fbcd4804c9d3"
+    },
+    {
+      "path": ".claude/skills/qta-openclaw-integration/agents/openai.yaml",
+      "type": "file",
+      "sha256": "ecc813f4a6b785486c2757860800d0d9af05a035c88eef6d9dd0cbc8ef940578"
+    },
+    {
+      "path": ".claude/skills/qta-openclaw-integration/SKILL.md",
+      "type": "file",
+      "sha256": "552f68780da667a1e48beb58e66a83930a61c702d15ceff1ae944eb683daf80a"
+    },
+    {
+      "path": ".claude/skills/qta-product-design/agents/openai.yaml",
+      "type": "file",
+      "sha256": "037eb94284853ea928a9d5848fa73f61f836bc0cae86510433b6c6c8793e25a7"
+    },
+    {
+      "path": ".claude/skills/qta-product-design/SKILL.md",
+      "type": "file",
+      "sha256": "af7fd671fd3ed8526e8a5ea615c878a68fa55c7f7decad993c57b1ef4a946a2f"
+    },
+    {
+      "path": ".claude/skills/qta-task-checkpoint/agents/openai.yaml",
+      "type": "file",
+      "sha256": "51a75cda304ed2059f17b56e076c5fdecb12a6ab212f449b31a4ec727fb2a38b"
+    },
+    {
+      "path": ".claude/skills/qta-task-checkpoint/assets/HANDOFF_TEMPLATE.md",
+      "type": "file",
+      "sha256": "cda5aa3794ac973dfe0aa56f08602c80e58443daaf1e26250fca5c163b11fe4a"
+    },
+    {
+      "path": ".claude/skills/qta-task-checkpoint/assets/TASK_STATE_TEMPLATE.md",
+      "type": "file",
+      "sha256": "af5e8ab7547a970035d1016a3a76b176a58107a56107d29994830cb373387fd4"
+    },
+    {
+      "path": ".claude/skills/qta-task-checkpoint/SKILL.md",
+      "type": "file",
+      "sha256": "822b149b6ea30ff16cd877d9273adee01a4c4319bfbcaca96e830b42bef99cc1"
+    },
+    {
+      "path": ".claude/skills/qta-task-contract/agents/openai.yaml",
+      "type": "file",
+      "sha256": "15d44826cf4cb258e2219bfe8359d468109c5168b9424147f78fcaf3cb42b920"
+    },
+    {
+      "path": ".claude/skills/qta-task-contract/assets/TASK_CONTRACT_TEMPLATE.md",
+      "type": "file",
+      "sha256": "b938914297b2cf41c2d1b0259ce550cb32d4654b6c18b864c1ede3a4a56da090"
+    },
+    {
+      "path": ".claude/skills/qta-task-contract/SKILL.md",
+      "type": "file",
+      "sha256": "c65001db4c4bbdcba91ee6cc0d2f2b7a7baa91f6ff378c2e830220b09b9c3f57"
+    },
+    {
+      "path": ".zcode/agents/qta-code-reviewer.md",
+      "type": "file",
+      "sha256": "e0199a78316eb5f6726bec4ffa2d8ec654601f6a6030b3ba7b65ecba65aac53d"
+    },
+    {
+      "path": ".zcode/agents/qta-final-verifier.md",
+      "type": "file",
+      "sha256": "21b0421055ed2e4eb87dc7caa098c749b9ccdff22cbe595ea407d6465dc93a5f"
+    },
+    {
+      "path": ".zcode/agents/qta-implementer.md",
+      "type": "file",
+      "sha256": "14f1c69f677f6fe15c00ea4cb2b1fd724597e9fe71219083b0713ee2da31dcf7"
+    },
+    {
+      "path": ".zcode/agents/qta-test-designer.md",
+      "type": "file",
+      "sha256": "281fee439fd7c21891bba84f88bfeb6354edd57389b48cf638e4600708e46946"
+    },
+    {
+      "path": ".zcode/commands/qta-run.md",
+      "type": "file",
+      "sha256": "68d5deaaafd3f8e169d4ce964c8f6e7de2e4958057719883c810cc94c115cd33"
+    },
+    {
+      "path": "AGENTS.md",
+      "type": "file",
+      "sha256": "af6824584d090b1f6e67b5cd8fa925d436b409fec7527b8876b3efd8b79af28a"
+    },
+    {
+      "path": "CLAUDE.md",
+      "type": "file",
+      "sha256": "e156751c4c592549a24a18164199794f938a52abb571c0f405921a44c36ef46b"
+    },
+    {
+      "path": "docs/AI_DEVELOPMENT_INDEX.md",
+      "type": "file",
+      "sha256": "616358d3407ee95d5831ced1ce1249a27101e785303b59044eb895554e536677"
+    },
+    {
+      "path": "docs/AI_HANDOFF.md",
+      "type": "file",
+      "sha256": "bbb669407f86be25755c39ac7ab006e2f910880a36b7fad1632ce4391edcfe8a"
+    },
+    {
+      "path": "docs/ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md",
+      "type": "file",
+      "sha256": "7455de03e04001d90228166fb6b1c61fc2cfc3699453b4f00e8e4f4b8c471f55"
+    },
+    {
+      "path": "docs/ai/SKILL_AND_AGENT_GOVERNANCE.md",
+      "type": "file",
+      "sha256": "d6d72c4878d538ee898c6f89b92af95b5f6228ed4d03cf6d3e46ee5655666664"
+    },
+    {
+      "path": "docs/DEVELOPMENT_WORKFLOW.md",
+      "type": "file",
+      "sha256": "9f0f7e0278ced44f0f265f66a20ac055de28d0eaae797c1926fb4f26ceaf427d"
+    },
+    {
+      "path": "docs/development/tasks/AI-GOVERNANCE-CORE-20260729-contract.md",
+      "type": "file",
+      "sha256": "6ff9abaf2336ee3df6934d28f501ccdeb20c29ab1631455cd3541b9ec0e5a1c8"
+    },
+    {
+      "path": "scripts/create-candidate-manifest.mjs",
+      "type": "file",
+      "sha256": "6a7e81921532ee325017eae2412c84489d077082878c70aa66074ab7b8daab5b"
+    },
+    {
+      "path": "scripts/evaluate-skill-triggers.mjs",
+      "type": "file",
+      "sha256": "43abd172e4d1826a68098698e41cabc86cc5861538de73c93d671d29a950dffd"
+    },
+    {
+      "path": "scripts/sync-ai-skills.mjs",
+      "type": "file",
+      "sha256": "543ed1c2a3f9c3674b18047f35ca30b2f5c2750e096f69d4af3609c29a3ca4c3"
+    },
+    {
+      "path": "scripts/validate-ai-governance.mjs",
+      "type": "file",
+      "sha256": "6791680aa775f7f1e9fab476763dbc5794c4e64194bf1ccb4c1938c179de92cb"
+    }
+  ]
+}

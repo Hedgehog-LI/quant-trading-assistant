@@ -1,0 +1,6 @@
+interface:
+  display_name: "QTA Independent Verification"
+  short_description: "Verify QTA delivery independently without editing"
+  default_prompt: "Use $qta-independent-verification in a clean context to verify the task contract and diff without editing."
+policy:
+  allow_implicit_invocation: true

@@ -441,6 +441,26 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 - `created_at`
 - `updated_at`
 
+### agent_api_audit_log
+
+状态：已实现（V16 migration）。用途：Agent 只读 API 调用持久化脱敏审计。记录 requestId、clientId（Token hash）、senderHash（QQ OpenID hash）、operationCode、method、path、paramSummary（脱敏截断）、httpStatus、errorCode、resultCount、durationMs、requestedAt、completedAt。严禁记录 Token、Longbridge 凭据、完整请求/响应或异常堆栈。
+
+关键字段：
+
+- `id` — 主键
+- `request_id` — 请求追踪 ID
+- `client_id` — 客户端标识（Token hash）
+- `sender_hash` — QQ OpenID hash（可空）
+- `operation_code` — 操作码（如 qtaAgentSystemHealth）
+- `method` / `path` — HTTP 方法和路径
+- `param_summary` — 参数摘要（脱敏截断至 500 字符）
+- `http_status` — HTTP 状态码
+- `error_code` — 业务错误码（可空）
+- `result_count` — 结果条数
+- `duration_ms` — 耗时毫秒
+- `requested_at` / `completed_at` — 请求开始/完成时间
+- `created_at`
+
 ## 实施顺序
 
 1. `docs/features/TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md` 已完成，对比和对账结果不新增结果表。

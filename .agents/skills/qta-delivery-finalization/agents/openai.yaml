@@ -1,0 +1,6 @@
+interface:
+  display_name: "QTA Delivery Finalization"
+  short_description: "Finalize verified QTA evidence and project documents"
+  default_prompt: "Use $qta-delivery-finalization only after independent acceptance to synchronize durable delivery records."
+policy:
+  allow_implicit_invocation: true

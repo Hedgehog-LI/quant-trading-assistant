@@ -4,6 +4,123 @@
 
 ---
 
+## 2026-07-29 — 项目级 Skill 与固定 Agent 生命周期治理
+
+- **目标**：解决 Skill 不触发/误触发、专家团重复规划和递归分派、实现者自测自验、完成标准漂移、上下文耗尽后才压缩、交接与项目状态混写等长期问题。
+- **范围**：仅修改 AI 协作治理、Skill、Agent 模板、触发回归和流程文档；未修改后端/前端业务代码、API、数据库或部署配置。
+- **Skill 改造**：
+  - `.agents/skills/` 成为 9 个 Skill 规范源，`.claude/skills/` 为 Claude/ZCode 兼容镜像。
+  - 重写上下文、产品、后端、前端、OpenClaw 5 个既有 Skill；用 `qta-independent-verification` 替换职责混杂的 `qta-quality-acceptance`。
+  - 新增任务契约、断点续作、独立验收、交付收口 4 个生命周期能力及任务/验收模板。
+  - 每个 `SKILL.md` frontmatter description 均含正向与负向触发条件，正文含 Trigger/Stop Conditions。
+- **Agent 固化**：`.zcode/agents/` 新增测试设计者、实施者、代码审查者、最终核验者；按角色限制工具、Skill 和 permissionMode，全部禁止递归 `Agent/Task`。实施者只能 `SELF_CHECKED`，最终核验者可执行非修改性门禁但不可编辑。
+- **可执行治理**：
+  - `.agents/skill-manifest.json` 统一注册 9 个 Skill 及触发/排除规则。
+  - 20 条触发回归同时验证正例、误触发和 `negativePatterns` 真实参与排除。
+  - 同步器与 validator 共用 manifest；validator 检查规范目录/镜像目录全集、文件一致性、文档引用存在、角色权限矩阵、YAML 元数据和触发回归。
+- **流程决策**：checkpoint 只写 `docs/development/tasks/` 任务局部状态；项目级 `AI_HANDOFF`、开发日志、验收日志和建设看板只允许在独立验收允许交付后由 finalization 更新。上下文使用达到 25%/40%/60% 时分级摘要、停止开新工作流和切换干净上下文。
+- **验证结果**：`evaluate-skill-triggers` 20 cases 通过；`validate-ai-governance` 9 skills / 4 agents 通过；Ruby 解析 22 个 YAML/frontmatter 文件通过；治理范围 `git diff --check` 通过。独立干净上下文经过两轮 finding 修正后最终 `ACCEPTED`，无 P0-P2。
+- **未执行**：系统 `skill-creator/quick_validate.py` 因本机 Python 缺少 PyYAML 未运行；其命名、frontmatter key、description 长度等规则已由无依赖 validator 覆盖。未运行 Maven、npm、Docker 或浏览器测试，因为本轮无业务代码改动。
+- **关联文档**：`ai/SKILL_AND_AGENT_GOVERNANCE.md`、`ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md`、`DEVELOPMENT_WORKFLOW.md`、`AI_DEVELOPMENT_INDEX.md`、`development/tasks/README.md`。
+
+---
+
+## 2026-07-26~27 — Agent 只读助手最终收口（官方类型 + 真实过滤 + 安全 + 统一审计 + 错误语义 + 超时）
+
+- **目标**：按官方 OpenClaw TypeScript 类型重构插件，修复全部验收阻断项（含 D3/D4/D5 缺陷），达到设计文档和 ADR-0011 要求。
+- **修复内容**：
+  - 插件 `index.ts` 使用 `defineToolPlugin` **factory 模式**；返回 `AnyAgentTool`（官方 `execute(toolCallId, params, signal, onUpdate)` 4 参数签名）；返回 `jsonResult()` `AgentToolResult`；`toolContext.requesterSenderId` 做 fail-closed（allowlist 为空即拒绝所有）；`openclaw.extensions` 为 `["./dist/index.js"]` 数组格式；官方 `openclaw plugins build --check` + `validate` 全绿。
+  - **D5 QtaClient 双超时修正**：`connectTimeoutMs` 仅约束到响应头到达为止（fetch 返回后立即清除，避免大响应体被误杀）；`totalTimeoutMs` 覆盖响应头 + `resp.json()` body 解析全链路（仅在 body 解析完成后清除）；外部 `AbortSignal` 触发立即终止且不重试；所有计时器在 `finally` 清理避免泄漏；URLSearchParams+encodeURIComponent 编码；仅 502/503/timeout 重试一次。signal 经 index.ts → read-tools → client.get 透传。
+  - `execute.test.js` 通过 `register()` → `registerTool(factory)` → `factory(toolContext)` → `execute` 真实链路测试，无 fallback；fetch count=0 断言。
+  - 后端 `dataQualityAlerts` NPE 修复（显式 if/else）；移除 `/agent/audit`。
+  - **D4 错误语义**：`AgentController` 500 返回 `ApiResponse.fail(INTERNAL_ERROR)`（`success=false`/`code=INTERNAL_ERROR`），body 含 requestId 供关联，不泄露内部异常类名/堆栈；成功路径仍返回 `ApiResponse.ok`（`success=true`/`code=SUCCESS`）。
+  - `AgentTokenAuthFilter` SHA-256 + `MessageDigest.isEqual` 恒定时间比较；token/限流 filter 已禁用 servlet 自动注册，仅在 Security chain 内运行；requestId 复用自审计 filter。
+  - `AgentRateLimitFilter` 使用 `request.getRemoteAddr()` 防伪造 Authorization 绕过；requestId 复用自审计 filter。
+  - **D3 统一审计**：删除 `AgentAuditInterceptor`（MVC 拦截器）与 Controller 手动审计调用；改为单一 `AgentAuditFilter`（servlet 级 `OncePerRequestFilter`，经 `FilterRegistrationBean` 注册为最外层 filter，order = SecurityProperties.DEFAULT_FILTER_ORDER - 1）。无论请求被 token/限流 filter 短路、被 Security entry point 拒绝、还是 Controller 抛异常，都只产生**恰好一条**审计记录，覆盖 200/401/403/404/429/500。**requestId 单一来源**：由 `AgentAuditFilter` 生成并写入 request 属性 `agentRequestId` + 响应头 `X-Request-ID`，下游 token/限流 filter、`AuthenticationEntryPoint`、Controller 全部复用。
+  - `collectionOverview` market 过滤：从 recentWatermarks 按 canonicalSymbol 前缀过滤（SH/SZ/BJ→CN, HK→HK, US→US），`marketFilterApplied=true`，不同市场返回不同 watermark 集合。
+  - 参数差异测试：CN vs HK 板块排行返回不同 leaderSectorName；limit=2 vs limit=5 返回不同 failedTaskCount；resolved vs unresolved 返回不同 alerts。
+- **测试结果**：后端 **342 tests / 0 failures / 0 errors**（含 AgentAuditFilter 9 单测、AgentAuditOncePerRequestTest 4 集成测试、AgentErrorSemanticsTest 3 错误语义测试）；插件 **49 tests / 0 failed**（含 D5 4 超时/泄漏测试）；前端 **277 tests**。`openclaw plugins build --check` + `validate` + `import-check` 全绿。`git diff --check` 两仓库通过。
+- **关联**：`features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`、`decisions/ADR-0011`、`api/AGENT_ASSISTANT_API.md`。
+
+- **目标**：修复全部验收阻断项，达到设计文档和 ADR-0011 要求的完成标准。
+- **修复内容**：
+  - `AgentController` 改为 `ResponseEntity.status(httpStatus)` — 失败返回真实 500，不再伪装 200。所有错误响应包含 `requestId`。
+  - `AgentTokenAuthFilter` 使用 SHA-256 + `MessageDigest.isEqual` 恒定时间比较；401/404/503 统一 JSON 错误响应含 `requestId`。
+  - `AgentRateLimitFilter` 429 响应含 `requestId` + `Retry-After: 60`。
+  - `AgentSecurityConfig` 添加 `authenticationEntryPoint` — 未认证返回 401（含 requestId）而非 403。
+  - `AgentController` 所有 9 个 GET 端点添加 `@Operation(operationId=...)` + `@SecurityRequirement(name="bearerAuth")`。
+  - `AgentOpenApiConfig` GroupedOpenApi `agent` 分组，`/v3/api-docs/agent` 受 Token 保护，断言含 security/bearerAuth。
+  - `AgentQueryService` 8 端点参数真实生效（market/date/since/limit），freshness 基于 `Duration.between` 真实数据时间计算。
+  - 插件 `index.ts` 重构为 `defineToolPlugin` factory 模式 — 从 `toolContext` 获取 sender，factory 层 fail-closed 鉴权。
+  - `QtaClient` 重试规则修正：仅 502/503/timeout/网络瞬断重试一次；401/403/429/500 不重试。14 个 fetch mock 测试。
+  - 官方 `openclaw plugins build --check` + `openclaw plugins validate` 全绿。
+  - `openclaw.extensions` 改为 `["./dist/index.js"]` 数组格式。
+  - 移除废弃 `QTA_OPENCLAW_*` 配置；归档旧 `OPENCLAW_API.md`/`REMOTE_ASSISTANT_DESIGN.md`/`DEPLOYMENT.md`。
+- **测试结果**：后端 **322 tests / 0 failures**；插件 **38 tests / 0 failed**；前端 **277 tests + build OK**。`git diff --check` 通过。
+- **关联**：`features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`、`decisions/ADR-0011`、`api/AGENT_ASSISTANT_API.md`。
+
+---
+
+## 2026-07-26 — Agent 只读助手重构（按 ADR-0011 + 设计文档正确实现）
+
+- **目标**：删除上一轮偏离设计的 `openclaw` 模块，按照 `OPENCLAW_AGENT_ASSISTANT_DESIGN.md` 和 ADR-0011 重新实现正确架构。
+- **删除**：`src/main/java/com/quant/trade/openclaw/`（20 文件）、`src/test/java/com/quant/trade/openclaw/`（6 文件）、`openclaw-plugin/`。
+- **后端新增 `com.quant.trade.agent` 模块**：
+  - `config/`: `AgentProperties`（`QTA_AGENT_ENABLED` 默认关闭，Token 32+ 字符强度校验）、`AgentSecurityConfig`（Spring Security 只保护 `/api/v1/agent/**` 和 `/v3/api-docs/agent`，现有 API 保持兼容）。
+  - `security/`: `AgentTokenAuthFilter`（Bearer Token 常量时间比较，认证失败 401）、`AgentRateLimitFilter`（per-client per-minute 内存滑动窗口，超限 429）。
+  - `controller/`: `AgentController` — 9 个固定 GET 端点（capabilities + 8 tools），统一 `TrustedAnswer` 可信回答契约。
+  - `service/`: `AgentQueryService`（复用 Dashboard/Portfolio/MarketData Service，不直接访问 Mapper）、`AgentAuditService`（持久化到 Flyway V16 `agent_api_audit_log` 表）。
+  - `dao/`: `AgentApiAuditLogMapper` + XML（insert + selectRecent）。
+  - `model/`: `AgentApiAuditLogDO`。
+  - `vo/`: `TrustedAnswer`（conclusion/generatedAt/dataAsOf/freshnessStatus: FRESH/DELAYED/STALE/UNKNOWN/evidence/warnings/data）。
+- **Flyway V16**: `agent_api_audit_log` 表（requestId/clientId/senderHash/operationCode/method/path/paramSummary/httpStatus/errorCode/resultCount/durationMs/requestedAt/completedAt），禁止记录 Token。
+- **pom.xml**: 新增 `spring-boot-starter-security` + `springdoc-openapi-starter-webmvc-api:2.8.6` + `spring-security-test`。
+- **springdoc**: `agent-v1` 分组，只扫描 `com.quant.trade.agent.controller`，Swagger UI 关闭。
+- **测试**: `AgentControllerIntegrationTest`（3 disabled 测试）+ `AgentEnabledIntegrationTest`（11 enabled 测试：无 Token/错 Token/正确 Token/8 工具调用）。后端 **313 tests / 0 failures**。
+- **OpenClaw Tool Plugin** (`integrations/openclaw/qta-assistant/`):
+  - `openclaw.plugin.json`（8 tools contracts + configSchema + toolMetadata replaySafe）。
+  - `src/client/qta-client.ts`（超时 2s/10s、5xx 重试一次、4xx 不重试、错误翻译）。
+  - `src/tools/read-tools.ts`（8 个 TypeBox 工具定义，默认 10 条最大 50 条）。
+  - `src/formatter/result-formatter.ts`（结果裁剪 + 格式化）。
+  - `src/policy/sender-policy.ts`（OpenID 白名单 + toolsBySender）。
+  - `src/index.ts`（`defineToolPlugin` 入口）。
+  - `skills/qta-assistant/SKILL.md`（工具路由 + 边界）。
+  - `test/plugin.test.js`（12 tests：manifest 验证 + 工具定义 + 格式化 + 发送者策略）。
+  - 门禁：`npm test`(12 pass) + `plugin:build`(OK) + `plugin:validate`(OK)。
+- **测试结果**: 后端 313 tests + package + diff --check 全绿；插件 npm test/plugin:build/plugin:validate 全绿。
+- **未完成（部署验收待办）**: 服务器部署 + Nginx deny、真实 QQ OpenID allowlist、OpenClaw CLI install/enable、真实 Longbridge 联调。
+- **关联**: `features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`、`decisions/ADR-0011`、`development/OPENCLAW_AGENT_ASSISTANT_IMPLEMENTATION_PLAN.md`。
+
+---
+
+## 2026-07-26 — OpenClaw 远程只读助手第一期实现
+
+- **目标**：为 QTA 后端提供安全的远程只读查询接口，使 AI Agent（通过 OpenClaw 平台）能查询行情、持仓、自选股等，不接触写操作。
+- **范围**：新增 `com.quant.trade.openclaw` 模块（config/filter/controller/service/tool/dto/vo），OpenClaw 原生 Tool Plugin，自动化测试（单元 13 + MockMvc 集成 11），设计/API/部署文档。
+- **新增文件**：
+  - 后端 18 个 Java 文件：`OpenClawProperties`/`OpenClawConfig`/`OpenClawAuthFilter`/`OpenClawController`/`OpenClawAgentFacade`/`OpenClawAuthService`/`OpenClawRateLimitService`/`OpenClawAuditService`/`OpenClawTool` 接口 + 8 个 tool 实现 / 2 DTO / 1 VO。
+  - 测试 6 个 Java 文件：`OpenClawAgentFacadeTest`(4) + `OpenClawAuthServiceTest`(5) + `OpenClawRateLimitServiceTest`(3) + `OpenClawAuditServiceTest`(3) + `OpenClawControllerIntegrationTest`(3) + `OpenClawEnabledIntegrationTest`(8)。
+  - OpenClaw Plugin 3 文件：`openclaw.plugin.json` + `package.json` + `index.ts`。
+  - 文档 3 文件：`OPENCLAW_REMOTE_ASSISTANT_DESIGN.md` + `OPENCLAW_API.md` + `OPENCLAW_DEPLOYMENT.md`。
+  - `.env.example` 追加 OpenClaw 配置项。
+- **安全边界**：所有 tool 仅调 Service GET 方法；无写/交易/账户 API；API Key 鉴权（默认关闭）；per-key 限流；每次调用审计。
+- **测试结果**：`./mvnw test` **325 tests / 0 failures**；`package` BUILD SUCCESS。
+- **未完成（外部部署验收）**：服务器部署 + 真实 API Key、OpenClaw 插件运行时验证、真实行情联调、QQ 通知集成。
+- **关联文档**：`features/OPENCLAW_REMOTE_ASSISTANT_DESIGN.md`、`api/OPENCLAW_API.md`、`development/OPENCLAW_DEPLOYMENT.md`。
+
+---
+
+## 2026-07-26 — OpenClaw 远程只读助手专家设计与 Goal 交接
+
+- **目标**：让用户通过 QQ 上的 OpenClaw 安全查询 QTA 系统、行情采集、板块、持仓和交易待办，同时避免把全量业务 API、数据库或写操作交给模型。
+- **专家评审**：产品/量化、安全、Spring/OpenAPI、OpenClaw Plugin、QA/SRE 五组评审一致选择“专用 Agent Facade + 固定 Tool Plugin”；第一期只读，第二期受控写操作。
+- **产品决策**：首期提供系统健康、今日待办、持仓摘要、采集概览、失败任务、数据质量、板块排行和单证券摘要。所有结论带数据时间、新鲜度、证据和警告，明确区分空、旧、失败和 Provider 不可用。
+- **安全决策**：服务器回环访问、QQ OpenID allowlist、独立 Bearer Token、限流和脱敏审计；公网阻断 Agent/OpenAPI/Swagger/Actuator；禁止 SQL、Shell、Docker、文件系统、通用 HTTP、写业务数据和交易能力。
+- **交付物**：功能设计、ADR-0011、实施计划、专用 skill、compact handoff 和 ZCode Goal Mode 完整执行提示词。
+- **实现状态**：本轮只做设计与任务沉淀，未新增 API、migration、插件业务代码或验收记录。后续只有本地代码门禁通过才能标“代码交付”，真实 QQ/服务器链路另行验收。
+- **文档修正**：按验收日志事实将 P1.6 后端测试数从 293 修正为 299。
+- **关联**：`../features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`、`../decisions/ADR-0011-openclaw-agent-facade-and-tool-boundary.md`、`OPENCLAW_AGENT_ASSISTANT_IMPLEMENTATION_PLAN.md`、`../ai/HANDOFF_2026-07-26_openclaw_agent_assistant.md`、`../prompts/ZCODE_GOAL_OPENCLAW_AGENT_ASSISTANT_2026-07-26.md`。
+
 ## 2026-07-22 — P1.6 板块双层自动采集与历史榜单
 
 - **目标**：不再要求用户逐板块手工采集；低成本持续保存全市场领涨/领跌事实，并对用户关注板块保存更细的成分资金快照。
@@ -12,7 +129,7 @@
 - **可靠性**：DB claim 防并发，唯一时间桶防重复；鉴权/权限/配置错误进入阻断态，临时错误按 1/2/5/10/30 分钟退避；修改配置会清除阻断状态。
 - **交易窗口收口**：专家复核后，CN 增加 09:15-09:25 集合竞价采集并保留 09:25 末次采样，09:26-09:29/午休/收盘后停止周期采集；HK 收盘快照推迟至 16:15，US 等待 10 分钟。排行与关注采集统一按每段开市时间对齐频率桶，并复用 `market_calendar` 跳过已配置休市日；已有批次会修复成功水位，避免重启后每 30 秒重复查同一桶。
 - **前端**：板块管理新增“自动采集”页签，支持三市场启停、频率、收盘快照、运行状态、立即采集、历史领涨领跌和完整排名；我的关注支持独立自动采集频率与质量状态。
-- **验证**：Flyway V15 在 H2 从空库实际迁移；新 MyBatis config/batch/item 实际读写；CN/HK/US 时间桶单测；后端 293 tests + package、前端 typecheck/lint/36 files 277 tests/build 全绿。真实 Longbridge 与 Docker/MySQL 留给部署后最小验收，不虚构外联结果。
+- **验证**：Flyway V15 在 H2 从空库实际迁移；新 MyBatis config/batch/item 实际读写；CN/HK/US 时间桶单测；后端 299 tests + package、前端 typecheck/lint/36 files 277 tests/build 全绿。真实 Longbridge 与 Docker/MySQL 留给部署后最小验收，不虚构外联结果。
 - **关联**：`../features/MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`、`../decisions/ADR-0010-sector-ranking-dual-layer-collection.md`、`../ai/HANDOFF_2026-07-22_sector_automation.md`。
 
 ## 2026-07-19 — LongPort Token 失效诊断与盘中调度器降噪

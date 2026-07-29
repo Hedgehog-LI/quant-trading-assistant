@@ -1,0 +1,6 @@
+interface:
+  display_name: "QTA Context Bootstrap"
+  short_description: "Load minimal QTA context and route the task"
+  default_prompt: "Use $qta-context-bootstrap to load the minimum authoritative context and route this QTA task."
+policy:
+  allow_implicit_invocation: true

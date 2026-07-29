@@ -111,6 +111,7 @@ Quant Trading Assistant 是个人交易辅助工作台。它帮助用户把短�
 - 手工估值与外部行情严格分离：外部行情不得自动覆盖 `portfolio_price_snapshot`。
 - LongPort 仅作为行情 provider，不接交易、账户、订单、真实持仓能力。
 - P1.6 已在 P1.5 上建设全市场排行快照与关注板块明细双层采集；CN/HK/US 独立交易时区，盘中频率可选 5/10/15/30/60 分钟或仅收盘，并保留立即采集入口、DB claim、时间桶幂等、失败退避和质量状态。下一步基于连续快照计算相对强弱、资金趋势、轮动持续性和异动解释。
+- P1.8 已完成 OpenClaw 远程助手设计：通过专用只读 Agent Facade 和固定 Tool Plugin，让用户从 QQ 查询采集健康、失败任务、板块排行、持仓摘要和交易待办。第一期不开放写操作；生产必须使用回环网络、QQ OpenID 白名单、Bearer Token、限流和审计。详见 `docs/features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`。
 - 指标、策略和回测要等分钟线/日线质量治理和采集水位稳定后再推进。
 
 ### P2: 指标、策略和回测

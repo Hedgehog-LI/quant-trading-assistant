@@ -62,6 +62,7 @@ convert     # MapStruct 转换器
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
 | Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V15 新增全市场板块排行自动采集和关注板块自动采集 |
+| Agent Assistant | `agent` | `/api/v1/agent/**` | `agent_api_audit_log`（V16）。Spring Security Bearer Token 鉴权 + 限流 + 持久化脱敏审计 + TrustedAnswer 可信回答契约。8 个固定只读 GET 端点。OpenClaw Tool Plugin 在 `integrations/openclaw/qta-assistant/`。默认关闭。 |
 
 ## 4. 当前数据库迁移
 
@@ -79,8 +80,12 @@ convert     # MapStruct 转换器
 | `V10__add_market_data_workbench.sql` | stock_minute_bar、market_trading_session、market_calendar、market_data_sync_plan、market_data_sync_task_item、market_data_watermark |
 | `V11__add_market_segment.sql` | market_segment、market_segment_member |
 | `V12__add_sub_task_id_to_task_item.sql` | market_data_sync_task_item 增加 sub_task_id（主子任务追踪），支持 `POST /sync-tasks/{taskId}/reconcile` 非终态收敛 + `selectAllByTaskId` 全量查询 |
+| `V13__add_sync_plan_run_claim.sql` | market_data_sync_plan 增加 run_claim 字段（采集计划执行锁） |
+| `V14__add_market_sector_watch.sql` | market_sector_watch、market_sector_snapshot、market_sector_member_snapshot（行业关注与快照） |
+| `V15__add_market_sector_automatic_collection.sql` | market_sector_ranking_config、market_sector_ranking_batch、market_sector_ranking_item（全市场榜单历史） |
+| `V16__add_agent_api_audit_log.sql` | agent_api_audit_log（Agent 只读 API 持久化脱敏审计） |
 
-已发布的 V1-V12 migration 不应修改；后续表结构调整继续新增更高版本 migration。
+已发布的 V1-V16 migration 不应修改；后续表结构调整继续新增更高版本 migration。
 
 ## 5. 交易账本口径
 
@@ -202,3 +207,12 @@ npm run build
 - `docs/decisions/ADR-0008-longport-quote-only-provider.md`
 
 AI 图片识别暂缓。
+
+## 13. OpenClaw 远程助手规划（未实现）
+
+- 当前不存在 `/api/v1/agent/**`、springdoc、Spring Security、Agent 审计、限流或 OpenClaw Tool Plugin。
+- 已接受 ADR-0011：新增专用 Agent Facade；OpenAPI 仅描述白名单 Agent 接口；OpenClaw 通过固定 Tool Plugin 调用。
+- 第一期只做只读查询，复用现有 Dashboard、Portfolio 和 MarketData Service，不建立平行业务 DAO。
+- 生产调用链限定为 QQ OpenID 白名单 -> OpenClaw -> 服务器回环 Agent API；公网不得暴露 Agent、OpenAPI、Swagger UI 和非必要 Actuator。
+- 第二阶段受控写操作必须具备工具 allow、逐次审批、预检、一次性确认、幂等和审计，尚不在当前开发范围。
+- 设计与实施入口：`docs/features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`、`docs/development/OPENCLAW_AGENT_ASSISTANT_IMPLEMENTATION_PLAN.md`。
