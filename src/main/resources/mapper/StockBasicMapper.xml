@@ -152,12 +152,12 @@
             CASE WHEN EXISTS (
                 SELECT 1 FROM stock_alias ap
                 WHERE ap.stock_basic_id = s.id
-                  AND ap.normalized_alias LIKE CONCAT(#{query}, '%')
+                  AND ap.normalized_alias LIKE CONCAT(#{likeQuery}, '%') ESCAPE '!'
             ) THEN TRUE ELSE FALSE END AS alias_prefix,
             CASE WHEN EXISTS (
                 SELECT 1 FROM stock_alias ac
                 WHERE ac.stock_basic_id = s.id
-                  AND ac.normalized_alias LIKE CONCAT('%', #{query}, '%')
+                  AND ac.normalized_alias LIKE CONCAT('%', #{likeQuery}, '%') ESCAPE '!'
             ) THEN TRUE ELSE FALSE END AS alias_contains
         FROM stock_basic s
         <where>
@@ -185,17 +185,17 @@
                 <if test="hkSymbol != null">
                     OR (s.market = 'HK' AND s.symbol = #{hkSymbol})
                 </if>
-                OR LOWER(COALESCE(s.name, '')) LIKE CONCAT('%', #{query}, '%')
-                OR LOWER(COALESCE(s.name_cn, '')) LIKE CONCAT('%', #{query}, '%')
-                OR LOWER(COALESCE(s.name_hk, '')) LIKE CONCAT('%', #{query}, '%')
-                OR LOWER(COALESCE(s.name_en, '')) LIKE CONCAT('%', #{query}, '%')
-                OR LOWER(COALESCE(s.short_name, '')) LIKE CONCAT('%', #{query}, '%')
-                OR LOWER(COALESCE(s.pinyin_full, '')) LIKE CONCAT(#{query}, '%')
-                OR LOWER(COALESCE(s.pinyin_abbr, '')) LIKE CONCAT(#{query}, '%')
+                OR LOWER(COALESCE(s.name, '')) LIKE CONCAT('%', #{likeQuery}, '%') ESCAPE '!'
+                OR LOWER(COALESCE(s.name_cn, '')) LIKE CONCAT('%', #{likeQuery}, '%') ESCAPE '!'
+                OR LOWER(COALESCE(s.name_hk, '')) LIKE CONCAT('%', #{likeQuery}, '%') ESCAPE '!'
+                OR LOWER(COALESCE(s.name_en, '')) LIKE CONCAT('%', #{likeQuery}, '%') ESCAPE '!'
+                OR LOWER(COALESCE(s.short_name, '')) LIKE CONCAT('%', #{likeQuery}, '%') ESCAPE '!'
+                OR LOWER(COALESCE(s.pinyin_full, '')) LIKE CONCAT(#{likeQuery}, '%') ESCAPE '!'
+                OR LOWER(COALESCE(s.pinyin_abbr, '')) LIKE CONCAT(#{likeQuery}, '%') ESCAPE '!'
                 OR EXISTS (
                     SELECT 1 FROM stock_alias ax
                     WHERE ax.stock_basic_id = s.id
-                      AND ax.normalized_alias LIKE CONCAT('%', #{query}, '%')
+                      AND ax.normalized_alias LIKE CONCAT('%', #{likeQuery}, '%') ESCAPE '!'
                 )
             )
         </where>

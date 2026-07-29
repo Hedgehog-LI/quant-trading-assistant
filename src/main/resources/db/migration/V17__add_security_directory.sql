@@ -13,7 +13,7 @@ ALTER TABLE stock_basic ADD COLUMN currency VARCHAR(8);
 ALTER TABLE stock_basic ADD COLUMN security_type VARCHAR(16) NOT NULL DEFAULT 'STOCK';
 ALTER TABLE stock_basic ADD COLUMN list_status VARCHAR(16) NOT NULL DEFAULT 'UNKNOWN';
 ALTER TABLE stock_basic ADD COLUMN data_source VARCHAR(32);
-ALTER TABLE stock_basic ADD COLUMN source_updated_at DATETIME;
+ALTER TABLE stock_basic ADD COLUMN source_updated_at DATETIME(6);
 ALTER TABLE stock_basic ADD COLUMN source_hash VARCHAR(128);
 
 UPDATE stock_basic

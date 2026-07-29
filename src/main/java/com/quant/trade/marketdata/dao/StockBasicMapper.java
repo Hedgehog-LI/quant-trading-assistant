@@ -22,6 +22,7 @@ public interface StockBasicMapper {
     List<StockBasicDO> selectByCanonicalSymbols(@Param("ids") List<String> canonicalSymbols);
     List<SecuritySearchCandidateDO> searchCandidates(
             @Param("query") String normalizedQuery,
+            @Param("likeQuery") String escapedLikeQuery,
             @Param("queryUpper") String queryUpper,
             @Param("canonicalQuery") String canonicalQuery,
             @Param("hkSymbol") String hkSymbol,

@@ -108,6 +108,34 @@ class SecurityDirectoryControllerTest {
     }
 
     @Test
+    void missingAndWronglyTypedSearchParametersReturnStable400Envelope() throws Exception {
+        mockMvc.perform(get("/api/v1/market-data/securities/search"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("PARAM_ERROR"))
+                .andExpect(jsonPath("$.message").value("缺少必需参数: q"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/market-data/securities/search")
+                        .param("q", "Apple")
+                        .param("limit", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("PARAM_ERROR"))
+                .andExpect(jsonPath("$.message").value("参数类型不合法: limit"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/market-data/securities/search")
+                        .param("q", "Apple")
+                        .param("includeDelisted", "not-a-boolean"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("PARAM_ERROR"))
+                .andExpect(jsonPath("$.message").value("参数类型不合法: includeDelisted"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
     void oversizeMapsTo413WithoutAllocatingPayload() {
         SecurityDirectoryImportException exception = assertThrows(
                 SecurityDirectoryImportException.class,

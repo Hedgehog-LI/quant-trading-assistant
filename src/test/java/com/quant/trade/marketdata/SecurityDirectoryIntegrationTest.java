@@ -13,6 +13,7 @@ import com.quant.trade.marketdata.model.StockBasicDO;
 import com.quant.trade.marketdata.provider.MarketDataProvider;
 import com.quant.trade.marketdata.service.SecurityDirectoryService;
 import com.quant.trade.marketdata.service.StockDataService;
+import com.quant.trade.marketdata.util.SecurityTextNormalizer;
 import com.quant.trade.marketdata.vo.SecurityDirectoryImportResultVO;
 import com.quant.trade.marketdata.vo.SecuritySearchItemVO;
 import com.quant.trade.marketdata.vo.SecuritySearchResultVO;
@@ -30,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +68,8 @@ class SecurityDirectoryIntegrationTest {
         Mockito.reset(stockAliasMapper, marketDataProvider);
         jdbcTemplate.update("DELETE FROM stock_alias");
         jdbcTemplate.update("DELETE FROM stock_daily_bar");
+        jdbcTemplate.update("DELETE FROM stock_quote_snapshot");
+        jdbcTemplate.update("DELETE FROM market_data_sync_task");
         jdbcTemplate.update("DELETE FROM stock_basic");
     }
 
@@ -117,6 +121,35 @@ class SecurityDirectoryIntegrationTest {
     }
 
     @Test
+    void threeConflictingRowsCountUniqueFailedLinesAndErrorEvidenceIsCapped() {
+        String conflicts = header()
+                + row("HK.02498", "第一名称", "HK", "HKEX", "HKD", "STOCK", "LISTED",
+                "first", "f", "")
+                + row("HK.2498", "第二名称", "HK", "HKEX", "HKD", "STOCK", "LISTED",
+                "second", "s", "")
+                + row("HK.02498", "第三名称", "HK", "HKEX", "HKD", "STOCK", "LISTED",
+                "third", "t", "");
+        SecurityDirectoryImportException conflictError = assertThrows(
+                SecurityDirectoryImportException.class, () -> importCsv(conflicts));
+        assertEquals(3, conflictError.getResult().totalRows());
+        assertEquals(3, conflictError.getResult().failed());
+        assertEquals(4, conflictError.getResult().errors().size());
+        assertTrue(conflictError.getResult().errors().stream()
+                .allMatch(error -> "CONFLICTING_DUPLICATE".equals(error.reasonCode())));
+
+        StringBuilder invalidRows = new StringBuilder(header());
+        for (int index = 0; index < 60; index++) {
+            invalidRows.append(row("US.BAD" + index, "Invalid " + index, "US", "NYSE", "USD",
+                    "CRYPTO", "LISTED", "invalid", "inv", ""));
+        }
+        SecurityDirectoryImportException cappedError = assertThrows(
+                SecurityDirectoryImportException.class, () -> importCsv(invalidRows.toString()));
+        assertEquals(60, cappedError.getResult().totalRows());
+        assertEquals(60, cappedError.getResult().failed());
+        assertEquals(50, cappedError.getResult().errors().size());
+    }
+
+    @Test
     void malformedUtf8AndSemanticFailureReturnBoundedStructuredEvidenceWithoutWrites() {
         byte[] malformed = {(byte) 0xC3, (byte) 0x28};
         SecurityDirectoryImportException utf8 = assertThrows(SecurityDirectoryImportException.class,
@@ -130,6 +163,25 @@ class SecurityDirectoryIntegrationTest {
         assertTrue(semantic.getResult().errors().size() <= 50);
         assertTrue(semantic.getResult().errors().get(0).message().length() <= 240);
         assertEquals(0, stockBasicMapper.countAll());
+    }
+
+    @Test
+    void fractionalOffsetTimestampPersistsAtMicrosecondPrecisionAndRepeatsUnchanged() {
+        String csv = (header()
+                + row("US.MICRO", "Microsecond", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "microsecond", "micro", ""))
+                .replace("2026-07-01T00:00:00+08:00", "2026-07-01T08:00:00.900123+08:00");
+
+        SecurityDirectoryImportResultVO first = importCsv(csv);
+        assertEquals(1, first.inserted());
+        assertEquals(LocalDateTime.parse("2026-07-01T00:00:00.900123"),
+                stockBasicMapper.selectByCanonicalSymbol("US.MICRO").getSourceUpdatedAt());
+
+        SecurityDirectoryImportResultVO repeated = importCsv(csv);
+        assertEquals(1, repeated.unchanged());
+        assertEquals(0, repeated.updated());
+        assertEquals(LocalDateTime.parse("2026-07-01T00:00:00.900123"),
+                stockBasicMapper.selectByCanonicalSymbol("US.MICRO").getSourceUpdatedAt());
     }
 
     @Test
@@ -163,8 +215,35 @@ class SecurityDirectoryIntegrationTest {
     }
 
     @Test
+    void literalLikeMetacharactersDoNotExpandCandidateSets() {
+        StringBuilder csv = new StringBuilder(header())
+                .append(row("US.PCT", "Percent %% Fund", "US", "NYSE", "USD", "ETF", "LISTED",
+                        "percent", "pct", ""))
+                .append(row("US.UNDER", "Under__Score Fund", "US", "NYSE", "USD", "ETF", "LISTED",
+                        "underscore", "under", ""))
+                .append(row("US.BANG", "Bang!! Fund", "US", "NYSE", "USD", "ETF", "LISTED",
+                        "bang", "bang", ""));
+        for (int index = 0; index < 25; index++) {
+            csv.append(row("US.DECOY" + index, "Ordinary Fund " + index, "US", "NYSE", "USD",
+                    "ETF", "LISTED", "ordinary" + index, "ord" + index, ""));
+        }
+        importCsv(csv.toString());
+
+        assertEquals(List.of("US.PCT"), symbols(directoryService.search("%%", null, null, false, 20)));
+        assertEquals(List.of("US.UNDER"), symbols(directoryService.search("__", null, null, false, 20)));
+        assertEquals(List.of("US.BANG"), symbols(directoryService.search("!!", null, null, false, 20)));
+        assertEquals(1, candidateCount("%%"));
+        assertEquals(1, candidateCount("__"));
+        assertEquals(1, candidateCount("!!"));
+    }
+
+    @Test
     void searchCoversChannelsRankingFiltersHkPaddingAndProviderIsolation() {
-        List<Map<String, Object>> protectedBefore = protectedSnapshot();
+        seedProtectedTables();
+        ProtectedTablesSnapshot protectedBefore = protectedSnapshot();
+        assertFalse(protectedBefore.dailyBars().isEmpty());
+        assertFalse(protectedBefore.quoteSnapshots().isEmpty());
+        assertFalse(protectedBefore.syncTasks().isEmpty());
         importCsv(header()
                 + row("SH.603308", "应流股份", "SH", "SSE", "CNY", "STOCK", "LISTED",
                 "yingliugufen", "ylgf", "FORMER_NAME:zh:应流科技")
@@ -214,9 +293,12 @@ class SecurityDirectoryIntegrationTest {
         assertNull(empty.catalogUpdatedAt());
         assertFalse(empty.stale());
 
-        importCsv(header() + row("US.BOUND", "Boundary", "US", "NYSE", "USD", "STOCK", "LISTED",
-                "boundary", "bound", ""));
-        Instant updated = Instant.parse("2026-06-30T16:00:00Z");
+        String fractional = (header()
+                + row("US.BOUND", "Boundary", "US", "NYSE", "USD", "STOCK", "LISTED",
+                "boundary", "bound", ""))
+                .replace("2026-07-01T00:00:00+08:00", "2026-07-01T08:00:00.900123+08:00");
+        importCsv(fractional);
+        Instant updated = Instant.parse("2026-07-01T00:00:00.900123Z");
         SecurityDirectoryService exactService = new SecurityDirectoryService(
                 stockBasicMapper, stockAliasMapper, Clock.fixed(updated.plusSeconds(48 * 3600), ZoneOffset.UTC));
         SecuritySearchResultVO exact = exactService.search("zz", null, null, false, 20);
@@ -296,15 +378,52 @@ class SecurityDirectoryIntegrationTest {
         return result.items().stream().map(SecuritySearchItemVO::canonicalSymbol).toList();
     }
 
-    private List<Map<String, Object>> protectedSnapshot() {
-        return jdbcTemplate.queryForList("""
-                SELECT 'BAR' AS kind, id, canonical_symbol AS protected_value FROM stock_daily_bar
-                UNION ALL
-                SELECT 'QUOTE', id, canonical_symbol FROM stock_quote_snapshot
-                UNION ALL
-                SELECT 'TASK', id, idempotency_key FROM market_data_sync_task
-                ORDER BY kind, id
+    private int candidateCount(String query) {
+        String normalized = SecurityTextNormalizer.normalize(query);
+        return stockBasicMapper.searchCandidates(
+                normalized,
+                SecurityTextNormalizer.escapeLikeLiteral(normalized),
+                normalized.toUpperCase(java.util.Locale.ROOT),
+                null,
+                null,
+                List.of(),
+                List.of(),
+                false).size();
+    }
+
+    private void seedProtectedTables() {
+        jdbcTemplate.update("""
+                INSERT INTO stock_daily_bar (
+                    id, canonical_symbol, trade_date, adjust_type, data_source,
+                    open_price, high_price, low_price, close_price, volume, amount
+                ) VALUES (900001, 'US.PROTECTED', '2026-06-30', 'NONE', 'TEST',
+                          10.100000, 10.900000, 9.800000, 10.500000, 12345, 129623.250000)
                 """);
+        jdbcTemplate.update("""
+                INSERT INTO stock_quote_snapshot (
+                    id, canonical_symbol, quote_time, current_price, open_price, high_price, low_price,
+                    pre_close_price, volume, amount, trade_status, data_source, fetched_at, raw_hash
+                ) VALUES (900001, 'US.PROTECTED', '2026-07-01 00:00:00', 10.600000, 10.100000,
+                          10.900000, 9.800000, 10.500000, 23456, 248633.600000, 'NORMAL', 'TEST',
+                          '2026-07-01 00:00:01', 'protected-quote-hash')
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO market_data_sync_task (
+                    id, task_type, provider, scope_json, status, idempotency_key,
+                    total_count, success_count, fail_count, inserted_count, updated_count, skipped_count
+                ) VALUES (900001, 'QUOTE', 'TEST', '{"symbols":["US.PROTECTED"]}', 'SUCCESS',
+                          'D1-PROTECTED-TASK', 1, 1, 0, 1, 0, 0)
+                """);
+    }
+
+    private ProtectedTablesSnapshot protectedSnapshot() {
+        List<Map<String, Object>> dailyBars =
+                jdbcTemplate.queryForList("SELECT * FROM stock_daily_bar ORDER BY id");
+        List<Map<String, Object>> quoteSnapshots =
+                jdbcTemplate.queryForList("SELECT * FROM stock_quote_snapshot ORDER BY id");
+        List<Map<String, Object>> syncTasks =
+                jdbcTemplate.queryForList("SELECT * FROM market_data_sync_task ORDER BY id");
+        return new ProtectedTablesSnapshot(dailyBars, quoteSnapshots, syncTasks);
     }
 
     private SecurityDirectoryImportResultVO importCsv(String csv) {
@@ -323,5 +442,11 @@ class SecurityDirectoryIntegrationTest {
         return String.join(",", canonical, name, market, exchange, currency, type, status, "TEST",
                 "2026-07-01T00:00:00+08:00", name, "", "", "", pinyinFull, pinyinAbbr,
                 "2020-01-01", "hash-" + canonical.replace('.', '-'), aliases) + "\n";
+    }
+
+    private record ProtectedTablesSnapshot(
+            List<Map<String, Object>> dailyBars,
+            List<Map<String, Object>> quoteSnapshots,
+            List<Map<String, Object>> syncTasks) {
     }
 }

@@ -113,10 +113,11 @@ public class SecurityDirectoryService {
         }
 
         String queryUpper = query.toUpperCase(Locale.ROOT);
+        String likeQuery = SecurityTextNormalizer.escapeLikeLiteral(query);
         String canonicalQuery = normalizeCanonicalQuery(queryUpper);
         String hkSymbol = normalizeHkNumericQuery(query);
         List<SecuritySearchCandidateDO> candidates = stockBasicMapper.searchCandidates(
-                query, queryUpper, canonicalQuery, hkSymbol, markets, types, includeDelisted);
+                query, likeQuery, queryUpper, canonicalQuery, hkSymbol, markets, types, includeDelisted);
         Map<String, Integer> marketOrder = new HashMap<>();
         for (int index = 0; index < markets.size(); index++) {
             marketOrder.put(markets.get(index), index);
@@ -203,7 +204,7 @@ public class SecurityDirectoryService {
         LinkedHashMap<String, DirectoryRow> uniqueRows = new LinkedHashMap<>();
         long totalRows = 0;
         long duplicateUnchanged = 0;
-        long failedRows = 0;
+        Set<Long> failedLines = new LinkedHashSet<>();
         try (Reader reader = new InputStreamReader(
                 new ByteArrayInputStream(decoded.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
              CSVParser parser = CSVFormat.RFC4180.builder()
@@ -218,12 +219,12 @@ public class SecurityDirectoryService {
                 long line = record.getRecordNumber() + 1;
                 if (totalRows > MAX_ROWS) {
                     addError(errors, line, "file", "TOO_MANY_ROWS", "CSV 数据行超过 200000 行限制");
-                    failedRows++;
+                    failedLines.add(line);
                     break;
                 }
                 if (!record.isConsistent()) {
                     addError(errors, line, "row", "MALFORMED_CSV", "CSV 列数与表头不一致");
-                    failedRows++;
+                    failedLines.add(line);
                     continue;
                 }
                 try {
@@ -238,11 +239,12 @@ public class SecurityDirectoryService {
                                 "与第 " + line + " 行的同一证券内容冲突");
                         addError(errors, line, "canonical_symbol", "CONFLICTING_DUPLICATE",
                                 "与第 " + first.line() + " 行的同一证券内容冲突");
-                        failedRows += 2;
+                        failedLines.add(first.line());
+                        failedLines.add(line);
                     }
                 } catch (RowValidationException exception) {
                     addError(errors, line, exception.field(), exception.reasonCode(), exception.getMessage());
-                    failedRows++;
+                    failedLines.add(line);
                 }
             }
         } catch (SecurityDirectoryImportException exception) {
@@ -252,7 +254,7 @@ public class SecurityDirectoryService {
                     "CSV 格式不合法");
         }
         if (!errors.isEmpty()) {
-            throw validationFailure(totalRows, failedRows, errors);
+            throw validationFailure(totalRows, failedLines.size(), errors);
         }
         return new ParsedBatch(totalRows, duplicateUnchanged, List.copyOf(uniqueRows.values()));
     }
@@ -701,7 +703,7 @@ public class SecurityDirectoryService {
 
     private LocalDateTime requiredTimestamp(String value) {
         try {
-            Instant instant = OffsetDateTime.parse(value).toInstant().truncatedTo(ChronoUnit.SECONDS);
+            Instant instant = OffsetDateTime.parse(value).toInstant().truncatedTo(ChronoUnit.MICROS);
             return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
         } catch (RuntimeException exception) {
             throw rowError("source_updated_at", "INVALID_TIMESTAMP",

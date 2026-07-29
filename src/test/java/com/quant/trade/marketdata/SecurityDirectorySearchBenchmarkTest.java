@@ -216,6 +216,10 @@ class SecurityDirectorySearchBenchmarkTest {
                   "matrix": {"classes": %d, "warmups": %d, "measured": %d, "measuredPerClass": %d},
                   "queries": "%s",
                   "percentileMethod": "nearest-rank: sort ascending; index=ceil(0.95*N)-1",
+                  "limitations": [
+                    "H2 MySQL mode is not production MySQL evidence",
+                    "each query class repeats one hot key, so cache-hot latency may understate mixed-key production latency"
+                  ],
                   "thresholdMillis": %.1f,
                   "overallP95Millis": %.6f,
                   "perClassP95Millis": {%s
