@@ -22,6 +22,20 @@
 | GET | `/api/v1/market-data/securities/search?q=&markets=&types=&includeDelisted=&limit=` | 已实现 | 仅查询本地目录，按冻结规则确定性排序 |
 | GET | `/api/v1/market-data/securities/{canonicalSymbol}` | 已实现 | 查询本地证券详情及别名 |
 
+### 证券目录同步基础（P1.4b-D3）
+
+| 方法 | 路径 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/market-data/security-directory/sync` | 已实现 | 手动触发证券目录同步，返回同步任务 VO |
+| GET | `/api/v1/market-data/security-directory/sync/tasks/{taskId}` | 已实现 | 查询目录同步任务详情，不存在返回 404 |
+| GET | `/api/v1/market-data/security-directory/status` | 已实现 | 查询目录同步状态与 catalog 状态，不泄露路径/凭据 |
+
+- `POST /sync` 请求体可选 `{mode}`，默认 `FULL`，合法值为 `FULL`/`INCREMENTAL`。provider 未启用时返回 HTTP 400 + `BUSINESS_RULE_VIOLATION`，且不创建任务、不回显凭据/路径。重复触发同一快照（按内容 hash 内容身份）返回既有 PENDING/RUNNING/SUCCEEDED 任务，不重复执行；失败后允许 retry 并建立 `parent_task_id` 链。
+- 同步任务复用 `market_data_sync_task`：`task_type=SECURITY_MASTER_SYNC`，`provider=CSV_SNAPSHOT_DIR`，`scope_json={provider, snapshotId, snapshotHash, mode}`。
+- 同步五阶段：解析 → 校验 → staging/diff → 质量门禁（非空快照 `MARKET_DATA_EMPTY_RESULT`、必填字段/唯一性 `DAILY_BAR_VALIDATION_ERROR`、数量波动 `BUSINESS_RULE_VIOLATION` 默认阈值 0.30）→ 原子发布（单事务 upsert，任一阶段失败整批回滚保留上一成功目录，失败不修改任何 `list_status`）。质量门禁默认值经 `qta.market-data.security-directory.*` 配置。
+- `GET /status` 返回 `SecurityDirectoryStatusVO{providerCode, providerEnabled, providerConfigured, lastSuccessAt, lastSnapshotId, lastMode, lastErrorCode, catalogStatus, catalogUpdatedAt, stale, degraded}`；`catalogStatus/catalogUpdatedAt/stale/degraded` 沿用 D1 启发式（`MAX(source_updated_at)` + 48h），`lastSuccessAt/lastSnapshotId` 来自 `security_directory_sync_state`。
+- 默认安全关闭：`qta.market-data.security-directory.enabled=false`、`scheduler.enabled=false`。provider 未启用 / CSV 路径缺失 / 内容非法时应用仍可启动，D1 搜索/详情/导入和 `/stocks` CRUD 不受影响。每日增量（默认 cron `2 30 6 * * *` Asia/Shanghai）与每周全量对账（默认 `0 30 4 * * MON`）调度仅在显式启用时装配。
+
 搜索参数：
 
 - `q` 必填；支持 canonical symbol、裸代码、正式名称、曾用名/其他别名、拼音全拼及首字母。

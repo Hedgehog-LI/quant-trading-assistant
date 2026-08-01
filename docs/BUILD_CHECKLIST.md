@@ -55,7 +55,7 @@
 - [x] 采集计划支持“查询并验证 -> 展示名称/价格/时间 -> 确认加入”。
 - [x] mock 模式明确拒绝伪造外部验证；编辑旧计划仍兼容已有 scope。
 - [x] Docker 真实验证 `SH.603308`、`HK.02498`、`US.NVDA` 均成功。
-- [~] P1.4b 本地证券目录、名称/拼音模糊检索和目录同步：D1 后端已验收；D2-D4 尚未完成。
+- [~] P1.4b 本地证券目录、名称/拼音模糊检索和目录同步：D1 后端已验收；D3 目录同步基础已条件验收；D2/D4 尚未完成。
 - [ ] 港美股分钟采集的交易日历、时区和 scheduler；精确验证成功不等于分钟任务已支持。
 
 ## 4. 已完成 P0: 建设看板
@@ -285,7 +285,8 @@
 - [x] 自动化门禁：Flyway/MyBatis 实际读写、三市场时间桶、后端全量测试、前端 typecheck/lint/test/build。
 - [ ] 部署后最小真实验收：每个具备权限的市场手动采集 1 次，再启用低频自动采集观察两个时间桶。
 - [ ] P1.7：相对强弱、轮动持续性、龙头贡献和异动提醒。
-- [ ] D3：接入可审计的目录 provider、同步状态和 LongPort Static Info 按需补全。
+- [x] D3：接入可审计的目录 provider（CSV 快照默认实现）、同步任务/状态 API、默认安全关闭的每日增量/每周全量调度；复用 `market_data_sync_task` 的 `SECURITY_MASTER_SYNC`；V18 `security_directory_sync_state`。代码与自动化条件验收（候选 `ff393bc`，406 tests）。LongPort Static Info 按需补全仍待后续；Docker/MySQL runtime 未验证。
+- [ ] D3-LongPort：LongPort Static Info 按需 metadata enricher（待后续）。
 - [ ] D4：推广到自选/计划/交易/风控/快照，完成 A/H/US E2E 与建设看板同步。
 
 ### P1.8 代码交付完成、待部署验收：Agent 只读远程助手

@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-08-02 — P1.4b-D3 证券目录同步基础（条件通过，允许本地交付）
+
+- **冻结身份**：任务 `SECURITY-DIRECTORY-D3-20260802`；contract SHA-256 `afc854bd205b3c152cc96c25546eac978dd882229edf3136c3987b3748b9e95a`；候选 commit `ff393bc69279a85eddf0d54897df4f0cb67eb4fd`、tree `a91ff7e32d11214d597dee0d29981ab67a5911de`、patch SHA-256 `20baa4c9b523d14320982a1aa1fb71055c7d5601e6f2770677e8168196ec928f`。
+- **独立性（重要偏差）**：三次 implementer 子代理超时后由父上下文实现；gen3 `qta-code-reviewer CR-20260802-G3-01` 在独立干净上下文返回 `REVIEW_CLEAR`（CR-1 原子发布 self-invocation、CR-2 缺失 UNIQUENESS 门禁均已修复）。`qta-final-verifier` 子代理进入 plan 模式未执行，父上下文运行客观确定性门禁；建议 push 前补一次真正独立的 disposable-worktree 最终核验。
+- **AC-01**：provider 抽象 + CSV provider + disabled 兜底；`SecurityDirectoryService.java` 未改动（D1 字节不变）；`SecurityDirectoryCsvParserEquivalenceTest`（11 例覆盖全部 D1 reasonCode）；disabled/missing-file/malformed 应用可启动。
+- **AC-02**：五阶段管线；幂等重同步；rename→单 FORMER_NAME；`multiInsertLateFailureRollsBackAllWritesAndPreservesListStatus`（晚期失败 stock_basic 回滚 + DELISTED/UNKNOWN list_status 不变）；`aliasUniquenessGateRejectsCrossStockAliasIdentity`（UNIQUENESS 门禁）；empty/swing 拒绝保留旧目录。
+- **AC-03**：disabled→400+BUSINESS_RULE_VIOLATION 不泄露；任务 404；status VO 无 path/secret。
+- **AC-04**：retry parent_task_id 链；行锁 + selectLatestByScope 短路（结构正确）。残余：无显式多线程并发测试。
+- **AC-05**：scheduler 默认关闭时 bean 不装配；启用时 seam 可触发；provider disabled 时可解释跳过。
+- **AC-06**：STATIC PASS（forbidden-path/secret/V1-V17 扫描干净，arch 门禁 file-protocol ERROR 已修复）；AUTOMATION PASS（`./mvnw test` 406/0/0，`./mvnw package` 通过）。
+- **未验证维度**：RUNTIME `NOT_VERIFIED`（Docker/MySQL 不可用，H2 不冒充）；DEPLOYMENT `NOT_VERIFIED`（范围外）。
+- **关联**：`docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md`、`-REVIEW-G3.md`、`-SELF-CHECK.md`。
+
 ## 2026-07-29 — P1.4b-D1 证券目录与确定性搜索（条件通过，允许交付）
 
 - **冻结身份**：任务 `SECURITY-DIRECTORY-D1-20260729`；contract SHA-256 `0c16a3510ca7e8c34354c42ce78babcd1ffff3f4ffbf83d91debd74a7db6b500`；候选 commit `f3ba47597d54abe9a3fe391e7e8c4834fa0c94ae`、tree `cd69250db8808986f8685b91b5d11ea673f6b9bf`、patch SHA-256 `3eb9086274ca6a25b1ba2c2f3e45307ea7c66bdaa18544d452184f56af900f9e`。核验前后 tracked candidate identity 不变。

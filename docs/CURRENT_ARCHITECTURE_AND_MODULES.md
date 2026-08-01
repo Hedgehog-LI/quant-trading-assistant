@@ -61,7 +61,7 @@ convert     # MapStruct 转换器
 | Review | `review` | `/api/v1/reviews` | `review_note` |
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
-| Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、本地目录 CSV 导入、确定性搜索/详情、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V17 新增目录字段与 `stock_alias` |
+| Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、本地目录 CSV 导入、确定性搜索/详情、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V17 新增目录字段与 `stock_alias`；V18 新增 `security_directory_sync_state` 与 D3 目录同步（CSV 快照 provider、五阶段管线、复用 `market_data_sync_task` 的 `SECURITY_MASTER_SYNC`） |
 | Agent Assistant | `agent` | `/api/v1/agent/**` | `agent_api_audit_log`（V16）。Spring Security Bearer Token 鉴权 + 限流 + 持久化脱敏审计 + TrustedAnswer 可信回答契约。8 个固定只读 GET 端点。OpenClaw Tool Plugin 在 `integrations/openclaw/qta-assistant/`。默认关闭。 |
 
 ## 4. 当前数据库迁移
@@ -85,6 +85,7 @@ convert     # MapStruct 转换器
 | `V15__add_market_sector_automatic_collection.sql` | market_sector_ranking_config、market_sector_ranking_batch、market_sector_ranking_item（全市场榜单历史） |
 | `V16__add_agent_api_audit_log.sql` | agent_api_audit_log（Agent 只读 API 持久化脱敏审计） |
 | `V17__add_security_directory.sql` | 扩展 stock_basic 目录字段，新增 stock_alias 与目录检索索引 |
+| `V18__add_security_directory_sync_state.sql` | security_directory_sync_state，证券目录同步（D3）按 provider 维护最近成功时间/快照标识/计数/错误 |
 
 已发布的 V1-V17 migration 不应修改；后续表结构调整继续新增更高版本 migration。
 

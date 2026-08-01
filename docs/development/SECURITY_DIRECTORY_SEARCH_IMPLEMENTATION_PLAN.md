@@ -74,6 +74,14 @@
 - 同一快照重复导入结果幂等；改名、退市和恢复上市有集成测试。
 - 仅用最小外部调用验证连接，不做全市场行情下载。
 
+交付证据：任务契约与角色记录见 `tasks/SECURITY-DIRECTORY-D3-20260802-*.md`。冻结候选
+`ff393bc69279a85eddf0d54897df4f0cb67eb4fd`（gen3/repair2）。代码条件验收：H2 集成测试通过，全量
+`406 tests / 0 failures / 0 errors` 与 `./mvnw package` 通过，架构门禁通过（file-protocol ERROR 已修复）。
+独立 gen3 `qta-code-reviewer` 返回 `REVIEW_CLEAR`（CR-1 原子发布 self-invocation、CR-2 缺失 UNIQUENESS
+门禁已修复）。诚实偏差：三次 implementer 子代理超时后由父上下文实现/修复；`qta-final-verifier` 子
+代理进入 plan 模式未执行，父上下文运行客观门禁。Docker daemon 不可用，MySQL runtime/curl 明确记为
+`NOT_VERIFIED`，未用 H2 冒充。LongPort Static Info metadata enricher 仍待后续。
+
 ### D4：跨模块推广与体验收口
 
 交付：

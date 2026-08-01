@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-08-02 — P1.4b-D3 证券目录同步基础后端
+
+- **目标**：定义 `SecurityDirectoryProvider` 与 CSV 快照目录 provider，安全、幂等、可恢复地更新本地证券目录，为后续自动目录同步准备稳定边界；不接真实外部网络、不碰交易/账户/订单。
+- **治理**：任务 `SECURITY-DIRECTORY-D3-20260802`，`L2` lane；契约 v1.0 SHA-256 `afc854bd205b3c152cc96c25546eac978dd882229edf3136c3987b3748b9e95a`。测试设计者提出 A1/A2/A3 阻塞修订（CSV 解析复用边界、快照内容身份、质量门禁阈值/错误码）与 R-1..R-5 + Q-1（removal 语义）已采纳。**诚实记录偏差**：三次 implementer 子代理在 600s 窗口超时无编译结果，父上下文恢复 D1 干净基线后直接实现；gen2 代码审查发现 CR-1（原子发布 self-invocation 陷阱，`@Transactional` 失效）、CR-2（缺失 UNIQUENESS 门禁）、CR-3（弱字节等价证据）阻塞，父上下文 repair-2 修复（`txRequiresNew.execute(status->publish(...))`、新增 `validateAliasUniqueness`、晚期失败字节等价测试、exception 包归位）；gen3 独立 `qta-code-reviewer` 返回 `REVIEW_CLEAR`。`qta-final-verifier` 子代理进入 plan 模式未执行，父上下文运行客观门禁。
+- **数据库**：新增 V18 `security_directory_sync_state`（按 provider 维护最近成功时间/快照标识/计数/错误，唯一 `provider`），不回写 `stock_basic`，`catalogStatus` 沿用 D1 启发式；V1-V17 未修改。
+- **后端**：`provider/SecurityDirectoryProvider` + `DisabledSecurityDirectoryProvider` 兜底 + `provider/csv/CsvSnapshotSecurityDirectoryProvider`（默认可审计，P2 `SecurityDirectoryCsvParser` 复用 D1 冻结口径）；五阶段 `service/SecurityDirectorySyncService`（解析→校验→staging/diff→质量门禁→原子发布，单事务 `txRequiresNew`，失败整批回滚保留旧目录，不修改 `list_status`）；复用 `market_data_sync_task` 的 `SECURITY_MASTER_SYNC`、`SyncScopeLockMapper` 行锁、`parent_task_id` retry；`util/SecurityDirectoryIdentityCalculator` 内容身份 snapshotHash 幂等；`SecurityDirectorySyncScheduler` 默认关闭（`@ConditionalOnProperty` 无 matchIfMissing），每日增量/每周全量 + 测试 seam；`SecurityDirectoryProperties`/`SecurityDirectoryConstants` 配置化（默认 enabled/scheduler=false，swing=0.30）。
+- **API**：新增 `POST /security-directory/sync`（返回 task VO；disabled→400+BUSINESS_RULE_VIOLATION；不回显凭据）、`GET /security-directory/sync/tasks/{taskId}`（404）、`GET /security-directory/status`（`SecurityDirectoryStatusVO`，不泄露路径/凭据）。
+- **安全与边界**：provider disabled / CSV 缺失 / 内容非法时应用仍可启动，D1 搜索/详情/导入和 `/stocks` CRUD 不受影响；不接真实外部网络、交易、账户、订单。
+- **验证**：后端 **406 tests / 0 failures / 0 errors**（377 D1 + 29 D3；1 预存在 skip），`./mvnw package` 通过，`check-ai-architecture.mjs` 通过（file-protocol ERROR 已修复，仅剩规模型 error=1 由独立代码审查承担），`git diff --check` 通过；冻结候选 `ff393bc69279a85eddf0d54897df4f0cb67eb4fd`（gen3/repair2）。Docker/MySQL RUNTIME/DEPLOYMENT 为 `NOT_VERIFIED`。
+- **遗留**：建议 push 前补一次真正独立的 disposable-worktree `qta-final-verifier`；CR-5（scheduler disabled-provider 跳过不记 FAILED task，已接受）、CR-6（晚期失败测试 stock_alias 为 count-only，当前 fixture 下功能等价）、`selectLatestByScope` 精确 scope_json 匹配对未来字段脆弱（非阻塞）为残余风险。D2 前端 selector 与 D4 跨模块推广不在本轮。
+- **关联文档**：`docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`、`docs/decisions/ADR-0009-local-first-security-directory.md`、`docs/api/MARKET_DATA_API.md`、`docs/DATABASE_DESIGN.md`、`docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-*.md`。
+
 ## 2026-07-29 — P1.4b-D1 证券目录与确定性搜索后端
 
 - **目标**：在不建立平行证券主表、不触发外部行情的前提下，交付可审计的本地证券目录、CSV 幂等导入、确定性搜索和证券详情基础。

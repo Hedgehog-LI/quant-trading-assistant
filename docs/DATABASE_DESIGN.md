@@ -87,6 +87,27 @@
 
 CSV 目录导入以 canonical symbol 更新同一 `stock_basic`，以规范化后的证券 id + alias + alias type 幂等写入 `stock_alias`。正式名称变化时旧名称进入 `FORMER_NAME`。任一行非法时整批回滚。
 
+### security_directory_sync_state
+
+状态：已实现（V18 migration）。用途：证券目录同步（D3）按 provider 维护最近成功时间/快照标识/计数/错误；不回写 `stock_basic`，`catalogStatus` 仍由 D1 启发式决定。
+
+核心字段：
+
+- `id`
+- `provider`（唯一）
+- `last_snapshot_id` / `last_snapshot_hash`
+- `last_mode`（FULL/INCREMENTAL）
+- `last_success_at`
+- `last_inserted_count` / `last_updated_count` / `last_unchanged_count`
+- `last_error_code` / `last_error_summary`
+- `created_at` / `updated_at`
+
+索引：
+
+- unique `uk_security_directory_sync_state_provider(provider)`
+
+D3 同步任务复用既有 `market_data_sync_task`（`task_type=SECURITY_MASTER_SYNC`，`provider=CSV_SNAPSHOT_DIR`），不新建第二套证券主数据。同步五阶段任一失败整批回滚，保留上一成功目录。
+
 ### watchlist
 
 用途：保存自选股和关注理由。
@@ -519,7 +540,7 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 6. 行情 P1.3 已实现板块/自定义分组（V11：`market_segment`、`market_segment_member`）。
 7. 行情 P1.5 已实现市场行业关注与不可变快照（V14：`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`）。
 8. 行情 P1.6 已实现全市场板块历史榜单与自动采集（V15：`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item`），并扩展关注/快照表的采集频率、claim、质量和错误状态。
-9. 证券目录 P1.4b-D1 已实现 `stock_basic` 扩展和 `stock_alias`（V17），支持 CSV 原子幂等导入、本地确定性搜索和详情查询。
+9. 证券目录 P1.4b-D1 已实现 `stock_basic` 扩展和 `stock_alias`（V17），支持 CSV 原子幂等导入、本地确定性搜索和详情查询。P1.4b-D3 已实现 `security_directory_sync_state`（V18）与目录同步（CSV 快照 provider、五阶段管线、复用 `market_data_sync_task` 的 `SECURITY_MASTER_SYNC`）。
 10. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。
