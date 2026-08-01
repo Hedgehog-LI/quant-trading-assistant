@@ -334,25 +334,7 @@ public class SecurityDirectoryCsvParser {
     }
 
     public static boolean sameDirectoryData(StockBasicDO left, StockBasicDO right) {
-        return Objects.equals(left.getCanonicalSymbol(), right.getCanonicalSymbol())
-                && Objects.equals(left.getSymbol(), right.getSymbol())
-                && Objects.equals(left.getName(), right.getName())
-                && Objects.equals(left.getMarket(), right.getMarket())
-                && Objects.equals(left.getNameCn(), right.getNameCn())
-                && Objects.equals(left.getNameHk(), right.getNameHk())
-                && Objects.equals(left.getNameEn(), right.getNameEn())
-                && Objects.equals(left.getShortName(), right.getShortName())
-                && Objects.equals(left.getPinyinFull(), right.getPinyinFull())
-                && Objects.equals(left.getPinyinAbbr(), right.getPinyinAbbr())
-                && Objects.equals(left.getExchange(), right.getExchange())
-                && Objects.equals(left.getCurrency(), right.getCurrency())
-                && Objects.equals(left.getSecurityType(), right.getSecurityType())
-                && Objects.equals(left.getListStatus(), right.getListStatus())
-                && Objects.equals(left.getDataSource(), right.getDataSource())
-                && Objects.equals(left.getSourceUpdatedAt(), right.getSourceUpdatedAt())
-                && Objects.equals(left.getSourceHash(), right.getSourceHash())
-                && Objects.equals(left.getListDate(), right.getListDate())
-                && Objects.equals(left.getDelisted(), right.getDelisted());
+        return com.quant.trade.marketdata.util.SecurityDirectoryIdentityCalculator.sameDirectoryData(left, right);
     }
 
     private String required(CSVRecord record, String field) {

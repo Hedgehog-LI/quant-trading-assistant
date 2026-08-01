@@ -18,8 +18,7 @@ import com.quant.trade.marketdata.provider.DirectorySnapshotIdentity;
 import com.quant.trade.marketdata.provider.SecurityDirectoryProvider;
 import com.quant.trade.marketdata.provider.SecurityDirectoryProvider.DirectorySnapshot;
 import com.quant.trade.marketdata.provider.SecurityDirectoryProviderException;
-import com.quant.trade.marketdata.provider.csv.CsvSnapshotSecurityDirectoryProvider;
-import com.quant.trade.marketdata.provider.csv.SecurityDirectoryCsvParser;
+import com.quant.trade.marketdata.util.SecurityDirectoryIdentityCalculator;
 import com.quant.trade.marketdata.util.SecurityTextNormalizer;
 import com.quant.trade.marketdata.vo.MarketDataSyncTaskVO;
 import lombok.RequiredArgsConstructor;
@@ -82,8 +81,12 @@ public class SecurityDirectorySyncService {
     private MarketDataSyncTaskVO runSync(String mode, DirectorySnapshot snapshot) {
         List<StockAliasDO> allAliases = new ArrayList<>();
         snapshot.rows().forEach(row -> allAliases.addAll(row.aliases()));
-        DirectorySnapshotIdentity identity = CsvSnapshotSecurityDirectoryProvider.computeIdentity(
-                snapshot.providerCode(), mode, snapshot.stocks(), allAliases);
+        String snapshotHash = com.quant.trade.marketdata.util.SecurityDirectoryIdentityCalculator
+                .computeSnapshotHash(snapshot.providerCode(), mode, snapshot.stocks(), allAliases);
+        DirectorySnapshotIdentity identity = new DirectorySnapshotIdentity(
+                com.quant.trade.marketdata.util.SecurityDirectoryIdentityCalculator.snapshotIdFromHash(snapshotHash),
+                snapshotHash, snapshot.providerCode() + "@"
+                        + com.quant.trade.marketdata.util.SecurityDirectoryIdentityCalculator.snapshotIdFromHash(snapshotHash));
         String scopeJson = buildScopeJson(snapshot.providerCode(), identity, mode);
         String scopeHash = UUID.nameUUIDFromBytes(scopeJson.getBytes()).toString();
 
@@ -188,7 +191,7 @@ public class SecurityDirectorySyncService {
             StockBasicDO existing = existingStocks.get(candidate.getCanonicalSymbol());
             if (existing == null) {
                 toInsert.add(candidate);
-            } else if (SecurityDirectoryCsvParser.sameDirectoryData(existing, candidate)) {
+            } else if (SecurityDirectoryIdentityCalculator.sameDirectoryData(existing, candidate)) {
                 unchanged++;
             } else {
                 candidate.setId(existing.getId());
@@ -247,7 +250,7 @@ public class SecurityDirectorySyncService {
         // unchanged 候选的 alias 也幂等 upsert（与 D1 persist 行为一致）。
         for (StockBasicDO candidate : candidates) {
             StockBasicDO existing = existingStocks.get(candidate.getCanonicalSymbol());
-            if (existing != null && SecurityDirectoryCsvParser.sameDirectoryData(existing, candidate)) {
+            if (existing != null && SecurityDirectoryIdentityCalculator.sameDirectoryData(existing, candidate)) {
                 for (StockAliasDO alias : aliasesBySymbol.getOrDefault(candidate.getCanonicalSymbol(), List.of())) {
                     alias.setStockBasicId(existing.getId());
                     upsertAlias(alias, existingAliases);

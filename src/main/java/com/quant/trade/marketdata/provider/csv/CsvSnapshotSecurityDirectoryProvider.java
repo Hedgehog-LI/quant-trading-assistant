@@ -9,21 +9,17 @@ import com.quant.trade.marketdata.provider.SecurityDirectoryProvider;
 import com.quant.trade.marketdata.provider.SecurityDirectoryProvider.DirectorySnapshot;
 import com.quant.trade.marketdata.provider.SecurityDirectoryProvider.SnapshotRow;
 import com.quant.trade.marketdata.provider.SecurityDirectoryProviderException;
-import com.quant.trade.marketdata.util.SecurityTextNormalizer;
+import com.quant.trade.marketdata.util.SecurityDirectoryIdentityCalculator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 
 /**
@@ -98,58 +94,14 @@ public class CsvSnapshotSecurityDirectoryProvider implements SecurityDirectoryPr
             });
             rows.add(new SnapshotRow(row.stock(), List.copyOf(rowAliases)));
         }
-        DirectorySnapshotIdentity identity = computeIdentity(providerCode, mode, stocks, allAliases);
+        String snapshotHash = SecurityDirectoryIdentityCalculator.computeSnapshotHash(
+                providerCode, mode, stocks, allAliases);
+        String snapshotId = SecurityDirectoryIdentityCalculator.snapshotIdFromHash(snapshotHash);
+        DirectorySnapshotIdentity identity = new DirectorySnapshotIdentity(
+                snapshotId, snapshotHash, providerCode + "@" + snapshotId);
         LocalDateTime fileTime = fileTimeOf(snapshotPath);
         return new DirectorySnapshot(providerCode, mode, identity.sourceDescription(), fileTime,
                 List.copyOf(stocks), List.copyOf(rows), batch.duplicateUnchanged());
-    }
-
-    public static DirectorySnapshotIdentity computeIdentity(String providerCode, String mode,
-                                                     List<StockBasicDO> stocks, List<StockAliasDO> aliases) {
-        MessageDigest digest = newSha256();
-        digest.update(utf8(providerCode));
-        digest.update((byte) 0x1f);
-        digest.update(utf8(mode));
-        digest.update((byte) 0x1f);
-        stocks.stream()
-                .map(CsvSnapshotSecurityDirectoryProvider::canonicalStockKey)
-                .sorted()
-                .forEachOrdered(key -> { digest.update(utf8(key)); digest.update((byte) 0x1e); });
-        digest.update((byte) 0x1f);
-        aliases.stream()
-                .map(CsvSnapshotSecurityDirectoryProvider::canonicalAliasKey)
-                .sorted()
-                .forEachOrdered(key -> { digest.update(utf8(key)); digest.update((byte) 0x1e); });
-        String snapshotHash = HexFormat.of().formatHex(digest.digest());
-        String snapshotId = snapshotHash.substring(0, 16);
-        String sourceDescription = providerCode + "@" + snapshotId;
-        return new DirectorySnapshotIdentity(snapshotId, snapshotHash, sourceDescription);
-    }
-
-    private static String canonicalStockKey(StockBasicDO stock) {
-        return SecurityTextNormalizer.normalize(stock.getCanonicalSymbol()) + "|"
-                + SecurityTextNormalizer.normalize(stock.getName()) + "|"
-                + stock.getMarket() + "|" + stock.getExchange() + "|" + stock.getCurrency() + "|"
-                + stock.getSecurityType() + "|" + stock.getListStatus() + "|"
-                + stock.getDataSource() + "|" + stock.getSourceUpdatedAt() + "|"
-                + stock.getSourceHash() + "|" + stock.getListDate() + "|" + stock.getDelisted();
-    }
-
-    private static String canonicalAliasKey(StockAliasDO alias) {
-        return alias.getAliasType() + "|" + alias.getNormalizedAlias() + "|"
-                + alias.getLanguage() + "|" + alias.getDataSource();
-    }
-
-    private static byte[] utf8(String value) {
-        return (value == null ? "" : value).getBytes(StandardCharsets.UTF_8);
-    }
-
-    private static MessageDigest newSha256() {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 unavailable", exception);
-        }
     }
 
     private static LocalDateTime fileTimeOf(Path path) {
