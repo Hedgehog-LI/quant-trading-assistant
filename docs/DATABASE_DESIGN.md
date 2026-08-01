@@ -2,7 +2,7 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
-当前已发布 V1-V15，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+当前已发布 V1-V17，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
 
 ## 命名约定
 
@@ -17,7 +17,7 @@
 
 ### stock_basic
 
-状态：已由 V5 实现。用途：保存证券基础信息，为后续行情落库提供统一标识。
+状态：已由 V5 实现、V17 扩展。用途：保存统一证券标识及本地证券目录，为行情落库、确定性搜索和证券选择提供同一事实源。
 
 核心字段：
 
@@ -26,8 +26,21 @@
 - `canonical_symbol`
 - `name`
 - `market`
+- `name_cn`
+- `name_hk`
+- `name_en`
+- `short_name`
+- `pinyin_full`
+- `pinyin_abbr`
+- `exchange`
+- `currency`
+- `security_type`（`STOCK/ETF/INDEX/REIT/FUND/BOND/WARRANT/OPTION/FUTURE/OTHER`）
+- `list_status`（`LISTED/DELISTED/UNKNOWN`）
 - `list_date`
 - `delisted`
+- `data_source`
+- `source_updated_at`
+- `source_hash`
 - `created_at`
 - `updated_at`
 
@@ -36,8 +49,43 @@
 - unique `uk_stock_basic_canonical(canonical_symbol)`
 - index `idx_stock_basic_market(market)`
 - index `idx_stock_basic_symbol(symbol)`
+- index `idx_stock_basic_directory_filter(market, security_type, list_status)`
+- index `idx_stock_basic_name(name)`
+- index `idx_stock_basic_name_cn(name_cn)`
+- index `idx_stock_basic_name_en(name_en)`
+- index `idx_stock_basic_pinyin_full(pinyin_full)`
+- index `idx_stock_basic_pinyin_abbr(pinyin_abbr)`
+- index `idx_stock_basic_source_updated(source_updated_at)`
 
-统一标识规则：A 股使用 `SH/SZ/BJ + 数字代码`；港股使用五位内部代码（如 `HK.02498`）；美股使用大写 ticker（如 `US.AAPL`、`US.BRK.B`）。现有 `varchar(32)` 字段可容纳这些格式，本轮无需 migration。
+统一标识规则：A 股使用 `SH/SZ/BJ + 数字代码`；港股使用五位内部代码（如 `HK.02498`）；美股使用大写 ticker（如 `US.AAPL`、`US.BRK.B`）。V17 保留既有 `name/delisted` 字段和 `/stocks` CRUD 兼容，并把旧记录的 `delisted` 映射到新 `list_status`。
+
+### stock_alias
+
+状态：已实现（V17 migration）。用途：保存证券曾用名、简称、英文名、中文名和拼音等可检索别名；不建立平行证券主表。
+
+核心字段：
+
+- `id`
+- `stock_basic_id` — 外键关联 `stock_basic`，主记录删除时级联清理
+- `alias`
+- `normalized_alias`
+- `normalized_alias_key` — 二进制规范化键，避免数据库 collation 折叠不同 Unicode 值
+- `alias_type`（`FORMER_NAME/OLD_TICKER/SHORT_NAME/ENGLISH/TRADITIONAL/USER`）
+- `language`
+- `data_source`
+- `effective_from`
+- `effective_to`
+- `created_at`
+- `updated_at`
+
+索引：
+
+- unique `uk_stock_alias_identity(stock_basic_id, normalized_alias_key, alias_type)`
+- index `idx_stock_alias_normalized(normalized_alias)`
+- index `idx_stock_alias_normalized_key(normalized_alias_key)`
+- index `idx_stock_alias_stock(stock_basic_id)`
+
+CSV 目录导入以 canonical symbol 更新同一 `stock_basic`，以规范化后的证券 id + alias + alias type 幂等写入 `stock_alias`。正式名称变化时旧名称进入 `FORMER_NAME`。任一行非法时整批回滚。
 
 ### watchlist
 
@@ -471,6 +519,7 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 6. 行情 P1.3 已实现板块/自定义分组（V11：`market_segment`、`market_segment_member`）。
 7. 行情 P1.5 已实现市场行业关注与不可变快照（V14：`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`）。
 8. 行情 P1.6 已实现全市场板块历史榜单与自动采集（V15：`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item`），并扩展关注/快照表的采集频率、claim、质量和错误状态。
-9. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
+9. 证券目录 P1.4b-D1 已实现 `stock_basic` 扩展和 `stock_alias`（V17），支持 CSV 原子幂等导入、本地确定性搜索和详情查询。
+10. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。

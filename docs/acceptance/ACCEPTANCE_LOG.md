@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-07-29 — P1.4b-D1 证券目录与确定性搜索（条件通过，允许交付）
+
+- **冻结身份**：任务 `SECURITY-DIRECTORY-D1-20260729`；contract SHA-256 `0c16a3510ca7e8c34354c42ce78babcd1ffff3f4ffbf83d91debd74a7db6b500`；候选 commit `f3ba47597d54abe9a3fe391e7e8c4834fa0c94ae`、tree `cd69250db8808986f8685b91b5d11ea673f6b9bf`、patch SHA-256 `3eb9086274ca6a25b1ba2c2f3e45307ea7c66bdaa18544d452184f56af900f9e`。核验前后 tracked candidate identity 不变。
+- **独立性**：实施者未给出最终验收；代码审查 `CR-20260729-03 / REVIEW_CLEAR` 后，由未参与实现的 `FV-20260729-01` 在 `/private/tmp/qta-security-directory-verify.JZXtbE` 独立核验。
+- **AC-01**：V17 additive migration、旧记录生命周期映射、旧 `/stocks` CRUD、目录字段保留和 alias cascade 的 H2 migration/HTTP/DB 回归通过；MySQL runtime 未执行。
+- **AC-02**：BOM/RFC 4180、重复导入、改名留 former-name、重复/冲突计数、非法 header/symbol/enum/date/alias、200001 行边界和强制晚失败整批回滚均通过。
+- **AC-03/04**：`SH.603308/应流股份/603308/ylgf`、`HK.02498/速腾聚创/2498`、`US.AAPL/Apple/AAPL`，以及跨市场同名、退市显式包含、市场/类型过滤、HK 补零冲突和完整 ranking/tie/matchedBy 矩阵均通过；重复调用顺序稳定。
+- **AC-05**：非空日 K、报价、同步任务、采集计划/run claim、手工价格快照在搜索/导入前后内容等价；provider 交互为零。
+- **AC-06**：H2 MySQL mode，固定 50000 securities + 100000 aliases；400 次预热、八类共 1600 次测量、零 miss；总体 P95 `178.420375ms`，类别最高 P95 `186.131542ms`，均 `<300ms`。该结果不外推为部署 MySQL 性能。
+- **AC-07/08**：focused `65 tests`、全量 `377 tests / 0 failures / 0 errors`、package、静态范围/历史 migration/密钥/运行产物扫描全部通过；EMPTY/READY、null timestamp、48h 边界、stale 和详情 404 语义通过。
+- **维度结论**：`STATIC=PASS`、`AUTOMATION=PASS`、`RUNTIME=NOT_VERIFIED`、`DEPLOYMENT=NOT_VERIFIED`。Docker probe 因 socket 不存在失败，未创建容器或 volume，未以 H2 冒充 MySQL/curl。
+- **最终结论**：`CONDITIONALLY_ACCEPTED`，允许按已验证事实完成 D1 文档和本地提交；不允许宣称 MySQL runtime 或部署已验证。D2/D3 不属于本结论。
+- **详细证据**：`../development/tasks/SECURITY-DIRECTORY-D1-20260729-VERIFICATION.md`。
+
+---
+
 ## 2026-07-29 — Skill 与 Agent 生命周期治理验收（通过）
 
 - **范围**：9 个项目 Skill、4 个 ZCode 固定角色、规范源/兼容镜像、可执行触发回归、同步/治理脚本及 AI 生命周期文档。

@@ -34,14 +34,16 @@ Do not invoke merely because implementation or self-tests finished.
 1. Confirm the accepted candidate identity is unchanged since the verdict:
    - `COMMIT`: contract, commit, tree, and patch hashes.
    - `SNAPSHOT`: contract, manifest, and entry-set hashes.
-2. Extract current facts; do not copy conversation history.
-3. Update only documents whose authoritative facts changed.
-4. Record acceptance evidence and residual limitations.
-5. Update capability-matrix status from evidence, not optimism.
-6. Write deployment/restart/migration steps when deployment is in scope.
-7. Refresh `docs/AI_HANDOFF.md` with the smallest useful current-state summary.
-8. Run documentation and governance consistency checks.
-9. Ask the parent Git owner to create the finalization commit; this Skill does not stage unrelated files.
+2. Confirm the machine control file passes, the verifier used a fresh role instance, and both functional and
+   architecture verdicts passed.
+3. Extract current facts; do not copy conversation history.
+4. Update only documents whose authoritative facts changed.
+5. Record acceptance evidence and residual limitations.
+6. Update capability-matrix status from evidence, not optimism.
+7. Write deployment/restart/migration steps when deployment is in scope.
+8. Refresh `docs/AI_HANDOFF.md` with the smallest useful current-state summary.
+9. Run documentation and governance consistency checks.
+10. Ask the parent Git owner to create the finalization commit; this Skill does not stage unrelated files.
 
 ## Document Ownership Matrix
 

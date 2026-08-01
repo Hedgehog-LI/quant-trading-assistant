@@ -4,7 +4,8 @@
 
 - 产品设计与 ADR：已完成。
 - D0 精确代码在线验证：已完成并验收，详见 `HANDOFF_2026-07-17_exact_security_verification.md`。
-- D1-D4 本地目录、模糊搜索、目录同步与跨模块推广：未开始。
+- D1 后端本地目录、CSV 导入、确定性搜索和详情 API：已于 2026-07-29 独立验收。
+- D2-D4 共享选择器、目录同步与跨模块推广：未开始。
 - 技术接手入口：`docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md`。
 
 ## 新会话最小读取顺序
@@ -17,9 +18,9 @@
 6. `docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md`
 7. 仅按当前阶段读取对应 API/数据库/前端架构文档。
 
-## 建议首轮任务
+## 建议下一轮任务
 
-只执行 D1：migration、目录导入、搜索排名 API、后端测试和接口文档。D1 验收前不并行改造所有前端表单，不接外部 provider，不下载全市场行情。
+只执行 D2：前端共享 `SecuritySelector`、mock/remote 同形 adapter、竞态与无障碍测试，以及首批四处接入。D2 不应夹带 D3 外部 provider 或目录同步。
 
 ## 不可破坏边界
 

@@ -96,7 +96,9 @@ docker compose down
 ## AI 协作要求
 
 - 非简单任务先用 `qta-task-contract` 冻结范围、验收标准和证据；长任务按 `qta-task-checkpoint` 主动存档，禁止等到上下文耗尽才压缩。
-- 标准、跨仓或长任务由父上下文启用 `qta-development-orchestration`，也可用 `/qta-run` 显式启动。父协调者负责 lane、TaskPacket、角色顺序、候选哈希和 Git；子角色不得操作 Git。
+- 标准、跨仓或长任务由父上下文启用 `qta-development-orchestration`，也可用 `/qta-run` 显式启动。父协调者负责 L0-L3 风险 lane、TaskPacket、机器控制文件、角色顺序、候选哈希和 Git；子角色不得操作 Git。
+- 固定 Agent 是模板，不是持续会话。初始实现、每轮 repair、每代 review 和最终 verifier 必须使用新的 role/session；子角色结束即销毁。
+- 每次状态迁移运行任务控制校验，候选冻结前运行架构门禁；最终验收必须同时通过 FUNCTIONAL 与 ARCHITECTURE。
 - 实现者只可把任务标记为 `SELF_CHECKED`。独立验收必须由未参与实现的干净上下文使用 `qta-independent-verification` 完成，验收者不得同时修代码。
 - 只有独立验收允许交付后，才能使用 `qta-delivery-finalization` 更新建设看板、交接、接口和验收记录。
 - 固定 ZCode 角色在 `.zcode/agents/`：测试设计者、实施者、代码审查者、最终核验者。各角色禁止递归创建子代理。

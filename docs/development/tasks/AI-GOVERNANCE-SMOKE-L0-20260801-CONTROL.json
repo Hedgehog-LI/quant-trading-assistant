@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 2,
+  "taskId": "AI-GOVERNANCE-SMOKE-L0-20260801",
+  "controlPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-CONTROL.json",
+  "startedAt": "2026-08-01T15:49:27Z",
+  "lane": "L0",
+  "lifecycleState": "FINALIZED",
+  "contract": {
+    "path": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-CONTRACT.md",
+    "version": "1",
+    "sha256": "2cf0f00d1cbc112afea5436fa38d831f85138d908adb3a5a43465e8482a1f1ef",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["STATIC"]},
+      {"id": "AC-02", "requiredEvidence": ["STATIC"]}
+    ],
+    "blockingAmendments": []
+  },
+  "git": {
+    "automation": "NONE",
+    "branch": "codex/security-directory-d1-20260729",
+    "baselineCommit": "f3ba47597d54abe9a3fe391e7e8c4834fa0c94ae",
+    "preExistingDirtyPaths": [
+      ".agents/schemas/qta-task-control.schema.json",
+      ".agents/skills/qta-backend-implementation/SKILL.md",
+      ".agents/skills/qta-context-bootstrap/SKILL.md",
+      ".agents/skills/qta-delivery-finalization/SKILL.md",
+      ".agents/skills/qta-delivery-finalization/assets/FINALIZATION_CHECKLIST.md",
+      ".agents/skills/qta-development-orchestration/SKILL.md",
+      ".agents/skills/qta-development-orchestration/assets/TASK_CONTROL_TEMPLATE.json",
+      ".agents/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md",
+      ".agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md",
+      ".agents/skills/qta-frontend-implementation/SKILL.md",
+      ".agents/skills/qta-independent-verification/SKILL.md",
+      ".agents/skills/qta-independent-verification/assets/INDEPENDENT_VERIFICATION_TEMPLATE.md",
+      ".agents/skills/qta-task-checkpoint/SKILL.md",
+      ".agents/skills/qta-task-checkpoint/assets/HANDOFF_TEMPLATE.md",
+      ".agents/skills/qta-task-checkpoint/assets/TASK_STATE_TEMPLATE.md",
+      ".agents/skills/qta-task-contract/SKILL.md",
+      ".agents/skills/qta-task-contract/assets/TASK_CONTRACT_TEMPLATE.md",
+      ".claude/skills/qta-backend-implementation/SKILL.md",
+      ".claude/skills/qta-context-bootstrap/SKILL.md",
+      ".claude/skills/qta-delivery-finalization/SKILL.md",
+      ".claude/skills/qta-delivery-finalization/assets/FINALIZATION_CHECKLIST.md",
+      ".claude/skills/qta-development-orchestration/SKILL.md",
+      ".claude/skills/qta-development-orchestration/assets/TASK_CONTROL_TEMPLATE.json",
+      ".claude/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md",
+      ".claude/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md",
+      ".claude/skills/qta-frontend-implementation/SKILL.md",
+      ".claude/skills/qta-independent-verification/SKILL.md",
+      ".claude/skills/qta-independent-verification/assets/INDEPENDENT_VERIFICATION_TEMPLATE.md",
+      ".claude/skills/qta-task-checkpoint/SKILL.md",
+      ".claude/skills/qta-task-checkpoint/assets/HANDOFF_TEMPLATE.md",
+      ".claude/skills/qta-task-checkpoint/assets/TASK_STATE_TEMPLATE.md",
+      ".claude/skills/qta-task-contract/SKILL.md",
+      ".claude/skills/qta-task-contract/assets/TASK_CONTRACT_TEMPLATE.md",
+      ".zcode/agents/qta-code-reviewer.md",
+      ".zcode/agents/qta-final-verifier.md",
+      ".zcode/agents/qta-implementer.md",
+      ".zcode/agents/qta-test-designer.md",
+      ".zcode/commands/qta-run.md",
+      ".zcode/config.json",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "docs/AI_DEVELOPMENT_INDEX.md",
+      "docs/AI_HANDOFF.md",
+      "docs/BUILD_CHECKLIST.md",
+      "docs/CURRENT_ARCHITECTURE_AND_MODULES.md",
+      "docs/DATABASE_DESIGN.md",
+      "docs/DEVELOPMENT_WORKFLOW.md",
+      "docs/PRODUCT_BLUEPRINT.md",
+      "docs/acceptance/ACCEPTANCE_LOG.md",
+      "docs/ai/HANDOFF_2026-07-17_security_directory_search.md",
+      "docs/ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md",
+      "docs/ai/SKILL_AND_AGENT_GOVERNANCE.md",
+      "docs/api/API_INDEX.md",
+      "docs/api/MARKET_DATA_API.md",
+      "docs/development/DEVELOPMENT_LOG.md",
+      "docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D1-20260729-FINALIZATION.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D1-20260729-REVIEW-3.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D1-20260729-STATE.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D1-20260729-VERIFICATION.md",
+      "docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md",
+      "docs/mock/MOCK_REMOTE_CONTRACT.md",
+      "scripts/check-ai-architecture.mjs",
+      "scripts/check-ai-task-control.mjs",
+      "scripts/run-ai-governance-gates.mjs",
+      "scripts/tests/ai-governance.test.mjs",
+      "scripts/validate-ai-governance.mjs",
+      "scripts/zcode-governance-hook.mjs"
+    ]
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-01T15:49:27Z",
+      "actor": "codex-parent-smoke-1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-01T15:50:00Z",
+      "actor": "codex-parent-smoke-1"
+    },
+    {
+      "sequence": 3,
+      "from": "CONTRACT_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-01T15:51:45Z",
+      "actor": "codex-parent-smoke-1"
+    },
+    {
+      "sequence": 4,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-01T15:52:51Z",
+      "actor": "codex-parent-smoke-1"
+    },
+    {
+      "sequence": 5,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-01T15:53:30Z",
+      "actor": "codex-parent-smoke-1"
+    },
+    {
+      "sequence": 6,
+      "from": "CANDIDATE_FROZEN",
+      "to": "VERIFIED",
+      "at": "2026-08-01T15:58:18Z",
+      "actor": "codex-parent-smoke-1"
+    },
+    {
+      "sequence": 7,
+      "from": "VERIFIED",
+      "to": "FINALIZED",
+      "at": "2026-08-01T16:02:31Z",
+      "actor": "codex-parent-smoke-1"
+    }
+  ],
+  "candidate": {
+    "mode": "SNAPSHOT",
+    "generation": 1,
+    "identity": "a94f99f0f206caf0272a9fce0fdf5ad96d6eabb8aa7528891f6ac3220846c7b4",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "51554e59f6c77814c835abce4b3f6f1670dde91d34095d5a4987df8425a90e0d",
+    "manifestPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-CANDIDATE.json",
+    "manifestSha256": "a94f99f0f206caf0272a9fce0fdf5ad96d6eabb8aa7528891f6ac3220846c7b4",
+    "entrySetSha256": "43d7532288546f0b45c5e54c2e41f3e150b7098165871b3b98f9497572c88513",
+    "diffArtifactPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-CANDIDATE.patch",
+    "diffArtifactSha256": "51554e59f6c77814c835abce4b3f6f1670dde91d34095d5a4987df8425a90e0d"
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [
+    {
+      "roleRunId": "impl-g1-019fbe06",
+      "sessionId": "codex-agent-019fbe06-5e6e-7760-9d5f-559f1932cf2f",
+      "startedAt": "2026-08-01T15:51:45Z",
+      "finishedAt": "2026-08-01T15:52:51Z",
+      "runtimeReceiptPath": "",
+      "role": "IMPLEMENTER",
+      "generation": 1,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "exact one-path write allowlist plus parent pre/post status inspection",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-IMPLEMENTER.md",
+      "artifactSha256": "2f4e8bca4961c02e90af3d8de9a8171a58af2a9ceaf3688c611c02ec8792060d"
+    },
+    {
+      "roleRunId": "verify-g1-019fbe09",
+      "sessionId": "codex-agent-019fbe09-de5d-7142-b4f5-8e0f75f1f699",
+      "startedAt": "2026-08-01T15:55:29Z",
+      "finishedAt": "2026-08-01T15:58:18Z",
+      "runtimeReceiptPath": "",
+      "role": "FINAL_VERIFIER",
+      "generation": 1,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only five-file packet plus immutable manifest and patch hashes",
+      "waitCalls": 2,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-VERIFICATION.md",
+      "artifactSha256": "9315c21aea2a1e3fab57fd6b6c02c8668589d955f3a2de82f7e4480fb954b4b2"
+    }
+  ],
+  "review": {
+    "omitted": true,
+    "omissionReason": "L0 documentation smoke permits direct clean verification",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_REQUIRED",
+    "architectureVerdict": "NOT_REQUIRED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "findingIds": []
+  },
+  "verification": {
+    "candidateIdentity": "a94f99f0f206caf0272a9fce0fdf5ad96d6eabb8aa7528891f6ac3220846c7b4",
+    "verdict": "ACCEPTED",
+    "deliveryPermitted": true,
+    "functionalVerdict": "PASS",
+    "architectureVerdict": "PASS",
+    "artifactPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-VERIFICATION.md",
+    "artifactSha256": "9315c21aea2a1e3fab57fd6b6c02c8668589d955f3a2de82f7e4480fb954b4b2",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "PASS"},
+      "AUTOMATION": {"required": false, "status": "NOT_REQUIRED"},
+      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "finalization": {
+    "status": "COMPLETED",
+    "candidateIdentity": "a94f99f0f206caf0272a9fce0fdf5ad96d6eabb8aa7528891f6ac3220846c7b4",
+    "artifactPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-FINALIZATION.md",
+    "artifactSha256": "cdb913308290d74cb675a3e67a370829359807cf5a3031c38b694740f926272e",
+    "changedPaths": [
+      "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-FINALIZATION.md"
+    ]
+  },
+  "evidence": [
+    {
+      "evidenceId": "E-AC-01-STATIC",
+      "acId": "AC-01",
+      "kind": "STATIC",
+      "candidateIdentity": "a94f99f0f206caf0272a9fce0fdf5ad96d6eabb8aa7528891f6ac3220846c7b4",
+      "artifactPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-VERIFICATION.md",
+      "artifactSha256": "9315c21aea2a1e3fab57fd6b6c02c8668589d955f3a2de82f7e4480fb954b4b2"
+    },
+    {
+      "evidenceId": "E-AC-02-STATIC",
+      "acId": "AC-02",
+      "kind": "STATIC",
+      "candidateIdentity": "a94f99f0f206caf0272a9fce0fdf5ad96d6eabb8aa7528891f6ac3220846c7b4",
+      "artifactPath": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-VERIFICATION.md",
+      "artifactSha256": "9315c21aea2a1e3fab57fd6b6c02c8668589d955f3a2de82f7e4480fb954b4b2"
+    }
+  ]
+}

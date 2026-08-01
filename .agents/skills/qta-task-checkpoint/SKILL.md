@@ -40,13 +40,15 @@ Only an independent verifier may set `INDEPENDENTLY_VERIFIED`.
 
 1. Re-read the task contract and current diff.
 2. Confirm the lifecycle state, contract hash, candidate hash, repair round, and failure fingerprint.
-3. Record what changed since the previous checkpoint.
-4. Map files and evidence to acceptance criteria.
-5. Record commands actually run and exact outcomes.
-6. Separate code defects from environment/external blockers.
-7. State the next smallest executable action.
-8. Update only the task-local contract, state, and continuation handoff.
-9. Leave project-level status and acceptance documents unchanged until finalization.
+3. Validate the task control file and record role-run, wait, poll, context, compaction, and optional usage
+   counters.
+4. Record what changed since the previous checkpoint.
+5. Map files and evidence to acceptance criteria.
+6. Record commands actually run and exact outcomes without pasting unchanged logs.
+7. Separate code defects, architecture debt, policy violations, and environment/external blockers.
+8. State the next smallest executable action and the fresh role instance required.
+9. Update only the task-local contract, control, state, and continuation handoff.
+10. Leave project-level status and acceptance documents unchanged until finalization.
 
 ## Required Artifacts
 
@@ -68,6 +70,9 @@ facts through `$qta-delivery-finalization`, never from an implementation checkpo
 - Preserve unresolved blockers exactly until new evidence changes them.
 - Invalidate review and verification whenever the candidate hash changes.
 - Persist repair counts across clean contexts; a new conversation does not reset a failure fingerprint.
+- Never reuse a prior implementer, reviewer, or verifier role run after checkpoint.
+- A compaction or prohibited tool call invalidates that role artifact and must be recorded as
+  `POLICY_VIOLATION`.
 
 ## Context Budget
 
@@ -76,6 +81,8 @@ Default checkpoint thresholds:
 - At 25% of a large context window: summarize discoveries and freeze scope.
 - At 40%: checkpoint before any new workstream.
 - At 60%: stop implementation, write handoff, continue in a clean context.
+- At the first automatic compaction: checkpoint immediately and end the role run.
+- Record no more than two Agent waits per role and three shell polls per command.
 
 Tool-specific limits may require earlier checkpoints.
 

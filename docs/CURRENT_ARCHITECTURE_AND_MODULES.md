@@ -61,7 +61,7 @@ convert     # MapStruct 转换器
 | Review | `review` | `/api/v1/reviews` | `review_note` |
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
-| Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V15 新增全市场板块排行自动采集和关注板块自动采集 |
+| Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、本地目录 CSV 导入、确定性搜索/详情、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V17 新增目录字段与 `stock_alias` |
 | Agent Assistant | `agent` | `/api/v1/agent/**` | `agent_api_audit_log`（V16）。Spring Security Bearer Token 鉴权 + 限流 + 持久化脱敏审计 + TrustedAnswer 可信回答契约。8 个固定只读 GET 端点。OpenClaw Tool Plugin 在 `integrations/openclaw/qta-assistant/`。默认关闭。 |
 
 ## 4. 当前数据库迁移
@@ -84,8 +84,9 @@ convert     # MapStruct 转换器
 | `V14__add_market_sector_watch.sql` | market_sector_watch、market_sector_snapshot、market_sector_member_snapshot（行业关注与快照） |
 | `V15__add_market_sector_automatic_collection.sql` | market_sector_ranking_config、market_sector_ranking_batch、market_sector_ranking_item（全市场榜单历史） |
 | `V16__add_agent_api_audit_log.sql` | agent_api_audit_log（Agent 只读 API 持久化脱敏审计） |
+| `V17__add_security_directory.sql` | 扩展 stock_basic 目录字段，新增 stock_alias 与目录检索索引 |
 
-已发布的 V1-V16 migration 不应修改；后续表结构调整继续新增更高版本 migration。
+已发布的 V1-V17 migration 不应修改；后续表结构调整继续新增更高版本 migration。
 
 ## 5. 交易账本口径
 
@@ -178,8 +179,11 @@ npm run build
 
 ## 11. 行情基础当前事实
 
-证券主数据和 CSV 日 K 基础已经由 `marketdata` 模块实现。LongPort 只读行情 provider 已完成真实外联验收：
+证券主数据、CSV 日 K 和 P1.4b-D1 本地证券目录基础已经由 `marketdata` 模块实现。LongPort 只读行情 provider 已完成真实外联验收：
 
+- V17 扩展既有 `stock_basic` 并新增 `stock_alias`；没有建立 `security_master` 等平行主表，旧 `/stocks` CRUD 保持兼容。
+- `SecurityDirectoryImportService` 负责 UTF-8/RFC 4180 CSV 的原子幂等导入；`SecurityDirectoryManager` 通过 MyBatis/XML 做本地过滤并在 Java 中执行确定性匹配分档与稳定排序。
+- `/security-directory/import`、`/securities/search`、`/securities/{canonicalSymbol}` 只访问本地目录，不调用报价、K 线或 LongPort，也不创建采集任务。D2 前端 selector 和 D3 外部目录同步仍未实现。
 - `stock_quote_snapshot` 存外部最新价快照，不覆盖 `portfolio_price_snapshot`。
 - `market_data_sync_task` 存历史日 K 同步任务和失败留痕。
 - `market_data_alert` 存 provider 未配置、同步失败、数据质量等提醒。

@@ -8,6 +8,7 @@
 3. 冲突裁决按 `AI_DEVELOPMENT_INDEX.md §2`：migration+代码+测试 > 架构事实 > API/DB > 开发/验收日志 > 历史交接。
 4. 非简单任务先启用 `qta-task-contract`；实现者只做自检，独立验收使用干净上下文和 `qta-independent-verification`。
 5. 标准、跨仓或长任务由父上下文启用 `qta-development-orchestration`，固定角色只接收 TaskPacket。
+   固定角色是一次性模板实例：每轮实现、repair、review、verification 都新开 role/session，禁止续用。
 
 ## 开发结束必做
 

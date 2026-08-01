@@ -35,19 +35,20 @@ written down before editing.
 ## Contract Construction
 
 1. Assign a stable task ID and concise objective.
-2. Select `TRIVIAL`, `STANDARD`, or `LONG_HIGH_RISK` using `$qta-development-orchestration`.
+2. Select risk lane `L0`, `L1`, `L2`, or `L3` using `$qta-development-orchestration`.
 3. Record baseline commit/branch and pre-existing dirty paths.
 4. Separate `FACT`, `DECISION`, `ASSUMPTION`, and `OPEN_QUESTION`.
 5. Define in-scope repositories, modules, allowed write paths, and interfaces.
 6. Define explicit non-goals and prohibited behavior.
-7. Write acceptance criteria as externally observable outcomes.
+7. Write acceptance criteria as externally observable outcomes and stay within the lane cap: L0=3, L1=5,
+   L2=8, L3=10.
 8. Attach an evidence method and owner role to every criterion.
 9. Define required verification dimensions:
    - `STATIC`
    - `AUTOMATION`
    - `RUNTIME`
    - `DEPLOYMENT`
-10. Define stop conditions, context budget, checkpoint cadence, and repair-round limit.
+10. Define architecture/NFR gates, stop conditions, context budget, wait/poll limits, and repair-round limit.
 11. Define which clean-context role gives the final verdict.
 12. Freeze `contract_version` and `contract_hash` after test-design amendments are accepted.
 
@@ -64,8 +65,13 @@ Each criterion must contain:
 - Responsible role
 - Status
 
-Avoid criteria such as “code is high quality” or “feature is complete.” Replace them with inspectable behavior,
-commands, response contracts, persisted records, or user-visible states.
+Each AC describes one result and uses at most two mandatory evidence types. Avoid criteria such as “code is
+high quality” or “feature is complete.” Replace them with inspectable behavior, response contracts, persisted
+records, or user-visible states. Put detailed test cases in the test matrix, not in the product contract.
+
+Test-design blockers are limited to ambiguities that prevent falsifiable behavior, safety, data integrity, or
+financial correctness. Lane amendment caps are L0=0, L1=1, L2=3, and L3=5. Nonblocking implementation ideas
+remain recommendations; exceeding a cap requires task splitting or a parent-owned exception.
 
 ## Required Artifact
 
@@ -86,8 +92,8 @@ artifact to the parent coordinator, which owns persistence and contract freezing
 - Code reviewer inspects the diff without editing it.
 - Final verifier executes required gates and decides the verdict.
 
-`STANDARD` and `LONG_HIGH_RISK` use all four roles. `TRIVIAL` may omit test design and code review only when
-the contract-lite record explains why; it still requires a clean final verifier.
+`L1`, `L2`, and `L3` use all four roles. `L0` may omit test design and code review only when the contract-lite
+record explains why; it still requires a clean final verifier.
 
 ## Stop Conditions
 

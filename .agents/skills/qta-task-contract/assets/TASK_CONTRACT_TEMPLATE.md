@@ -6,7 +6,7 @@
 - Contract version:
 - Frozen at:
 - Frozen by parent run:
-- Lane: `TRIVIAL | STANDARD | LONG_HIGH_RISK`
+- Lane: `L0 | L1 | L2 | L3`
 
 After freezing the file, the parent computes its SHA-256 and records it in task state and TaskPackets. The
 contract does not contain its own hash.
@@ -54,6 +54,14 @@ contract does not contain its own hash.
 | RUNTIME | | | |
 | DEPLOYMENT | | | |
 
+## Architecture And Quality Gates
+
+- Required architecture review: `YES | NO`
+- Triggered thresholds:
+- Required layers/boundaries:
+- Responsibility-map evidence:
+- ADR exception and expiry:
+
 ## Role Assignments
 
 - Test designer:
@@ -80,6 +88,14 @@ contract does not contain its own hash.
 ## Checkpoint Policy
 
 - Context budget:
-- Checkpoint interval:
+- Persist discoveries at: 25%
+- Stop opening stages at: 40%
+- Mandatory fresh-context handoff at: 60%
+- Maximum waits per role run: 2
+- Maximum shell polls per command: 3
+- Automatic compaction policy: first compaction forces handoff; second is prohibited
 - Maximum repair rounds for one failure fingerprint: 2
+- Lane AC cap:
+- Blocking amendment cap:
+- Blocking amendment history:
 - Stop conditions:

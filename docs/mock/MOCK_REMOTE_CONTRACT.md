@@ -24,6 +24,7 @@
 | Market Data（证券/日 K/最新价/同步） | ✅ localStorage；不伪造 provider 执行成功 | ✅ 后端 DB + LongPort | canonical 规则必须一致：`SH/SZ/BJ/HK/US` |
 | Market Workbench（行情工作台） | ✅ 计划 CRUD 落 `marketSyncPlans`；`run/getTask` 明确拒绝 | ✅ overview + 手工/盘中执行引擎 | mock 只验表单/状态；真实 task/item/分钟 K/水位必须使用 remote |
 | Security Verification（精确代码验证） | ❌ 明确提示切换后端模式，不伪造 LongPort 结果 | ✅ `/market-data/securities/verify` | 验证只读；确认后才进入计划 scope |
+| Security Directory（目录/搜索/详情） | ❌ D2 尚未实现前端 adapter，不伪造目录结果 | ✅ D1 `/security-directory/import` + `/securities/search` + `/securities/{canonicalSymbol}` | 仅本地 DB；不调用 provider、报价或 K 线 |
 | Market Segments（市场板块/自定义分组） | ✅ 市场板块仅演示数据；自定义分组 localStorage | ✅ `/sector-catalog/*` + `/segments/*` | 演示数据必须标 `LOCAL_DEMO`，不得冒充 LongPort |
 
 ## 3. localStorage 规则
@@ -49,6 +50,7 @@
 - mock ID（UUID）与 remote ID（Long）不混用；`String(id)` 比较用于跨模式兼容。
 - 生产部署默认 remote，`apiBaseUrl` 留空走同源 `/api/v1`（Nginx 反代）；公网页面禁止保存 localhost 后端地址（`settingsApi.isLocalhostUrl` 防误配）。
 - mock 模式不触发后端校验（如计划关联/删除保护），仅 remote 模式强制；故 mock 测试通过 ≠ 后端校验通过，关键校验必须后端单测覆盖。
+- P1.4b-D1 只交付 remote 后端目录契约；D2 前端 `SecuritySelector` 和 mock/remote adapter 尚未实现，前端不得把静态演示数据冒充后端目录。
 
 ## 6. 行情工作台与板块（P1.2/P1.3）
 

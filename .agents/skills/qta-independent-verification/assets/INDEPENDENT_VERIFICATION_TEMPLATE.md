@@ -2,6 +2,8 @@
 
 Verifier:
 Role run ID:
+Role session ID:
+Role context inherited: NO
 Baseline:
 Contract SHA-256:
 Candidate mode:
@@ -37,6 +39,18 @@ Tracked candidate unchanged: YES/NO
 
 `NOT_REQUIRED` is valid only when the frozen contract marks the dimension as not required. A required
 `NOT_VERIFIED` dimension cannot produce `ACCEPTED`.
+
+## Quality Tracks
+
+| Track | Result | Evidence | Notes |
+|---|---|---|---|
+| FUNCTIONAL | PASS/FAIL | | |
+| ARCHITECTURE | PASS/FAIL | | |
+
+Architecture gate command:
+Responsibility-map evidence:
+Architecture score:
+ADR exception and expiry:
 
 ## Verdict
 

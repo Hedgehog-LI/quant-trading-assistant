@@ -19,6 +19,7 @@ const expectedSkills = manifest.skills.map((skill) => skill.id);
 const expectedAgentPolicies = {
   "qta-test-designer": {
     permissionMode: "plan",
+    maxTurns: "8",
     tools: ["Read", "Glob", "Grep", "Skill"],
     disallowedTools: [
       "Bash", "Edit", "Write", "ApplyPatch", "NotebookEdit",
@@ -28,6 +29,7 @@ const expectedAgentPolicies = {
   },
   "qta-implementer": {
     permissionMode: "acceptEdits",
+    maxTurns: "20",
     tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash", "Skill"],
     disallowedTools: ["Agent", "Task", "EnterPlanMode", "ExitPlanMode"],
     skills: [
@@ -37,6 +39,7 @@ const expectedAgentPolicies = {
   },
   "qta-code-reviewer": {
     permissionMode: "plan",
+    maxTurns: "10",
     tools: ["Read", "Glob", "Grep", "Skill"],
     disallowedTools: [
       "Bash", "Edit", "Write", "ApplyPatch", "NotebookEdit",
@@ -46,6 +49,7 @@ const expectedAgentPolicies = {
   },
   "qta-final-verifier": {
     permissionMode: "plan",
+    maxTurns: "12",
     tools: ["Read", "Glob", "Grep", "Bash", "Skill"],
     disallowedTools: [
       "Edit", "Write", "ApplyPatch", "NotebookEdit",
@@ -220,6 +224,9 @@ for (const agent of expectedAgents) {
   if (scalar(meta, "permissionMode") !== policy.permissionMode) {
     errors.push(`${agent}: permissionMode must be ${policy.permissionMode}`);
   }
+  if (scalar(meta, "maxTurns") !== policy.maxTurns) {
+    errors.push(`${agent}: maxTurns must be ${policy.maxTurns}`);
+  }
   const tools = listValues(meta, "tools");
   const disallowed = listValues(meta, "disallowedTools");
   const skills = listValues(meta, "skills");
@@ -237,6 +244,66 @@ for (const agent of expectedAgents) {
       errors.push(`${agent}: references unknown skill ${skill}`);
     }
   }
+  for (const required of ["session ID", "compaction", "role instance"]) {
+    if (!content.includes(required)) errors.push(`${agent}: missing V2 role-instance rule: ${required}`);
+  }
+}
+
+const requiredGovernanceFiles = [
+  ".agents/schemas/qta-task-control.schema.json",
+  ".agents/skills/qta-development-orchestration/assets/TASK_CONTROL_TEMPLATE.json",
+  ".agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md",
+  ".zcode/config.json",
+  "scripts/check-ai-task-control.mjs",
+  "scripts/check-ai-architecture.mjs",
+  "scripts/zcode-governance-hook.mjs",
+  "scripts/tests/ai-governance.test.mjs"
+];
+for (const relative of requiredGovernanceFiles) {
+  try {
+    await stat(path.join(root, relative));
+  } catch {
+    errors.push(`missing governance V2 asset: ${relative}`);
+  }
+}
+
+try {
+  JSON.parse(await readFile(path.join(root, ".agents", "schemas", "qta-task-control.schema.json"), "utf8"));
+  const zcodeConfig = JSON.parse(await readFile(path.join(root, ".zcode", "config.json"), "utf8"));
+  const hooks = zcodeConfig?.hooks;
+  if (hooks?.enabled !== true) errors.push("ZCode workspace hooks must be enabled");
+  const supportedEvents = new Set([
+    "SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest",
+    "PostToolUse", "PostToolUseFailure", "Stop"
+  ]);
+  for (const event of Object.keys(hooks?.events ?? {})) {
+    if (!supportedEvents.has(event)) errors.push(`ZCode hook event is unsupported: ${event}`);
+  }
+  const preToolHooks = hooks?.events?.PreToolUse ?? [];
+  const governanceMatchers = preToolHooks.filter((group) => {
+    try {
+      new RegExp(group.matcher ?? "");
+      return (group.hooks ?? []).some((hook) => hook.type === "process"
+        && hook.command === "node"
+        && Array.isArray(hook.args)
+        && hook.args.includes("${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs")
+        && Number.isInteger(hook.timeoutMs));
+    } catch {
+      errors.push(`ZCode hook matcher is invalid: ${group.matcher}`);
+      return false;
+    }
+  });
+  if (governanceMatchers.length !== 1) {
+    errors.push("ZCode PreToolUse must invoke zcode-governance-hook.mjs");
+  }
+  if (!governanceMatchers[0]?.matcher?.includes("Bash")
+      || !governanceMatchers[0]?.matcher?.includes("Read")
+      || !governanceMatchers[0]?.matcher?.includes("Write")
+      || !governanceMatchers[0]?.matcher?.includes("Edit")) {
+    errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit aliases");
+  }
+} catch (error) {
+  errors.push(`governance V2 JSON configuration is invalid (${error.message})`);
 }
 
 const triggerResult = spawnSync(process.execPath, [path.join(root, "scripts", "evaluate-skill-triggers.mjs")], {
@@ -272,6 +339,11 @@ const orchestrationCommand = await readFile(path.join(root, ".zcode", "commands"
 if (!orchestrationCommand.includes("skills: qta-development-orchestration")
     || !orchestrationCommand.includes("$ARGUMENTS")) {
   errors.push("qta-run command must mount qta-development-orchestration and forward task arguments");
+}
+for (const required of ["TASK_CONTROL", "fresh", "two waits", "architecture"]) {
+  if (!orchestrationCommand.toLowerCase().includes(required.toLowerCase())) {
+    errors.push(`qta-run command missing V2 instruction: ${required}`);
+  }
 }
 
 if (errors.length > 0) {

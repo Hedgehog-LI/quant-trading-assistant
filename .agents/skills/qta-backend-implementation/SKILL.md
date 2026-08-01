@@ -58,9 +58,13 @@ business meaning. Avoid builder/getter chains used only as manual conversion.
 1. Implement the smallest coherent slice.
 2. Add or update focused tests before broad tests.
 3. Run compile/static checks for the affected module.
-4. Run targeted tests, then broader backend tests when risk justifies them.
-5. Inspect the final diff for unrelated edits and contract drift.
-6. If context grows large, use `$qta-task-checkpoint` before continuing.
+4. Run targeted tests while editing. Run the full suite/package once when the candidate is ready to freeze;
+   do not repeat an unchanged broad gate after every repair.
+5. Run `node scripts/check-ai-architecture.mjs --base <baseline> --architecture-review-count 0` and either resolve triggered architecture
+   errors or report them as blockers. Self-checking this gate is not independent acceptance.
+6. Inspect the final diff for unrelated edits and contract drift.
+7. At 40% context, checkpoint before opening another workstream. At 60% or the first compaction, checkpoint
+   and end this role instance.
 
 Implementation self-tests prove only `SELF_CHECKED`; they do not prove independent acceptance.
 
@@ -85,3 +89,4 @@ Stop and checkpoint when:
 - The task expands beyond its contract.
 - Existing unrelated changes make a safe patch impossible.
 - The same failure repeats without new evidence.
+- A hard architecture threshold is reached without an approved, time-bounded ADR exception.

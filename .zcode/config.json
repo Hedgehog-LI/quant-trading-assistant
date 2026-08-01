@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "enabled": true,
+    "timeoutMs": 5000,
+    "maxOutputBytes": 4096,
+    "events": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|Read|Write|Edit|ApplyPatch",
+          "hooks": [
+            {
+              "type": "process",
+              "command": "node",
+              "args": [
+                "${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs"
+              ],
+              "timeoutMs": 5000,
+              "statusMessage": "Checking QTA governance policy"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

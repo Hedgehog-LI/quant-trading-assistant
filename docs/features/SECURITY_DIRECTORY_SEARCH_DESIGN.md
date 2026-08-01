@@ -1,11 +1,12 @@
 # 证券目录与智能检索产品设计
 
-> 状态：Planned（后续阶段）。近期先实现 `EXACT_SECURITY_VERIFICATION_DESIGN.md` 定义的“市场 + 精确代码 + 静态信息/报价确认”；本文保留全量目录与名称模糊搜索的完整演进方案。
+> 状态：P1.4b-D1 已于 2026-07-29 独立验收；D2 共享选择器、D3 外部目录同步、D4 跨模块推广仍待实施。精确在线验证见 `EXACT_SECURITY_VERIFICATION_DESIGN.md`。
 
 ## 0. 分阶段决策
 
-- **P1.4a 当前实施**：用户选择市场、输入精确代码，通过 LongPort Static Info + Quote 验证并确认加入采集计划。无需下载全量目录，接口和验收见 `EXACT_SECURITY_VERIFICATION_DESIGN.md`。
-- **P1.4b 后续实施**：扩展 `stock_basic`、导入全市场证券目录、支持名称/拼音/别名模糊检索和共享选择器。
+- **P1.4a 已完成**：用户选择市场、输入精确代码，通过 LongPort Static Info + Quote 验证并确认加入采集计划。无需下载全量目录，接口和验收见 `EXACT_SECURITY_VERIFICATION_DESIGN.md`。
+- **P1.4b-D1 已完成**：V17 扩展 `stock_basic`、新增 `stock_alias`，交付可重复 CSV 导入、本地名称/拼音/别名确定性搜索和证券详情 API。
+- **P1.4b-D2-D4 待实施**：共享 `SecuritySelector`、外部目录同步/元数据补全和跨模块推广。
 - P1.4a 不建设平行主数据，也不妨碍 P1.4b；它将成为目录未命中时的在线精确补全通道。
 
 ## 1. 背景与目标
@@ -67,12 +68,12 @@
 | 统一证券代码完全匹配 | 100 |
 | 原始代码完全匹配 | 95 |
 | 当前正式名称完全匹配 | 90 |
-| 当前名称前缀匹配 | 80 |
+| 当前正式名称前缀匹配 | 80 |
 | 别名完全/前缀匹配 | 75 |
 | 拼音首字母或全拼前缀匹配 | 70 |
 | 名称或别名包含匹配 | 50 |
 
-同分时依次按：正常上市优先、用户指定市场优先、名称、`canonical_symbol` 排序。MVP 不使用不可解释的模型排序。
+同分时依次按：正常上市优先、用户指定市场顺序、规范化显示名、`canonical_symbol` 排序。MVP 不使用不可解释的模型排序。
 
 ### 4.3 首批接入位置
 
@@ -96,7 +97,7 @@
 | `pinyin_full` / `pinyin_abbr` | 中文名称全拼与首字母，供本地检索 |
 | `exchange` | 交易所代码，区别于市场 |
 | `currency` | 交易币种 |
-| `security_type` | STOCK / ETF / INDEX / REIT 等 |
+| `security_type` | STOCK / ETF / INDEX / REIT / FUND / BOND / WARRANT / OPTION / FUTURE / OTHER |
 | `list_status` | LISTED / DELISTED / UNKNOWN；停牌属于时点行情状态，不放入生命周期 |
 | `data_source` | 当前主信息来源 |
 | `source_updated_at` | 来源数据更新时间 |
@@ -149,19 +150,24 @@ MVP 首选可审计的 CSV/官方目录快照导入；后续可配置 LongPort S
 - 全量同步先进入 staging/候选集，完成数量波动、唯一性和必填字段门禁后再发布，禁止把异常空结果覆盖为正式目录。
 - 来源优先级可配置；权威目录字段不被用户别名覆盖。
 
-## 7. 规划 API
+## 7. API 状态
 
-以下接口尚未实现，因此暂不加入“已实现 API”索引：
+D1 已实现并加入 API 索引：
 
 ```http
+POST /api/v1/market-data/security-directory/import
 GET /api/v1/market-data/securities/search?q=应流股份&markets=SH,SZ&types=STOCK&includeDelisted=false&limit=20
 GET /api/v1/market-data/securities/{canonicalSymbol}
-POST /api/v1/market-data/security-directory/sync
-GET /api/v1/market-data/security-directory/status
-POST /api/v1/market-data/securities/{canonicalSymbol}/verify
 ```
 
-搜索响应至少包含 `canonicalSymbol`、`symbol`、`displayName`、`market`、`exchange`、`currency`、`securityType`、`listStatus`、`matchedBy`；响应元数据包含 `catalogUpdatedAt`、`stale`、`degraded`。同步与在线校验接口必须鉴权/限流能力预留，且不得返回 provider 密钥。
+D3 尚未实现：
+
+```http
+POST /api/v1/market-data/security-directory/sync
+GET /api/v1/market-data/security-directory/status
+```
+
+既有 P1.4a 在线精确验证接口为 `POST /api/v1/market-data/securities/verify`。D1 搜索响应包含 `canonicalSymbol`、`symbol`、`displayName`、`market`、`exchange`、`currency`、`securityType`、`listStatus`、`matchedBy`；响应元数据包含 `catalogStatus`、`catalogUpdatedAt`、`stale`、`degraded`。同步接口未来必须预留鉴权/限流能力，且不得返回 provider 密钥。
 
 ## 8. 非功能要求
 

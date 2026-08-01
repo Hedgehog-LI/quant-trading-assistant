@@ -1,6 +1,6 @@
 # 证券目录与智能检索实施计划
 
-> 状态：Ready for technical team。每阶段独立验收、独立同步文档；不得把未完成项提前标记为 DONE。
+> 状态：D1 已于 2026-07-29 独立验收；D2-D4 待实施。每阶段独立验收、独立同步文档；不得把未完成项提前标记为 DONE。
 
 ## 1. 目标与交付边界
 
@@ -21,7 +21,7 @@
 
 完成门槛：后端/前端目标测试、静态门禁、Docker curl 最小真实验证和文档收口；浏览器 E2E 若未执行必须明确记录。
 
-### D1：后端目录与搜索基础
+### D1：后端目录与搜索基础（已完成并独立验收）
 
 交付：
 
@@ -37,6 +37,8 @@
 - `./mvnw test`、`./mvnw package` 通过。
 - 搜索 API 文档与 `API_INDEX.md` 在接口真正实现后同步。
 - 真实规模样本或可复现基准证明 P95 目标，若暂不达标必须记录数据量与结果。
+
+交付证据：任务契约与角色记录见 `tasks/SECURITY-DIRECTORY-D1-20260729-*.md`。冻结候选 `f3ba47597d54abe9a3fe391e7e8c4834fa0c94ae` 在独立临时 worktree 验证：H2 migration/集成测试通过，全量 `377 tests` 与 package 通过；50000 securities + 100000 aliases、1600 次测量的总体 P95 为 `178.420375ms`。Docker daemon 不可用，MySQL runtime/curl 明确记为 `NOT_VERIFIED`，未用 H2 冒充。
 
 ### D2：前端共享选择器与首批接入
 

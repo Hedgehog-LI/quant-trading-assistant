@@ -1,0 +1,9 @@
+diff --git a/docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-TARGET.md b/docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-TARGET.md
+new file mode 100644
+index 0000000..d4b1bf7
+--- /dev/null
++++ b/docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-TARGET.md
+@@ -0,0 +1,3 @@
++# Governance Smoke Test
++
++Status: PASS_CANDIDATE

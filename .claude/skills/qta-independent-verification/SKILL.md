@@ -31,6 +31,8 @@ Before verification, confirm:
 - The diff can be isolated from unrelated dirty changes.
 - `contract_hash`, candidate identity, and `REVIEW_CLEAR` refer to the same generation. Candidate identity is
   either commit/tree/patch hashes or snapshot manifest/entry-set hashes.
+- The verifier `role_run_id` and session identifier are new and differ from all implementer and reviewer runs.
+- The task control file passes `scripts/check-ai-task-control.mjs`.
 
 If this context implemented the change, report only `SELF_CHECK`; start a clean top-level task or dedicated
 verifier role for independent acceptance.
@@ -48,14 +50,15 @@ Do not accept the implementer's prose as proof without inspecting the underlying
 ## Verification Process
 
 1. Check scope: required changes present, prohibited changes absent.
-2. Review the diff for behavior, regressions, data safety, security, and maintainability.
+2. Review the diff on two independent tracks: `FUNCTIONAL` and `ARCHITECTURE`.
 3. Derive or inspect tests independently from implementation details.
 4. Execute the cheapest decisive gates first.
 5. Verify every AC separately.
 6. Record each verification dimension independently.
 7. Compare tracked candidate state before and after executable gates.
-8. Classify findings by severity and cite file/line or command evidence.
-9. Produce a verdict without editing production files.
+8. Run the architecture gate and inspect any triggered responsibility map or ADR exception.
+9. Classify findings by severity and cite file/line or command evidence.
+10. Produce a verdict without editing production files.
 
 ## Evidence Rules
 
@@ -76,6 +79,10 @@ manifest mismatch invalidates the run and produces `REJECTED`.
 - `REJECTED`: one or more required criteria failed.
 - `BLOCKED`: verification cannot continue because required evidence or environment is unavailable.
 
+`ACCEPTED` requires both quality tracks to pass. `CONDITIONALLY_ACCEPTED` may omit only a dimension that the
+frozen contract explicitly marked optional and delivery-permitted; it cannot hide a required L3 runtime or
+deployment gate.
+
 ## Required Artifact
 
 Use `assets/INDEPENDENT_VERIFICATION_TEMPLATE.md`. Store the report with the task contract or under the
@@ -88,3 +95,4 @@ persists it without changing the verdict or evidence.
 
 Do not edit production code, tests written by the implementer, task criteria, or product documents.
 Return findings to an implementer in a new implementation round. Reverify from a fresh diff afterward.
+Never reuse this verifier session for a repaired candidate.

@@ -23,8 +23,12 @@
 ### 1.3 任务契约
 - 非简单任务使用 `qta-task-contract` 冻结范围、非目标、AC、证据、验证维度、角色和停止条件。
 - 在实现前由独立测试设计者检查 AC 是否可证伪；测试设计者不改代码。
-- 标准/长任务由父上下文启用 `qta-development-orchestration` 或 `/qta-run`，选择 lane 并冻结
+- 标准/长任务由父上下文启用 `qta-development-orchestration` 或 `/qta-run`，选择 L0-L3 风险 lane 并冻结
   `contract_hash`。子角色只接收 TaskPacket。
+- 父协调者创建 `<TASK-ID>-CONTROL.json`，每次角色派发和状态迁移前运行
+  `node scripts/check-ai-task-control.mjs <control-file>`。
+- Codex 沙箱若因 `.git/qta-governance` 只读返回 `EPERM/EACCES`，仅为上述控制命令申请受限 `.git`
+  写权限并重跑；不得设置关闭 anchor 的环境变量。
 - 契约冻结后由父协调者创建 `contract` 阶段提交；子角色不得操作 Git。
 - 只有任务契约记录用户授权的 `git_automation` 允许时才能实际提交或推送；缺省为 `NONE`。
 
@@ -33,6 +37,12 @@
 - **前端**：feature-based，mock/remote 双模式，不用 `any`，覆盖 loading/empty/error/retry 状态，盈利红亏损绿。
 - **测试**：覆盖核心场景与边界（参考 `acceptance/ACCEPTANCE_LOG.md` 已有覆盖度）。
 - **角色边界**：实施者可实现和运行自测，但只能标记 `SELF_CHECKED`，不得给出最终验收结论。
+- **角色实例**：初始实现、每轮 repair、每代 review、最终 verifier 都使用新的 role/session；禁止
+  延续旧子会话。
+- **测试节奏**：开发/repair 跑聚焦测试；最终候选冻结前跑一次 full/package；独立 verifier 再跑
+  一次，不对未变化候选重复跑全量门禁。
+- **架构自检**：候选冻结前运行 `node scripts/check-ai-architecture.mjs --base <baseline>
+  --architecture-review-count <count>`；SNAPSHOT 模式增加 `--manifest <candidate-manifest>`。
 - **断点**：阶段完成、重复失败、外部阻塞或达到上下文预算时启用 `qta-task-checkpoint`。
 - **候选版本**：自检通过后由父协调者创建 `candidate` 提交，记录 tree hash 和 patch SHA-256；
   该版本尚未独立验收，不能标记可部署。
@@ -47,6 +57,7 @@
 - 前端：`npm run typecheck` / `lint` / `test` / `build`。
 - 浏览器：页面渲染 + 控制台无 deprecated/error。
 - 按任务契约分别记录 `STATIC/AUTOMATION/RUNTIME/DEPLOYMENT`，未执行是 `NOT_VERIFIED`，环境缺失是 `BLOCKED`。
+- 同时记录 `FUNCTIONAL/ARCHITECTURE`；二者都通过才可验收。
 - 验收输出 `ACCEPTED/CONDITIONALLY_ACCEPTED/REJECTED/BLOCKED`，不得用笼统“全绿”代替逐 AC 证据。
 - Reviewer 与 verifier 必须绑定同一 contract/candidate/patch hash。候选变化后旧结论自动失效。
 - Verifier 在 disposable worktree 中执行门禁，前后 tracked tree 必须不变。
@@ -87,3 +98,6 @@
 - 由同一个上下文完成实现、修改测试、修复缺陷并给自己最终验收通过。
 - 子代理继续创建子代理，或多个角色重复读取全量背景、重复制定同一份计划。
 - 子角色 stage/commit/push，或父协调者把未验收的 checkpoint push 描述为可部署交付。
+- 复用上一轮 implementer/reviewer/verifier 会话，或让发生 compaction/禁止工具调用的角色 artifact
+  继续参与验收。
+- 用短间隔 `wait_agent`/`write_stdin` 制造状态轮询，或对同一候选重复执行未变化的全量门禁。

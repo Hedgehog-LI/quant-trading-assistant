@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "algorithm": "sha256(sorted JSON entries: path,type,sha256)",
+  "root": ".",
+  "entrySetSha256": "43d7532288546f0b45c5e54c2e41f3e150b7098165871b3b98f9497572c88513",
+  "entries": [
+    {
+      "path": "docs/development/tasks/AI-GOVERNANCE-SMOKE-L0-20260801-TARGET.md",
+      "type": "file",
+      "sha256": "da2239b6286cc09763f046a5aac23db182d482906293cb69121293b6fe1d5b85"
+    }
+  ]
+}

@@ -7,6 +7,8 @@ Lane:
 Lifecycle state:
 Current role:
 Role run ID:
+Role session ID:
+Role instance status: `FRESH | POLICY_VIOLATION | CLOSED`
 Contract version:
 Contract SHA-256:
 Candidate mode:
@@ -20,6 +22,13 @@ Orchestration metadata commit:
 Review generation:
 Repair round:
 Failure fingerprint:
+Repair/failure history:
+Blocking amendment history:
+Context percent:
+Compaction count:
+Wait calls in current role:
+Maximum shell polls for one command:
+Machine control file:
 
 ## Acceptance Status
 
@@ -34,6 +43,13 @@ Failure fingerprint:
 | AUTOMATION | NOT_VERIFIED | | |
 | RUNTIME | NOT_VERIFIED | | |
 | DEPLOYMENT | NOT_VERIFIED | | |
+
+## Quality Verdicts
+
+| Track | Status | Evidence | Blocker |
+|---|---|---|---|
+| FUNCTIONAL | NOT_VERIFIED | | |
+| ARCHITECTURE | NOT_VERIFIED | | |
 
 ## Last Completed Step
 

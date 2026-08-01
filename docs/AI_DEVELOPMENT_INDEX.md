@@ -59,6 +59,7 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 | 开发流程与同步规则 | `DEVELOPMENT_WORKFLOW.md` |
 | AI 渐进式加载 / 轻量交接协议 | `ai/PROGRESSIVE_DISCLOSURE_PROTOCOL.md` |
 | Skill / Agent 职责、触发、权限与维护 | `ai/SKILL_AND_AGENT_GOVERNANCE.md` |
+| 活跃 AI 任务生命周期、角色实例、预算和候选身份 | `development/tasks/<TASK-ID>-CONTROL.json` |
 | 当前接手事实 | `AI_HANDOFF.md`（精简，历史进 DEVELOPMENT_LOG） |
 
 ## 6. Historical 文档（仅参考，不在主流程）

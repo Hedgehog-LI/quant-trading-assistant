@@ -24,7 +24,7 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 - **P1.1 港美股扩展（2026-07-17）**：统一证券标识已扩展为 `SH/SZ/BJ/HK/US`；港股内部固定五位（`HK.02498`），美股统一大写（`US.AAPL`，支持 `US.BRK.B`）。LongPort 双向映射、证券主数据、最新价、历史日 K、板块成员及前端录入已接入。后端 **258 tests** + package、前端 **264 tests** + typecheck/lint/build 通过；仍需在部署环境用真实只读账号分别做港股/美股最小外联验收。分钟 K 和定时采集不在本轮范围。
 - **P1.2 行情工作台 + 行情采集执行引擎（2026-07-17 验收完成）**：V10-V13 migration、工作台、采集计划 CRUD/统一合法性校验、分钟 K 存储/质量/水位、LongPort 原生 1M/5M/15M/30M/60M adapter、`DAILY_BAR_BACKFILL` / `MINUTE_BAR_BACKFILL` / `INTRADAY_MINUTE_REFRESH` 执行链路、A 股交易时段 scheduler、DB claim 与重启恢复均已实现。前端改为结构化计划表单，旧非法计划明确展示纠正状态，执行 pending 防重复，mock 执行明确拒绝而不伪造成功。后端 **270 tests** + package、前端 **267 tests** + typecheck/lint/build 已通过。用户手动 Docker 重建后，curl 再次验证 health、首次成功、幂等复跑、任务明细/收敛、水位、非法配置拒绝、盘中手工执行拒绝、非交易时段跳过及受控失败持久化留痕；真实 `SH.601318 / 5M` 最小外联也已通过。浏览器验收按用户要求跳过，不作为本轮阻塞项。完整交付证据见 `development/MARKET_DATA_EXECUTION_ENGINE_DELIVERY_2026-07-17.md`。
 - **P1.4a 精确证券代码验证（2026-07-17 已完成）**：采集计划支持 A/H/US 市场 + 精确代码，通过 LongPort Static Info + Quote 展示名称、统一代码、交易所、币种、每手股数、当前价和报价时间，用户确认后加入 scope；验证不落库。后端 **276 tests**、前端 **270 tests**、Docker 三市场真实 curl 通过。入口：`docs/features/EXACT_SECURITY_VERIFICATION_DESIGN.md`。
-- **P1.4b 证券目录与模糊检索（待开发）**：本地统一证券目录、名称/拼音/别名搜索和目录同步仍按 D1-D4 规划；复用并增强 `stock_basic`，不建立平行证券主表。入口：`docs/ai/HANDOFF_2026-07-17_security_directory_search.md`。
+- **P1.4b-D1 证券目录与模糊检索后端（2026-07-29 已独立验收）**：V17 扩展既有 `stock_basic` 并新增 `stock_alias`；实现 UTF-8/RFC 4180 CSV 原子幂等导入、本地确定性代码/名称/别名/拼音搜索、证券详情和目录状态，保持 `/stocks` CRUD 兼容且不调用报价/K 线/LongPort 或创建采集任务。冻结候选 `f3ba47597d54abe9a3fe391e7e8c4834fa0c94ae`；后端 **377 tests**、package、50000 securities + 100000 aliases 性能基准均通过（总体 P95 `178.420375ms`）。Docker daemon 不可用，MySQL runtime/curl 为 `NOT_VERIFIED`。D2 前端 selector 和 D3 provider/同步仍未实现。入口：`docs/ai/HANDOFF_2026-07-17_security_directory_search.md`。
 - **P1.5 市场板块发现与数据资产（2026-07-18 已完成）**：Longbridge 行业排行/层级/成分改为官方签名 HTTPS，不依赖 4.3.3 缺失 JNI；CN/HK/US 排行及 CN 层级/成分资金最小真实调用通过。V14 新增行业关注、聚合快照、成分快照，API 和前端已覆盖关注、手动采集、启停、删除、历史与成分查看，可保存关联 ETF/指数代码。后端 **284 tests**，前端 typecheck/lint/test 已通过；Docker/curl/浏览器以验收日志最新条目为准。入口：`docs/features/MARKET_SECTOR_CATALOG_DESIGN.md`。
 - **多轮交付总览**：2026-07-12 至 2026-07-16 的功能、六轮质量收口、最终门禁和未完成边界见 `development/MULTI_ROUND_DELIVERY_2026-07-16.md`。
 - **P1.1 LongPort 单股票手动同步**：后端已实现 `LongPortProperties`、`LongPortMarketDataProvider`、`LongPortQuoteClient`、`ReflectiveLongPortQuoteClient`、Docker/env 透传和单元测试；默认仍安全 disabled。Docker `runtime-libs/` 外部 jar 通道已用 fake SDK jar 实测可加载。**官方 Java SDK artifact 已在 Maven Central 找到并安装（2026-07-12）**：之前查询失败是因为用了官方源码 `java/javasrc/pom.xml` 里错误的 groupId `io.github.longport`（缺 `app` 后缀），正确坐标是 `io.github.longportapp:openapi-sdk:4.3.3`（`<release>=4.3.3`，`versionCount=68`）。`openapi-sdk-4.3.3.jar`（约 35MB）内置全平台 native（linux/osx/windows × 64/arm64），已连同 `gson-2.10.1`、`native-lib-loader-2.4.0` 放入 `runtime-libs/`（gitignored），`inspect-longport-runtime-libs.sh` 对 osx_arm64 与 linux_64 均通过。**真实外联已于 2026-07-12 验证通过**（见下条）。
@@ -47,7 +47,7 @@ P1.2 行情采集执行引擎和 P1.6 板块双层自动采集已完成代码与
 
 1. 按 P1.8 实施 OpenClaw 远程只读助手，使用户可从 QQ 安全查询系统、采集和业务摘要；服务器真实 QQ 与公网阻断单独验收。
 2. 基于已落库的全市场板块排行和关注成分快照，建设相对强弱、轮动持续性、龙头贡献和异动提醒；分析不直接生成交易指令。
-3. P1.4a 精确证券代码验证已完成；后续按 D1-D4 实施 **P1.4b 证券目录与模糊检索**。
+3. P1.4b-D1 后端目录已完成；后续按独立任务实施 D2 共享 `SecuritySelector`，再实施 D3 可审计目录 provider/同步，不把两者混入同一验收。
 4. 港股、美股分钟自动采集必须先补齐各市场交易日历、时区和交易时段，不能直接复用 A 股 scheduler。
 5. 数据资产稳定后再推进指标、策略和回测；信号必须经过风险模块。
 

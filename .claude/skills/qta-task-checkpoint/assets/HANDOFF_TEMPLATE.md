@@ -4,6 +4,10 @@
 
 ## Current Facts
 
+- Machine control file:
+- Last successful control validation:
+- Current role/session closed: YES/NO
+
 ## Changes Made
 
 ## Acceptance Status

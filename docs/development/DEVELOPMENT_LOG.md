@@ -4,6 +4,21 @@
 
 ---
 
+## 2026-07-29 — P1.4b-D1 证券目录与确定性搜索后端
+
+- **目标**：在不建立平行证券主表、不触发外部行情的前提下，交付可审计的本地证券目录、CSV 幂等导入、确定性搜索和证券详情基础。
+- **治理**：任务 `SECURITY-DIRECTORY-D1-20260729` 使用 `LONG_HIGH_RISK` lane；契约 SHA-256 为 `0c16a3510ca7e8c34354c42ce78babcd1ffff3f4ffbf83d91debd74a7db6b500`。测试设计者先挑战契约，实施者只给出 `SELF_CHECKED`；两轮修复后，代码审查 generation 3 为 `REVIEW_CLEAR`，最终核验者在独立临时 worktree 对冻结候选 `f3ba47597d54abe9a3fe391e7e8c4834fa0c94ae` 验收。
+- **数据库**：新增 V17，仅扩展既有 `stock_basic` 的多语言名称、拼音、交易所、币种、类型、上市状态和来源字段；新增 `stock_alias`、二进制规范化唯一键、外键级联和检索索引。V1-V16 未修改，旧数据与 `/stocks` CRUD 保持兼容。
+- **后端**：沿用 `marketdata` 分层、MyBatis Mapper/XML 和 MapStruct。CSV 导入支持严格 UTF-8/BOM、RFC 4180、50 MiB/200000 行门禁、整批预校验和事务回滚、canonical symbol/alias 幂等、改名留 `FORMER_NAME`；错误返回受限的行号、字段、稳定原因码和脱敏消息。
+- **API**：新增 `POST /api/v1/market-data/security-directory/import`、`GET /api/v1/market-data/securities/search`、`GET /api/v1/market-data/securities/{canonicalSymbol}`。检索支持代码、正式名称、别名和拼音，按冻结分档与显式 tie-break 稳定排序，默认隐藏退市证券并返回目录新鲜度元数据。
+- **安全与边界**：生产依赖和测试快照证明导入/搜索不调用 provider、报价、K 线或 LongPort，不创建采集任务，也不改动价格事实。未接交易、账户、订单或自动下单。
+- **验证**：独立 focused 65 tests、全量 `377 tests / 0 failures / 0 errors`、`./mvnw package` 通过；固定数据集 50000 securities + 100000 aliases、400 warmups + 1600 measured 的总体 P95 为 `178.420375ms`，最慢类别 P95 `186.131542ms`，均低于 300ms。
+- **未验证**：本机 Docker socket 不存在，未执行 MySQL 8.4 migration、应用 curl 或部署验证；`RUNTIME/DEPLOYMENT=NOT_VERIFIED`，H2 结果未冒充 MySQL/部署证据。
+- **剩余边界**：D2 前端 `SecuritySelector`、mock/remote adapter 与首批页面接入未开始；D3 外部目录 provider、Longbridge 元数据补全、同步任务/状态 API 未开始。本轮到 D1 停止。
+- **关联**：`tasks/SECURITY-DIRECTORY-D1-20260729-CONTRACT.md`、`tasks/SECURITY-DIRECTORY-D1-20260729-VERIFICATION.md`、`../api/MARKET_DATA_API.md`、`../features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`。
+
+---
+
 ## 2026-07-29 — 项目级 Skill 与固定 Agent 生命周期治理
 
 - **目标**：解决 Skill 不触发/误触发、专家团重复规划和递归分派、实现者自测自验、完成标准漂移、上下文耗尽后才压缩、交接与项目状态混写等长期问题。

@@ -12,6 +12,9 @@ Verified candidate entry-set SHA-256:
 | Item | Result | Evidence |
 |---|---|---|
 | Independent verdict permits delivery | | |
+| Task control machine validation passes | | |
+| Functional and architecture verdicts both pass | | |
+| Verifier role/session differs from implementer and reviewer | | |
 | Verified contract and mode-specific candidate identity are unchanged | | |
 | Product behavior document is current when affected | | |
 | API document matches implemented routes and examples when affected | | |

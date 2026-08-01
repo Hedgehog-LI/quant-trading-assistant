@@ -87,7 +87,17 @@ Default lifecycle thresholds:
 - At 25% context use, freeze discoveries into the task contract or state file.
 - At 40%, checkpoint before opening a new workstream.
 - At 60%, stop implementation and continue from a clean context.
+- At the first automatic compaction, checkpoint immediately and terminate the role instance.
+- Never reuse an implementer for repair or a reviewer for another candidate generation.
 - Never deliberately fill a 100% context window and rely on emergency compaction.
+
+Control-loop limits:
+
+- Wait for an Agent once with a long timeout; at most one follow-up wait is allowed for that role run.
+- Give a long shell command an initial 30-second yield, then poll at most three times with increasing waits.
+- Do not wake the model to report unchanged status.
+- Do not rerun the same command against the same candidate/evidence hash.
+- When usage telemetry is available, pause at the lane budget or 5% of the weekly allowance.
 
 Avoid prompts like:
 
@@ -120,6 +130,11 @@ Use one lifecycle stage at a time:
 
 Fixed ZCode roles live in `.zcode/agents/`. The implementer cannot accept its own work; the reviewer cannot
 edit it; the final verifier can run gates but cannot repair code. No role may create nested subagents.
+
+Treat fixed roles as templates. Every lifecycle invocation is a fresh, disposable role instance. Pass the
+TaskPacket and machine control file, never the previous role conversation. ZCode allowlists are machine
+enforcement only when the fixed template is actually active; other runtimes must use disposable snapshots and
+before/after hashes and label the permission boundary `ADVISORY`.
 
 See `docs/ai/SKILL_AND_AGENT_GOVERNANCE.md` for the durable boundary and maintenance rules.
 

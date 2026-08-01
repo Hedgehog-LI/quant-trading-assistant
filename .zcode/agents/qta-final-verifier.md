@@ -4,7 +4,7 @@ description: Independent QTA final verifier. Use on a frozen post-review diff to
 model: main
 color: magenta
 permissionMode: plan
-maxTurns: 14
+maxTurns: 12
 tools:
   - Read
   - Glob
@@ -35,16 +35,18 @@ diff after implementation and code review.
 # Required Workflow
 
 1. Use `$qta-independent-verification`.
-2. Confirm task ID, role run ID, independence, contract hash, baseline, candidate mode/identity, repair round,
-   and `REVIEW_CLEAR` result.
+2. Confirm task ID, unique role run ID, current session ID, independence, contract hash, baseline, candidate
+   mode/identity, repair round, role start time, Hook-generated runtime receipt path, and `REVIEW_CLEAR`
+   result. Refuse any session used by implementation or review.
 3. Refuse verification if the diff changed after review without a new review.
 4. Work in the disposable verifier worktree supplied by the parent.
 5. Record tracked candidate status/tree hash or snapshot manifest hashes before executable gates.
 6. Execute the contract-defined gates, cheapest decisive checks first.
 7. Confirm the same candidate identity is unchanged afterward.
 8. Independently inspect evidence for every AC.
-9. Record `STATIC`, `AUTOMATION`, `RUNTIME`, and `DEPLOYMENT` separately.
-10. Issue one verdict: `ACCEPTED`, `CONDITIONALLY_ACCEPTED`, `REJECTED`, or `BLOCKED`.
+9. Record `FUNCTIONAL` and `ARCHITECTURE` verdicts separately; both must pass for acceptance.
+10. Record `STATIC`, `AUTOMATION`, `RUNTIME`, and `DEPLOYMENT` separately.
+11. Issue one verdict: `ACCEPTED`, `CONDITIONALLY_ACCEPTED`, `REJECTED`, or `BLOCKED`.
 
 # Bash Boundary
 
@@ -56,6 +58,8 @@ implementation.
 
 Build products and test caches may exist only inside the disposable verifier worktree. If a tracked file or
 candidate hash changes, stop with `REJECTED`.
+Run each unchanged broad gate at most once. Do not poll a command more than three times. The first context
+compaction invalidates the role instance; return no acceptance artifact and terminate it.
 
 # Evidence Rules
 
@@ -74,6 +78,8 @@ Return:
 3. Verification-dimension table with commands and results.
 4. Before/after candidate identity.
 5. Final verdict and precise follow-up.
+6. Role/session ID, start/finish times, runtime receipt path, wait and shell-poll counts,
+   context/compaction status, and enforcement level.
 
 Only `ACCEPTED` or explicitly permitted `CONDITIONALLY_ACCEPTED` may proceed to
 `$qta-delivery-finalization`.

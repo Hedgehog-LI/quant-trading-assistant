@@ -14,6 +14,90 @@
 | PUT | `/api/v1/market-data/stocks/{id}` | 已实现 | 更新名称、上市日期、退市状态 |
 | DELETE | `/api/v1/market-data/stocks/{canonicalSymbol}` | 已实现 | 无日 K 关联时删除证券 |
 
+### 本地证券目录与确定性搜索（P1.4b-D1）
+
+| 方法 | 路径 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/market-data/security-directory/import` | 已实现 | multipart CSV 原子、幂等导入证券及别名 |
+| GET | `/api/v1/market-data/securities/search?q=&markets=&types=&includeDelisted=&limit=` | 已实现 | 仅查询本地目录，按冻结规则确定性排序 |
+| GET | `/api/v1/market-data/securities/{canonicalSymbol}` | 已实现 | 查询本地证券详情及别名 |
+
+搜索参数：
+
+- `q` 必填；支持 canonical symbol、裸代码、正式名称、曾用名/其他别名、拼音全拼及首字母。
+- `markets`、`types` 可选，逗号分隔；市场为 `SH/SZ/BJ/HK/US`，证券类型为 `STOCK/ETF/INDEX/REIT/FUND/BOND/WARRANT/OPTION/FUTURE/OTHER`。
+- `includeDelisted` 默认 `false`；退市证券仅在显式传 `true` 时参与检索。
+- `limit` 默认 `20`，最大 `100`。
+
+排序分档固定为：canonical symbol 精确命中 → 裸代码精确命中 → 正式名称精确命中 → 正式名称前缀 → 别名精确/前缀 → 拼音全拼/首字母前缀 → 名称/别名包含；同分再按正常上市优先、请求中的市场顺序、规范化显示名、`canonicalSymbol` 排序，不依赖数据库偶然顺序。`matchedBy` 为 `CANONICAL_SYMBOL_EXACT/RAW_SYMBOL_EXACT/FORMAL_NAME_EXACT/FORMAL_NAME_PREFIX/ALIAS_EXACT/ALIAS_PREFIX/PINYIN_FULL_PREFIX/PINYIN_ABBR_PREFIX/NAME_CONTAINS/ALIAS_CONTAINS`。
+
+搜索响应示例：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "data": {
+    "items": [
+      {
+        "canonicalSymbol": "SH.603308",
+        "symbol": "603308",
+        "displayName": "应流股份",
+        "name": "应流股份",
+        "nameCn": "应流股份",
+        "nameHk": null,
+        "nameEn": null,
+        "shortName": "应流股份",
+        "market": "SH",
+        "exchange": "SSE",
+        "currency": "CNY",
+        "securityType": "STOCK",
+        "listStatus": "LISTED",
+        "matchedBy": "PINYIN_ABBR_PREFIX"
+      }
+    ],
+    "catalogStatus": "READY",
+    "catalogUpdatedAt": "2026-07-29T10:00:00",
+    "stale": false,
+    "degraded": false
+  },
+  "timestamp": "2026-07-29T10:00:01"
+}
+```
+
+详情响应除搜索项字段外，还包含 `pinyinFull/pinyinAbbr/listDate/delisted/dataSource/sourceUpdatedAt/sourceHash/aliases`。未找到时返回 HTTP 404。
+
+CSV 必填表头：
+
+```csv
+canonical_symbol,name,market,exchange,currency,security_type,list_status,data_source,source_updated_at
+```
+
+可选表头为 `name_cn,name_hk,name_en,short_name,pinyin_full,pinyin_abbr,list_date,source_hash,aliases`。`aliases` 用 `|` 分隔，每项格式为 `ALIAS_TYPE:LANGUAGE:VALUE`；允许的 alias type 为 `FORMER_NAME/OLD_TICKER/SHORT_NAME/ENGLISH/TRADITIONAL/USER`。导入支持 UTF-8 BOM 和 RFC 4180 引号，限制 50 MiB、200000 行；任一非法行会以可解释的 `line/field/reasonCode/message` 拒绝整批，避免部分落库。
+
+导入响应示例：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "data": {
+    "totalRows": 3,
+    "inserted": 3,
+    "updated": 0,
+    "unchanged": 0,
+    "aliasesInserted": 2,
+    "aliasesUnchanged": 0,
+    "formerNamesAdded": 0,
+    "failed": 0,
+    "errors": []
+  },
+  "timestamp": "2026-07-29T10:00:01"
+}
+```
+
+同一 CSV 重复导入不会重复证券或别名；正式名称发生变化时，旧正式名称会写入 `FORMER_NAME` alias。导入与搜索都只访问本地 `stock_basic/stock_alias`，不会调用报价、K 线、LongPort，也不会创建采集任务。目录为空时返回 `catalogStatus=EMPTY`；非空目录以最大 `sourceUpdatedAt` 表示更新时间，超过 48 小时才标记 `stale=true`。D3 可替换这一临时新鲜度口径。
+
 ### 精确证券代码验证
 
 | 方法 | 路径 | 状态 | 说明 |

@@ -42,7 +42,7 @@ context growth.
 - Backend: module source, API document, database migration, and backend conventions.
 - Frontend: feature source, API client contract, route, and frontend conventions.
 - OpenClaw: `docs/features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`, its linked API document, and module source.
-- Review/acceptance: task contract, diff, test evidence, and acceptance log.
+- Review/acceptance: task contract, `<TASK-ID>-CONTROL.json`, frozen diff, test evidence, and acceptance log.
 
 ### Level 3: Read Only When Referenced
 
@@ -80,6 +80,7 @@ Before substantial work, state:
 - Documents that may be read only if needed
 - Explicitly prohibited reading scope
 - Current baseline and dirty-worktree risks
+- Active task control validation result when resuming a governed task
 - Skill(s) to invoke next
 - Planned edits and verification
 - Checkpoint/handoff target
@@ -91,6 +92,7 @@ Keep this digest concise. Do not paste entire documents into the conversation.
 Stop and report a conflict when:
 
 - Two active documents disagree on current facts.
+- An active machine control file is invalid or contradicts the prose task state.
 - The requested scope cannot be isolated from unrelated dirty changes.
 - A required repository or task contract is missing.
 

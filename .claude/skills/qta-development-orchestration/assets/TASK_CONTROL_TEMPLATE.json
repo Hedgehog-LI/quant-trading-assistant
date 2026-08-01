@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 2,
+  "taskId": "<TASK-ID>",
+  "controlPath": "docs/development/tasks/<TASK-ID>-CONTROL.json",
+  "startedAt": "<ISO-8601>",
+  "lane": "L0",
+  "lifecycleState": "CONTRACT_DRAFTED",
+  "contract": {
+    "path": "<CONTRACT-PATH>",
+    "version": "1",
+    "sha256": "<SHA-256>",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["STATIC"]}
+    ],
+    "blockingAmendments": []
+  },
+  "git": {
+    "automation": "NONE",
+    "branch": "<TASK-BRANCH>",
+    "baselineCommit": "<BASELINE-COMMIT>",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "<ISO-8601>",
+      "actor": "<PARENT-RUN-ID>"
+    }
+  ],
+  "candidate": {
+    "mode": "SNAPSHOT",
+    "generation": 1,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "",
+    "diffArtifactSha256": ""
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [],
+  "review": {
+    "omitted": true,
+    "omissionReason": "L0 contract-lite permits direct clean verification",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_REQUIRED",
+    "architectureVerdict": "NOT_REQUIRED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "findingIds": []
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": false, "status": "NOT_REQUIRED"},
+      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}

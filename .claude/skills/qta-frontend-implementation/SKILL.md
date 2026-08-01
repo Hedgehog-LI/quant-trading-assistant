@@ -56,10 +56,14 @@ dedicated adapter, not scattered across components.
 1. Implement the smallest complete user path.
 2. Add focused component, hook, or adapter tests.
 3. Run typecheck and lint.
-4. Run targeted tests, then build.
+4. Run targeted tests while editing, then run the full test/build gate once when the candidate is ready to
+   freeze.
 5. Inspect routes and API URLs against the backend contract.
 6. Use browser/runtime verification only when the task contract requires it.
-7. Use `$qta-task-checkpoint` before context or scope becomes large.
+7. Run `node scripts/check-ai-architecture.mjs --base <baseline> --architecture-review-count 0` for changed TypeScript/TSX files and
+   disposition triggered complexity warnings.
+8. At 40% context, checkpoint before another workstream. At 60% or the first compaction, use
+   `$qta-task-checkpoint` and end this role instance.
 
 Self-tests are implementation evidence, not independent acceptance.
 
