@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.dao.SecurityDirectorySyncStateMapper">
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.SecurityDirectorySyncStateDO">
+        <id column="id" property="id"/>
+        <result column="provider" property="provider"/>
+        <result column="last_snapshot_id" property="lastSnapshotId"/>
+        <result column="last_snapshot_hash" property="lastSnapshotHash"/>
+        <result column="last_mode" property="lastMode"/>
+        <result column="last_success_at" property="lastSuccessAt"/>
+        <result column="last_inserted_count" property="lastInsertedCount"/>
+        <result column="last_updated_count" property="lastUpdatedCount"/>
+        <result column="last_unchanged_count" property="lastUnchangedCount"/>
+        <result column="last_error_code" property="lastErrorCode"/>
+        <result column="last_error_summary" property="lastErrorSummary"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="Cols">id,provider,last_snapshot_id,last_snapshot_hash,last_mode,last_success_at,last_inserted_count,last_updated_count,last_unchanged_count,last_error_code,last_error_summary,created_at,updated_at</sql>
+
+    <insert id="upsertByProvider" parameterType="com.quant.trade.marketdata.model.SecurityDirectorySyncStateDO">
+        INSERT INTO security_directory_sync_state(
+            provider, last_snapshot_id, last_snapshot_hash, last_mode, last_success_at,
+            last_inserted_count, last_updated_count, last_unchanged_count,
+            last_error_code, last_error_summary)
+        VALUES(
+            #{provider}, #{lastSnapshotId}, #{lastSnapshotHash}, #{lastMode}, #{lastSuccessAt},
+            #{lastInsertedCount}, #{lastUpdatedCount}, #{lastUnchangedCount},
+            #{lastErrorCode}, #{lastErrorSummary})
+        ON DUPLICATE KEY UPDATE
+            last_snapshot_id = VALUES(last_snapshot_id),
+            last_snapshot_hash = VALUES(last_snapshot_hash),
+            last_mode = VALUES(last_mode),
+            last_success_at = VALUES(last_success_at),
+            last_inserted_count = VALUES(last_inserted_count),
+            last_updated_count = VALUES(last_updated_count),
+            last_unchanged_count = VALUES(last_unchanged_count),
+            last_error_code = VALUES(last_error_code),
+            last_error_summary = VALUES(last_error_summary)
+    </insert>
+
+    <select id="selectByProvider" resultMap="BaseResultMap">
+        SELECT <include refid="Cols"/> FROM security_directory_sync_state WHERE provider = #{provider}
+    </select>
+</mapper>

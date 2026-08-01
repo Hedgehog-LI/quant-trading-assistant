@@ -5,12 +5,18 @@ import com.quant.trade.marketdata.provider.LongPortSymbolMapper;
 import com.quant.trade.marketdata.provider.MarketDataProvider;
 import com.quant.trade.marketdata.provider.LongPortMarketSectorProvider;
 import com.quant.trade.marketdata.provider.MarketSectorProvider;
+import com.quant.trade.marketdata.provider.SecurityDirectoryProvider;
+import com.quant.trade.marketdata.provider.DisabledSecurityDirectoryProvider;
+import com.quant.trade.marketdata.provider.csv.CsvSnapshotSecurityDirectoryProvider;
+import com.quant.trade.marketdata.provider.csv.SecurityDirectoryCsvParser;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient;
 import com.quant.trade.marketdata.provider.longport.LongPortIndustryHttpClient;
 import com.quant.trade.marketdata.provider.longport.LongPortSectorClient;
 import com.quant.trade.marketdata.provider.longport.ReflectiveLongPortQuoteClient;
+import com.quant.trade.marketdata.service.SecurityDirectorySyncService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.MultipartConfigElement;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.MultipartConfigFactory;
@@ -21,10 +27,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.unit.DataSize;
 
+import java.nio.file.Path;
+
 /** 行情数据模块配置。 */
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(LongPortProperties.class)
+@EnableConfigurationProperties({LongPortProperties.class, SecurityDirectoryProperties.class})
 public class MarketDataConfig {
 
     /** 目录导入允许 50 MiB；业务服务仍负责精确文件上限和稳定错误码。 */
@@ -80,5 +88,48 @@ public class MarketDataConfig {
     public MarketSectorProvider longPortMarketSectorProvider(LongPortProperties properties,
                                                               LongPortSectorClient sectorClient) {
         return new LongPortMarketSectorProvider(properties, sectorClient);
+    }
+
+    /** 证券目录 CSV 解析器（D3 路径 P2，复用 D1 冻结口径）。 */
+    @Bean
+    public SecurityDirectoryCsvParser securityDirectoryCsvParser() {
+        return new SecurityDirectoryCsvParser();
+    }
+
+    /** 证券目录同步 provider：enabled 时装配 CSV 快照 provider，否则 disabled 兜底。 */
+    @Bean
+    @ConditionalOnProperty(prefix = "qta.market-data.security-directory", name = "enabled",
+            havingValue = "true")
+    public SecurityDirectoryProvider csvSecurityDirectoryProvider(SecurityDirectoryProperties properties,
+                                                                  SecurityDirectoryCsvParser csvParser) {
+        Path path = properties.getSnapshotPath() == null || properties.getSnapshotPath().isBlank()
+                ? null : Path.of(properties.getSnapshotPath());
+        return new CsvSnapshotSecurityDirectoryProvider(true, properties.getProviderCode(), path, csvParser);
+    }
+
+    /** provider disabled 时的兜底 bean，保证应用可启动且 D1 本地搜索可用。 */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(SecurityDirectoryProvider.class)
+    public SecurityDirectoryProvider disabledSecurityDirectoryProvider() {
+        return new DisabledSecurityDirectoryProvider();
+    }
+
+    /** 证券目录同步服务。注入当前 provider（CSV 或 disabled）与行数波动阈值。 */
+    @Bean
+    public SecurityDirectorySyncService securityDirectorySyncService(
+            SecurityDirectoryProvider provider,
+            com.quant.trade.marketdata.dao.SecurityDirectorySyncStateMapper syncStateMapper,
+            com.quant.trade.marketdata.dao.MarketDataSyncTaskMapper taskMapper,
+            com.quant.trade.marketdata.dao.SyncScopeLockMapper syncScopeLockMapper,
+            com.quant.trade.marketdata.dao.StockBasicMapper stockBasicMapper,
+            com.quant.trade.marketdata.dao.StockAliasMapper stockAliasMapper,
+            ObjectMapper objectMapper,
+            java.time.Clock marketDataClock,
+            @Autowired @org.springframework.beans.factory.annotation.Qualifier("txRequiresNew")
+                    TransactionTemplate txRequiresNew,
+            SecurityDirectoryProperties properties) {
+        return new SecurityDirectorySyncService(provider, syncStateMapper, taskMapper, syncScopeLockMapper,
+                stockBasicMapper, stockAliasMapper, objectMapper, marketDataClock, txRequiresNew,
+                properties.getRowCountSwingThreshold());
     }
 }
