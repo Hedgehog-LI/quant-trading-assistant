@@ -8,7 +8,8 @@
 - Verified candidate commit: `f3ba47597d54abe9a3fe391e7e8c4834fa0c94ae`
 - Verified candidate tree: `cd69250db8808986f8685b91b5d11ea673f6b9bf`
 - Verified patch SHA-256: `3eb9086274ca6a25b1ba2c2f3e45307ea7c66bdaa18544d452184f56af900f9e`
-- Finalization status: `PREPARED_PENDING_COMMIT`
+- Finalization status: `FINALIZED`
+- Finalization commit: `3a88ee3`
 
 ## Synchronized Records
 
@@ -44,11 +45,10 @@
 - D2 frontend `SecuritySelector`, adapters and page integration remain out of scope.
 - D3 external directory provider, Longbridge metadata enrichment, scheduler, sync/status APIs and real external
   connectivity remain out of scope.
-- All verified D1 records are prepared. The lifecycle remains at `VERIFIED` until the parent can create the
-  authorized local finalization commit; D2/D3 must not start meanwhile.
+- All verified D1 records were committed by the parent in `3a88ee3`; the lifecycle is `FINALIZED`.
+- D2 and D3 remain separate future tasks and must freeze their own contracts and candidate identities.
 
-## Commit Blocker
+## Commit Record
 
-The parent attempted to stage the explicit finalization file list, but the environment's Git-write approval
-layer rejected the operation because its usage allowance was exhausted. No alternate or indirect `.git` write
-was attempted. The working tree therefore contains the prepared documentation as unstaged changes.
+The parent created local finalization commit `3a88ee3` after governance gates, Maven tests/package, sensitive
+value scanning and staged diff checks passed. No push or deployment was performed.

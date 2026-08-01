@@ -1,7 +1,7 @@
 # Task State: SECURITY-DIRECTORY-D1-20260729
 
-- Updated at: `2026-07-29T18:25:39Z`
-- State: `VERIFIED`
+- Updated at: `2026-08-01T16:47:16Z`
+- State: `FINALIZED`
 - Lane: `LONG_HIGH_RISK`
 - Parent run: `/root`
 - Baseline commit: `8c7d131da052cc9fc39f6d9b6e3158d4cc33f640`
@@ -30,7 +30,8 @@
 - Repair-2 implementer run/result: `IMP-20260729-R2 / SELF_CHECKED`
 - Verifier worktree: `/private/tmp/qta-security-directory-verify.JZXtbE`
 - Verifier run/verdict: `FV-20260729-01 / CONDITIONALLY_ACCEPTED`
-- Finalization record: `docs/development/tasks/SECURITY-DIRECTORY-D1-20260729-FINALIZATION.md` (`PREPARED_PENDING_COMMIT`)
+- Finalization record: `docs/development/tasks/SECURITY-DIRECTORY-D1-20260729-FINALIZATION.md` (`FINALIZED`)
+- Finalization commit: `3a88ee3`
 - Runtime: `NOT_VERIFIED` (Docker socket absent; H2 evidence not promoted)
 - Deployment: `NOT_VERIFIED` (remote deployment is outside D1 and not authorized)
 - Push: prohibited
@@ -62,8 +63,9 @@
     unchanged candidate; runtime/deployment remain not verified.
 16. `FINALIZATION_PREPARED`: verifier-permitted project API/DB/architecture/product/status/log/handoff
     documents were synchronized from frozen evidence only; production code remained identical to the verified
-    candidate. The parent finalization commit is pending because the local Git-write approval layer exhausted
-    its usage allowance.
+    candidate.
+17. `FINALIZED`: the parent created local finalization commit `3a88ee3` after all repository gates passed;
+    no push or deployment was performed.
 
 ## Acceptance Status
 
