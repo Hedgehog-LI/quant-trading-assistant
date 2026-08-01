@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 2,
+  "taskId": "SECURITY-DIRECTORY-D3-20260802",
+  "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTROL.json",
+  "startedAt": "2026-08-02T00:30:00Z",
+  "lane": "L2",
+  "lifecycleState": "CONTRACT_FROZEN",
+  "contract": {
+    "path": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTRACT.md",
+    "version": "1.0",
+    "sha256": "afc854bd205b3c152cc96c25546eac978dd882229edf3136c3987b3748b9e95a",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-02", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-03", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-04", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-05", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-06", "requiredEvidence": ["STATIC"]}
+    ],
+    "blockingAmendments": []
+  },
+  "git": {
+    "automation": "COMMIT",
+    "branch": "codex/security-directory-d3-20260802",
+    "baselineCommit": "8e4447ed86aa2cf53c0c52388a1b2d592ceb70e0",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-02T00:30:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "TEST_DESIGN_READY",
+      "at": "2026-08-02T00:55:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 3,
+      "from": "TEST_DESIGN_READY",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-02T01:05:00Z",
+      "actor": "codex-parent-d3-1"
+    }
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "",
+    "diffArtifactSha256": ""
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [
+    {
+      "roleRunId": "TD-20260802-01",
+      "sessionId": "codex-agent-119c9803-a650-4699-8266-91e37feb4d18",
+      "startedAt": "2026-08-02T00:40:00Z",
+      "finishedAt": "2026-08-02T00:55:00Z",
+      "runtimeReceiptPath": "",
+      "role": "TEST_DESIGNER",
+      "generation": 0,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only test-designer; no edits, no Git, no shell commands, no sub-agents; parent persists the returned artifact",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-TEST-DESIGN.md",
+      "artifactSha256": "a622f72ff4b2cda6813e5bf6de3b4a4282c251daa0a116733fe6ea06bf61e567"
+    }
+  ],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_REQUIRED",
+    "architectureVerdict": "NOT_REQUIRED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "findingIds": []
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
+      "RUNTIME": {"required": false, "status": "NOT_VERIFIED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_VERIFIED"}
+    }
+  },
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
