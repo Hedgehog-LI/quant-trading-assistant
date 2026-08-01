@@ -25,7 +25,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
@@ -137,9 +136,10 @@ public class SecurityDirectorySyncService {
             taskMapper.updateById(running);
         });
 
-        // 4. 执行五阶段（不包外层事务，发布内部单事务）。
+        // 4. 执行五阶段。发布在独立新事务内（txRequiresNew），任一阶段或发布失败整批回滚，
+        //    保留上一成功目录；不能依赖 self-invocation 的 @Transactional（Spring 代理不拦截自调用）。
         try {
-            PublishResult result = publish(snapshot, identity);
+            PublishResult result = txRequiresNew.execute(status -> publish(snapshot, identity));
             txRequiresNew.executeWithoutResult(status -> {
                 MarketDataSyncTaskDO done = new MarketDataSyncTaskDO();
                 done.setId(taskId);
@@ -169,8 +169,7 @@ public class SecurityDirectorySyncService {
         return toTaskVO(taskMapper.selectById(taskId));
     }
 
-    /** 五阶段发布：校验 → staging/diff → 质量门禁 → 原子发布（单事务）。 */
-    @Transactional
+    /** 五阶段发布：校验 → staging/diff → 质量门禁 → 原子发布（由 runSync 经 txRequiresNew 包裹单事务）。 */
     PublishResult publish(DirectorySnapshot snapshot, DirectorySnapshotIdentity identity) {
         List<StockBasicDO> candidates = snapshot.stocks();
         Map<String, List<StockAliasDO>> aliasesBySymbol = aliasesBySymbol(snapshot.rows());
@@ -179,8 +178,9 @@ public class SecurityDirectorySyncService {
             throw gateFailure(ErrorCodeEnum.MARKET_DATA_EMPTY_RESULT,
                     SecurityDirectoryConstants.GATE_EMPTY_SNAPSHOT, null);
         }
-        // 质量门禁：必填字段（D1 REQUIRED）。
-        validateCandidateUniqueness(candidates);
+        // 质量门禁：必填字段（D1 REQUIRED）+ 候选集内 alias identity 唯一性。
+        validateRequiredFields(candidates);
+        validateAliasUniqueness(aliasesBySymbol);
         // staging/diff：按 canonical_symbol 预加载现有目录，计算 inserted/updated/unchanged。
         Map<String, StockBasicDO> existingStocks = preloadStocks(candidates);
         Map<Long, Map<String, StockAliasDO>> existingAliases = preloadAliases(existingStocks.values());
@@ -288,8 +288,7 @@ public class SecurityDirectorySyncService {
         aliases.put(key, alias);
     }
 
-    private void validateCandidateUniqueness(List<StockBasicDO> candidates) {
-        // canonical_symbol 不重复（已由 parser 的 uniqueRows 保证；此处仅二次防御）。
+    private void validateRequiredFields(List<StockBasicDO> candidates) {
         // 必填字段检查（D1 REQUIRED）。
         for (StockBasicDO stock : candidates) {
             if (isBlank(stock.getCanonicalSymbol()) || isBlank(stock.getName())
@@ -302,6 +301,28 @@ public class SecurityDirectorySyncService {
                         "{\"gate\":\"" + SecurityDirectoryConstants.GATE_REQUIRED_FIELD
                                 + "\",\"sample\":\"" + sanitize(stock.getCanonicalSymbol()) + "\"}");
             }
+        }
+    }
+
+    private void validateAliasUniqueness(Map<String, List<StockAliasDO>> aliasesBySymbol) {
+        // 候选集内 alias identity 不重复：同一 (aliasType, normalizedAlias) 不得归属多只证券。
+        Map<String, List<String>> owners = new LinkedHashMap<>();
+        aliasesBySymbol.forEach((symbol, aliases) -> {
+            for (StockAliasDO alias : aliases) {
+                String key = alias.getAliasType() + "|" + alias.getNormalizedAlias();
+                owners.computeIfAbsent(key, ignored -> new ArrayList<>()).add(symbol);
+            }
+        });
+        List<String> conflicts = owners.entrySet().stream()
+                .filter(entry -> entry.getValue().size() > 1)
+                .map(entry -> entry.getKey() + "@[" + String.join(",", entry.getValue()) + "]")
+                .limit(10)
+                .toList();
+        if (!conflicts.isEmpty()) {
+            throw gateFailure(ErrorCodeEnum.DAILY_BAR_VALIDATION_ERROR,
+                    SecurityDirectoryConstants.GATE_UNIQUENESS,
+                    "{\"gate\":\"" + SecurityDirectoryConstants.GATE_UNIQUENESS
+                            + "\",\"conflicts\":" + objectMapper.valueToTree(conflicts).toString() + "}");
         }
     }
 

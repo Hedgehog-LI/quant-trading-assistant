@@ -44,6 +44,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -245,6 +246,63 @@ class SecurityDirectorySyncIntegrationTest {
         assertEquals(beforeCount, stockBasicMapper.countAll());
         StockBasicDO preserved = stockBasicMapper.selectByCanonicalSymbol("SH.603308");
         assertEquals("应流股份", preserved.getName(), "失败不应修改名称");
+    }
+
+    @Test
+    void multiInsertLateFailureRollsBackAllWritesAndPreservesListStatus() {
+        // 预置一个 DELISTED 与一个 UNKNOWN 行，验证失败后 list_status 字节不变。
+        jdbcTemplate.update("INSERT INTO stock_basic(canonical_symbol,symbol,name,market,exchange,currency,"
+                + "security_type,list_status,data_source,source_updated_at,delisted) "
+                + "VALUES('SH.600000','600000','存量','SH','SSE','CNY','STOCK','DELISTED','SNAPSHOT',"
+                + "'2026-07-01 00:00:00',true)");
+        jdbcTemplate.update("INSERT INTO stock_basic(canonical_symbol,symbol,name,market,exchange,currency,"
+                + "security_type,list_status,data_source,source_updated_at,delisted) "
+                + "VALUES('HK.00001','00001','other','HK','HKEX','HKD','STOCK','UNKNOWN','SNAPSHOT',"
+                + "'2026-07-01 00:00:00',false)");
+        long beforeCount = stockBasicMapper.countAll();
+        long beforeAliasCount = stockAliasMapper.countAll();
+
+        // 快照含 3 条全新证券；在最后一条 insertDirectory 时强制失败 → 必须整批回滚。
+        String rows = """
+                SH.600001,新股A,SH,SSE,CNY,STOCK,LISTED,SNAPSHOT,2026-08-01T10:00:00Z,
+                SH.600002,新股B,SH,SSE,CNY,STOCK,LISTED,SNAPSHOT,2026-08-01T10:00:00Z,
+                SH.600003,新股C,SH,SSE,CNY,STOCK,LISTED,SNAPSHOT,2026-08-01T10:00:00Z,
+                """;
+        Path snapshot = writeSnapshot("late_fail", rows);
+        // 仅对第三条 insertDirectory 抛错：用状态计数实现“晚期失败”。
+        doThrow(new RuntimeException("forced late failure"))
+                .when(stockBasicMapperSpy).insertDirectory(org.mockito.ArgumentMatchers.argThat(
+                        (StockBasicDO s) -> "SH.600003".equals(s.getCanonicalSymbol())));
+        assertThrows(BusinessException.class,
+                () -> syncServiceWithSnapshot(snapshot).trigger("FULL"));
+
+        // 整批回滚：失败前后的 stock_basic / stock_alias 行数与内容字节等价。
+        assertEquals(beforeCount, stockBasicMapper.countAll(),
+                "晚期失败后 stock_basic 行数应与失败前等价（整批回滚）");
+        assertEquals(beforeAliasCount, stockAliasMapper.countAll(),
+                "晚期失败后 stock_alias 行数应与失败前等价（整批回滚）");
+        assertNull(stockBasicMapper.selectByCanonicalSymbol("SH.600001"),
+                "已回滚的插入不得残留");
+        assertNull(stockBasicMapper.selectByCanonicalSymbol("SH.600002"),
+                "已回滚的插入不得残留");
+        // list_status 字节不变。
+        StockBasicDO delisted = stockBasicMapper.selectByCanonicalSymbol("SH.600000");
+        StockBasicDO unknown = stockBasicMapper.selectByCanonicalSymbol("HK.00001");
+        assertEquals("DELISTED", delisted.getListStatus(), "失败不得修改 list_status");
+        assertEquals("UNKNOWN", unknown.getListStatus(), "失败不得修改 list_status");
+    }
+
+    @Test
+    void aliasUniquenessGateRejectsCrossStockAliasIdentity() {
+        // 两只不同证券声明同一 alias identity (aliasType=SHORT_NAME, value=重复) → UNIQUENESS 拒绝。
+        String rows = """
+                SH.600001,新股A,SH,SSE,CNY,STOCK,LISTED,SNAPSHOT,2026-08-01T10:00:00Z,SHORT_NAME::重复
+                SH.600002,新股B,SH,SSE,CNY,STOCK,LISTED,SNAPSHOT,2026-08-01T10:00:00Z,SHORT_NAME::重复
+                """;
+        Path snapshot = writeSnapshot("uniq", rows);
+        assertThrows(BusinessException.class,
+                () -> syncServiceWithSnapshot(snapshot).trigger("FULL"));
+        assertEquals(0, stockBasicMapper.countAll(), "UNIQUENESS 拒绝不得发布任何证券");
     }
 
     @Test
