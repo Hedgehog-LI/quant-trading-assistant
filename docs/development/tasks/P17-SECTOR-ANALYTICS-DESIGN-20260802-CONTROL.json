@@ -136,16 +136,14 @@
       "role": "FINAL_VERIFIER", "generation": 1, "executorType": "SUBAGENT",
       "agentDefinition": ".zcode/agents/qta-final-verifier.md", "sliceId": "",
       "executionOutcome": "COMPLETED", "capability": "VERIFY_EXECUTE", "contextMode": "FRESH", "enforcement": "ADVISORY",
-      "compensatingIsolation": "clean verify-execute subagent; ran protected gates via bounded Bash",
+      "compensatingIsolation": "clean verify-execute subagent; original ACCEPTED verifier; superseded by FV-RUN-5 evidence/arch regeneration (same artifact, identity realigned to manifestSha256)",
       "waitCalls": 0, "maxShellPollsForOneCommand": 1, "compactionCount": 0,
-      "status": "COMPLETED", "artifactAccepted": true,
-      "artifactPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-VERIFICATION.md",
-      "artifactSha256": "9116c786c87f7911eb4019b4520b31642fa81cf5ce928c97806f7f8bbb31643f",
+      "status": "CLOSED", "artifactAccepted": false,
+      "artifactPath": "", "artifactSha256": "",
       "startedAt": "2026-08-02T15:20:11Z", "finishedAt": "2026-08-02T15:25:15Z",
       "runtimeReceiptPath": "",
       "dispatchReceiptPath": ".git/qta-governance/dispatches/b8e2ac7b180a067269d81a070de04200ea9efa798b31e95939fcccc0e7801d78/d11c09be9d04818d29b2036310cd3ce7885c1f95af74b1107706c1e1f695b150.json",
       "verdict": "ACCEPTED", "functionalVerdict": "PASS", "architectureVerdict": "PASS",
-      "architectureGateSha256": "30017d57e77fcd580aa8f6f901385ec71bb755235deef386211d394c5cc7300f",
       "deliveryPermitted": true, "findingIds": []
     },
     {
@@ -200,12 +198,26 @@
       "status": "COMPLETED", "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-VERIFICATION.md",
       "artifactSha256": "9116c786c87f7911eb4019b4520b31642fa81cf5ce928c97806f7f8bbb31643f",
-      "startedAt": "2026-08-02T15:42:00Z", "finishedAt": "2026-08-02T15:42:30Z",
+      "startedAt": "2026-08-02T15:42:00Z", "finishedAt": "2026-08-02T15:46:00Z",
       "runtimeReceiptPath": "",
       "dispatchReceiptPath": ".git/qta-governance/dispatches/b8e2ac7b180a067269d81a070de04200ea9efa798b31e95939fcccc0e7801d78/780f0ac454dfeaf3fbb09ee8f6b765f8d31430cc1e11c437d1a022e219e61138.json",
       "verdict": "ACCEPTED", "functionalVerdict": "PASS", "architectureVerdict": "PASS",
       "architectureGateSha256": "30017d57e77fcd580aa8f6f901385ec71bb755235deef386211d394c5cc7300f",
       "deliveryPermitted": true, "findingIds": []
+    },
+    {
+      "roleRunId": "FV-RUN-6", "dispatchId": "DISPATCH-FV-6", "sessionId": "FV-RUN-6",
+      "role": "FINAL_VERIFIER", "generation": 1, "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-final-verifier.md", "sliceId": "",
+      "executionOutcome": "COMPLETED", "capability": "VERIFY_EXECUTE", "contextMode": "FRESH", "enforcement": "ADVISORY",
+      "compensatingIsolation": "clean verify-execute subagent; task-control anchor write attempt",
+      "waitCalls": 0, "maxShellPollsForOneCommand": 1, "compactionCount": 0,
+      "status": "CLOSED", "artifactAccepted": false,
+      "artifactPath": "", "artifactSha256": "",
+      "startedAt": "2026-08-02T15:47:00Z", "finishedAt": "2026-08-02T15:48:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/b8e2ac7b180a067269d81a070de04200ea9efa798b31e95939fcccc0e7801d78/9aa446212d6b61afff5eadae992ce2f44a275adc6fc7c9f66df15dfc90a0adf9.json",
+      "verdict": "NOT_VERIFIED", "findingIds": []
     }
   ],
   "review": {
