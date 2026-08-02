@@ -1,0 +1,195 @@
+{
+  "schemaVersion": 3,
+  "taskId": "FRONTEND-GOVERNANCE-BOOTSTRAP-20260802",
+  "controlPath": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-CONTROL.json",
+  "startedAt": "2026-08-02T15:00:00Z",
+  "lane": "L2",
+  "lifecycleState": "CONTRACT_FROZEN",
+  "contract": {
+    "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-CONTRACT.md",
+    "version": "2",
+    "sha256": "31f9794c561e0470c39741d72202a819a08af7552967f976a6be3ea3d0b68cc2",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-02", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-03", "requiredEvidence": ["STATIC"]},
+      {"id": "AC-04", "requiredEvidence": ["STATIC"]},
+      {"id": "AC-05", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-06", "requiredEvidence": ["STATIC"]},
+      {"id": "AC-07", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-08", "requiredEvidence": ["AUTOMATION"]}
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "前端字节级移植治理资产 + sync 脚本 + provenance + .gitignore",
+        "acIds": ["AC-01", "AC-02", "AC-03"],
+        "allowedWritePaths": [
+          ".agents/", ".zcode/", ".claude/", "scripts/", "GOVERNANCE_SOURCE.md", ".gitignore"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-02",
+        "description": "前端精简 active docs + AGENTS/CLAUDE + feature stubs",
+        "acIds": ["AC-04"],
+        "allowedWritePaths": ["AGENTS.md", "CLAUDE.md", "docs/"],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-03",
+        "description": "控制仓库 D1/D2/D3/D4 事实修正（16 行/7 文件）",
+        "acIds": ["AC-06"],
+        "allowedWritePaths": [
+          "docs/AI_HANDOFF.md", "docs/BUILD_CHECKLIST.md",
+          "docs/CURRENT_ARCHITECTURE_AND_MODULES.md", "docs/PRODUCT_BLUEPRINT.md",
+          "docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md",
+          "docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md",
+          "docs/ai/HANDOFF_2026-07-17_security_directory_search.md",
+          "docs/acceptance/ACCEPTANCE_LOG.md"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-04",
+        "description": "前端真实 L1 冒烟微任务（仅改 GOVERNANCE_SOURCE.md）完整 lifecycle（implementer→reviewer→verifier→finalization）",
+        "acIds": ["AC-05", "AC-07", "AC-08"],
+        "allowedWritePaths": ["GOVERNANCE_SOURCE.md"],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      }
+    ],
+    "testInventory": [
+      {"testId": "TEST-01", "acIds": ["AC-01"], "kind": "AUTOMATION", "required": true, "sourcePath": "scripts/run-ai-governance-gates.mjs", "selector": "exit code 0 + stdout 'QTA AI governance gates passed.'"},
+      {"testId": "TEST-02", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "scripts/sync-governance-from-source.mjs", "selector": "exit code 0 + stdout '0 byte diffs' over named allowlist (.agents/skills,.agents/schemas,.agents/skill-manifest.json,.agents/skill-evals/trigger-cases.json,.zcode,.claude/skills,scripts minus sync-governance-from-source.mjs); explicit exclusion of AGENTS.md/CLAUDE.md/docs/**/GOVERNANCE_SOURCE.md/.gitignore"},
+      {"testId": "TEST-03", "acIds": ["AC-03"], "kind": "STATIC", "required": true, "sourcePath": ".gitignore", "selector": "(i) .gitignore contains .env/.env.*/!.env.example/.claude/settings.local.json; (ii) git check-ignore .claude/settings.local.json exits 0; (iii) git ls-files --error-unmatch .claude/settings.local.json exits nonzero; (iv) git diff main --name-only has no .env*/credential path"},
+      {"testId": "TEST-04", "acIds": ["AC-04"], "kind": "STATIC", "required": true, "sourcePath": "scripts/validate-ai-governance.mjs", "selector": "exit code 0 + stdout 'AI governance validation passed: 10 skills, 4 agents.'"},
+      {"testId": "TEST-05", "acIds": ["AC-05"], "kind": "AUTOMATION", "required": true, "sourcePath": "package.json", "selector": "npm run typecheck && npm run lint && npm run test && npm run build all exit 0; git diff main --name-only -- 'src/**' empty"},
+      {"testId": "TEST-06", "acIds": ["AC-06"], "kind": "STATIC", "required": true, "sourcePath": "git diff", "selector": "(i) diff touches exactly 7 named control files; (ii) 16 enumerated line corrections present; (iii) negative grep 条件验收/D2.*仍未实现/D3.*仍未实现/D4.*已.*实施 0 hits outside D4 context; (iv) ADR docs/decisions/ and frozen artifacts SECURITY-DIRECTORY-D2*/D3* 0 diff"},
+      {"testId": "TEST-07", "acIds": ["AC-07"], "kind": "AUTOMATION", "required": true, "sourcePath": "scripts/check-ai-delivery-ready.mjs", "selector": "exit code 0 + stdout 'AI delivery ready'; smoke control lifecycleState DELIVERY_READY; git diff smoke-baseline..HEAD --name-only exactly GOVERNANCE_SOURCE.md plus declared metadata"},
+      {"testId": "TEST-08", "acIds": ["AC-08"], "kind": "AUTOMATION", "required": true, "sourcePath": "scripts/run-ai-governance-gates.mjs", "selector": "control exit 0 + 'QTA AI governance gates passed.'; web check-ai-architecture.mjs --base smoke-baseline --candidate-identity id --json-output report exit 0 + report errorCount=0 + status=PASS"}
+    ],
+    "blockingAmendments": [
+      {"id": "BLOCK-01", "fromRoleRunId": "TD-RUN-001", "rationale": "AC-07 required L0 lifecycle with reviewer session; L0 mandates review.omitted=true. Adopted Option B: promote smoke to L1.", "accepted": true},
+      {"id": "BLOCK-02", "fromRoleRunId": "TD-RUN-001", "rationale": "AC-02 byte-identical selector unfalsifiable without explicit allowlist/exclusion set. Enumerated in revised AC-02 + TEST-02.", "accepted": true},
+      {"id": "BLOCK-03", "fromRoleRunId": "TD-RUN-001", "rationale": "SLICE-02 needs 5+ doc stubs + 7 active docs + 2 dir placeholders (>8). maxExpectedFiles is declarative (validator only checks [1,8]); implementer creates all stubs. AC-04 + TEST-04 updated.", "accepted": true}
+    ]
+  },
+  "git": {
+    "automation": "DELIVERY_PUSH",
+    "branch": "codex/frontend-governance-bootstrap-20260802",
+    "baselineCommit": "563e84a573426800b3f6aa8e4e0525bc5314b3a8",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {"sequence": 1, "from": "CONTEXT_READY", "to": "CONTRACT_DRAFTED", "at": "2026-08-02T15:00:00Z", "actor": "zcode-parent-FRONTEND-GOVERNANCE-BOOTSTRAP-20260802"},
+    {"sequence": 2, "from": "CONTRACT_DRAFTED", "to": "TEST_DESIGN_READY", "at": "2026-08-02T15:10:00Z", "actor": "qta-test-designer/TD-RUN-001"},
+    {"sequence": 3, "from": "TEST_DESIGN_READY", "to": "CONTRACT_FROZEN", "at": "2026-08-02T15:11:00Z", "actor": "zcode-parent-FRONTEND-GOVERNANCE-BOOTSTRAP-20260802"}
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "",
+    "diffArtifactSha256": ""
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [
+    {
+      "roleRunId": "TD-RUN-001",
+      "dispatchId": "DISP-TD-001",
+      "sessionId": "zcode-agent-36ac4b2d",
+      "role": "TEST_DESIGNER",
+      "generation": 0,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-test-designer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "fresh subagent context; read-only tools",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "COMPLETED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-CONTRACT.md",
+      "artifactSha256": "31f9794c561e0470c39741d72202a819a08af7552967f976a6be3ea3d0b68cc2",
+      "startedAt": "2026-08-02T15:05:00Z",
+      "finishedAt": "2026-08-02T15:10:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/7e35846862cb00585b185cba13225557ce9c78982b6ad55f1c6efa7e4a8b96d4/34a55e0b2b5e7ba4181438d8f47487448abb104e2179fba521c5ba8ec4ed8dd2.json"
+    }
+  ],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "architectureGate": {
+    "required": true,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": -1,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
+      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
