@@ -218,6 +218,34 @@
       "runtimeReceiptPath": "",
       "dispatchReceiptPath": ".git/qta-governance/dispatches/b8e2ac7b180a067269d81a070de04200ea9efa798b31e95939fcccc0e7801d78/9aa446212d6b61afff5eadae992ce2f44a275adc6fc7c9f66df15dfc90a0adf9.json",
       "verdict": "NOT_VERIFIED", "findingIds": []
+    },
+    {
+      "roleRunId": "FV-RUN-7", "dispatchId": "DISPATCH-FV-7", "sessionId": "FV-RUN-7",
+      "role": "FINAL_VERIFIER", "generation": 1, "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-final-verifier.md", "sliceId": "",
+      "executionOutcome": "COMPLETED", "capability": "VERIFY_EXECUTE", "contextMode": "FRESH", "enforcement": "ADVISORY",
+      "compensatingIsolation": "clean verify-execute subagent; task-control validation (anchor-bootstrap diagnostic)",
+      "waitCalls": 0, "maxShellPollsForOneCommand": 1, "compactionCount": 0,
+      "status": "CLOSED", "artifactAccepted": false,
+      "artifactPath": "", "artifactSha256": "",
+      "startedAt": "2026-08-02T15:49:00Z", "finishedAt": "2026-08-02T15:50:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/b8e2ac7b180a067269d81a070de04200ea9efa798b31e95939fcccc0e7801d78/88bc7c041d33c8197d514d0e2e898117672433ec605b6a215ddb44bd43d32c0c.json",
+      "verdict": "NOT_VERIFIED", "findingIds": []
+    },
+    {
+      "roleRunId": "FV-RUN-8", "dispatchId": "DISPATCH-FV-8", "sessionId": "FV-RUN-8",
+      "role": "FINAL_VERIFIER", "generation": 1, "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-final-verifier.md", "sliceId": "",
+      "executionOutcome": "COMPLETED", "capability": "VERIFY_EXECUTE", "contextMode": "FRESH", "enforcement": "ADVISORY",
+      "compensatingIsolation": "clean verify-execute subagent; task-control validation PASS with seeded anchor",
+      "waitCalls": 0, "maxShellPollsForOneCommand": 1, "compactionCount": 0,
+      "status": "CLOSED", "artifactAccepted": false,
+      "artifactPath": "", "artifactSha256": "",
+      "startedAt": "2026-08-02T15:51:00Z", "finishedAt": "2026-08-02T15:52:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/b8e2ac7b180a067269d81a070de04200ea9efa798b31e95939fcccc0e7801d78/4d8122fea82c8b93016dc66dec7c01f7f0333635ab6d60c64d41bd70e082ab6c.json",
+      "verdict": "NOT_VERIFIED", "findingIds": []
     }
   ],
   "review": {
