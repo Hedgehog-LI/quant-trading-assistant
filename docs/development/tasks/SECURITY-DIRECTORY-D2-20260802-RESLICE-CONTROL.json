@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTROL.json",
   "startedAt": "2026-08-02T05:47:00Z",
   "lane": "L2",
-  "lifecycleState": "IMPLEMENTING",
+  "lifecycleState": "CANDIDATE_FROZEN",
   "contract": {
     "path": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTRACT.md",
     "version": "1",
@@ -474,20 +474,36 @@
       "to": "IMPLEMENTING",
       "at": "2026-08-02T05:50:00Z",
       "actor": "codex-parent-d2-reslice-1"
+    },
+    {
+      "sequence": 5,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-02T07:48:00Z",
+      "actor": "codex-parent-d2-reslice-recovery",
+      "note": "RS-01..RS-05 + REPAIR-1 all SELF_CHECKED; frontend focused tests + typecheck + lint clean"
+    },
+    {
+      "sequence": 6,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-02T07:50:00Z",
+      "actor": "codex-parent-d2-reslice-recovery",
+      "note": "Full frontend gate green (typecheck/lint 0-0/test 303-303/build); candidate commit 00820f1e2d3f81e50c055eb29a5ec4d2838fe2b2 with frozen frontend diff patch artifact 479d6bf4..."
     }
   ],
   "candidate": {
     "mode": "COMMIT",
     "generation": 1,
-    "identity": "",
-    "commit": "",
-    "treeHash": "",
-    "patchSha256": "479d6bf4b9f2fdce39d90fa49bb6cb251bae55202e0b98027fa21c3674164b06",
+    "identity": "00820f1e2d3f81e50c055eb29a5ec4d2838fe2b2",
+    "commit": "00820f1e2d3f81e50c055eb29a5ec4d2838fe2b2",
+    "treeHash": "3adbfaed47a8357eb0a3990f51a2ab0e7d09d6ab",
+    "patchSha256": "7a0e7980e59890093199c00e8316adf608f62c493171a0e14a4988d22f8591bf",
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
-    "diffArtifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CANDIDATE.patch",
-    "diffArtifactSha256": "479d6bf4b9f2fdce39d90fa49bb6cb251bae55202e0b98027fa21c3674164b06"
+    "diffArtifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-BASELINE-CANDIDATE.patch",
+    "diffArtifactSha256": "7a0e7980e59890093199c00e8316adf608f62c493171a0e14a4988d22f8591bf"
   },
   "budget": {
     "contextPercent": null,

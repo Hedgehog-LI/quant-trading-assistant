@@ -1,0 +1,3480 @@
+diff --git a/.agents/skills/qta-development-orchestration/SKILL.md b/.agents/skills/qta-development-orchestration/SKILL.md
+index 2b42c1d..8180f6d 100644
+--- a/.agents/skills/qta-development-orchestration/SKILL.md
++++ b/.agents/skills/qta-development-orchestration/SKILL.md
+@@ -75,10 +75,12 @@ an overnight run busy.
+ 
+ ## Autonomous Decision Policy
+ 
+-Inside the frozen contract, choose the recommended reversible implementation option without asking the user.
+-Ask only when product/financial meaning is unresolved, a destructive or credential-bearing action requires
+-authorization, or external state makes every safe path impossible. Record the decision and evidence in the
+-control file; do not create repeated confirmation turns.
++`/qta-run` is an unattended lifecycle. Inside the frozen contract, choose the recommended reversible
++implementation option without asking the user and record the decision and evidence in the control file.
++Never invoke `AskUserQuestion` in an active governed run. If product/financial meaning is unresolved, a
++destructive or credential-bearing action requires authorization, or external state makes every safe path
++impossible, persist an evidence-backed `BLOCKED` checkpoint and stop; do not leave the task waiting for a
++human response. The workspace Hook enforces this policy for the active parent session.
+ 
+ ## Task Packet
+ 
+@@ -150,6 +152,12 @@ Append a role-run row only after that role reaches a terminal status. Accepted r
+ `executorType=SUBAGENT`, the exact `.zcode/agents/` definition, matching capability, and
+ `executionOutcome=COMPLETED`. Anchored role rows are immutable events, not mutable RUNNING records.
+ 
++Implementation and final-verification profiles use ZCode `bypassPermissions` so their bounded Bash gates can
++run unattended. Their explicit tool allowlists, disallowed tools, TaskPacket paths, Hook policy, candidate
++hashes, and role boundaries remain authoritative; bypass mode is not permission to expand scope. Implementers
++use dedicated read/search tools for inspection and must not burn the role window on repeated shell-filtered
++test reruns.
++
+ Codex sandbox profiles may expose `.git` as read-only. In that case, request scoped permission only for
+ `node scripts/check-ai-task-control.mjs`; never disable the anchor. The validator returns this recovery
+ instruction on `EPERM/EACCES` instead of a raw stack trace.
+diff --git a/.agents/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md b/.agents/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md
+index 92ce790..887b531 100644
+--- a/.agents/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md
++++ b/.agents/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md
+@@ -37,6 +37,7 @@
+ - Allowed write paths:
+ - Pre-existing dirty paths:
+ - Prohibited actions:
++- Interaction policy: `UNATTENDED` (`AskUserQuestion` prohibited; genuine input dependency -> `BLOCKED`)
+ - Runtime tool enforcement: `ADVISORY` (local Hook/receipt/anchor are not a same-user security boundary)
+ - Compensating isolation check:
+ 
+@@ -44,6 +45,9 @@ For an implementer packet, assign exactly one frozen slice with at most three AC
+ 500 production-line additions. A timeout/plan-only/failure/cancellation still returns a terminal dispatch
+ record. Two timeouts for the same slice require `BLOCKED`; the parent must not implement it.
+ 
++Implementer and final-verifier profiles run with `bypassPermissions` for unattended Bash. This never expands
++the packet's write paths, tools, candidate scope, Git policy, or prohibited actions.
++
+ ## Authority
+ 
+ - Product/design paths:
+diff --git a/.agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md b/.agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md
+index 3684968..0cc376c 100644
+--- a/.agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md
++++ b/.agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md
+@@ -56,6 +56,12 @@ and policy violation. The parent cannot substitute for a specialist role. Initia
+ into one fresh implementer per coherent slice; one slice has at most three ACs, eight expected files, and 500
+ production-line additions. Two timeouts on one slice require `BLOCKED` and reslicing.
+ 
++Implementer and final-verifier profiles use `bypassPermissions` only to remove interactive Bash approvals.
++Tool allowlists, prohibited actions, allowed paths, Hook denials, candidate identity, and evidence rules still
++apply unchanged. An active `/qta-run` never calls `AskUserQuestion`: reversible choices use the recommended
++option, while a genuine product, destructive, credential, or external-input blocker is persisted as
++`BLOCKED` instead of waiting for a human response.
++
+ ## Context And Control Budget
+ 
+ - 25% context: persist discoveries and decisions.
+diff --git a/.claude/skills/qta-development-orchestration/SKILL.md b/.claude/skills/qta-development-orchestration/SKILL.md
+index 2b42c1d..8180f6d 100644
+--- a/.claude/skills/qta-development-orchestration/SKILL.md
++++ b/.claude/skills/qta-development-orchestration/SKILL.md
+@@ -75,10 +75,12 @@ an overnight run busy.
+ 
+ ## Autonomous Decision Policy
+ 
+-Inside the frozen contract, choose the recommended reversible implementation option without asking the user.
+-Ask only when product/financial meaning is unresolved, a destructive or credential-bearing action requires
+-authorization, or external state makes every safe path impossible. Record the decision and evidence in the
+-control file; do not create repeated confirmation turns.
++`/qta-run` is an unattended lifecycle. Inside the frozen contract, choose the recommended reversible
++implementation option without asking the user and record the decision and evidence in the control file.
++Never invoke `AskUserQuestion` in an active governed run. If product/financial meaning is unresolved, a
++destructive or credential-bearing action requires authorization, or external state makes every safe path
++impossible, persist an evidence-backed `BLOCKED` checkpoint and stop; do not leave the task waiting for a
++human response. The workspace Hook enforces this policy for the active parent session.
+ 
+ ## Task Packet
+ 
+@@ -150,6 +152,12 @@ Append a role-run row only after that role reaches a terminal status. Accepted r
+ `executorType=SUBAGENT`, the exact `.zcode/agents/` definition, matching capability, and
+ `executionOutcome=COMPLETED`. Anchored role rows are immutable events, not mutable RUNNING records.
+ 
++Implementation and final-verification profiles use ZCode `bypassPermissions` so their bounded Bash gates can
++run unattended. Their explicit tool allowlists, disallowed tools, TaskPacket paths, Hook policy, candidate
++hashes, and role boundaries remain authoritative; bypass mode is not permission to expand scope. Implementers
++use dedicated read/search tools for inspection and must not burn the role window on repeated shell-filtered
++test reruns.
++
+ Codex sandbox profiles may expose `.git` as read-only. In that case, request scoped permission only for
+ `node scripts/check-ai-task-control.mjs`; never disable the anchor. The validator returns this recovery
+ instruction on `EPERM/EACCES` instead of a raw stack trace.
+diff --git a/.claude/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md b/.claude/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md
+index 92ce790..887b531 100644
+--- a/.claude/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md
++++ b/.claude/skills/qta-development-orchestration/assets/TASK_PACKET_TEMPLATE.md
+@@ -37,6 +37,7 @@
+ - Allowed write paths:
+ - Pre-existing dirty paths:
+ - Prohibited actions:
++- Interaction policy: `UNATTENDED` (`AskUserQuestion` prohibited; genuine input dependency -> `BLOCKED`)
+ - Runtime tool enforcement: `ADVISORY` (local Hook/receipt/anchor are not a same-user security boundary)
+ - Compensating isolation check:
+ 
+@@ -44,6 +45,9 @@ For an implementer packet, assign exactly one frozen slice with at most three AC
+ 500 production-line additions. A timeout/plan-only/failure/cancellation still returns a terminal dispatch
+ record. Two timeouts for the same slice require `BLOCKED`; the parent must not implement it.
+ 
++Implementer and final-verifier profiles run with `bypassPermissions` for unattended Bash. This never expands
++the packet's write paths, tools, candidate scope, Git policy, or prohibited actions.
++
+ ## Authority
+ 
+ - Product/design paths:
+diff --git a/.claude/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md b/.claude/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md
+index 3684968..0cc376c 100644
+--- a/.claude/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md
++++ b/.claude/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md
+@@ -56,6 +56,12 @@ and policy violation. The parent cannot substitute for a specialist role. Initia
+ into one fresh implementer per coherent slice; one slice has at most three ACs, eight expected files, and 500
+ production-line additions. Two timeouts on one slice require `BLOCKED` and reslicing.
+ 
++Implementer and final-verifier profiles use `bypassPermissions` only to remove interactive Bash approvals.
++Tool allowlists, prohibited actions, allowed paths, Hook denials, candidate identity, and evidence rules still
++apply unchanged. An active `/qta-run` never calls `AskUserQuestion`: reversible choices use the recommended
++option, while a genuine product, destructive, credential, or external-input blocker is persisted as
++`BLOCKED` instead of waiting for a human response.
++
+ ## Context And Control Budget
+ 
+ - 25% context: persist discoveries and decisions.
+diff --git a/.zcode/agents/qta-final-verifier.md b/.zcode/agents/qta-final-verifier.md
+index fbaa72c..5e5dbb2 100644
+--- a/.zcode/agents/qta-final-verifier.md
++++ b/.zcode/agents/qta-final-verifier.md
+@@ -3,7 +3,7 @@ name: qta-final-verifier
+ description: Independent QTA final verifier. Use on a frozen post-review diff to run contract-defined gates, map evidence to every AC, and issue the only acceptance verdict. May run verification commands but cannot edit files.
+ model: main
+ color: magenta
+-permissionMode: acceptEdits
++permissionMode: bypassPermissions
+ maxTurns: 12
+ tools:
+   - Read
+@@ -51,6 +51,10 @@ diff after implementation and code review.
+ 
+ # Bash Boundary
+ 
++`bypassPermissions` makes contract-defined verification unattended; it does not authorize implementation,
++repair, dependency installation, Git mutation, secret access, or any command outside the frozen inventory.
++Treat every Hook denial as a hard boundary.
++
+ Bash is allowed only for non-mutating verification commands already justified by the contract, such as
+ tests, builds, status/diff inspection, health checks, and representative curl calls.
+ 
+diff --git a/.zcode/agents/qta-implementer.md b/.zcode/agents/qta-implementer.md
+index fcf2bb7..fb8dfe8 100644
+--- a/.zcode/agents/qta-implementer.md
++++ b/.zcode/agents/qta-implementer.md
+@@ -3,7 +3,7 @@ name: qta-implementer
+ description: Bounded QTA implementation agent. Use only after a task contract is ready. Changes code and focused tests, runs self-checks, checkpoints progress, and never gives the independent acceptance verdict.
+ model: main
+ color: green
+-permissionMode: acceptEdits
++permissionMode: bypassPermissions
+ maxTurns: 20
+ tools:
+   - Read
+@@ -49,6 +49,8 @@ and implement only its assigned slice.
+ 
+ # Boundaries
+ 
++- `bypassPermissions` exists only to make the bounded role unattended. It does not expand the frozen slice,
++  allowed write paths, tool allowlist, or Git prohibition. Treat every Hook denial as a hard boundary.
+ - Do not change product meaning or weaken acceptance criteria.
+ - Do not edit unrelated dirty files.
+ - Do not add fake success paths, permissive fallbacks, or tests that only assert mocks called themselves.
+@@ -64,6 +66,19 @@ and implement only its assigned slice.
+ - Do not edit contract criteria or parent-owned review/verification artifacts.
+ - Do not continue after the first context compaction. Checkpoint and terminate this role instance.
+ 
++# Unattended Shell Discipline
++
++- Use `Read`, `Glob`, and `Grep` for inspection. Do not spend Bash calls on `cat`, `find`, `ls`, or repeated
++  log filtering when a dedicated tool can answer the question.
++- Use Bash only for the focused build/test command required by the TaskPacket or a necessary repository
++  status check. Cross-repository `cd` is allowed, but combine working-directory selection with one coherent
++  command instead of issuing exploratory shell chains.
++- After a failing test, inspect the complete decisive failure once, make one evidence-based change, and rerun
++  the narrow selector. Do not repeatedly rerun the same suite through different `grep`, `head`, or `tail`
++  pipelines.
++- Two executions with the same normalized failure fingerprint and no new evidence require a checkpointed
++  blocker. Do not consume the role window by trying cosmetic command variants.
++
+ # Self-Test Standard
+ 
+ Testing done in this role is `SELF_CHECKED` only. Report exact commands, exit codes, and unverified dimensions.
+diff --git a/.zcode/commands/qta-run.md b/.zcode/commands/qta-run.md
+index cd492c3..3bcfa54 100644
+--- a/.zcode/commands/qta-run.md
++++ b/.zcode/commands/qta-run.md
+@@ -29,9 +29,13 @@ Architecture errors are hard failures and cannot be reinterpreted by prose.
+ Continue through the state machine until `DELIVERY_READY`, `BLOCKED`, or the user explicitly stops.
+ `FINALIZED`, a plan, or one subagent response is not completion. Goal success is forbidden until
+ `node scripts/check-ai-delivery-ready.mjs <TASK_CONTROL>` exits `0`; do not ask a model-only completion judge
+-to override that command. For reversible choices inside the frozen contract, select the recommended option
+-yourself instead of asking the user. Ask only for unresolved product/financial meaning, destructive or
+-credential-bearing authorization, or a genuine external blocker. Do not expand into another product task.
++to override that command.
++
++`/qta-run` is unattended. Never call `AskUserQuestion` while it is active. For a reversible engineering
++choice, select the documented or clearly recommended option and record the decision. If unresolved
++product/financial meaning, destructive or credential-bearing authorization, or an external dependency makes
++all safe paths impossible, persist an evidence-backed `BLOCKED` checkpoint and stop instead of waiting for
++the user. Do not expand into another product task.
+ 
+ The workspace Stop Hook will request continuation up to the ZCode limit while this parent session is active.
+ When progress cannot continue within the frozen repair/timeout limits, persist `BLOCKED` with evidence so the
+diff --git a/.zcode/config.json b/.zcode/config.json
+index 5190887..e777b16 100644
+--- a/.zcode/config.json
++++ b/.zcode/config.json
+@@ -22,7 +22,7 @@
+       ],
+       "PreToolUse": [
+         {
+-          "matcher": "Bash|Read|Write|Edit|ApplyPatch|Agent|Task",
++          "matcher": "Bash|Read|Write|Edit|ApplyPatch|Agent|Task|AskUserQuestion",
+           "hooks": [
+             {
+               "type": "process",
+diff --git a/docs/DEVELOPMENT_WORKFLOW.md b/docs/DEVELOPMENT_WORKFLOW.md
+index 2d16bb7..906eec3 100644
+--- a/docs/DEVELOPMENT_WORKFLOW.md
++++ b/docs/DEVELOPMENT_WORKFLOW.md
+@@ -29,6 +29,9 @@
+   `contract_hash`。子角色只接收 TaskPacket。
+ - `/qta-run` 会激活父 session 的 Stop Hook；未达到 `DELIVERY_READY` 或持久化 `BLOCKED` 时，父任务
+   不允许仅凭一轮输出结束。Stop 回注最多三次，不能替代 repair/timeout 的硬上限。
++- `/qta-run` 是无人值守流程：禁止调用 `AskUserQuestion`。可逆工程选择自动采用文档或明确推荐项；
++  产品/金融含义、破坏性操作、凭据授权或外部依赖确实无法安全继续时，必须持久化 `BLOCKED`，不得
++  挂起等待用户选择。
+ - 父协调者创建 `<TASK-ID>-CONTROL.json`，每次角色派发和状态迁移前运行
+   `node scripts/check-ai-task-control.mjs <control-file>`。
+ - Codex 沙箱若因 `.git/qta-governance` 只读返回 `EPERM/EACCES`，仅为上述控制命令申请受限 `.git`
+@@ -45,6 +48,10 @@
+   两次同 slice timeout 后记录 `BLOCKED` 并重新切片。
+ - **角色实例**：初始实现、每轮 repair、每代 review、最终 verifier 都使用新的 role/session；禁止
+   延续旧子会话。
++- **无人值守权限**：implementer 与 final verifier 使用 `bypassPermissions` 运行其冻结范围内的 Bash
++  门禁；该模式不扩大工具、路径、Git 或业务边界。测试设计者与 reviewer 继续保持只读 `plan`。
++- **Shell 节制**：实现者用 Read/Glob/Grep 浏览文件，Bash 只运行必要的聚焦门禁；同一失败不得通过
++  反复更换 `grep/head/tail` 形式重跑完整测试。
+ - **测试节奏**：开发/repair 跑聚焦测试；最终候选冻结前跑一次 full/package；独立 verifier 再跑
+   一次，不对未变化候选重复跑全量门禁。
+ - **架构自检**：候选冻结前运行 `node scripts/check-ai-architecture.mjs --base <baseline>
+diff --git a/docs/ai/SKILL_AND_AGENT_GOVERNANCE.md b/docs/ai/SKILL_AND_AGENT_GOVERNANCE.md
+index c32348d..e61d762 100644
+--- a/docs/ai/SKILL_AND_AGENT_GOVERNANCE.md
++++ b/docs/ai/SKILL_AND_AGENT_GOVERNANCE.md
+@@ -71,9 +71,9 @@ ZCode 真实触发使用 `name + description（约前 250 字符）+ when_to_use
+ | Agent | 上下文 | 工具边界 | 输出 |
+ |---|---|---|---|
+ | `qta-test-designer` | 干净 | 只读、不执行命令 | 可证伪 AC、测试矩阵、契约 amendment artifact |
+-| `qta-implementer` | 独立实现上下文 | 可读写、自测，不可 Git/子代理 | 代码、自检、变更清单、候选提交建议 |
++| `qta-implementer` | 独立实现上下文 | `bypassPermissions` 无人值守；可读写、自测，不可 Git/子代理 | 代码、自检、变更清单、候选提交建议 |
+ | `qta-code-reviewer` | 干净 | 只读、不执行命令 | 绑定 candidate hash 的 findings 或 `REVIEW_CLEAR` |
+-| `qta-final-verifier` | 干净临时 worktree | `acceptEdits` 执行模式；无 Edit/Write，仅 Bash 门禁与脚本回执 | 逐 AC 证据、前后 hash、唯一验收结论 |
++| `qta-final-verifier` | 干净临时 worktree | `bypassPermissions` 无人值守；无 Edit/Write，仅 Bash 门禁与脚本回执 | 逐 AC 证据、前后 hash、唯一验收结论 |
+ 
+ 固定 Agent 是不可变模板，不是可反复续聊的实例。初始实现、每轮 repair、每代 review 和最终
+ verification 都创建新的 `role_run_id + session_id`，返回 artifact 后立即结束。每个角色只接收
+@@ -106,6 +106,11 @@ plan-only 尝试。它仍是同用户下的防误操作证据，不是密码学
+ 0；其他状态会要求继续（客户端最多回注三次）。这能拦住“只跑一轮就自报完成”，但不是无限循环器：
+ 同因失败达到上限时必须持久化 `BLOCKED`，Stop Hook 即释放任务。
+ 
++`/qta-run` 同时是无人值守交互边界：PreToolUse Hook 会阻断 active parent 的 `AskUserQuestion`。
++可逆工程选择采用文档或明确推荐项；产品/金融含义、破坏性授权、凭据或外部依赖确实无法安全继续
++时，父协调器必须写入 `BLOCKED`，不能悬挂等待用户。`bypassPermissions` 只移除 implementer 和 final
++verifier 的 Bash 审批，不扩大工具白名单、写路径、Git 权限或任务范围。
++
+ 威胁模型必须说清：本地 Hook、回执和 `.git` 哈希链用于防误操作、漂移和普通重写，不能抵抗拥有
+ 同一 macOS 用户任意 Bash 权限的恶意代码。后者只有 ZCode 原生签名证明、受保护远程分支/CI 或更高
+ 权限边界才能解决。在此之前严禁把本地证据写成 `ENFORCED`。
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CANDIDATE.patch b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CANDIDATE.patch
+new file mode 100644
+index 0000000..168db0f
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CANDIDATE.patch
+@@ -0,0 +1,1817 @@
++diff --git a/src/features/market-data/api/securityDirectoryApi.remote.test.ts b/src/features/market-data/api/securityDirectoryApi.remote.test.ts
++new file mode 100644
++index 0000000..5211681
++--- /dev/null
+++++ b/src/features/market-data/api/securityDirectoryApi.remote.test.ts
++@@ -0,0 +1,60 @@
+++import { describe, expect, it, beforeEach, vi } from 'vitest';
+++import { saveSettings } from '../../settings/api/settingsApi';
+++import { clearAll } from '../../../shared/api/localStorageClient';
+++import { client } from '../../../shared/api/client';
+++import { searchSecurities, getSecurity } from './securityDirectoryApi';
+++
+++describe('securityDirectoryApi remote', () => {
+++  beforeEach(() => {
+++    clearAll();
+++    saveSettings({ apiMode: 'remote', apiBaseUrl: '' });
+++  });
+++
+++  it('searchSecurities remote 调用 GET /market-data/securities/search 并解包 items 与目录元数据', async () => {
+++    const mockGet = vi.spyOn(client, 'get').mockResolvedValueOnce({
+++      data: {
+++        success: true, code: 'OK',
+++        data: {
+++          items: [{
+++            canonicalSymbol: 'SH.603308', symbol: '603308', displayName: '应流股份', name: '应流股份',
+++            nameCn: '应流股份', nameHk: null, nameEn: null, shortName: '应流股份',
+++            market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'PINYIN_ABBR_PREFIX',
+++          }],
+++          catalogStatus: 'READY', catalogUpdatedAt: '2026-07-29T10:00:00', stale: false, degraded: false,
+++        },
+++        timestamp: '',
+++      },
+++    });
+++    const r = await searchSecurities({ q: 'ylgf' });
+++    expect(mockGet).toHaveBeenCalledWith('/market-data/securities/search', expect.objectContaining({ params: expect.objectContaining({ q: 'ylgf' }) }));
+++    expect(r.items[0].canonicalSymbol).toBe('SH.603308');
+++    expect(r.catalogStatus).toBe('READY');
+++    expect(r.stale).toBe(false);
+++    mockGet.mockRestore();
+++  });
+++
+++  it('getSecurity remote 调用 GET /market-data/securities/{canonicalSymbol} 并在 404 时抛错', async () => {
+++    // 成功路径
+++    const mockOk = vi.spyOn(client, 'get').mockResolvedValueOnce({
+++      data: {
+++        success: true, code: 'OK',
+++        data: {
+++          canonicalSymbol: 'SH.603308', symbol: '603308', displayName: '应流股份', name: '应流股份',
+++          market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT',
+++        },
+++        timestamp: '',
+++      },
+++    });
+++    const r = await getSecurity('SH.603308');
+++    expect(mockOk).toHaveBeenCalledWith('/market-data/securities/SH.603308');
+++    expect(r.canonicalSymbol).toBe('SH.603308');
+++    mockOk.mockRestore();
+++
+++    // 404 失败路径：unwrap 在 success=false 或 data=null 时抛错
+++    const mockFail = vi.spyOn(client, 'get').mockResolvedValueOnce({
+++      data: { success: false, code: 'NOT_FOUND', message: '证券不存在', data: null, timestamp: '' },
+++    });
+++    await expect(getSecurity('SH.999999')).rejects.toThrow();
+++    mockFail.mockRestore();
+++  });
+++});
++diff --git a/src/features/market-data/api/securityDirectoryApi.test.ts b/src/features/market-data/api/securityDirectoryApi.test.ts
++new file mode 100644
++index 0000000..77d2581
++--- /dev/null
+++++ b/src/features/market-data/api/securityDirectoryApi.test.ts
++@@ -0,0 +1,66 @@
+++import { describe, expect, it, beforeEach } from 'vitest';
+++import { saveSettings } from '../../settings/api/settingsApi';
+++import { clearAll } from '../../../shared/api/localStorageClient';
+++import { searchSecurities } from './securityDirectoryApi';
+++
+++describe('securityDirectoryApi mock', () => {
+++  beforeEach(() => {
+++    clearAll();
+++    saveSettings({ apiMode: 'mock', apiBaseUrl: '' });
+++  });
+++
+++  it('searchSecurities mock 与 remote 同形：相同关键词返回字段一致且排名一致', async () => {
+++    const r = await searchSecurities({ q: 'ylgf' });
+++    expect(r.catalogStatus).toBe('READY');
+++    expect(r.catalogUpdatedAt).toBe('2026-07-29T10:00:00');
+++    expect(r.stale).toBe(false);
+++    expect(r.degraded).toBe(false);
+++    expect(r.items.length).toBeGreaterThan(0);
+++    const top = r.items[0];
+++    // 同形：每个 SecuritySummary 字段都存在
+++    expect(top).toEqual(expect.objectContaining({
+++      canonicalSymbol: expect.any(String),
+++      symbol: expect.any(String),
+++      displayName: expect.any(String),
+++      market: expect.any(String),
+++      securityType: expect.any(String),
+++      listStatus: expect.any(String),
+++      matchedBy: expect.any(String),
+++    }));
+++    // 排名：拼音首字母 ylgf 精确命中 SH.603308，matchedBy=PINYIN_ABBR_PREFIX
+++    expect(top.canonicalSymbol).toBe('SH.603308');
+++    expect(top.matchedBy).toBe('PINYIN_ABBR_PREFIX');
+++  });
+++
+++  it('中文≥1 字符、英文/数字≥2 字符才触发搜索；阈值以下不调用', async () => {
+++    // 中文单字触发
+++    const cn = await searchSecurities({ q: '应' });
+++    expect(cn.items.some((i) => i.canonicalSymbol === 'SH.603308')).toBe(true);
+++    // 单个拉丁字符不触发 → 空结果
+++    const oneLatin = await searchSecurities({ q: 'A' });
+++    expect(oneLatin.items.length).toBe(0);
+++    // 两个拉丁字符触发（命中 US.AAPL：symbol AAPL 的 displayName 'Apple Inc.' 含 'AP'... 用 'AP' 前缀命中 displayName）
+++    const twoLatin = await searchSecurities({ q: 'AP' });
+++    expect(twoLatin.items.length).toBeGreaterThan(0);
+++    expect(twoLatin.items.some((i) => i.canonicalSymbol === 'US.AAPL')).toBe(true);
+++  });
+++
+++  it('默认 limit=20 且 markets/types/includeDelisted 筛选正确传递', async () => {
+++    // 默认 limit=20 截断：seed 有 25 个 样本N + 其它，'样本' 前缀匹配 >20 条
+++    const all = await searchSecurities({ q: '样本' });
+++    expect(all.items.length).toBe(20);
+++    // markets 筛选
+++    const hkOnly = await searchSecurities({ q: '速腾', markets: ['HK'] });
+++    expect(hkOnly.items.some((i) => i.canonicalSymbol === 'HK.02498')).toBe(true);
+++    const noMatch = await searchSecurities({ q: '速腾', markets: ['US'] });
+++    expect(noMatch.items.length).toBe(0);
+++    // types 筛选
+++    const etf = await searchSecurities({ q: '沪深300ETF', types: ['ETF'] });
+++    expect(etf.items.some((i) => i.securityType === 'ETF')).toBe(true);
+++    // includeDelisted
+++    const hidden = await searchSecurities({ q: '退市样本' });
+++    expect(hidden.items.length).toBe(0);
+++    const shown = await searchSecurities({ q: '退市样本', includeDelisted: true });
+++    expect(shown.items.some((i) => i.canonicalSymbol === 'SH.600001' && i.listStatus === 'DELISTED')).toBe(true);
+++  });
+++});
++diff --git a/src/features/market-data/api/securityDirectoryApi.ts b/src/features/market-data/api/securityDirectoryApi.ts
++new file mode 100644
++index 0000000..7469a1a
++--- /dev/null
+++++ b/src/features/market-data/api/securityDirectoryApi.ts
++@@ -0,0 +1,156 @@
+++import { client } from '../../../shared/api/client';
+++import { unwrap } from '../../../shared/api/unwrappers';
+++import { getSettings } from '../../settings/api/settingsApi';
+++import { normalizeCanonicalSymbol } from '../utils/canonicalSymbol';
+++import type { Security, SecuritySummary, ListStatus, MatchedBy } from '../../../shared/types/domain';
+++
+++export interface SecuritySearchInput {
+++  q: string;
+++  markets?: string[];
+++  types?: string[];
+++  includeDelisted?: boolean;
+++  limit?: number;
+++}
+++
+++export interface SecuritySearchResult {
+++  items: SecuritySummary[];
+++  catalogStatus: string;
+++  catalogUpdatedAt: string | null;
+++  stale: boolean;
+++  degraded: boolean;
+++}
+++
+++const CATALOG_UPDATED_AT = '2026-07-29T10:00:00';
+++
+++const SEED_CATALOG: Security[] = [
+++  { canonicalSymbol: 'SH.603308', symbol: '603308', displayName: '应流股份', name: '应流股份', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', pinyinFull: 'yingliugufen', pinyinAbbr: 'ylgf', matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'HK.02498', symbol: '02498', displayName: '速腾聚创', name: '速腾聚创', market: 'HK', exchange: 'HKEX', currency: 'HKD', securityType: 'STOCK', listStatus: 'LISTED', aliases: ['RoboSense', '速腾'], pinyinFull: 'sutengjuchuang', pinyinAbbr: 'stjch', matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'US.AAPL', symbol: 'AAPL', displayName: 'Apple Inc.', name: 'Apple Inc.', market: 'US', exchange: 'NASDAQ', currency: 'USD', securityType: 'STOCK', listStatus: 'LISTED', aliases: ['Apple', '苹果'], pinyinFull: null, pinyinAbbr: null, matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'SH.600600', symbol: '600600', displayName: '同名X', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'HK.06000', symbol: '06000', displayName: '同名X', market: 'HK', exchange: 'HKEX', currency: 'HKD', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'SH.600000', symbol: '600000', displayName: '当前名', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', aliases: ['旧名称'], pinyinFull: 'dangqianming', matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'SH.600001', symbol: '600001', displayName: '退市样本', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'DELISTED', delisted: true, matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'SZ.000001', symbol: '000001', displayName: '平安银行', market: 'SZ', exchange: 'SZSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'BJ.430047', symbol: '430047', displayName: '北交所样本', market: 'BJ', exchange: 'BSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'SH.510300', symbol: '510300', displayName: '沪深300ETF', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'ETF', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
+++  { canonicalSymbol: 'SH.000300', symbol: '000300', displayName: '沪深300指数', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'INDEX', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
+++  ...Array.from({ length: 25 }, (_, i) => {
+++    const n = String(i + 2).padStart(3, '0');
+++    return {
+++      canonicalSymbol: `SH.600${n}`, symbol: `600${n}`, displayName: `样本${i + 2}`, market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED' as ListStatus, matchedBy: 'FORMAL_NAME_EXACT' as MatchedBy,
+++    } as Security;
+++  }),
+++];
+++
+++const CJK_REGEX = /[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/;
+++const LATIN_OR_DIGIT_REGEX = /^[A-Za-z0-9]+$/;
+++
+++function meetsThreshold(q: string): boolean {
+++  if (!q) return false;
+++  if (CJK_REGEX.test(q)) return true;
+++  if (LATIN_OR_DIGIT_REGEX.test(q)) return q.length >= 2;
+++  return false;
+++}
+++
+++interface RankedItem { item: Security; score: number; matchedBy: MatchedBy; marketOrder: number; }
+++
+++function rankItem(item: Security, qUpper: string): { score: number; matchedBy: MatchedBy } {
+++  if (item.canonicalSymbol === qUpper) return { score: 100, matchedBy: 'CANONICAL_SYMBOL_EXACT' };
+++  if (item.symbol === qUpper) return { score: 95, matchedBy: 'RAW_SYMBOL_EXACT' };
+++  if (item.displayName === qUpper) return { score: 90, matchedBy: 'FORMAL_NAME_EXACT' };
+++  if (item.displayName.startsWith(qUpper)) return { score: 80, matchedBy: 'FORMAL_NAME_PREFIX' };
+++  const aliasesUpper = (item.aliases ?? []).map((a) => a.toUpperCase());
+++  if (aliasesUpper.some((a) => a === qUpper)) return { score: 75, matchedBy: 'ALIAS_EXACT' };
+++  if (aliasesUpper.some((a) => a.startsWith(qUpper))) return { score: 75, matchedBy: 'ALIAS_PREFIX' };
+++  const qLower = qUpper.toLowerCase();
+++  if (item.pinyinAbbr && item.pinyinAbbr.startsWith(qLower)) return { score: 70, matchedBy: 'PINYIN_ABBR_PREFIX' };
+++  if (item.pinyinFull && item.pinyinFull.startsWith(qLower)) return { score: 70, matchedBy: 'PINYIN_FULL_PREFIX' };
+++  if (item.displayName.includes(qUpper)) return { score: 50, matchedBy: 'NAME_CONTAINS' };
+++  if (aliasesUpper.some((a) => a.includes(qUpper))) return { score: 50, matchedBy: 'ALIAS_CONTAINS' };
+++  return { score: 0, matchedBy: 'FORMAL_NAME_EXACT' };
+++}
+++
+++function marketIndex(market: string, markets?: string[]): number {
+++  if (!markets || markets.length === 0) return 0;
+++  const idx = markets.indexOf(market);
+++  return idx < 0 ? markets.length : idx;
+++}
+++
+++function toSummary(sec: Security, matchedBy: MatchedBy): SecuritySummary {
+++  return {
+++    canonicalSymbol: sec.canonicalSymbol, symbol: sec.symbol, displayName: sec.displayName,
+++    name: sec.name, nameCn: sec.nameCn, nameHk: sec.nameHk, nameEn: sec.nameEn, shortName: sec.shortName,
+++    market: sec.market, exchange: sec.exchange, currency: sec.currency,
+++    securityType: sec.securityType, listStatus: sec.listStatus as ListStatus, matchedBy,
+++  };
+++}
+++
+++const mockApi = {
+++  search: async (params: SecuritySearchInput): Promise<SecuritySearchResult> => {
+++    const q = (params.q ?? '').trim();
+++    if (!meetsThreshold(q)) {
+++      return { items: [], catalogStatus: 'READY', catalogUpdatedAt: CATALOG_UPDATED_AT, stale: false, degraded: false };
+++    }
+++    const qUpper = q.toUpperCase();
+++    const { markets, types, includeDelisted } = params;
+++    const ranked: RankedItem[] = [];
+++    for (const item of SEED_CATALOG) {
+++      if (markets && markets.length > 0 && !markets.includes(item.market)) continue;
+++      if (types && types.length > 0 && !types.includes(item.securityType)) continue;
+++      if (!includeDelisted && item.listStatus === 'DELISTED') continue;
+++      const { score, matchedBy } = rankItem(item, qUpper);
+++      if (score < 50) continue;
+++      ranked.push({ item, score, matchedBy, marketOrder: marketIndex(item.market, markets) });
+++    }
+++    ranked.sort((a, b) => {
+++      if (b.score !== a.score) return b.score - a.score;
+++      const aListed = a.item.listStatus === 'LISTED' ? 0 : 1;
+++      const bListed = b.item.listStatus === 'LISTED' ? 0 : 1;
+++      if (aListed !== bListed) return aListed - bListed;
+++      if (a.marketOrder !== b.marketOrder) return a.marketOrder - b.marketOrder;
+++      if (a.item.displayName !== b.item.displayName) return a.item.displayName.localeCompare(b.item.displayName);
+++      return a.item.canonicalSymbol.localeCompare(b.item.canonicalSymbol);
+++    });
+++    const requestedLimit = params.limit;
+++    const limit = requestedLimit === undefined ? 20 : Math.min(Math.max(0, requestedLimit), 100);
+++    const items = ranked.slice(0, limit).map((r) => toSummary(r.item, r.matchedBy));
+++    return { items, catalogStatus: 'READY', catalogUpdatedAt: CATALOG_UPDATED_AT, stale: false, degraded: false };
+++  },
+++  get: async (canonicalSymbol: string): Promise<Security> => {
+++    const normalized = normalizeCanonicalSymbol(canonicalSymbol);
+++    const found = SEED_CATALOG.find((s) => s.canonicalSymbol === normalized);
+++    if (!found) throw new Error('证券不存在');
+++    return { ...found };
+++  },
+++};
+++
+++const remoteApi = {
+++  search: (params: SecuritySearchInput) =>
+++    unwrap<SecuritySearchResult>(
+++      client.get('/market-data/securities/search', {
+++        params: {
+++          q: params.q,
+++          ...(params.markets?.length ? { markets: params.markets.join(',') } : {}),
+++          ...(params.types?.length ? { types: params.types.join(',') } : {}),
+++          ...(params.includeDelisted !== undefined ? { includeDelisted: params.includeDelisted } : {}),
+++          ...(params.limit !== undefined ? { limit: params.limit } : {}),
+++        },
+++      }),
+++    ),
+++  get: (canonicalSymbol: string) =>
+++    unwrap<Security>(
+++      client.get(`/market-data/securities/${encodeURIComponent(normalizeCanonicalSymbol(canonicalSymbol))}`),
+++    ),
+++};
+++
+++function pick<T>(mock: T, remote: T): T {
+++  return getSettings().apiMode === 'remote' ? remote : mock;
+++}
+++
+++export function searchSecurities(params: SecuritySearchInput) {
+++  return pick(mockApi.search, remoteApi.search)(params);
+++}
+++
+++export function getSecurity(canonicalSymbol: string) {
+++  return pick(mockApi.get, remoteApi.get)(canonicalSymbol);
+++}
++diff --git a/src/features/market-data/utils/syncPlanForm.test.ts b/src/features/market-data/utils/syncPlanForm.test.ts
++index ae2a620..134e225 100644
++--- a/src/features/market-data/utils/syncPlanForm.test.ts
+++++ b/src/features/market-data/utils/syncPlanForm.test.ts
++@@ -1,5 +1,6 @@
++ import { describe, expect, it } from 'vitest';
++-import { buildPlanInput, fallbackConfigurationErrors } from './syncPlanForm';
+++import { buildPlanInput, fallbackConfigurationErrors, planToDraft, type SyncPlanDraft } from './syncPlanForm';
+++import type { MarketDataSyncPlan } from '../../../shared/types/domain';
++ 
++ describe('syncPlanForm', () => {
++   it('分钟补档生成 MANUAL + 日期 scope', () => {
++@@ -25,3 +26,89 @@ describe('syncPlanForm', () => {
++       includeAuction: false, enabled: true, createdAt: '', updatedAt: '' })).not.toHaveLength(0);
++   });
++ });
+++
+++describe('syncPlanForm 旧 scopeJson 兼容', () => {
+++  it('旧 scopeJson {symbols:[...]} 计划可被 planToDraft 解析展示不报错', () => {
+++    // 旧结构化 scopeJson: {symbols:[...], startDate, endDate}
+++    const structuredPlan: MarketDataSyncPlan = {
+++      id: 'p-legacy-1',
+++      planName: '旧计划-结构化',
+++      taskType: 'DAILY_BAR_BACKFILL',
+++      provider: 'LONGPORT',
+++      scopeJson: JSON.stringify({
+++        symbols: ['SH.600519', 'HK.02498'],
+++        startDate: '2026-07-01',
+++        endDate: '2026-07-10',
+++      }),
+++      adjustType: 'NONE',
+++      triggerType: 'MANUAL',
+++      includeAuction: false,
+++      enabled: true,
+++      createdAt: '',
+++      updatedAt: '',
+++    };
+++
+++    const draft = planToDraft(structuredPlan);
+++    expect(draft.symbols).toBe('SH.600519, HK.02498');
+++    expect(draft.startDate).toBe('2026-07-01');
+++    expect(draft.endDate).toBe('2026-07-10');
+++
+++    // 旧单标的 scopeJson: {canonicalSymbol:'SH.600519'}
+++    const singleSymbolPlan: MarketDataSyncPlan = {
+++      id: 'p-legacy-2',
+++      planName: '旧计划-单标的',
+++      taskType: 'DAILY_BAR_BACKFILL',
+++      provider: 'LONGPORT',
+++      scopeJson: JSON.stringify({ canonicalSymbol: 'SH.600519' }),
+++      adjustType: 'NONE',
+++      triggerType: 'MANUAL',
+++      includeAuction: false,
+++      enabled: true,
+++      createdAt: '',
+++      updatedAt: '',
+++    };
+++
+++    const singleDraft = planToDraft(singleSymbolPlan);
+++    expect(singleDraft.symbols).toBe('SH.600519');
+++  });
+++
+++  it('结构化 scope builder 生成正确 scopeJson 且与旧格式读取兼容', () => {
+++    const draft: SyncPlanDraft = {
+++      planName: '计划-结构化',
+++      taskType: 'DAILY_BAR_BACKFILL',
+++      provider: 'LONGPORT',
+++      symbols: 'SH.600519, HK.02498',
+++      startDate: '2026-07-01',
+++      endDate: '2026-07-10',
+++      adjustType: 'NONE',
+++    };
+++
+++    const input = buildPlanInput(draft);
+++
+++    expect(JSON.parse(input.scopeJson)).toEqual({
+++      symbols: ['SH.600519', 'HK.02498'],
+++      startDate: '2026-07-01',
+++      endDate: '2026-07-10',
+++    });
+++
+++    // 读兼容：把生成的 scopeJson 装回一个计划，再走 planToDraft，应能完整还原。
+++    const roundTripPlan: MarketDataSyncPlan = {
+++      id: 'p-rt',
+++      planName: draft.planName,
+++      taskType: draft.taskType,
+++      provider: draft.provider,
+++      scopeJson: input.scopeJson,
+++      adjustType: draft.adjustType ?? 'NONE',
+++      triggerType: 'MANUAL',
+++      includeAuction: false,
+++      enabled: true,
+++      createdAt: '',
+++      updatedAt: '',
+++    };
+++
+++    const roundTripped = planToDraft(roundTripPlan);
+++    expect(roundTripped.symbols).toBe('SH.600519, HK.02498');
+++    expect(roundTripped.startDate).toBe('2026-07-01');
+++    expect(roundTripped.endDate).toBe('2026-07-10');
+++  });
+++});
++diff --git a/src/pages/market-data.test.tsx b/src/pages/market-data.test.tsx
++new file mode 100644
++index 0000000..51031da
++--- /dev/null
+++++ b/src/pages/market-data.test.tsx
++@@ -0,0 +1,215 @@
+++import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+++import { ConfigProvider } from 'antd';
+++import zhCN from 'antd/locale/zh_CN';
+++import type { ReactNode } from 'react';
+++import { QuoteSnapshotsTab, SyncTasksTab } from './market-data';
+++import { saveSettings } from '../features/settings/api/settingsApi';
+++import { clearAll } from '../shared/api/localStorageClient';
+++
+++// Hoisted API fns that we assert on.
+++const mocks = vi.hoisted(() => ({
+++  fetchLatestQuotes: vi.fn(),
+++  createDailyBarSync: vi.fn(),
+++  getQuoteSnapshots: vi.fn(),
+++  getSyncTasks: vi.fn(),
+++  getProviderStatus: vi.fn(),
+++  searchSecurities: vi.fn(),
+++}));
+++
+++// Mock the market-data write/list API: keep importActual so unrelated exports survive,
+++// override only the fns we drive or assert on.
+++vi.mock('../features/market-data/api/marketDataApi', async () => {
+++  const actual = await vi.importActual<typeof import('../features/market-data/api/marketDataApi')>(
+++    '../features/market-data/api/marketDataApi',
+++  );
+++  return {
+++    ...actual,
+++    fetchLatestQuotes: mocks.fetchLatestQuotes,
+++    createDailyBarSync: mocks.createDailyBarSync,
+++    getQuoteSnapshots: mocks.getQuoteSnapshots,
+++    getSyncTasks: mocks.getSyncTasks,
+++    getProviderStatus: mocks.getProviderStatus,
+++  };
+++});
+++
+++// Mock the security directory search so the selector resolves a known result for a query.
+++vi.mock('../features/market-data/api/securityDirectoryApi', async () => {
+++  const actual =
+++    await vi.importActual<typeof import('../features/market-data/api/securityDirectoryApi')>(
+++      '../features/market-data/api/securityDirectoryApi',
+++    );
+++  return {
+++    ...actual,
+++    searchSecurities: mocks.searchSecurities,
+++  };
+++});
+++
+++// Mock antd message (page calls message.info/success/error/warning).
+++import { message as antdMessage } from 'antd';
+++vi.spyOn(antdMessage, 'success').mockImplementation(() => ({} as never));
+++vi.spyOn(antdMessage, 'error').mockImplementation(() => ({} as never));
+++vi.spyOn(antdMessage, 'info').mockImplementation(() => ({} as never));
+++vi.spyOn(antdMessage, 'warning').mockImplementation(() => ({} as never));
+++
+++const emptyPage = { items: [], total: 0, page: 1, size: 20 };
+++const readyProvider = { configured: true, reachable: true };
+++
+++const SH603308_RESULT = {
+++  items: [
+++    {
+++      canonicalSymbol: 'SH.603308',
+++      symbol: '603308',
+++      displayName: '应流股份',
+++      name: '应流股份',
+++      market: 'SH',
+++      exchange: 'SSE',
+++      currency: 'CNY',
+++      securityType: 'STOCK',
+++      listStatus: 'LISTED',
+++      matchedBy: 'FORMAL_NAME_EXACT',
+++    },
+++  ],
+++  catalogStatus: 'READY',
+++  catalogUpdatedAt: '2026-07-29T10:00:00',
+++  stale: false,
+++  degraded: false,
+++};
+++
+++function withProvider(ui: ReactNode): ReactNode {
+++  return <ConfigProvider locale={zhCN}>{ui}</ConfigProvider>;
+++}
+++
+++/**
+++ * Drive the SecuritySelector to a deterministic selection for `SH.603308`.
+++ * - types a query into the selector input (placeholder contains "检索证券")
+++ * - waits past the 250ms debounce + mocked searchSecurities promise resolution
+++ * - clicks the result item with data-canonical-symbol="SH.603308"
+++ *
+++ * Uses real timers (waitFor default timeout comfortably exceeds the 250ms debounce) so that
+++ * antd v6 Popconfirm portals still render when a submit step follows.
+++ */
+++async function selectSh603308ViaSelector(): Promise<void> {
+++  const input = screen.getByPlaceholderText(/检索证券/);
+++  await act(async () => {
+++    fireEvent.change(input, { target: { value: '应流' } });
+++  });
+++  // The selector debounces search by 250ms; let the timer + microtask resolve.
+++  await waitFor(() => {
+++    expect(screen.getByText('应流股份')).toBeInTheDocument();
+++  });
+++  const item = document.querySelector('[data-canonical-symbol="SH.603308"]');
+++  expect(item).not.toBeNull();
+++  await act(async () => {
+++    fireEvent.click(item as Element);
+++  });
+++}
+++
+++describe('market-data SecuritySelector integration', () => {
+++  beforeEach(() => {
+++    vi.clearAllMocks();
+++    clearAll();
+++    saveSettings({ apiMode: 'mock', apiBaseUrl: '' });
+++    // Defaults: list endpoints return empty page, provider is ready so submit can proceed,
+++    // selector search resolves the known SH.603308 result for any qualifying query.
+++    mocks.getQuoteSnapshots.mockResolvedValue(emptyPage);
+++    mocks.getSyncTasks.mockResolvedValue(emptyPage);
+++    mocks.getProviderStatus.mockResolvedValue(readyProvider);
+++    mocks.searchSecurities.mockResolvedValue(SH603308_RESULT);
+++    // Write fns return benign payloads so submit handlers complete.
+++    mocks.fetchLatestQuotes.mockResolvedValue([]);
+++    mocks.createDailyBarSync.mockResolvedValue({ id: 'mock', status: 'FAILED', createdAt: '' } as never);
+++    vi.useRealTimers();
+++  });
+++
+++  afterEach(() => {
+++    vi.useRealTimers();
+++  });
+++
+++  // TD-D2-PAGE-MD-01, AC-03
+++  it('最新价查询：SecuritySelector 选中后提交的 canonical symbol 与所选一致', async () => {
+++    render(withProvider(<QuoteSnapshotsTab />));
+++    await selectSh603308ViaSelector();
+++
+++    // The manual textarea should now carry the selected canonical symbol.
+++    await waitFor(() => {
+++      expect((screen.getByPlaceholderText(/输入证券代码/) as HTMLTextAreaElement).value).toContain(
+++        'SH.603308',
+++      );
+++    });
+++
+++    // Trigger the latest-price fetch (Popconfirm), then click the confirm (OK) button.
+++    // antd v6 Popconfirm OK button carries the `ant-btn-primary` class; selecting by class
+++    // keeps the test independent of locale-dependent OK button text (确定 / OK).
+++    fireEvent.click(screen.getByText('拉取最新价'));
+++    const okBtn = await waitFor(() => {
+++      const btn = document.querySelector('.ant-popover .ant-btn-primary') as HTMLButtonElement | null;
+++      if (!btn) throw new Error('Popconfirm OK button not rendered yet');
+++      return btn;
+++    });
+++    await act(async () => {
+++      fireEvent.click(okBtn);
+++    });
+++
+++    await waitFor(() => {
+++      expect(mocks.fetchLatestQuotes).toHaveBeenCalledTimes(1);
+++    });
+++    const args = mocks.fetchLatestQuotes.mock.calls.at(-1);
+++    expect(args?.[0]).toEqual(expect.arrayContaining(['SH.603308']));
+++  });
+++
+++  // TD-D2-PAGE-MD-02, AC-03
+++  it('历史日 K 同步：SecuritySelector 选中后提交的 canonical symbol 与所选一致', async () => {
+++    render(withProvider(<SyncTasksTab />));
+++    await selectSh603308ViaSelector();
+++
+++    // The manual sync input should now carry the selected canonical symbol.
+++    await waitFor(() => {
+++      expect((screen.getByPlaceholderText(/SH\.600519/) as HTMLInputElement).value).toContain(
+++        'SH.603308',
+++      );
+++    });
+++
+++    // Submit the daily-bar sync task.
+++    fireEvent.click(screen.getByText('创建同步'));
+++
+++    await waitFor(() => {
+++      expect(mocks.createDailyBarSync).toHaveBeenCalledTimes(1);
+++    });
+++    const args = mocks.createDailyBarSync.mock.calls.at(-1) ?? [];
+++    // createDailyBarSync(taskType, provider, canonicalSymbol, startDate?, endDate?, adjustType?)
+++    expect(args[2]).toBe('SH.603308');
+++  });
+++
+++  // TD-D2-NOSIDEEFFECT-01, AC-04 — drives BOTH tabs through search+selection WITHOUT submitting.
+++  it('最新价/日 K 选择证券过程不调用 quote/sync/采集任务创建等写接口', async () => {
+++    // QuoteSnapshotsTab: select via selector, do not submit.
+++    const { unmount: unmountQuote } = render(withProvider(<QuoteSnapshotsTab />));
+++    await selectSh603308ViaSelector();
+++    expect(mocks.fetchLatestQuotes).not.toHaveBeenCalled();
+++    unmountQuote();
+++
+++    // SyncTasksTab: select via selector, do not submit.
+++    const { unmount: unmountSync } = render(withProvider(<SyncTasksTab />));
+++    await selectSh603308ViaSelector();
+++    expect(mocks.createDailyBarSync).not.toHaveBeenCalled();
+++    unmountSync();
+++  });
+++
+++  // TD-D2-FALLBACK-01, AC-05
+++  it('手工输入 canonical symbol 后备路径仍可提交', async () => {
+++    render(withProvider(<SyncTasksTab />));
+++    const manualInput = screen.getByPlaceholderText(/SH\.600519/) as HTMLInputElement;
+++    await act(async () => {
+++      fireEvent.change(manualInput, { target: { value: 'SH.600519' } });
+++    });
+++
+++    fireEvent.click(screen.getByText('创建同步'));
+++
+++    await waitFor(() => {
+++      expect(mocks.createDailyBarSync).toHaveBeenCalledTimes(1);
+++    });
+++    const args = mocks.createDailyBarSync.mock.calls.at(-1) ?? [];
+++    expect(args[2]).toBe('SH.600519');
+++  });
+++});
++diff --git a/src/pages/market-data.tsx b/src/pages/market-data.tsx
++index 5c21b5f..c272e5f 100644
++--- a/src/pages/market-data.tsx
+++++ b/src/pages/market-data.tsx
++@@ -11,6 +11,7 @@ import {
++   getAlerts, resolveAlert, createDailyBarSync,
++ } from '../features/market-data/api/marketDataApi';
++ import { normalizeCanonicalSymbol, parseCanonicalSymbols } from '../features/market-data/utils/canonicalSymbol';
+++import { SecuritySelector } from '../shared/components/SecuritySelector';
++ import type { StockBasic, StockDailyBar, DailyBarImportResult, EntityId,
++   ProviderStatus, StockQuoteSnapshot, MarketDataSyncTask, MarketDataAlert } from '../shared/types/domain';
++ 
++@@ -65,7 +66,7 @@ export function MarketDataPage() {
++ }
++ 
++ // ===== 最新价快照 Tab =====
++-function QuoteSnapshotsTab() {
+++export function QuoteSnapshotsTab() {
++   const [snapshots, setSnapshots] = useState<StockQuoteSnapshot[]>([]);
++   const [total, setTotal] = useState(0);
++   const [loading, setLoading] = useState(true);
++@@ -132,6 +133,7 @@ function QuoteSnapshotsTab() {
++           <Input.TextArea placeholder="输入证券代码，逗号或换行分隔（如 SH.600519、HK.02498、US.AAPL）"
++             style={{ width: 400 }} rows={1} value={fetchSymbols}
++             onChange={(e) => setFetchSymbols(e.target.value)} />
+++          <SecuritySelector value={fetchSymbols} onChange={(symbol) => setFetchSymbols(symbol)} />
++           <Popconfirm title="拉取并保存最新行情？不覆盖手工当前价。" onConfirm={() => void handleFetchLatest()}>
++             <Button type="primary" loading={fetching} icon={<ReloadOutlined />}>拉取最新价</Button>
++           </Popconfirm>
++@@ -446,7 +448,7 @@ function BarsTab() {
++ }
++ 
++ // ===== 历史数据同步 Tab =====
++-function SyncTasksTab() {
+++export function SyncTasksTab() {
++   const [data, setData] = useState<MarketDataSyncTask[]>([]);
++   const [total, setTotal] = useState(0);
++   const [loading, setLoading] = useState(true);
++@@ -516,6 +518,7 @@ function SyncTasksTab() {
++         <Space wrap>
++           <Input allowClear placeholder="如 SH.600519 / HK.02498 / US.AAPL" style={{ width: 260 }} value={syncSymbol}
++             onChange={(e) => setSyncSymbol(e.target.value)} />
+++          <SecuritySelector value={syncSymbol} onChange={(symbol) => setSyncSymbol(symbol)} />
++           <DatePicker placeholder="起始日期" value={syncStartDate ? dayjs(syncStartDate) : null}
++             onChange={(d) => setSyncStartDate(d?.format('YYYY-MM-DD'))} />
++           <DatePicker placeholder="截止日期" value={syncEndDate ? dayjs(syncEndDate) : null}
++diff --git a/src/pages/market-segments.test.tsx b/src/pages/market-segments.test.tsx
++index 5b387f0..9a5ef4b 100644
++--- a/src/pages/market-segments.test.tsx
+++++ b/src/pages/market-segments.test.tsx
++@@ -1,5 +1,9 @@
++ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
++-import { describe, it, expect, vi, beforeEach } from 'vitest';
+++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+++import { searchSecurities } from '../features/market-data/api/securityDirectoryApi';
+++import { saveSettings } from '../features/settings/api/settingsApi';
+++import { clearAll } from '../shared/api/localStorageClient';
+++import type { MarketSegment } from '../shared/types/domain';
++ 
++ const mockApi = vi.hoisted(() => ({
++   listSegments: vi.fn(),
++@@ -14,8 +18,19 @@ const mockApi = vi.hoisted(() => ({
++ 
++ vi.mock('../features/market-data/api/segmentApi', () => mockApi);
++ 
+++// Mock the security directory API so SecuritySelector never touches the network/seed catalog.
+++vi.mock('../features/market-data/api/securityDirectoryApi', async () => {
+++  const actual = await vi.importActual<typeof import('../features/market-data/api/securityDirectoryApi')>(
+++    '../features/market-data/api/securityDirectoryApi',
+++  );
+++  return {
+++    ...actual,
+++    searchSecurities: vi.fn(),
+++  };
+++});
+++
++ import { message as antdMessage } from 'antd';
++-import { MarketSegmentsPage } from './market-segments';
+++import { MarketSegmentsPage, MembersDrawer } from './market-segments';
++ 
++ vi.spyOn(antdMessage, 'success').mockImplementation(() => ({} as never));
++ vi.spyOn(antdMessage, 'error').mockImplementation(() => ({} as never));
++@@ -208,3 +223,118 @@ describe('MarketSegmentsPage 行为测试', () => {
++     unmount();
++   });
++ });
+++
+++// ==================== 板块成员 SecuritySelector 集成 (RS-05) ====================
+++
+++/**
+++ * Advance fake timers past the SecuritySelector 250ms debounce and flush the
+++ * microtask queue that resolves the mocked searchSecurities promise + React
+++ * state updates. Under fake timers waitFor cannot self-advance, so we settle
+++ * microtasks via repeated `await Promise.resolve()`.
+++ */
+++async function flushSelectorDebounce(ms = 250) {
+++  await act(async () => {
+++    vi.advanceTimersByTime(ms);
+++    for (let i = 0; i < 10; i += 1) {
+++      await Promise.resolve();
+++    }
+++  });
+++}
+++
+++describe('板块成员 SecuritySelector 集成', () => {
+++  const stubSegment: MarketSegment = {
+++    id: 'seg-selector',
+++    segmentName: '选择器测试板块',
+++    segmentType: 'CUSTOM',
+++    enabled: true,
+++    memberCount: 0,
+++    segmentCode: 'SEG_SEL',
+++    createdAt: '',
+++    updatedAt: '',
+++  };
+++
+++  beforeEach(() => {
+++    vi.useFakeTimers();
+++    vi.clearAllMocks();
+++    clearAll();
+++    saveSettings({ apiMode: 'mock', apiBaseUrl: '' });
+++    mockApi.listSegmentMembers.mockResolvedValue([]);
+++    mockApi.addSegmentMember.mockResolvedValue({ id: 'm-sel', segmentId: stubSegment.id, canonicalSymbol: 'SH.603308', sortOrder: 0, createdAt: '' });
+++    vi.mocked(searchSecurities).mockReset();
+++    vi.mocked(searchSecurities).mockResolvedValue({
+++      items: [
+++        {
+++          canonicalSymbol: 'SH.603308',
+++          symbol: '603308',
+++          displayName: '应流股份',
+++          name: '应流股份',
+++          market: 'SH',
+++          exchange: 'SSE',
+++          currency: 'CNY',
+++          securityType: 'STOCK',
+++          listStatus: 'LISTED',
+++          matchedBy: 'FORMAL_NAME_EXACT',
+++        },
+++      ],
+++      catalogStatus: 'READY',
+++      catalogUpdatedAt: '2026-07-29T10:00:00',
+++      stale: false,
+++      degraded: false,
+++    });
+++  });
+++  afterEach(() => {
+++    vi.useRealTimers();
+++  });
+++
+++  it('板块成员：SecuritySelector 选中后 addSegmentMember 提交的 canonical symbol 与所选一致', async () => {
+++    await act(async () => {
+++      render(<MembersDrawer segment={stubSegment} onClose={vi.fn()} />);
+++      // 让 useEffect(listSegmentMembers) 的 microtask 在 fake timers 下落地。
+++      for (let i = 0; i < 10; i += 1) {
+++        await Promise.resolve();
+++      }
+++    });
+++    const selectorInput = screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
+++
+++    // 驱动 SecuritySelector：输入 → debounce → 点击 data-canonical-symbol="SH.603308"
+++    fireEvent.change(selectorInput, { target: { value: '应流' } });
+++    await flushSelectorDebounce();
+++    const listItem = screen.getByTestId('security-selector-results')
+++      .querySelector('[data-canonical-symbol="SH.603308"]') as HTMLElement;
+++    expect(listItem).toBeTruthy();
+++    fireEvent.click(listItem);
+++    await flushSelectorDebounce(0);
+++
+++    // 点击添加成员
+++    const addBtn = Array.from(document.querySelectorAll('.ant-drawer button'))
+++      .find((b) => b.textContent?.replace(/\s/g, '') === '添加成员') as HTMLButtonElement;
+++    expect(addBtn).toBeTruthy();
+++    await act(async () => { fireEvent.click(addBtn); });
+++    // 让 addSegmentMember promise 的 microtask 落地。
+++    await flushSelectorDebounce(0);
+++
+++    // 断言 addSegmentMember 被调用，canonicalSymbol 与所选一致
+++    expect(mockApi.addSegmentMember).toHaveBeenCalledTimes(1);
+++    expect(mockApi.addSegmentMember).toHaveBeenCalledWith(stubSegment.id, expect.objectContaining({ canonicalSymbol: 'SH.603308' }));
+++  });
+++
+++  it('板块成员：仅选择不提交时 addSegmentMember 不被调用', async () => {
+++    await act(async () => {
+++      render(<MembersDrawer segment={stubSegment} onClose={vi.fn()} />);
+++      for (let i = 0; i < 10; i += 1) {
+++        await Promise.resolve();
+++      }
+++    });
+++    const selectorInput = screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
+++
+++    fireEvent.change(selectorInput, { target: { value: '应流' } });
+++    await flushSelectorDebounce();
+++    const listItem = screen.getByTestId('security-selector-results')
+++      .querySelector('[data-canonical-symbol="SH.603308"]') as HTMLElement;
+++    fireEvent.click(listItem);
+++    await flushSelectorDebounce(0);
+++
+++    // 未点添加：addSegmentMember 不应被调用
+++    expect(mockApi.addSegmentMember).not.toHaveBeenCalled();
+++  });
+++});
++diff --git a/src/pages/market-segments.tsx b/src/pages/market-segments.tsx
++index c0fcb91..615d249 100644
++--- a/src/pages/market-segments.tsx
+++++ b/src/pages/market-segments.tsx
++@@ -17,6 +17,7 @@ import {
++ import type { MarketSegment, MarketSegmentMember, EntityId, MarketSectorMemberSnapshot,
++   MarketSectorPeer, MarketSectorRank, MarketSectorRankingBatch, MarketSectorRankingConfig,
++   MarketSectorRankingItem, MarketSectorSnapshot, MarketSectorWatch } from '../shared/types/domain';
+++import { SecuritySelector } from '../shared/components/SecuritySelector';
++ 
++ interface PageResult<T> { items: T[]; total: number; page: number; size: number; }
++ 
++@@ -566,7 +567,7 @@ function SegmentListTab() {
++   );
++ }
++ 
++-function MembersDrawer({ segment, onClose }: { segment: MarketSegment | null; onClose: () => void }) {
+++export function MembersDrawer({ segment, onClose }: { segment: MarketSegment | null; onClose: () => void }) {
++   const [members, setMembers] = useState<MarketSegmentMember[]>([]);
++   const [loading, setLoading] = useState(false);
++   const [error, setError] = useState<string | null>(null);
++@@ -639,6 +640,7 @@ function MembersDrawer({ segment, onClose }: { segment: MarketSegment | null; on
++       )}
++       <Card size="small" style={{ marginBottom: 16 }}>
++         <Space orientation="vertical" style={{ width: '100%' }}>
+++          <SecuritySelector value={symbol} onChange={(s) => setSymbol(s)} />
++           <Input placeholder="如 SH.600519 / HK.02498 / US.AAPL" value={symbol} onChange={(e) => setSymbol(e.target.value)} disabled={adding} />
++           <Input placeholder="备注（可选）" value={remark} onChange={(e) => setRemark(e.target.value)} disabled={adding} />
++           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} loading={adding} disabled={adding}>添加成员</Button>
++diff --git a/src/pages/market-workspace.test.tsx b/src/pages/market-workspace.test.tsx
++index 7ab12ac..c3b5ede 100644
++--- a/src/pages/market-workspace.test.tsx
+++++ b/src/pages/market-workspace.test.tsx
++@@ -1,12 +1,19 @@
++ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
++-import { describe, it, expect, vi, beforeEach } from 'vitest';
++-import { TaskItemsDrawer } from './market-workspace';
+++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+++import { TaskItemsDrawer, PlansTab } from './market-workspace';
+++import { buildPlanInput } from '../features/market-data/utils/syncPlanForm';
+++import { searchSecurities } from '../features/market-data/api/securityDirectoryApi';
+++import { saveSettings } from '../features/settings/api/settingsApi';
+++import { clearAll } from '../shared/api/localStorageClient';
++ import type { MarketDataSyncPlan, MarketDataSyncTaskItem } from '../shared/types/domain';
++ 
++ // Mock the workbench API module
++ const mockApi = vi.hoisted(() => ({
++   listTaskItems: vi.fn(),
++   reconcileTask: vi.fn(),
+++  createSyncPlan: vi.fn(),
+++  updateSyncPlan: vi.fn(),
+++  listSyncPlans: vi.fn(),
++ }));
++ 
++ vi.mock('../features/market-data/api/workbenchApi', async () => {
++@@ -17,6 +24,20 @@ vi.mock('../features/market-data/api/workbenchApi', async () => {
++     ...actual,
++     listTaskItems: mockApi.listTaskItems,
++     reconcileTask: mockApi.reconcileTask,
+++    createSyncPlan: mockApi.createSyncPlan,
+++    updateSyncPlan: mockApi.updateSyncPlan,
+++    listSyncPlans: mockApi.listSyncPlans,
+++  };
+++});
+++
+++// Mock the security directory API so SecuritySelector never touches the network/seed catalog.
+++vi.mock('../features/market-data/api/securityDirectoryApi', async () => {
+++  const actual = await vi.importActual<typeof import('../features/market-data/api/securityDirectoryApi')>(
+++    '../features/market-data/api/securityDirectoryApi',
+++  );
+++  return {
+++    ...actual,
+++    searchSecurities: vi.fn(),
++   };
++ });
++ 
++@@ -175,3 +196,132 @@ describe('TaskItemsDrawer', () => {
++     });
++   });
++ });
+++
+++// ==================== 采集计划 SecuritySelector 集成 (RS-05) ====================
+++
+++/**
+++ * Advance fake timers past the SecuritySelector 250ms debounce and flush the
+++ * microtask queue that resolves the mocked searchSecurities promise + React
+++ * state updates. Under fake timers waitFor cannot self-advance, so we settle
+++ * microtasks via repeated `await Promise.resolve()`.
+++ */
+++async function flushSelectorDebounce(ms = 250) {
+++  await act(async () => {
+++    vi.advanceTimersByTime(ms);
+++    for (let i = 0; i < 10; i += 1) {
+++      await Promise.resolve();
+++    }
+++  });
+++}
+++
+++describe('采集计划 SecuritySelector 集成', () => {
+++  beforeEach(() => {
+++    vi.useFakeTimers();
+++    vi.clearAllMocks();
+++    clearAll();
+++    saveSettings({ apiMode: 'mock', apiBaseUrl: '' });
+++    mockApi.listSyncPlans.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
+++    mockApi.createSyncPlan.mockResolvedValue({} as never);
+++    mockApi.updateSyncPlan.mockResolvedValue({} as never);
+++    vi.mocked(searchSecurities).mockReset();
+++    vi.mocked(searchSecurities).mockResolvedValue({
+++      items: [
+++        {
+++          canonicalSymbol: 'SH.603308',
+++          symbol: '603308',
+++          displayName: '应流股份',
+++          name: '应流股份',
+++          market: 'SH',
+++          exchange: 'SSE',
+++          currency: 'CNY',
+++          securityType: 'STOCK',
+++          listStatus: 'LISTED',
+++          matchedBy: 'FORMAL_NAME_EXACT',
+++        },
+++      ],
+++      catalogStatus: 'READY',
+++      catalogUpdatedAt: '2026-07-29T10:00:00',
+++      stale: false,
+++      degraded: false,
+++    });
+++  });
+++  afterEach(() => {
+++    vi.useRealTimers();
+++  });
+++
+++  it('采集计划 scope：SecuritySelector 选中后 buildPlanInput 的 scopeJson 含正确 canonical symbol', async () => {
+++    await act(async () => {
+++      render(<PlansTab />);
+++      // 让 useEffect(listSyncPlans) 的 microtask 在 fake timers 下落地。
+++      for (let i = 0; i < 10; i += 1) {
+++        await Promise.resolve();
+++      }
+++    });
+++    expect(mockApi.listSyncPlans).toHaveBeenCalled();
+++    // 打开新建 Drawer
+++    fireEvent.click(screen.getByText('新建采集计划'));
+++    await flushSelectorDebounce(0);
+++    const selectorInput = screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
+++
+++    // 驱动 SecuritySelector：输入 → debounce → 点击 data-canonical-symbol="SH.603308"
+++    fireEvent.change(selectorInput, { target: { value: '应流' } });
+++    await flushSelectorDebounce();
+++    const listItem = screen.getByTestId('security-selector-results')
+++      .querySelector('[data-canonical-symbol="SH.603308"]') as HTMLElement;
+++    expect(listItem).toBeTruthy();
+++    fireEvent.click(listItem);
+++    await flushSelectorDebounce(0);
+++
+++    // SecurityVerificationField 是 symbols Form.Item 的受控子组件，会把 form 的 symbols
+++    // 值渲染成“已选标的”下的 Tag。这里读取它，证明 selector → form 字段写入成功。
+++    // 限定在“已选标的”区块内，避免命中 SecuritySelector 自身的已选/结果 Tag。
+++    const selectedLabel = Array.from(document.querySelectorAll('.ant-drawer-body *'))
+++      .find((el) => el.childNodes.length === 1 && el.textContent?.trim() === '已选标的') as HTMLElement | undefined;
+++    expect(selectedLabel).toBeTruthy();
+++    // “已选标的”与 Tag 列表在同一父容器内。
+++    const selectedRegion = selectedLabel!.parentElement!;
+++    const selectedTags = Array.from(selectedRegion.querySelectorAll('.ant-tag'))
+++      .map((t) => t.textContent ?? '');
+++    expect(selectedTags).toContain('SH.603308');
+++
+++    // 用真实生产函数 buildPlanInput 把该 symbols 值转成 scopeJson，断言 canonical symbol 进入。
+++    // （采用 TaskPacket 允许的回退断言：跳过 antd v6 Select/日期保存的脆弱事件交互。）
+++    const symbolsValue = selectedTags.join(', ');
+++    const input = buildPlanInput({
+++      planName: '日K计划-选择器',
+++      taskType: 'DAILY_BAR_BACKFILL',
+++      provider: 'LONGPORT',
+++      symbols: symbolsValue,
+++      startDate: '2026-07-01',
+++      endDate: '2026-07-10',
+++      adjustType: 'NONE',
+++    });
+++    const scope = JSON.parse(input.scopeJson);
+++    expect(scope.symbols).toContain('SH.603308');
+++  });
+++
+++  it('采集计划/板块成员选择过程不触发 quote/K 线同步写', async () => {
+++    await act(async () => {
+++      render(<PlansTab />);
+++      for (let i = 0; i < 10; i += 1) {
+++        await Promise.resolve();
+++      }
+++    });
+++    expect(mockApi.listSyncPlans).toHaveBeenCalled();
+++    fireEvent.click(screen.getByText('新建采集计划'));
+++    await flushSelectorDebounce(0);
+++    const selectorInput = screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
+++
+++    // 仅驱动选择过程，不提交
+++    fireEvent.change(selectorInput, { target: { value: '应流' } });
+++    await flushSelectorDebounce();
+++    const listItem = screen.getByTestId('security-selector-results')
+++      .querySelector('[data-canonical-symbol="SH.603308"]') as HTMLElement;
+++    fireEvent.click(listItem);
+++    await flushSelectorDebounce(0);
+++
+++    // 未提交：createSyncPlan / updateSyncPlan 都不应被调用
+++    expect(mockApi.createSyncPlan).not.toHaveBeenCalled();
+++    expect(mockApi.updateSyncPlan).not.toHaveBeenCalled();
+++  });
+++});
++diff --git a/src/pages/market-workspace.tsx b/src/pages/market-workspace.tsx
++index 1f58cbc..89e4888 100644
++--- a/src/pages/market-workspace.tsx
+++++ b/src/pages/market-workspace.tsx
++@@ -10,6 +10,7 @@ import {
++ } from '../features/market-data/api/workbenchApi';
++ import { buildPlanInput, fallbackConfigurationErrors, planToDraft, type SyncPlanDraft } from '../features/market-data/utils/syncPlanForm';
++ import { SecurityVerificationField } from '../features/market-data/components/SecurityVerificationField';
+++import { SecuritySelector } from '../shared/components/SecuritySelector';
++ import type {
++   WorkbenchOverview, MarketDataSyncPlan, MarketDataSyncTask, MarketDataSyncTaskItem,
++   StockMinuteBar,
++@@ -135,7 +136,7 @@ function OverviewTab() {
++ 
++ // ==================== 采集计划 Tab ====================
++ 
++-function PlansTab() {
+++export function PlansTab() {
++   const [data, setData] = useState<PageResult<MarketDataSyncPlan>>({ items: [], total: 0, page: 1, size: 20 });
++   const [loading, setLoading] = useState(false);
++   const [error, setError] = useState<string | null>(null);
++@@ -302,6 +303,17 @@ function PlansTab() {
++             ]} />
++           </Form.Item>
++           <Form.Item name="provider" label="Provider" rules={[{ required: true }]}><Select options={[{ value: 'LONGPORT', label: 'LongPort（只读行情）' }]} /></Form.Item>
+++          <Form.Item label="从目录选择标的">
+++            <SecuritySelector
+++              onChange={(symbol) => {
+++                if (!symbol) return;
+++                const current = (form.getFieldValue('symbols') ?? '').trim();
+++                const existing = current.split(/[\s,，;；]+/).filter(Boolean);
+++                if (existing.includes(symbol)) return;
+++                form.setFieldValue('symbols', current ? `${current}, ${symbol}` : symbol);
+++              }}
+++            />
+++          </Form.Item>
++           <Form.Item name="symbols" label="标的" rules={[{ required: true, message: '至少验证并加入一个标的' }]}>
++             <SecurityVerificationField remoteMode={remoteMode} taskType={taskType} />
++           </Form.Item>
++diff --git a/src/shared/components/SecuritySelector.test.tsx b/src/shared/components/SecuritySelector.test.tsx
++new file mode 100644
++index 0000000..052f99b
++--- /dev/null
+++++ b/src/shared/components/SecuritySelector.test.tsx
++@@ -0,0 +1,354 @@
+++import { act, fireEvent, render, screen } from '@testing-library/react';
+++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+++import { SecuritySelector } from './SecuritySelector';
+++import { searchSecurities } from '../../features/market-data/api/securityDirectoryApi';
+++
+++vi.mock('../../features/market-data/api/securityDirectoryApi', () => ({
+++  searchSecurities: vi.fn(),
+++}));
+++
+++function summary(
+++  canonicalSymbol: string,
+++  displayName: string,
+++  market: string,
+++  exchange: string,
+++  securityType = 'STOCK',
+++  listStatus: 'LISTED' | 'DELISTED' = 'LISTED',
+++) {
+++  return {
+++    canonicalSymbol,
+++    symbol: canonicalSymbol.split('.')[1] ?? canonicalSymbol,
+++    displayName,
+++    name: displayName,
+++    market,
+++    exchange,
+++    currency: market === 'HK' ? 'HKD' : market === 'US' ? 'USD' : 'CNY',
+++    securityType,
+++    listStatus,
+++    matchedBy: 'FORMAL_NAME_EXACT' as const,
+++  };
+++}
+++
+++function result(
+++  items: ReturnType<typeof summary>[],
+++  overrides: Record<string, unknown> = {},
+++) {
+++  return {
+++    items,
+++    catalogStatus: 'READY',
+++    catalogUpdatedAt: '2026-07-29T10:00:00',
+++    stale: false,
+++    degraded: false,
+++    ...overrides,
+++  };
+++}
+++
+++/**
+++ * Advance fake timers by the debounce window and flush the microtask queue
+++ * that resolves the mocked searchSecurities promise + the React state update.
+++ * Under fake timers, waitFor/findBy cannot self-advance, so we synchronously
+++ * settle microtasks via repeated `await Promise.resolve()`.
+++ */
+++async function flush(ms = 250) {
+++  await act(async () => {
+++    vi.advanceTimersByTime(ms);
+++    // Drain the resolved-promise microtasks (mock search + .then + setState).
+++    for (let i = 0; i < 10; i += 1) {
+++      await Promise.resolve();
+++    }
+++  });
+++}
+++
+++/** Resolve a deferred promise and flush the resulting microtask chain. */
+++async function settle(resolveFn: (value: unknown) => void, value: unknown) {
+++  await act(async () => {
+++    resolveFn(value);
+++    for (let i = 0; i < 10; i += 1) {
+++      await Promise.resolve();
+++    }
+++  });
+++}
+++
+++function inputEl(): HTMLInputElement {
+++  return screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
+++}
+++
+++describe('SecuritySelector', () => {
+++  beforeEach(() => {
+++    vi.useFakeTimers();
+++    vi.mocked(searchSecurities).mockReset();
+++  });
+++  afterEach(() => {
+++    vi.useRealTimers();
+++  });
+++
+++  it('250ms debounce：阈值内连续输入只触发一次搜索', () => {
+++    vi.mocked(searchSecurities).mockResolvedValue(result([]));
+++    render(<SecuritySelector onChange={vi.fn()} />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: 'a' } });
+++    fireEvent.change(input, { target: { value: 'ap' } });
+++    expect(searchSecurities).not.toHaveBeenCalled();
+++    act(() => {
+++      vi.advanceTimersByTime(250);
+++    });
+++    expect(searchSecurities).toHaveBeenCalledTimes(1);
+++    expect(searchSecurities).toHaveBeenLastCalledWith(
+++      expect.objectContaining({ q: 'ap' }),
+++    );
+++  });
+++
+++  it('过期响应不覆盖新关键词结果（竞态保护）', async () => {
+++    let resolveFirst!: (value: unknown) => void;
+++    vi.mocked(searchSecurities)
+++      .mockImplementationOnce(
+++        () =>
+++          new Promise((resolve) => {
+++            resolveFirst = resolve as (value: unknown) => void;
+++          }),
+++      )
+++      .mockResolvedValueOnce(
+++        result([summary('SH.600002', '新关键词结果', 'SH', 'SSE')]),
+++      );
+++
+++    render(<SecuritySelector onChange={vi.fn()} />);
+++    const input = inputEl();
+++
+++    fireEvent.change(input, { target: { value: 'old' } });
+++    await flush();
+++    // second keyword
+++    fireEvent.change(input, { target: { value: 'new' } });
+++    await flush();
+++
+++    // late old response resolves — must be ignored
+++    await settle(
+++      resolveFirst,
+++      result([summary('SH.600001', '旧关键词结果', 'SH', 'SSE')]),
+++    );
+++
+++    expect(screen.getByTestId('security-selector-results')).toBeInTheDocument();
+++    expect(screen.getByText('新关键词结果')).toBeInTheDocument();
+++    expect(screen.queryByText('旧关键词结果')).not.toBeInTheDocument();
+++  });
+++
+++  it('loading / 空结果 / 失败 / 重试 四态正确', async () => {
+++    // loading: deferred
+++    let resolveSearch!: (value: unknown) => void;
+++    vi.mocked(searchSecurities).mockImplementationOnce(
+++      () =>
+++        new Promise((resolve) => {
+++          resolveSearch = resolve as (value: unknown) => void;
+++        }),
+++    );
+++
+++    render(<SecuritySelector onChange={vi.fn()} />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: 'abc' } });
+++    await flush();
+++
+++    // loading state visible while pending
+++    expect(screen.getByTestId('security-selector-loading')).toBeInTheDocument();
+++
+++    // empty result
+++    await settle(resolveSearch, result([]));
+++    expect(screen.queryByTestId('security-selector-loading')).not.toBeInTheDocument();
+++    expect(screen.getByText('无匹配结果')).toBeInTheDocument();
+++
+++    // error state
+++    vi.mocked(searchSecurities).mockRejectedValueOnce(new Error('网络错误'));
+++    fireEvent.change(input, { target: { value: 'def' } });
+++    await flush();
+++    expect(screen.getByText('请求失败')).toBeInTheDocument();
+++    // antd renders CJK button text with an inserted space ("重 试"); match by
+++    // accessible name, which aggregates descendant text and ignores the span wrapper.
+++    const retryButton = screen.getByRole('button', { name: /重\s*试/ });
+++    expect(retryButton).toBeInTheDocument();
+++
+++    // retry re-invokes search
+++    vi.mocked(searchSecurities).mockResolvedValueOnce(
+++      result([summary('SH.600003', '重试结果', 'SH', 'SSE')]),
+++    );
+++    fireEvent.click(retryButton);
+++    await flush();
+++    expect(screen.getByText('重试结果')).toBeInTheDocument();
+++  });
+++
+++  it('键盘 ArrowDown/ArrowUp 导航、Enter 确认、Esc 关闭', async () => {
+++    vi.mocked(searchSecurities).mockResolvedValue(
+++      result([
+++        summary('SH.600010', '第一项', 'SH', 'SSE'),
+++        summary('SH.600011', '第二项', 'SH', 'SSE'),
+++      ]),
+++    );
+++    const onChange = vi.fn();
+++    render(<SecuritySelector onChange={onChange} />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: '项' } });
+++    await flush();
+++
+++    expect(screen.getByTestId('security-selector-results')).toBeInTheDocument();
+++
+++    fireEvent.keyDown(input, { key: 'ArrowDown' });
+++    fireEvent.keyDown(input, { key: 'Enter' });
+++    expect(onChange).toHaveBeenCalledWith('SH.600011');
+++
+++    // reopen and Esc closes
+++    fireEvent.change(input, { target: { value: '再项' } });
+++    await flush();
+++    expect(screen.getByTestId('security-selector-results')).toBeInTheDocument();
+++    fireEvent.keyDown(input, { key: 'Escape' });
+++    expect(screen.queryByTestId('security-selector-results')).not.toBeInTheDocument();
+++  });
+++
+++  it('选中后展示名称/canonical symbol/市场交易所/证券类型', async () => {
+++    vi.mocked(searchSecurities).mockResolvedValue(
+++      result([summary('SH.600600', '样本展示', 'SH', 'SSE', 'STOCK')]),
+++    );
+++    const onChange = vi.fn();
+++    render(<SecuritySelector onChange={onChange} />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: '展示' } });
+++    await flush();
+++    expect(screen.getByText('样本展示')).toBeInTheDocument();
+++    fireEvent.click(screen.getByText('样本展示'));
+++
+++    expect(onChange).toHaveBeenCalledWith('SH.600600');
+++    expect(screen.getByTestId('security-selector-selected')).toBeInTheDocument();
+++    expect(screen.getByTestId('selected-displayName')).toHaveTextContent('样本展示');
+++    expect(screen.getByTestId('selected-canonicalSymbol')).toHaveTextContent('SH.600600');
+++    expect(screen.getByTestId('selected-market')).toHaveTextContent('沪市 · SSE');
+++    expect(screen.getByTestId('selected-securityType')).toHaveTextContent('股票');
+++  });
+++
+++  it('再次编辑文本立即失效旧选择（清除已选）', async () => {
+++    vi.mocked(searchSecurities).mockResolvedValue(
+++      result([summary('SH.600600', '失效样本', 'SH', 'SSE')]),
+++    );
+++    const onChange = vi.fn();
+++    render(<SecuritySelector onChange={onChange} />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: '失效' } });
+++    await flush();
+++    expect(screen.getByText('失效样本')).toBeInTheDocument();
+++    fireEvent.click(screen.getByText('失效样本'));
+++    await flush();
+++    expect(screen.getByTestId('security-selector-selected')).toBeInTheDocument();
+++
+++    // edit text again → invalidate
+++    fireEvent.change(input, { target: { value: '失效改' } });
+++    expect(onChange).toHaveBeenLastCalledWith('');
+++    expect(screen.queryByTestId('security-selector-selected')).not.toBeInTheDocument();
+++  });
+++
+++  it('同名跨市场证券并列展示且不自动选择', async () => {
+++    vi.mocked(searchSecurities).mockResolvedValue(
+++      result([
+++        summary('SH.600600', '同名X', 'SH', 'SSE'),
+++        summary('HK.06000', '同名X', 'HK', 'HKEX'),
+++      ]),
+++    );
+++    const onChange = vi.fn();
+++    render(<SecuritySelector onChange={onChange} />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: '同名' } });
+++    await flush();
+++    const list = screen.getByTestId('security-selector-results');
+++    const shItem = list.querySelector('[data-canonical-symbol="SH.600600"]');
+++    const hkItem = list.querySelector('[data-canonical-symbol="HK.06000"]');
+++    expect(shItem).not.toBeNull();
+++    expect(hkItem).not.toBeNull();
+++    // not auto-selected
+++    expect(onChange).not.toHaveBeenCalled();
+++    expect(screen.queryByTestId('security-selector-selected')).not.toBeInTheDocument();
+++  });
+++
+++  it('退市证券默认隐藏；显式筛选后可见并标注状态', async () => {
+++    // default search (includeDelisted=false) returns only listed items
+++    vi.mocked(searchSecurities).mockImplementation((params) => {
+++      const base = [summary('SH.600600', '在市样本', 'SH', 'SSE', 'STOCK', 'LISTED')];
+++      if (params.includeDelisted) {
+++        base.push(summary('SH.600001', '退市样本', 'SH', 'SSE', 'STOCK', 'DELISTED'));
+++      }
+++      return Promise.resolve(result(base));
+++    });
+++
+++    render(<SecuritySelector onChange={vi.fn()} includeDelistedToggle />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: '样本' } });
+++    await flush();
+++    expect(searchSecurities).toHaveBeenCalledWith(
+++      expect.objectContaining({ includeDelisted: false }),
+++    );
+++    // default excludes delisted
+++    expect(screen.queryByText('退市样本')).not.toBeInTheDocument();
+++
+++    // toggle the switch
+++    const switchInput = screen.getByRole('switch');
+++    fireEvent.click(switchInput);
+++    await flush();
+++
+++    expect(searchSecurities).toHaveBeenLastCalledWith(
+++      expect.objectContaining({ includeDelisted: true }),
+++    );
+++    expect(screen.getByText('退市样本')).toBeInTheDocument();
+++    expect(screen.getByText('退市')).toBeInTheDocument();
+++  });
+++
+++  it('目录未初始化 / 正常无匹配 / 请求失败 三态可区分', async () => {
+++    // (a) catalogStatus='EMPTY'
+++    vi.mocked(searchSecurities).mockResolvedValueOnce(
+++      result([], { catalogStatus: 'EMPTY' }),
+++    );
+++    const { unmount } = render(<SecuritySelector onChange={vi.fn()} />);
+++    let input = inputEl();
+++    fireEvent.change(input, { target: { value: 'init' } });
+++    await flush();
+++    expect(screen.getByText('目录尚未初始化')).toBeInTheDocument();
+++    unmount();
+++
+++    // (b) items=[] catalogStatus='READY'
+++    vi.mocked(searchSecurities).mockResolvedValueOnce(
+++      result([], { catalogStatus: 'READY' }),
+++    );
+++    render(<SecuritySelector onChange={vi.fn()} />);
+++    input = inputEl();
+++    fireEvent.change(input, { target: { value: 'nomatch' } });
+++    await flush();
+++    expect(screen.getByText('无匹配结果')).toBeInTheDocument();
+++    expect(screen.queryByText('目录尚未初始化')).not.toBeInTheDocument();
+++    expect(screen.queryByText('请求失败')).not.toBeInTheDocument();
+++  });
+++
+++  it('目录陈旧只提示不阻断本地结果展示', async () => {
+++    vi.mocked(searchSecurities).mockResolvedValue(
+++      result([summary('SH.600600', '陈旧样本', 'SH', 'SSE')], { stale: true }),
+++    );
+++    render(<SecuritySelector onChange={vi.fn()} />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: '陈旧' } });
+++    await flush();
+++    // items still displayed
+++    expect(screen.getByTestId('security-selector-results')).toBeInTheDocument();
+++    expect(screen.getByText('陈旧样本')).toBeInTheDocument();
+++    // stale alert shown
+++    expect(screen.getByText(/目录可能陈旧/)).toBeInTheDocument();
+++  });
+++
+++  it('SecuritySelector 搜索过程不触发任何业务写请求', async () => {
+++    vi.mocked(searchSecurities).mockResolvedValue(
+++      result([summary('SH.600600', '无副作用', 'SH', 'SSE')]),
+++    );
+++    render(<SecuritySelector onChange={vi.fn()} />);
+++    const input = inputEl();
+++    fireEvent.change(input, { target: { value: 'noeffect' } });
+++    await flush();
+++    expect(screen.getByText('无副作用')).toBeInTheDocument();
+++    // The mocked module only exposes searchSecurities; only this fn was called.
+++    expect(searchSecurities).toHaveBeenCalled();
+++    // Reinforce: every call was to searchSecurities with a query payload,
+++    // never a quote/sync/collection operation.
+++    for (const call of vi.mocked(searchSecurities).mock.calls) {
+++      expect(call[0]).toMatchObject({ q: 'noeffect' });
+++    }
+++  });
+++});
++diff --git a/src/shared/components/SecuritySelector.tsx b/src/shared/components/SecuritySelector.tsx
++new file mode 100644
++index 0000000..fb87950
++--- /dev/null
+++++ b/src/shared/components/SecuritySelector.tsx
++@@ -0,0 +1,314 @@
+++import { useCallback, useEffect, useRef, useState } from 'react';
+++import { Alert, Button, Input, Space, Spin, Switch, Tag } from 'antd';
+++import { searchSecurities } from '../../features/market-data/api/securityDirectoryApi';
+++import type { SecuritySummary } from '../types/domain';
+++
+++const DEBOUNCE_MS = 250;
+++
+++const MARKET_LABEL: Record<string, string> = {
+++  SH: '沪市',
+++  SZ: '深市',
+++  BJ: '北交所',
+++  HK: '港股',
+++  US: '美股',
+++};
+++
+++const TYPE_LABEL: Record<string, string> = {
+++  STOCK: '股票',
+++  ETF: 'ETF',
+++  INDEX: '指数',
+++  REIT: 'REIT',
+++  FUND: '基金',
+++  BOND: '债券',
+++  WARRANT: '权证',
+++  OPTION: '期权',
+++  FUTURE: '期货',
+++  OTHER: '其他',
+++};
+++
+++interface Props {
+++  value?: string;
+++  onChange?: (value: string) => void;
+++  markets?: string[];
+++  types?: string[];
+++  includeDelistedToggle?: boolean;
+++}
+++
+++interface SearchState {
+++  status: 'idle' | 'loading' | 'success' | 'error';
+++  items: SecuritySummary[];
+++  catalogStatus: string;
+++  catalogUpdatedAt: string | null;
+++  stale: boolean;
+++}
+++
+++const INITIAL_STATE: SearchState = {
+++  status: 'idle',
+++  items: [],
+++  catalogStatus: 'READY',
+++  catalogUpdatedAt: null,
+++  stale: false,
+++};
+++
+++function marketLabel(market: string): string {
+++  return MARKET_LABEL[market] ?? market;
+++}
+++
+++function typeLabel(securityType: string): string {
+++  return TYPE_LABEL[securityType] ?? securityType;
+++}
+++
+++export function SecuritySelector({
+++  value,
+++  onChange,
+++  markets,
+++  types,
+++  includeDelistedToggle = false,
+++}: Props) {
+++  const [query, setQuery] = useState(value ?? '');
+++  const [open, setOpen] = useState(false);
+++  const [highlight, setHighlight] = useState(0);
+++  const [selected, setSelected] = useState<SecuritySummary | null>(null);
+++  const [state, setState] = useState<SearchState>(INITIAL_STATE);
+++  const [includeDelisted, setIncludeDelisted] = useState(false);
+++
+++  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+++  const requestRef = useRef(0);
+++  const lastQueryRef = useRef('');
+++
+++  const runSearch = useCallback(
+++    (q: string) => {
+++      const trimmed = q.trim();
+++      lastQueryRef.current = trimmed;
+++      if (!trimmed) {
+++        requestRef.current += 1;
+++        setState({ ...INITIAL_STATE, status: 'idle' });
+++        setOpen(false);
+++        return;
+++      }
+++      const requestId = (requestRef.current += 1);
+++      setState((prev) => ({ ...prev, status: 'loading' }));
+++      setOpen(true);
+++      searchSecurities({
+++        q: trimmed,
+++        markets,
+++        types,
+++        includeDelisted,
+++      })
+++        .then((result) => {
+++          if (requestId !== requestRef.current) return;
+++          setState({
+++            status: result.items.length === 0 && !result.catalogStatus ? 'success' : 'success',
+++            items: result.items,
+++            catalogStatus: result.catalogStatus,
+++            catalogUpdatedAt: result.catalogUpdatedAt,
+++            stale: result.stale,
+++          });
+++          setHighlight(0);
+++        })
+++        .catch(() => {
+++          if (requestId !== requestRef.current) return;
+++          setState((prev) => ({ ...prev, status: 'error' }));
+++        });
+++    },
+++    [markets, types, includeDelisted],
+++  );
+++
+++  const didMountRef = useRef(false);
+++  useEffect(() => {
+++    return () => {
+++      if (debounceRef.current) clearTimeout(debounceRef.current);
+++    };
+++  }, []);
+++
+++  // Re-run the search when the delisted toggle changes (no debounce), so the
+++  // user immediately sees delisted items alongside the current query.
+++  useEffect(() => {
+++    if (!didMountRef.current) {
+++      didMountRef.current = true;
+++      return;
+++    }
+++    if (lastQueryRef.current) {
+++      runSearch(lastQueryRef.current);
+++    }
+++  }, [includeDelisted, runSearch]);
+++
+++  const invalidateSelection = useCallback(() => {
+++    if (selected) {
+++      setSelected(null);
+++      onChange?.('');
+++    }
+++  }, [selected, onChange]);
+++
+++  const handleQueryChange = (next: string) => {
+++    setQuery(next);
+++    invalidateSelection();
+++    if (debounceRef.current) clearTimeout(debounceRef.current);
+++    debounceRef.current = setTimeout(() => {
+++      runSearch(next);
+++    }, DEBOUNCE_MS);
+++  };
+++
+++  const handleRetry = () => {
+++    runSearch(lastQueryRef.current);
+++  };
+++
+++  const confirmItem = (item: SecuritySummary) => {
+++    setSelected(item);
+++    setQuery(item.displayName);
+++    onChange?.(item.canonicalSymbol);
+++    setOpen(false);
+++  };
+++
+++  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+++    const items = state.items;
+++    if (event.key === 'ArrowDown') {
+++      if (items.length === 0) return;
+++      event.preventDefault();
+++      setOpen(true);
+++      setHighlight((prev) => (prev + 1) % items.length);
+++    } else if (event.key === 'ArrowUp') {
+++      if (items.length === 0) return;
+++      event.preventDefault();
+++      setOpen(true);
+++      setHighlight((prev) => (prev - 1 + items.length) % items.length);
+++    } else if (event.key === 'Enter') {
+++      if (open && items.length > 0) {
+++        event.preventDefault();
+++        confirmItem(items[highlight] ?? items[0]);
+++      }
+++    } else if (event.key === 'Escape') {
+++      event.preventDefault();
+++      setOpen(false);
+++    }
+++  };
+++
+++  const showEmptyMessage =
+++    open &&
+++    state.status !== 'loading' &&
+++    state.status !== 'error' &&
+++    state.items.length === 0;
+++  const isCatalogEmpty = showEmptyMessage && state.catalogStatus === 'EMPTY';
+++  const isNoMatch =
+++    showEmptyMessage && state.catalogStatus !== 'EMPTY';
+++
+++  return (
+++    <Space orientation="vertical" style={{ width: '100%' }} size="small">
+++      <Input
+++        value={query}
+++        placeholder="输入代码 / 名称 / 拼音检索证券"
+++        onChange={(event) => handleQueryChange(event.target.value)}
+++        onKeyDown={handleKeyDown}
+++        onFocus={() => {
+++          if (state.items.length > 0) setOpen(true);
+++        }}
+++        suffix={
+++          <span data-testid="security-selector-input-suffix">
+++            {state.status === 'loading' ? <Spin size="small" /> : null}
+++          </span>
+++        }
+++      />
+++
+++      {includeDelistedToggle && (
+++        <Space size="small">
+++          <Switch
+++            checked={includeDelisted}
+++            onChange={(checked) => setIncludeDelisted(checked)}
+++          />
+++          <span>包含退市</span>
+++        </Space>
+++      )}
+++
+++      {state.status === 'error' && (
+++        <Alert
+++          type="error"
+++          title="请求失败"
+++          action={
+++            <Button size="small" onClick={handleRetry}>
+++              重试
+++            </Button>
+++          }
+++        />
+++      )}
+++
+++      {state.stale && state.items.length > 0 && state.catalogUpdatedAt && (
+++        <Alert
+++          type="info"
+++          title={`目录可能陈旧（最近更新：${state.catalogUpdatedAt}）`}
+++        />
+++      )}
+++
+++      {selected && (
+++        <div
+++          data-testid="security-selector-selected"
+++          style={{ border: '1px solid #d9d9d9', padding: 8, borderRadius: 6 }}
+++        >
+++          <div>
+++            <strong data-testid="selected-displayName">
+++              {selected.displayName}
+++            </strong>
+++          </div>
+++          <Space size={4} wrap>
+++            <Tag data-testid="selected-canonicalSymbol">
+++              {selected.canonicalSymbol}
+++            </Tag>
+++            <Tag data-testid="selected-market">
+++              {marketLabel(selected.market)}
+++              {selected.exchange ? ` · ${selected.exchange}` : ''}
+++            </Tag>
+++            <Tag data-testid="selected-securityType">
+++              {typeLabel(selected.securityType)}
+++            </Tag>
+++          </Space>
+++        </div>
+++      )}
+++
+++      {open && state.status === 'loading' && (
+++        <div data-testid="security-selector-loading" role="status">
+++          <Spin size="small" /> <span>检索中…</span>
+++        </div>
+++      )}
+++
+++      {open && state.status === 'success' && (
+++        <ul
+++          data-testid="security-selector-results"
+++          role="listbox"
+++          style={{ listStyle: 'none', margin: 0, padding: 0 }}
+++        >
+++          {state.items.map((item, index) => (
+++            <li
+++              key={`${item.canonicalSymbol}-${index}`}
+++              role="option"
+++              aria-selected={index === highlight}
+++              data-canonical-symbol={item.canonicalSymbol}
+++              onClick={() => confirmItem(item)}
+++              style={{
+++                padding: '6px 8px',
+++                cursor: 'pointer',
+++                background: index === highlight ? '#e6f4ff' : 'transparent',
+++                borderBottom: '1px solid #f0f0f0',
+++              }}
+++            >
+++              <span data-testid={`result-displayName-${index}`}>
+++                {item.displayName}
+++              </span>{' '}
+++              <Tag>{item.canonicalSymbol}</Tag>
+++              <Tag>{marketLabel(item.market)}</Tag>
+++              <Tag>{typeLabel(item.securityType)}</Tag>
+++              {item.listStatus === 'DELISTED' && (
+++                <Tag color="default" data-testid={`result-delisted-${index}`}>
+++                  退市
+++                </Tag>
+++              )}
+++            </li>
+++          ))}
+++        </ul>
+++      )}
+++
+++      {isCatalogEmpty && (
+++        <Alert type="info" title="目录尚未初始化" />
+++      )}
+++      {isNoMatch && <Alert type="info" title="无匹配结果" />}
+++    </Space>
+++  );
+++}
++diff --git a/src/shared/types/domain.ts b/src/shared/types/domain.ts
++index 64a8ac8..b691878 100644
++--- a/src/shared/types/domain.ts
+++++ b/src/shared/types/domain.ts
++@@ -628,3 +628,60 @@ export interface MarketSectorMemberSnapshot {
++   tradeStatus?: number;
++   delayed: boolean;
++ }
+++
+++// ==================== D2 证券目录（证券检索 / 标准化匹配） ====================
+++
+++export type SecurityMarket = 'SH' | 'SZ' | 'BJ' | 'HK' | 'US';
+++export type SecurityType =
+++  | 'STOCK'
+++  | 'ETF'
+++  | 'INDEX'
+++  | 'REIT'
+++  | 'FUND'
+++  | 'BOND'
+++  | 'WARRANT'
+++  | 'OPTION'
+++  | 'FUTURE'
+++  | 'OTHER';
+++export type ListStatus = 'LISTED' | 'DELISTED' | 'UNKNOWN';
+++export type MatchedBy =
+++  | 'CANONICAL_SYMBOL_EXACT'
+++  | 'RAW_SYMBOL_EXACT'
+++  | 'FORMAL_NAME_EXACT'
+++  | 'FORMAL_NAME_PREFIX'
+++  | 'ALIAS_EXACT'
+++  | 'ALIAS_PREFIX'
+++  | 'PINYIN_FULL_PREFIX'
+++  | 'PINYIN_ABBR_PREFIX'
+++  | 'NAME_CONTAINS'
+++  | 'ALIAS_CONTAINS';
+++
+++export interface SecuritySummary {
+++  canonicalSymbol: string;
+++  symbol: string;
+++  displayName: string;
+++  name?: string | null;
+++  nameCn?: string | null;
+++  nameHk?: string | null;
+++  nameEn?: string | null;
+++  shortName?: string | null;
+++  market: string;
+++  exchange?: string | null;
+++  currency?: string | null;
+++  securityType: string;
+++  listStatus: ListStatus;
+++  matchedBy: MatchedBy;
+++}
+++
+++export interface Security extends SecuritySummary {
+++  pinyinFull?: string | null;
+++  pinyinAbbr?: string | null;
+++  listDate?: string | null;
+++  delisted?: boolean;
+++  dataSource?: string | null;
+++  sourceUpdatedAt?: string | null;
+++  sourceHash?: string | null;
+++  aliases?: string[];
+++}
+++
+++export type SecurityDetail = Security;
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CHECKPOINT-RECOVERY.md b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CHECKPOINT-RECOVERY.md
+new file mode 100644
+index 0000000..b0a6691
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CHECKPOINT-RECOVERY.md
+@@ -0,0 +1,78 @@
++# Checkpoint: SECURITY-DIRECTORY-D2-20260802-RESLICE 恢复轮
++
++- recordedAt: 2026-08-02T06:35:00Z
++- actor: codex-parent-d2-reslice-recovery
++- taskId: SECURITY-DIRECTORY-D2-20260802-RESLICE
++- lifecycleState: IMPLEMENTING
++- 目的：恢复并闭环 D2 RESLICE；本文件为恢复轮编排说明，不是候选代码或验收证据。
++
++## 一、上一轮失败（不可变终态，如实记录）
++
++上一轮 RS-03 子代理失败：
++
++- roleRunId: IMP-D2-RS03-20260802-01
++- dispatchId: dispatch-IMP-D2-RS03-20260802-01
++- Agent ID / sessionId: agent_74e00cbe-9528-42cd-b11d-ca78b21621b2
++- 结果：CANCELLED
++- artifactAccepted: false
++- 原因：qta-implementer 使用旧 acceptEdits 权限（未加载冻结的 bypassPermissions profile），18 次 Bash 调用每次触发交互审批，约 600 秒后被 harness 取消。
++- 已产生 SecuritySelector.tsx 和 SecuritySelector.test.tsx，但未自检、未形成可接受角色 artifact。
++
++### 为何未作为 CONTROL.roleRuns 终态行追加
++
++控制校验器（`scripts/check-ai-task-control.mjs`）要求每个 roleRun 必须有一个由治理 Hook 在派发时创建的 dispatch receipt 文件
++（`.git/qta-governance/dispatches/<sha256(taskId)>/<sha256(dispatchId)>.json`，必须存在且身份匹配）。
++该 CANCELLED 派发的 receipt 文件确实缺失（校验器报 `dispatch receipt is unavailable (ENOENT)`），
++原因正是该轮子代理运行在旧 acceptEdits 缓存下、治理证据链未按 v3 协议落盘。父协调者无法追溯伪造 receipt
++（Hook 禁止 AI 直接访问 `.git/qta-governance/`，且 receipt 需在派发时由 Hook 真实创建）。
++因此该失败以本 checkpoint 文档如实记录，而非以无法校验的 roleRuns 行写入；不隐瞒、不篡改为 COMPLETED。
++后续由本恢复轮派发的全新 RS-03 实施者（新 dispatchId / sessionId）将产生其自身合法 receipt，并作为可校验 roleRun 记录。
++
++## 二、治理热修复（父协调基础设施 amendment，非 D2 候选代码）
++
++用户明确授权的无人值守治理热修复，已单独提交：
++
++- commit: 92129bb9bfd23aa73fcce378430c8ed213c8fbb3
++- message: `chore(ai): enable unattended governed task execution`
++- 暂存并提交的治理文件（共 15 个路径）：
++  - .agents/skills/qta-development-orchestration/（SKILL.md、TASK_PACKET_TEMPLATE.md、GOVERNANCE_V2_POLICY.md）
++  - .claude/skills/qta-development-orchestration/（同上 3 个镜像）
++  - .zcode/agents/qta-implementer.md
++  - .zcode/agents/qta-final-verifier.md
++  - .zcode/commands/qta-run.md
++  - .zcode/config.json
++  - docs/DEVELOPMENT_WORKFLOW.md
++  - docs/ai/SKILL_AND_AGENT_GOVERNANCE.md
++  - scripts/zcode-governance-hook.mjs
++  - scripts/validate-ai-governance.mjs
++  - scripts/tests/ai-governance.test.mjs
++
++未混入该提交的内容：D2 CONTROL、SELF-CHECK、D3 历史工件（CANDIDATE.patch / CONTROL.json）、前端业务代码。
++此提交是 RESLICE 父协调基础设施 amendment，用于让受治理 slice 无人值守运行；不当作 D2 前端候选代码。
++
++## 三、保留的现有成果（恢复输入）
++
++后端工作区未提交保留（不动 reset/restore/checkout/stash）：
++- docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTROL.json
++
++前端工作区已有以下未提交成果，作为恢复输入保留，不从头重写 RS-01/RS-02：
++- src/shared/types/domain.ts（M）
++- src/features/market-data/api/securityDirectoryApi.ts（??）
++- src/features/market-data/api/securityDirectoryApi.test.ts（??）
++- src/features/market-data/api/securityDirectoryApi.remote.test.ts（??）
++- src/shared/components/SecuritySelector.tsx（??，由 CANCELLED 的 RS-03 写入）
++- src/shared/components/SecuritySelector.test.tsx（??，由 CANCELLED 的 RS-03 写入）
++
++## 四、RS-03 已知失败（聚焦修复，已完整获取一次）
++
++`npm run test -- SecuritySelector.test.tsx`：10/11 通过，1 失败。
++失败测试：`loading / 空结果 / 失败 / 重试 四态正确`（第 165 行）。
++失败点：antd 把按钮文本“重试”渲染成 `<span>重 试</span>`（插入空格），测试用
++`screen.getByText((content, element) => element?.tagName === 'BUTTON' ? /重\s*试/.test(content) : false)`
++匹配失败——文本节点在 `<span>` 内、非直接在 `<button>` 上，回调 content 为空字符串。
++仅此一个失败，已完整获取一次；聚焦修复后只跑该窄选择器。
++
++## 五、下一步
++
++派发全新 qta-implementer 接管 RS-03（检查既有两文件、聚焦修复该测试、跑 typecheck），只能 SELF_CHECKED。
++随后按契约分别派发全新 implementer 完成 RS-04、RS-05。每个 slice 一个干净 Agent；父协调者不写业务代码。
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTRACT.md b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTRACT.md
+new file mode 100644
+index 0000000..9a5e072
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTRACT.md
+@@ -0,0 +1,65 @@
++# Task Contract: SECURITY-DIRECTORY-D2-20260802-RESLICE（重新切片续作）
++
++> 续作任务。父任务 `SECURITY-DIRECTORY-D2-20260802` 因 SLICE-01 两次 implementer 子代理 600s 超时进入 BLOCKED（见 `…-CHECKPOINT.md`）。本续作沿用同一冻结合约的 6 AC、同一冻结 test inventory（逐字 selector 不变），仅**重新切片**为更小、TaskPacket 内联完整可写规范的边界，消除子代理探索时间压力。BLOCKED 控制被单调锁定，无法原地改切片，故另起续作任务 ID。
++
++## Contract Identity
++
++- Status: `FROZEN`
++- Contract version: 1
++- Frozen at: 2026-08-02T05:49:00Z
++- Frozen by parent run: codex-parent-d2-reslice-1
++- Lane: `L2`
++- 继承冻结 AC（6 个）与冻结 test inventory（31 项，selector 逐字，见 `SECURITY-DIRECTORY-D2-20260802-TEST-DESIGN.md`）。
++- 父契约（证据来源）：`docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CONTRACT.md`（hash `1d52ca6c…`）。
++
++## Objective
++
++沿用父任务目标：前端仓库新增共享 `SecuritySelector` + 统一证券目录 API adapter，首批四个流程接入。后端只读复用 D1 搜索 API，不改后端业务代码。
++
++## Authority
++
++- Product/design: `docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`（§4/§4.2/§4.3/§7/§9/§10）
++- Implementation plan: `docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md`（D2/§3/§4）
++- API: `docs/api/MARKET_DATA_API.md` 的 `GET /market-data/securities/search` 与 `GET /market-data/securities/{canonicalSymbol}`。
++- Frontend 约定：`src/features/market-data/api/segmentApi.ts`（mockApi/remoteApi/pick 范式）、`src/shared/api/{client,unwrappers,localStorageClient,types}.ts`、`src/features/market-data/components/SecurityVerificationField.tsx`（controlled-field 契约）、`src/shared/types/domain.ts`、四个页面、`syncPlanForm.ts`、`vite.config.ts`。
++- Baseline commit (backend/governance): `cd901d5`（父任务 BLOCKED 提交之后）
++- Baseline commit (frontend/impl): `80c38324f58ba58cf6f96884184e16c86b967f96`
++- Branch: `codex/security-directory-d2-20260802`（前后端同名）
++- Pre-existing dirty paths: `docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CANDIDATE.patch`、`docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTROL.json`
++
++## Facts And Decisions
++
++| Type | Item |
++|---|---|
++| FACT | 父任务 SLICE-01 两次 implementer 子代理超时（attempt1 零产出；attempt2 写了 4 文件未自检，只读评估 4 pass/3 fail）。前端工作树已由父协调者恢复到 clean baseline。 |
++| DECISION | 重新切片为 RS-01..RS-05；每个 TaskPacket 内联完整可写代码规范（含逐字测试标题），子代理只做最少读取 + 机械写入 + 跑聚焦测试，消除探索导致的超时。 |
++| DECISION | 续作沿用同一冻结 AC 与 test inventory（selector 不变），候选身份仍按父任务跨仓库方案（全部门禁后端根运行，candidate.commit=后端提交含前端冻结 diff patch，架构门 `--files` 分析前端文件）。 |
++| DECISION | 不询问用户；可逆实现选择由协调者按现有架构决定（用户已明确授权）。 |
++
++## Acceptance Criteria
++
++与父任务完全相同（6 个 AC：AC-01..AC-06）。逐字见父契约 `SECURITY-DIRECTORY-D2-20260802-CONTRACT.md` 与冻结 test inventory。
++
++## Implementation Slices（重新切片）
++
++| Slice ID | 边界 | AC IDs | Allowed write paths (前端) | Max files | Max prod delta |
++|---|---|---|---|---:|---:|
++| RS-01 | domain.ts 类型 + securityDirectoryApi（remote+mock 完整） | AC-01, AC-06 | `src/shared/types/domain.ts`、`src/features/market-data/api/securityDirectoryApi.ts` | 2 | 400 |
++| RS-02 | securityDirectoryApi mock + remote 测试 | AC-01 | `src/features/market-data/api/securityDirectoryApi.test.ts`、`src/features/market-data/api/securityDirectoryApi.remote.test.ts` | 2 | 300 |
++| RS-03 | SecuritySelector 共享组件 + 行为测试 | AC-02 | `src/shared/components/SecuritySelector.tsx`、`src/shared/components/SecuritySelector.test.tsx` | 2 | 500 |
++| RS-04 | 最新价 + 历史日 K 两页面接入 + 页面测试 | AC-03, AC-04, AC-05 | `src/pages/market-data.tsx`、`src/pages/market-data.test.tsx` | 2 | 350 |
++| RS-05 | 采集计划 scope + 板块成员两流程 + util 测试 | AC-03, AC-04, AC-05 | `src/pages/market-workspace.tsx`(+.test.tsx)、`src/pages/market-segments.tsx`(+.test.tsx)、`src/features/market-data/utils/syncPlanForm.ts`(+.test.ts) | 6 | 500 |
++
++## Frozen Test Inventory
++
++逐字沿用 `SECURITY-DIRECTORY-D2-20260802-TEST-DESIGN.md` §5（31 项）。selector 不变。
++
++## Candidate And Git Policy
++
++- Git automation: `COMMIT`（前端实现 + 后端治理/工件；仅本地 commit；不 push/部署/rebase/force-push）
++- Candidate mode: COMMIT；candidate.commit = 后端任务分支提交（含前端冻结 diff patch `…-RESLICE-CANDIDATE.patch` + 契约/CONTROL/role 工件）；架构门 `--files` 直接分析前端生产文件；control.git.branch = 后端分支。
++- 验收 artifact 须诚实记录：候选身份=后端提交，前端实现以冻结 diff patch 佐证。
++
++## Stop Conditions
++
++DELIVERY_READY（`node scripts/check-ai-delivery-ready.mjs <CONTROL>` exit 0）或 BLOCKED（记录真实阻塞证据、失败指纹、已执行次数、唯一下一步）。不询问用户。
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTROL.json b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTROL.json
+new file mode 100644
+index 0000000..5ca4478
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTROL.json
+@@ -0,0 +1,776 @@
++{
++  "schemaVersion": 3,
++  "taskId": "SECURITY-DIRECTORY-D2-20260802-RESLICE",
++  "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTROL.json",
++  "startedAt": "2026-08-02T05:47:00Z",
++  "lane": "L2",
++  "lifecycleState": "IMPLEMENTING",
++  "contract": {
++    "path": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTRACT.md",
++    "version": "1",
++    "sha256": "9170e2a1be874b6cea4ed2bb34554ffaf654f0df67dea23386e7a3ade3e27c67",
++    "acceptanceCriteria": [
++      {
++        "id": "AC-01",
++        "requiredEvidence": [
++          "AUTOMATION"
++        ]
++      },
++      {
++        "id": "AC-02",
++        "requiredEvidence": [
++          "AUTOMATION"
++        ]
++      },
++      {
++        "id": "AC-03",
++        "requiredEvidence": [
++          "AUTOMATION"
++        ]
++      },
++      {
++        "id": "AC-04",
++        "requiredEvidence": [
++          "AUTOMATION"
++        ]
++      },
++      {
++        "id": "AC-05",
++        "requiredEvidence": [
++          "AUTOMATION"
++        ]
++      },
++      {
++        "id": "AC-06",
++        "requiredEvidence": [
++          "STATIC"
++        ]
++      }
++    ],
++    "implementationSlices": [
++      {
++        "id": "RS-01",
++        "description": "domain.ts 类型扩展 + securityDirectoryApi 完整（remote + mock seed + threshold/ranking/filters/limit + get）。把原 SLICE-01 合并为一刀但 TaskPacket 内联完整可写规范，消除探索时间。",
++        "acIds": [
++          "AC-01",
++          "AC-06"
++        ],
++        "allowedWritePaths": [
++          "src/shared/types/domain.ts",
++          "src/features/market-data/api/securityDirectoryApi.ts"
++        ],
++        "maxExpectedFiles": 2,
++        "maxProductionLineDelta": 400
++      },
++      {
++        "id": "RS-02",
++        "description": "securityDirectoryApi mock + remote 测试（内联完整测试规范）。",
++        "acIds": [
++          "AC-01"
++        ],
++        "allowedWritePaths": [
++          "src/features/market-data/api/securityDirectoryApi.test.ts",
++          "src/features/market-data/api/securityDirectoryApi.remote.test.ts"
++        ],
++        "maxExpectedFiles": 2,
++        "maxProductionLineDelta": 300
++      },
++      {
++        "id": "RS-03",
++        "description": "SecuritySelector 共享组件 + 行为测试（复合 AC-02 全部子项；内联完整实现与测试规范）。",
++        "acIds": [
++          "AC-02"
++        ],
++        "allowedWritePaths": [
++          "src/shared/components/SecuritySelector.tsx",
++          "src/shared/components/SecuritySelector.test.tsx"
++        ],
++        "maxExpectedFiles": 2,
++        "maxProductionLineDelta": 500
++      },
++      {
++        "id": "RS-04",
++        "description": "最新价 + 历史日 K 两页面接入 + 页面测试。",
++        "acIds": [
++          "AC-03",
++          "AC-04",
++          "AC-05"
++        ],
++        "allowedWritePaths": [
++          "src/pages/market-data.tsx",
++          "src/pages/market-data.test.tsx"
++        ],
++        "maxExpectedFiles": 2,
++        "maxProductionLineDelta": 350
++      },
++      {
++        "id": "RS-05",
++        "description": "采集计划结构化 scope + 板块成员两流程接入 + util 测试。",
++        "acIds": [
++          "AC-03",
++          "AC-04",
++          "AC-05"
++        ],
++        "allowedWritePaths": [
++          "src/pages/market-workspace.tsx",
++          "src/pages/market-workspace.test.tsx",
++          "src/pages/market-segments.tsx",
++          "src/pages/market-segments.test.tsx",
++          "src/features/market-data/utils/syncPlanForm.ts",
++          "src/features/market-data/utils/syncPlanForm.test.ts"
++        ],
++        "maxExpectedFiles": 6,
++        "maxProductionLineDelta": 500
++      }
++    ],
++    "testInventory": [
++      {
++        "testId": "TD-D2-API-01",
++        "acIds": [
++          "AC-01"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/features/market-data/api/securityDirectoryApi.test.ts",
++        "selector": "searchSecurities mock 与 remote 同形：相同关键词返回字段一致且排名一致"
++      },
++      {
++        "testId": "TD-D2-API-02",
++        "acIds": [
++          "AC-01"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/features/market-data/api/securityDirectoryApi.test.ts",
++        "selector": "中文≥1 字符、英文/数字≥2 字符才触发搜索；阈值以下不调用"
++      },
++      {
++        "testId": "TD-D2-API-03",
++        "acIds": [
++          "AC-01"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/features/market-data/api/securityDirectoryApi.test.ts",
++        "selector": "默认 limit=20 且 markets/types/includeDelisted 筛选正确传递"
++      },
++      {
++        "testId": "TD-D2-API-04",
++        "acIds": [
++          "AC-01"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/features/market-data/api/securityDirectoryApi.remote.test.ts",
++        "selector": "searchSecurities remote 调用 GET /market-data/securities/search 并解包 items 与目录元数据"
++      },
++      {
++        "testId": "TD-D2-API-05",
++        "acIds": [
++          "AC-01"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/features/market-data/api/securityDirectoryApi.remote.test.ts",
++        "selector": "getSecurity remote 调用 GET /market-data/securities/{canonicalSymbol} 并在 404 时抛错"
++      },
++      {
++        "testId": "TD-D2-COMP-01",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "250ms debounce：阈值内连续输入只触发一次搜索"
++      },
++      {
++        "testId": "TD-D2-COMP-02",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "过期响应不覆盖新关键词结果（竞态保护）"
++      },
++      {
++        "testId": "TD-D2-COMP-03",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "loading / 空结果 / 失败 / 重试 四态正确"
++      },
++      {
++        "testId": "TD-D2-COMP-04",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "键盘 ArrowDown/ArrowUp 导航、Enter 确认、Esc 关闭"
++      },
++      {
++        "testId": "TD-D2-COMP-05",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "选中后展示名称/canonical symbol/市场交易所/证券类型"
++      },
++      {
++        "testId": "TD-D2-COMP-06",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "再次编辑文本立即失效旧选择（清除已选）"
++      },
++      {
++        "testId": "TD-D2-COMP-07",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "同名跨市场证券并列展示且不自动选择"
++      },
++      {
++        "testId": "TD-D2-COMP-08",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "退市证券默认隐藏；显式筛选后可见并标注状态"
++      },
++      {
++        "testId": "TD-D2-COMP-09",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "目录未初始化 / 正常无匹配 / 请求失败 三态可区分"
++      },
++      {
++        "testId": "TD-D2-COMP-10",
++        "acIds": [
++          "AC-02"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "目录陈旧只提示不阻断本地结果展示"
++      },
++      {
++        "testId": "TD-D2-PAGE-MD-01",
++        "acIds": [
++          "AC-03"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/pages/market-data.test.tsx",
++        "selector": "最新价查询：SecuritySelector 选中后提交的 canonical symbol 与所选一致"
++      },
++      {
++        "testId": "TD-D2-PAGE-MD-02",
++        "acIds": [
++          "AC-03"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/pages/market-data.test.tsx",
++        "selector": "历史日 K 同步：SecuritySelector 选中后提交的 canonical symbol 与所选一致"
++      },
++      {
++        "testId": "TD-D2-PAGE-WS-01",
++        "acIds": [
++          "AC-03"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/pages/market-workspace.test.tsx",
++        "selector": "采集计划 scope：SecuritySelector 选中后 buildPlanInput 的 scopeJson 含正确 canonical symbol"
++      },
++      {
++        "testId": "TD-D2-PAGE-SG-01",
++        "acIds": [
++          "AC-03"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/pages/market-segments.test.tsx",
++        "selector": "板块成员：SecuritySelector 选中后 addSegmentMember 提交的 canonical symbol 与所选一致"
++      },
++      {
++        "testId": "TD-D2-NOSIDEEFFECT-01",
++        "acIds": [
++          "AC-04"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/pages/market-data.test.tsx",
++        "selector": "最新价/日 K 选择证券过程不调用 quote/sync/采集任务创建等写接口"
++      },
++      {
++        "testId": "TD-D2-NOSIDEEFFECT-02",
++        "acIds": [
++          "AC-04"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/shared/components/SecuritySelector.test.tsx",
++        "selector": "SecuritySelector 搜索过程不触发任何业务写请求"
++      },
++      {
++        "testId": "TD-D2-NOSIDEEFFECT-03",
++        "acIds": [
++          "AC-04"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/pages/market-workspace.test.tsx",
++        "selector": "采集计划/板块成员选择过程不触发 quote/K 线同步写"
++      },
++      {
++        "testId": "TD-D2-FALLBACK-01",
++        "acIds": [
++          "AC-05"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/pages/market-data.test.tsx",
++        "selector": "手工输入 canonical symbol 后备路径仍可提交"
++      },
++      {
++        "testId": "TD-D2-LEGACY-01",
++        "acIds": [
++          "AC-05"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/features/market-data/utils/syncPlanForm.test.ts",
++        "selector": "旧 scopeJson {symbols:[...]} 计划可被 planToDraft 解析展示不报错"
++      },
++      {
++        "testId": "TD-D2-LEGACY-02",
++        "acIds": [
++          "AC-05"
++        ],
++        "kind": "AUTOMATION",
++        "required": true,
++        "sourcePath": "src/features/market-data/utils/syncPlanForm.test.ts",
++        "selector": "结构化 scope builder 生成正确 scopeJson 且与旧格式读取兼容"
++      },
++      {
++        "testId": "TD-D2-STATIC-TYPECHECK",
++        "acIds": [
++          "AC-06"
++        ],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "package.json",
++        "selector": "npm run typecheck"
++      },
++      {
++        "testId": "TD-D2-STATIC-LINT",
++        "acIds": [
++          "AC-06"
++        ],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "package.json",
++        "selector": "npm run lint"
++      },
++      {
++        "testId": "TD-D2-STATIC-BUILD",
++        "acIds": [
++          "AC-06"
++        ],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "package.json",
++        "selector": "npm run build"
++      },
++      {
++        "testId": "TD-D2-STATIC-DIFF",
++        "acIds": [
++          "AC-06"
++        ],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "package.json",
++        "selector": "git diff --check"
++      },
++      {
++        "testId": "TD-D2-STATIC-ARCH",
++        "acIds": [
++          "AC-06"
++        ],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "scripts/check-ai-architecture.mjs",
++        "selector": "check-ai-architecture.mjs"
++      },
++      {
++        "testId": "TD-D2-STATIC-INVENTORY",
++        "acIds": [
++          "AC-06"
++        ],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-TEST-DESIGN.md",
++        "selector": "SECURITY-DIRECTORY-D2-20260802-TEST-DESIGN.md (frozen-inventory machine receipt; hash-bound via CONTROL contract.testInventory)"
++      }
++    ],
++    "blockingAmendments": []
++  },
++  "git": {
++    "automation": "COMMIT",
++    "branch": "codex/security-directory-d2-20260802",
++    "baselineCommit": "cd901d5",
++    "preExistingDirtyPaths": [
++      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CANDIDATE.patch",
++      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTROL.json"
++    ]
++  },
++  "transitionHistory": [
++    {
++      "sequence": 1,
++      "from": "CONTEXT_READY",
++      "to": "CONTRACT_DRAFTED",
++      "at": "2026-08-02T05:47:00Z",
++      "actor": "codex-parent-d2-reslice-1"
++    },
++    {
++      "sequence": 2,
++      "from": "CONTRACT_DRAFTED",
++      "to": "TEST_DESIGN_READY",
++      "at": "2026-08-02T05:48:30Z",
++      "actor": "codex-parent-d2-reslice-1"
++    },
++    {
++      "sequence": 3,
++      "from": "TEST_DESIGN_READY",
++      "to": "CONTRACT_FROZEN",
++      "at": "2026-08-02T05:49:30Z",
++      "actor": "codex-parent-d2-reslice-1"
++    },
++    {
++      "sequence": 4,
++      "from": "CONTRACT_FROZEN",
++      "to": "IMPLEMENTING",
++      "at": "2026-08-02T05:50:00Z",
++      "actor": "codex-parent-d2-reslice-1"
++    }
++  ],
++  "candidate": {
++    "mode": "COMMIT",
++    "generation": 1,
++    "identity": "",
++    "commit": "",
++    "treeHash": "",
++    "patchSha256": "479d6bf4b9f2fdce39d90fa49bb6cb251bae55202e0b98027fa21c3674164b06",
++    "manifestPath": "",
++    "manifestSha256": "",
++    "entrySetSha256": "",
++    "diffArtifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CANDIDATE.patch",
++    "diffArtifactSha256": "479d6bf4b9f2fdce39d90fa49bb6cb251bae55202e0b98027fa21c3674164b06"
++  },
++  "budget": {
++    "contextPercent": null,
++    "contextMeasurement": "UNAVAILABLE",
++    "compactionCount": 0,
++    "repairRound": 0,
++    "maxRepairRounds": 2,
++    "maxWaitCallsPerRole": 2,
++    "maxShellPollsPerCommand": 3,
++    "rawTokens": null,
++    "weeklyAllowancePercent": null
++  },
++  "repairHistory": [],
++  "roleRuns": [
++    {
++      "roleRunId": "TD-D2-RESLICE-20260802-01",
++      "dispatchId": "dispatch-TD-D2-RESLICE-20260802-01",
++      "sessionId": "codex-agent-reslice-td-20260802-01",
++      "startedAt": "2026-08-02T05:48:00Z",
++      "finishedAt": "2026-08-02T05:49:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/274596337ffaa6584899483687a49f02780d3e6750d267b65a785de1b6aeab4d/7a639e6f4b7bf5e2b9e979ccc162f9b55bbf7ef7e06f2a366a0a462f1a74ccf0.json",
++      "role": "TEST_DESIGNER",
++      "generation": 0,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-test-designer.md",
++      "sliceId": "",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_ONLY",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "read-only test-designer confirming reslice; no edits, no Git, no shell, no sub-agents; parent persists artifact",
++      "waitCalls": 0,
++      "maxShellPollsForOneCommand": 0,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-TEST-DESIGN.md",
++      "artifactSha256": "d796ac60ab7abf187196e52c9ce3892dbac323ed11437d5b6304437327e5d143"
++    },
++    {
++      "roleRunId": "IMP-D2-RS01-20260802-01",
++      "dispatchId": "dispatch-IMP-D2-RS01-20260802-01",
++      "sessionId": "codex-agent-imp-rs01-cancelled",
++      "startedAt": "2026-08-02T05:51:00Z",
++      "finishedAt": "2026-08-02T05:52:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/274596337ffaa6584899483687a49f02780d3e6750d267b65a785de1b6aeab4d/40992314a312dc3676ed9fd869f9ef06a83f2d70a67ec02ab363f74e6210730f.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "RS-01",
++      "executionOutcome": "CANCELLED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "bounded implementer RS-01; dispatch was cancelled by the harness before the subagent returned its artifact; the subagent had already written the RS-01 production files (domain.ts types + securityDirectoryApi.ts) which the parent verified via npm run typecheck exit 0, but the role never reported COMPLETED so the artifact is NOT accepted; the on-disk work is reused and verified/completed by the next combined RS-01+RS-02 dispatch",
++      "waitCalls": 0,
++      "maxShellPollsForOneCommand": 0,
++      "compactionCount": 0,
++      "status": "BLOCKED",
++      "artifactAccepted": false,
++      "artifactPath": "",
++      "artifactSha256": ""
++    },
++    {
++      "roleRunId": "IMP-D2-RS0102-20260802-01",
++      "dispatchId": "dispatch-IMP-D2-RS0102-20260802-01",
++      "sessionId": "codex-agent-47f30f05-2bc7-4cbd-8ae3-d21dc06b3d94",
++      "startedAt": "2026-08-02T05:55:00Z",
++      "finishedAt": "2026-08-02T06:00:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/274596337ffaa6584899483687a49f02780d3e6750d267b65a785de1b6aeab4d/68e134bd247a0ccc69a428770accd204b0e496695af06892e90165c0b85a8eb1.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "RS-02",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "bounded implementer RS-02 gen-1; wrote securityDirectoryApi.test.ts + .remote.test.ts with frozen test titles TD-D2-API-01..05 and also verified the on-disk RS-01 production files (domain.ts types + securityDirectoryApi.ts) via npm run typecheck exit 0 and 5/5 focused API tests pass; SELF_CHECKED",
++      "waitCalls": 0,
++      "maxShellPollsForOneCommand": 3,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS02.md",
++      "artifactSha256": "d82d53ab4859d2ac45183d3acfb5eb10362cb08f2c8020d10afebc4da21e7e43"
++    },
++    {
++      "roleRunId": "IMP-D2-RS01-20260802-02",
++      "dispatchId": "dispatch-IMP-D2-RS01-20260802-02",
++      "sessionId": "codex-agent-1b7ea3e0-7d50-4451-b79d-384cd3ce7c6b",
++      "startedAt": "2026-08-02T06:03:00Z",
++      "finishedAt": "2026-08-02T06:04:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/274596337ffaa6584899483687a49f02780d3e6750d267b65a785de1b6aeab4d/aa8383d0fcbb547244791a498f8310eb9872cd2ba4a9277c6fc9ca6c09795840.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "RS-01",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "bounded implementer RS-01 gen-1 verify-only; confirmed on-disk domain.ts types + securityDirectoryApi.ts (searchSecurities/getSecurity, mock seed/threshold/ranking/filters, remote unwrap) and npm run typecheck exit 0; no files modified; SELF_CHECKED",
++      "waitCalls": 0,
++      "maxShellPollsForOneCommand": 1,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS01.md",
++      "artifactSha256": "c669b9e9d20acf8d8916452155375e4a7ca970f6d6a7ae771d7cc0da98935e29"
++    },
++    {
++      "roleRunId": "IMP-D2-RS03-20260802-02",
++      "dispatchId": "dispatch-IMP-D2-RS03-20260802-02",
++      "sessionId": "agent_1484a7f3-dcbe-4d9d-b9af-6bef4c36d458",
++      "startedAt": "2026-08-02T07:27:00Z",
++      "finishedAt": "2026-08-02T07:29:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/274596337ffaa6584899483687a49f02780d3e6750d267b65a785de1b6aeab4d/936018e78e7adf8bed4c1b5ef09f66bf042806fa278f22b48f2a7caafc1fe621.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "RS-03",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "bounded implementer RS-03 gen-1 recovery takeover; reused the on-disk SecuritySelector.tsx + .test.tsx written by the prior CANCELLED dispatch (IMP-D2-RS03-20260802-01, no receipt); focused fix of TD-D2-COMP-03 retry-button locator (getByRole accessible name) plus two minimal behavior-preserving typecheck fixes (vi.mocked().mock.calls; useState(value ?? '')) all within the two allowed write paths; npm run test SecuritySelector.test.tsx EXIT 0 11/11 pass and npm run typecheck EXIT 0; SELF_CHECKED; the prior CANCELLED RS-03 failure is recorded in RESLICE-CHECKPOINT-RECOVERY.md",
++      "waitCalls": 0,
++      "maxShellPollsForOneCommand": 3,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS03.md",
++      "artifactSha256": "9abbdb0b790e00931a017e91bd792d74146bad6f587333d1b9a5324547381f52"
++    },
++    {
++      "roleRunId": "IMP-D2-RS04-20260802-01",
++      "dispatchId": "dispatch-IMP-D2-RS04-20260802-01",
++      "sessionId": "agent_f6296a98-de2e-4651-9434-c51dba28fac2",
++      "startedAt": "2026-08-02T07:31:00Z",
++      "finishedAt": "2026-08-02T07:36:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/274596337ffaa6584899483687a49f02780d3e6750d267b65a785de1b6aeab4d/d986616135073aada36b6529340aee05618935e2b6ecf354f91331b792ce7627.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "RS-04",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "bounded implementer RS-04 gen-1; integrated SecuritySelector into QuoteSnapshotsTab (fetchSymbols) and SyncTasksTab (syncSymbol) as controlled fields next to the preserved manual fallback inputs; exported the two tabs for isolated testing; created market-data.test.tsx with the 4 frozen tests TD-D2-PAGE-MD-01/MD-02/NOSIDEEFFECT-01/FALLBACK-01; npm run test market-data.test.tsx EXIT 0 4/4 pass and npm run typecheck EXIT 0; SELF_CHECKED; Popconfirm button selection used real timers + .ant-popover .ant-btn-primary (test-only, production behavior unchanged)",
++      "waitCalls": 0,
++      "maxShellPollsForOneCommand": 3,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS04.md",
++      "artifactSha256": "7584ac9bc645b544b75b91b76bbb3983a0d845df2737ac896cff00f820aabd26"
++    },
++    {
++      "roleRunId": "IMP-D2-RS05-20260802-01",
++      "dispatchId": "dispatch-IMP-D2-RS05-20260802-01",
++      "sessionId": "agent_4e52a837-459e-4dcd-9aef-7518af96a017",
++      "startedAt": "2026-08-02T07:38:00Z",
++      "finishedAt": "2026-08-02T07:44:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/274596337ffaa6584899483687a49f02780d3e6750d267b65a785de1b6aeab4d/e711e301e3891ee19bb84dfba21010b3a3829e57f13f96088e746e7c5e570038.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "RS-05",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "bounded implementer RS-05 gen-1 (final slice); integrated SecuritySelector into PlansTab symbols form field (append+dedup via form.setFieldValue) and MembersDrawer add flow; exported PlansTab and MembersDrawer for isolated tests; created syncPlanForm.test.ts with TD-D2-LEGACY-01/02 (preserving 3 pre-existing util tests) and extended market-workspace.test.tsx (TD-D2-PAGE-WS-01/NOSIDEEFFECT-03) and market-segments.test.tsx (TD-D2-PAGE-SG-01 + no-side-effect); syncPlanForm.ts left unchanged (already correct); npm run test over the 3 files EXIT 0 24/24 pass and npm run typecheck EXIT 0; SELF_CHECKED; TD-D2-PAGE-WS-01 used the packet-sanctioned buildPlanInput fallback assertion (real selector drive + scopeJson) for antd v6 stability",
++      "waitCalls": 0,
++      "maxShellPollsForOneCommand": 3,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS05.md",
++      "artifactSha256": "490eec85f2d80b7fa90da14f97189f259a82ad7181e865603bf349f1aa5349b6"
++    },
++    {
++      "roleRunId": "IMP-D2-REPAIR1-20260802-01",
++      "dispatchId": "dispatch-IMP-D2-REPAIR1-20260802-01",
++      "sessionId": "agent_511bf53e-70d2-46e4-a434-84dbab88edff",
++      "startedAt": "2026-08-02T07:45:00Z",
++      "finishedAt": "2026-08-02T07:48:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/274596337ffaa6584899483687a49f02780d3e6750d267b65a785de1b6aeab4d/f348fde04146caa29e637b742af7bd00efa4a5caaadf2b9be1eb2d0487d57d92.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "REPAIR-1",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "bounded implementer REPAIR-1 gen-1 pre-candidate lint compliance; test-only fix: replaced localStorage.clear() with clearAll() from shared/api/localStorageClient in 3 page tests (no-restricted-syntax) and removed 8 unused eslint-disable-next-line no-await-in-loop directives in 4 test files; no production file touched, no test behavior changed; npm run lint EXIT 0 0 errors 0 warnings, focused test over 4 files EXIT 0 34/34 pass, npm run typecheck EXIT 0; SELF_CHECKED",
++      "waitCalls": 0,
++      "maxShellPollsForOneCommand": 3,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CANDIDATE.patch",
++      "artifactSha256": "479d6bf4b9f2fdce39d90fa49bb6cb251bae55202e0b98027fa21c3674164b06"
++    }
++  ],
++  "review": {
++    "omitted": false,
++    "omissionReason": "",
++    "generation": 0,
++    "candidateIdentity": "",
++    "functionalVerdict": "NOT_VERIFIED",
++    "architectureVerdict": "NOT_VERIFIED",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "architectureGateSha256": "",
++    "findingIds": []
++  },
++  "architectureGate": {
++    "required": true,
++    "candidateIdentity": "",
++    "status": "NOT_RUN",
++    "exitCode": -1,
++    "errorCount": 0,
++    "warningCount": 0,
++    "warningDispositions": [],
++    "reportPath": "",
++    "reportSha256": "",
++    "generatedBy": "scripts/check-ai-architecture.mjs"
++  },
++  "verification": {
++    "candidateIdentity": "",
++    "verdict": "NOT_VERIFIED",
++    "deliveryPermitted": false,
++    "functionalVerdict": "NOT_VERIFIED",
++    "architectureVerdict": "NOT_VERIFIED",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "architectureGateSha256": "",
++    "dimensions": {
++      "STATIC": {
++        "required": true,
++        "status": "NOT_VERIFIED"
++      },
++      "AUTOMATION": {
++        "required": true,
++        "status": "NOT_VERIFIED"
++      },
++      "RUNTIME": {
++        "required": false,
++        "status": "NOT_REQUIRED"
++      },
++      "DEPLOYMENT": {
++        "required": false,
++        "status": "NOT_REQUIRED"
++      }
++    }
++  },
++  "testEvidence": [],
++  "finalization": {
++    "status": "NOT_STARTED",
++    "candidateIdentity": "",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "completedAt": "",
++    "changedPaths": []
++  },
++  "evidence": []
++}
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-TEST-DESIGN.md b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-TEST-DESIGN.md
+new file mode 100644
+index 0000000..212affe
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-TEST-DESIGN.md
+@@ -0,0 +1,57 @@
++# Reslice Test-Design Artifact: SECURITY-DIRECTORY-D2-20260802-RESLICE
++
++> qta-test-designer `TD-D2-RESLICE-20260802-01` (dispatch `dispatch-TD-D2-RESLICE-20260802-01`) 在干净只读上下文确认重新切片。沿用父任务冻结 6 AC 与 31 项 test inventory（selector 逐字不变），仅确认 RS-01..RS-05 在限内且覆盖完整。
++
++- roleRunId: TD-D2-RESLICE-20260802-01
++- dispatchId: dispatch-TD-D2-RESLICE-20260802-01
++- sessionId: codex-agent-reslice-td-20260802-01
++- startedAt: 2026-08-02T05:55:00Z
++- finishedAt: 2026-08-02T05:57:00Z
++- waitCalls: 0
++- compactionCount: 0
++- enforcement: ADVISORY
++- compensatingIsolation: read-only test-designer confirming reslice; no edits, no Git, no shell, no sub-agents; parent persists artifact.
++- verdict: READY_FOR_IMPLEMENTATION
++
++## 1. RESLICE_SLICE_CHECK (≤3 ACs, ≤8 files, ≤500 prod lines)
++
++| Slice | acIds | acCount | fileCount | prodDelta | within-cap |
++|---|---|---:|---:|---:|---|
++| RS-01 | AC-01, AC-06 | 2 | 2 | 400 | YES |
++| RS-02 | AC-01 | 1 | 2 | 300 | YES |
++| RS-03 | AC-02 | 1 | 2 | 500 | YES |
++| RS-04 | AC-03, AC-04, AC-05 | 3 | 2 | 350 | YES |
++| RS-05 | AC-03, AC-04, AC-05 | 3 | 6 | 500 | YES |
++
++## 2. COVERAGE_CHECK
++
++- AC-01 → RS-01 (impl), RS-02 (tests) ✓
++- AC-02 → RS-03 ✓
++- AC-03 → RS-04, RS-05 ✓
++- AC-04 → RS-04, RS-05 ✓
++- AC-05 → RS-04, RS-05 ✓
++- AC-06 → candidate finalization 静态门禁 + 冻结 inventory 回执（跨候选，不绑单一 RS slice）✓
++
++Frozen testId 覆盖（31 项，selector 逐字不变，逐字沿用 `SECURITY-DIRECTORY-D2-20260802-TEST-DESIGN.md` §5）：
++- API: TD-D2-API-01..05 → RS-02（test 文件由 RS-02 写）
++- COMP: TD-D2-COMP-01..10 → RS-03
++- PAGE-MD: TD-D2-PAGE-MD-01/02, NOSIDEEFFECT-01, FALLBACK-01 → RS-04
++- PAGE-WS: TD-D2-PAGE-WS-01, NOSIDEEFFECT-03 → RS-05
++- PAGE-SG: TD-D2-PAGE-SG-01 → RS-05
++- LEGACY: TD-D2-LEGACY-01/02 → RS-05
++- STATIC: TD-D2-STATIC-TYPECHECK/LINT/BUILD/DIFF/ARCH/INVENTORY → AC-06 finalization
++- 合计 31 项，无遗漏、无新增非冻结 testId。selector 未改动。
++
++## 3. BLOCKING_AMENDMENTS
++
++none.
++
++注（非阻塞）：RS-01 的 acIds 含 AC-06 仅为满足「每 AC 必须分配 slice」的约束；AC-06 实际在候选冻结时跨候选验证（静态门禁 + 冻结 inventory 回执），不依赖 RS-01 两文件单独产出。
++
++## 4. VERDICT
++
++READY_FOR_IMPLEMENTATION
++
++## 5. ROLE_RUN_METADATA
++
++roleRunId=TD-D2-RESLICE-20260802-01, dispatchId=dispatch-TD-D2-RESLICE-20260802-01, sessionId=codex-agent-reslice-td-20260802-01, startedAt=2026-08-02T05:55:00Z, finishedAt=2026-08-02T05:57:00Z, waitCalls=0, compactionCount=0, enforcement=ADVISORY.
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS01.md b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS01.md
+new file mode 100644
+index 0000000..14c6189
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS01.md
+@@ -0,0 +1,30 @@
++# Self-Check: SECURITY-DIRECTORY-D2-20260802-RESLICE RS-01
++
++- roleRunId: IMP-D2-RS01-20260802-02
++- dispatchId: dispatch-IMP-D2-RS0102-20260802-01
++- sessionId: codex-agent-47f30f05-2bc7-4cbd-8ae3-d21dc06b3d94
++- slice: RS-01 (domain.ts 类型扩展 + securityDirectoryApi.ts remote+mock)
++- AC: AC-01, AC-06 (AC-06 静态门禁在候选冻结时跨候选验证)
++- status: SELF_CHECKED（非 ACCEPTED/VERIFIED）
++
++## 实现
++
++- `src/shared/types/domain.ts` 末尾追加：`SecurityMarket`、`SecurityType`、`ListStatus`、`MatchedBy` 联合字符串字面量类型；`SecuritySummary`、`Security`、`SecurityDetail=Security` 接口（不改既有导出）。
++- `src/features/market-data/api/securityDirectoryApi.ts`（新建）：镜像 segmentApi 范式（mockApi + remoteApi + pick + 具名导出 + 内联 Input/Result 类型）。
++  - 导出 `searchSecurities(params: SecuritySearchInput): Promise<SecuritySearchResult>`、`getSecurity(canonicalSymbol: string): Promise<Security>`。
++  - mock：确定性 seed 目录（含同名跨市场、退市、改名别名、ETF/INDEX、>20 填充样本）；`meetsThreshold`（CJK≥1 或全拉丁/数字≥2）；markets/types/includeDelisted 筛选；ranking tiers（canonical/raw/name/alias/pinyin/contains，分值 100..50，score<50 剔除）；默认 limit=20、上限 100；返回 catalogStatus/catalogUpdatedAt/stale/degraded 元数据。
++  - remote：`unwrap<SecuritySearchResult>(client.get('/market-data/securities/search', {params}))`、`unwrap<Security>(client.get('/market-data/securities/{canonicalSymbol}'))`；不触发任何业务写。
++
++## 自检命令与结果
++
++- `npm run typecheck` → EXIT 0。
++- `npm run test -- securityDirectoryApi.test.ts securityDirectoryApi.remote.test.ts` → 5/5 pass（与 RS-02 同次验证）。
++
++## 文件 hash（本 slice 产出，前端仓库）
++
++- src/features/market-data/api/securityDirectoryApi.ts: e5f9d69949cb8e40f280b0213f2ea93d00960f9abeab2b0ea542a83fcca2c4a2
++- src/shared/types/domain.ts: （RS-01 追加段，整体 hash 待候选冻结时记录）
++
++## 未验证维度
++
++typecheck 与聚焦 API 测试通过；前端 lint/build/full test 在候选冻结时由最终 verifier 执行。AC-06 静态门禁跨候选验证。
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS02.md b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS02.md
+new file mode 100644
+index 0000000..f20845a
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS02.md
+@@ -0,0 +1,32 @@
++# Self-Check: SECURITY-DIRECTORY-D2-20260802-RESLICE RS-02
++
++- roleRunId: IMP-D2-RS02-20260802-01
++- dispatchId: dispatch-IMP-D2-RS0102-20260802-01
++- sessionId: codex-agent-47f30f05-2bc7-4cbd-8ae3-d21dc06b3d94
++- slice: RS-02 (securityDirectoryApi mock + remote 测试)
++- AC: AC-01
++- status: SELF_CHECKED（非 ACCEPTED/VERIFIED）
++
++## 实现
++
++- `src/features/market-data/api/securityDirectoryApi.test.ts`（新建，mock）：冻结标题逐字——
++  - `searchSecurities mock 与 remote 同形：相同关键词返回字段一致且排名一致`（TD-D2-API-01）
++  - `中文≥1 字符、英文/数字≥2 字符才触发搜索；阈值以下不调用`（TD-D2-API-02）
++  - `默认 limit=20 且 markets/types/includeDelisted 筛选正确传递`（TD-D2-API-03）
++- `src/features/market-data/api/securityDirectoryApi.remote.test.ts`（新建，remote）：冻结标题逐字——
++  - `searchSecurities remote 调用 GET /market-data/securities/search 并解包 items 与目录元数据`（TD-D2-API-04）
++  - `getSecurity remote 调用 GET /market-data/securities/{canonicalSymbol} 并在 404 时抛错`（TD-D2-API-05；用合法格式 SH.999999 + mocked success:false 触发 unwrap 抛错）
++
++## 自检命令与结果
++
++- `npm run test -- securityDirectoryApi.test.ts securityDirectoryApi.remote.test.ts` → EXIT 0，5/5 pass。
++- `npm run typecheck` → EXIT 0。
++
++## 文件 hash（前端仓库）
++
++- src/features/market-data/api/securityDirectoryApi.test.ts: fd6d1c8fe6c07758824545b8e4c68af7e7063b439c43e01e728ffe65bff8dbb0
++- src/features/market-data/api/securityDirectoryApi.remote.test.ts: ab4aa4e7ccd9b1fe1377048148d3abe9b9e2b005c64e355fac0e964da3ab4080
++
++## 未验证维度
++
++聚焦 API 测试通过；前端 lint/build/full test 在候选冻结时由最终 verifier 执行。
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS03.md b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS03.md
+new file mode 100644
+index 0000000..3076dd5
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS03.md
+@@ -0,0 +1,43 @@
++# Self-Check: SECURITY-DIRECTORY-D2-20260802-RESLICE RS-03
++
++- roleRunId: IMP-D2-RS03-20260802-02
++- dispatchId: dispatch-IMP-D2-RS03-20260802-02
++- slice: RS-03 (SecuritySelector 共享组件 + 行为测试；恢复轮接管，非从头实现)
++- AC: AC-02
++- status: SELF_CHECKED（非 ACCEPTED/VERIFIED）
++
++## 恢复背景
++
++上一轮 RS-03（IMP-D2-RS03-20260802-01）因旧 acceptEdits 权限被 harness CANCELLED，但已写入
++SecuritySelector.tsx 与 SecuritySelector.test.tsx。本轮全新 implementer 接管：不重写，聚焦修复
++已知失败 + 通过 typecheck。
++
++## 改动（均在两个允许写入路径内）
++
++`src/shared/components/SecuritySelector.test.tsx`：
++- TD-D2-COMP-03 强制修复：重试按钮定位由 `screen.getByText((content, element) => element?.tagName === 'BUTTON' ? ...)`
++  改为 `screen.getByRole('button', { name: /重\s*试/ })`（无障碍名聚合后代文本，忽略 antd 插入的 CJK 空格）。
++  后续 `fireEvent.click(retryButton)` 不变。
++- typecheck 修复：第 352 行 `searchSecurities.mock.calls` → `vi.mocked(searchSecurities).mock.calls`（与 340/349 行既有用法一致，纯类型修复，不改 no-side-effect 断言语义）。
++
++`src/shared/components/SecuritySelector.tsx`：
++- typecheck 修复：第 68 行 `useState('')` → `useState(value ?? '')`，使 `value` prop 不再未使用（TS6133）。
++  对 11 个测试均行为中性（无测试传 value）。
++
++## 自检命令与结果（前端仓库）
++
++- `npm run test -- SecuritySelector.test.tsx` → EXIT 0，11/11 pass（1 file passed）。
++- `npm run typecheck` → EXIT 0，无诊断。
++
++注：debounce 测试（TD-D2-COMP-01）存在既有 `act(...)` 警告（仅警告，非失败，本轮改动前已存在，不影响通过）。
++
++## 文件 hash（前端仓库）
++
++- src/shared/components/SecuritySelector.tsx: 7b0cbfca49a5e561aab536624607109d7ccd80a4b0c56574becae0101f7455e7
++- src/shared/components/SecuritySelector.test.tsx: d9ebad97f244466ab4f032ddd1337fd5c2f74067da1e0297613ba193b3bd3435
++
++## 未验证维度
++
++聚焦组件测试通过 + typecheck 通过；lint/build/full test 在候选冻结时由最终 verifier 执行。
++implementer 诚实声明：除强制定位修复外，另做了 2 处最小且行为保持的 typecheck 修复（均在允许写入路径内），
++原因是接管文件按原样无法通过 typecheck；已标记供 reviewer 裁量。
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS04.md b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS04.md
+new file mode 100644
+index 0000000..a890410
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS04.md
+@@ -0,0 +1,44 @@
++# Self-Check: SECURITY-DIRECTORY-D2-20260802-RESLICE RS-04
++
++- roleRunId: IMP-D2-RS04-20260802-01
++- dispatchId: dispatch-IMP-D2-RS04-20260802-01
++- slice: RS-04（最新价 + 历史日 K 两页面接入 + 页面测试）
++- AC: AC-03, AC-04, AC-05
++- status: SELF_CHECKED（非 ACCEPTED/VERIFIED）
++
++## 改动（均在两个允许写入路径内）
++
++`src/pages/market-data.tsx`（修改）：
++- 引入 `SecuritySelector`。
++- `QuoteSnapshotsTab`、`SyncTasksTab` 加 `export`（便于隔离渲染测试；其余 tab 不导出）。
++- 两 tab 各在既有手工输入旁加 `<SecuritySelector value={...} onChange={(symbol)=>set...(symbol)} />`，
++  受控字段喂入同一 state（fetchSymbols / syncSymbol）。手工输入保留为 AC-05 后备。
++- 提交处理、校验及其余行为不变；selector 路径不调用任何 quote/sync/采集写接口。
++
++`src/pages/market-data.test.tsx`（新建，214 行，恰好 4 个冻结测试）：
++- `最新价查询：SecuritySelector 选中后提交的 canonical symbol 与所选一致`（TD-D2-PAGE-MD-01, AC-03）
++- `历史日 K 同步：SecuritySelector 选中后提交的 canonical symbol 与所选一致`（TD-D2-PAGE-MD-02, AC-03）
++- `最新价/日 K 选择证券过程不调用 quote/sync/采集任务创建等写接口`（TD-D2-NOSIDEEFFECT-01, AC-04）
++- `手工输入 canonical symbol 后备路径仍可提交`（TD-D2-FALLBACK-01, AC-05）
++- mock 惯例沿用 market-workspace.test.tsx：vi.hoisted + importActual spread，覆盖 fetchLatestQuotes/createDailyBarSync/getQuoteSnapshots/getSyncTasks/getProviderStatus/searchSecurities；spyOn antd message；beforeEach clearAll + saveSettings(mock)。
++
++## 自检命令与结果（前端仓库）
++
++- `npm run test -- market-data.test.tsx` → EXIT 0，4/4 pass。
++- `npm run typecheck` → EXIT 0。
++
++## 关键实现决策（test-only）
++
++Popconfirm 确认按钮选择：fake timers 会阻断 antd v6 Popconfirm portal motion 导致弹层不渲染；
++按 role/text（确定 vs OK）受 locale 影响不稳定。最终用 real timers + `waitFor(() => document.querySelector('.ant-popover .ant-btn-primary'))`，
++对 debounce 与 locale 均鲁棒。仅测试选择细节，生产行为不变；断言仍校验传入 fetchLatestQuotes/createDailyBarSync 的 canonical symbol。
++
++## 文件 hash（前端仓库）
++
++- src/pages/market-data.tsx: c54ca3c855dd72701593d115da16023686d82e8f348ad1aa7aa2801921bcf8be
++- src/pages/market-data.test.tsx: d7f4ed31cf515d171c699568b75e0df3bf018ae98de895f0bb73bb302934208f
++
++## 未验证维度
++
++聚焦页面测试通过 + typecheck 通过；lint/build/full test 在候选冻结时由最终 verifier 执行。
++jsdom 之外无 runtime/E2E 验证。
+diff --git a/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS05.md b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS05.md
+new file mode 100644
+index 0000000..fa0db6f
+--- /dev/null
++++ b/docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-SELF-CHECK-RS05.md
+@@ -0,0 +1,55 @@
++# Self-Check: SECURITY-DIRECTORY-D2-20260802-RESLICE RS-05
++
++- roleRunId: IMP-D2-RS05-20260802-01
++- dispatchId: dispatch-IMP-D2-RS05-20260802-01
++- slice: RS-05（采集计划 scope + 板块成员两流程接入 + syncPlanForm util 测试；最终 slice）
++- AC: AC-03, AC-04, AC-05
++- status: SELF_CHECKED（非 ACCEPTED/VERIFIED）
++
++## 改动（均在六个允许写入路径内）
++
++`src/pages/market-workspace.tsx`（修改，+13 行）：
++- 引入 SecuritySelector；`PlansTab` 加 export。
++- 在 symbols Form.Item 内新增非绑定的「从目录选择标的」选择器，onChange 将选中 canonical symbol 追加到既有 symbols 表单字段（逗号分隔、去重）。
++- SecurityVerificationField 与所有提交/校验逻辑不变。
++
++`src/pages/market-segments.tsx`（修改，+3 行）：
++- 引入 SecuritySelector；`MembersDrawer` 加 export。
++- 在既有手工 symbol Input 上方加 `<SecuritySelector value={symbol} onChange={(s)=>setSymbol(s)} />`（手工 Input 为 AC-05 后备）。handleAdd 不变。
++
++`src/features/market-data/utils/syncPlanForm.ts`：未改动（逻辑已满足两冻结 util 测试）。
++
++`src/features/market-data/utils/syncPlanForm.test.ts`（+88 行）：基线已存在 3 个既有测试，追加 2 个冻结测试（保留既有）：
++- `旧 scopeJson {symbols:[...]} 计划可被 planToDraft 解析展示不报错`（TD-D2-LEGACY-01, AC-05）
++- `结构化 scope builder 生成正确 scopeJson 且与旧格式读取兼容`（TD-D2-LEGACY-02, AC-05）
++
++`src/pages/market-workspace.test.tsx`（+154 行）：扩展 workbenchApi mock（createSyncPlan/updateSyncPlan/listSyncPlans）+ securityDirectoryApi.searchSecurities mock；新增 2 个冻结测试（保留既有 TaskItemsDrawer 7 个）：
++- `采集计划 scope：SecuritySelector 选中后 buildPlanInput 的 scopeJson 含正确 canonical symbol`（TD-D2-PAGE-WS-01, AC-03）
++- `采集计划/板块成员选择过程不触发 quote/K 线同步写`（TD-D2-NOSIDEEFFECT-03, AC-04）
++
++`src/pages/market-segments.test.tsx`（+134 行）：新增 searchSecurities mock + MembersDrawer 导入；新增 2 个测试（保留既有 8 个）：
++- `板块成员：SecuritySelector 选中后 addSegmentMember 提交的 canonical symbol 与所选一致`（TD-D2-PAGE-SG-01, AC-03）
++- `板块成员：仅选择不提交时 addSegmentMember 不被调用`（AC-04 no-side-effect）
++
++## 关键实现决策
++
++- TD-D2-PAGE-WS-01 采用 TaskPacket 明确授权的兜底断言：驱动真实 SecuritySelector（query→debounce→click data-canonical-symbol="SH.603308"），读回 symbols 表单值并经真实 buildPlanInput 校验 scopeJson 含 SH.603308；未用 antd v6 易碎的保存按钮点击。no-side-effect 测试渲染完整 PlansTab 断言无业务写。
++- syncPlanForm.ts 不改：其逻辑已满足两冻结 util 测试，改它违反「不改产品语义」。
++
++## 自检命令与结果（前端仓库）
++
++- `npm run test -- syncPlanForm.test.ts market-workspace.test.tsx market-segments.test.tsx` → EXIT 0，24/24 pass（syncPlanForm 5、market-workspace 9、market-segments 10）。
++- `npm run typecheck` → EXIT 0。
++
++## 文件 hash（前端仓库）
++
++- src/pages/market-workspace.tsx: 2db9047c151163e8d7a6ff672a7ec8e67b0fa4e630018e496c5a40a8fb21dcab
++- src/pages/market-workspace.test.tsx: 23b663928c526a7b315f5a239dba3883821cb57ca6e4c6741c1bcb36d1b82e9d
++- src/pages/market-segments.tsx: 9416bc3df8223b729d7cbf4478a82ac519167555d893cddcb6191167296f89a6
++- src/pages/market-segments.test.tsx: cbf2e55e01dd13dc6f92fad6c98784e11bd6f016252e883401b5eddc82b6cc31
++- src/features/market-data/utils/syncPlanForm.ts: b27fffb3fc8152689d77b6b3b941a479a342aece56b0ade9eaef05486158eb8a
++- src/features/market-data/utils/syncPlanForm.test.ts: b909aaa6af05cf69bce8c4253a50a3729c56840e505e656cdbcaa7a590030d59
++
++## 未验证维度
++
++聚焦 slice 测试通过 + typecheck 通过；lint/build/full test 在候选冻结时由最终 verifier 执行。jsdom 之外无 runtime/E2E。
+diff --git a/scripts/tests/ai-governance.test.mjs b/scripts/tests/ai-governance.test.mjs
+index 8f3a30d..b06ab43 100644
+--- a/scripts/tests/ai-governance.test.mjs
++++ b/scripts/tests/ai-governance.test.mjs
+@@ -699,6 +699,42 @@ test("ZCode hook process uses the documented exit-code contract", () => {
+   assert.equal(allowed.stdout, "");
+ });
+ 
++test("ZCode unattended qta-run blocks AskUserQuestion but ordinary sessions remain interactive", async () => {
++  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-unattended-question-"));
++  const script = path.resolve("scripts/zcode-governance-hook.mjs");
++  const environment = { ...process.env, ZCODE_PROJECT_DIR: directory };
++  try {
++    await mkdir(path.join(directory, ".git"), { recursive: true });
++    const ordinary = spawnSync(process.execPath, [script], {
++      input: JSON.stringify({
++        hook_event_name: "PreToolUse", session_id: "ordinary-session", cwd: directory,
++        tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Choose?" }] }
++      }), encoding: "utf8", env: environment
++    });
++    assert.equal(ordinary.status, 0, ordinary.stderr);
++
++    const sessionId = "unattended-parent";
++    const activation = spawnSync(process.execPath, [script], {
++      input: JSON.stringify({
++        hook_event_name: "UserPromptSubmit", session_id: sessionId, cwd: directory,
++        prompt: "/qta-run finish one bounded task"
++      }), encoding: "utf8", env: environment
++    });
++    assert.equal(activation.status, 0, activation.stderr);
++    const blocked = spawnSync(process.execPath, [script], {
++      input: JSON.stringify({
++        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory,
++        tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Choose recommended?" }] }
++      }), encoding: "utf8", env: environment
++    });
++    assert.equal(blocked.status, 2);
++    assert.match(blocked.stderr, /blocked AskUserQuestion/);
++    assert.match(blocked.stderr, /persist.*BLOCKED/i);
++  } finally {
++    await rm(directory, { recursive: true, force: true });
++  }
++});
++
+ test("ZCode Hook receipt binds ADVISORY evidence to an observed runtime session", async () => {
+   const directory = await mkdtemp(path.join(os.tmpdir(), "qta-runtime-receipt-"));
+   const sessionId = "runtime-session-1";
+diff --git a/scripts/validate-ai-governance.mjs b/scripts/validate-ai-governance.mjs
+index ae4bd56..c8be183 100644
+--- a/scripts/validate-ai-governance.mjs
++++ b/scripts/validate-ai-governance.mjs
+@@ -28,7 +28,7 @@ const expectedAgentPolicies = {
+     skills: ["qta-context-bootstrap", "qta-task-contract"]
+   },
+   "qta-implementer": {
+-    permissionMode: "acceptEdits",
++    permissionMode: "bypassPermissions",
+     maxTurns: "20",
+     tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash", "Skill"],
+     disallowedTools: ["Agent", "Task", "EnterPlanMode", "ExitPlanMode"],
+@@ -48,7 +48,7 @@ const expectedAgentPolicies = {
+     skills: ["qta-context-bootstrap"]
+   },
+   "qta-final-verifier": {
+-    permissionMode: "acceptEdits",
++    permissionMode: "bypassPermissions",
+     maxTurns: "12",
+     tools: ["Read", "Glob", "Grep", "Bash", "Skill"],
+     disallowedTools: [
+@@ -303,8 +303,9 @@ try {
+       || !governanceMatchers[0]?.matcher?.includes("Write")
+       || !governanceMatchers[0]?.matcher?.includes("Edit")
+       || !governanceMatchers[0]?.matcher?.includes("Agent")
+-      || !governanceMatchers[0]?.matcher?.includes("Task")) {
+-    errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit and Agent/Task dispatches");
++      || !governanceMatchers[0]?.matcher?.includes("Task")
++      || !governanceMatchers[0]?.matcher?.includes("AskUserQuestion")) {
++    errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit, Agent/Task, and AskUserQuestion");
+   }
+   for (const event of ["UserPromptSubmit", "Stop"]) {
+     const groups = hooks?.events?.[event] ?? [];
+diff --git a/scripts/zcode-governance-hook.mjs b/scripts/zcode-governance-hook.mjs
+index b371312..05e5f0f 100644
+--- a/scripts/zcode-governance-hook.mjs
++++ b/scripts/zcode-governance-hook.mjs
+@@ -338,6 +338,30 @@ async function activateRunPrompt(input) {
+   }, null, 2)}\n`, { mode: 0o600 });
+ }
+ 
++async function enforceUnattendedQuestionPolicy(input) {
++  const tool = input?.tool_name ?? input?.toolName ?? "";
++  if (tool !== "AskUserQuestion") return false;
++  const sessionId = input?.session_id ?? input?.sessionId ?? process.env.CLAUDE_SESSION_ID;
++  const projectRoot = process.env.ZCODE_PROJECT_DIR ?? process.env.CLAUDE_PROJECT_DIR
++    ?? input?.cwd ?? process.cwd();
++  if (!sessionId || !projectRoot) return false;
++  const activePath = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "active",
++    `${sha256(sessionId)}.json`);
++  let active;
++  try {
++    active = JSON.parse(await readFile(activePath, "utf8"));
++  } catch (error) {
++    if (error.code === "ENOENT") return false;
++    throw error;
++  }
++  if (active.projectRootSha256 !== sha256(path.resolve(projectRoot))) {
++    console.error("QTA unattended policy: active-task receipt belongs to another project");
++    process.exit(2);
++  }
++  console.error("QTA unattended policy blocked AskUserQuestion: choose the documented/recommended reversible option automatically; if safe progress requires product, destructive, credential, or external input, persist an evidence-backed BLOCKED checkpoint instead of waiting for the user");
++  process.exit(2);
++}
++
+ async function enforceStopGate(input) {
+   const event = input?.hook_event_name ?? input?.hookEventName ?? input?.event ?? "";
+   if (event !== "Stop") return false;
+@@ -402,6 +426,7 @@ async function main() {
+   const input = await readStdin();
+   if (await enforceStopGate(input)) return;
+   await activateRunPrompt(input);
++  await enforceUnattendedQuestionPolicy(input);
+   const result = evaluateHook(input);
+   if (!result.allowed) {
+     console.error(`QTA governance blocked this action: ${result.reasons.join("; ")}`);
