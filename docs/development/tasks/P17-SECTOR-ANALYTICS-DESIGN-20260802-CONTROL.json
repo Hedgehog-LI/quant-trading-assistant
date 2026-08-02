@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 3,
+  "taskId": "P17-SECTOR-ANALYTICS-DESIGN-20260802",
+  "controlPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json",
+  "startedAt": "2026-08-02T00:00:00Z",
+  "lane": "L0",
+  "lifecycleState": "CONTRACT_FROZEN",
+  "contract": {
+    "path": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md",
+    "version": "1.1",
+    "sha256": "d55ef734e49108259f58bfd90e45d3bdbde5163a457f817f0b5f8872bb57a182",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["STATIC"]},
+      {"id": "AC-02", "requiredEvidence": ["STATIC"]},
+      {"id": "AC-03", "requiredEvidence": ["STATIC"]}
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "板块分析层可开发设计文档族（主设计 + API §5 追加 + DB 规划追加 + 实现计划 + 静态结构校验脚本 + 本任务治理 artifact）",
+        "acIds": ["AC-01", "AC-02", "AC-03"],
+        "allowedWritePaths": [
+          "docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md",
+          "docs/api/MARKET_DATA_API.md",
+          "docs/DATABASE_DESIGN.md",
+          "docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md",
+          "scripts/tests/p17-sector-analytics-design-structure.test.mjs",
+          "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md",
+          "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-01.json",
+          "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-02.json",
+          "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-03.json"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      }
+    ],
+    "testInventory": [
+      {
+        "testId": "TEST-01",
+        "acIds": ["AC-01"],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "scripts/tests/p17-sector-analytics-design-structure.test.mjs",
+        "selector": "P17-SECTOR-ANALYTICS-AC01"
+      },
+      {
+        "testId": "TEST-02",
+        "acIds": ["AC-02"],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "scripts/tests/p17-sector-analytics-design-structure.test.mjs",
+        "selector": "P17-SECTOR-ANALYTICS-AC02"
+      },
+      {
+        "testId": "TEST-03",
+        "acIds": ["AC-03"],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "scripts/tests/p17-sector-analytics-design-structure.test.mjs",
+        "selector": "P17-SECTOR-ANALYTICS-AC03"
+      },
+      {
+        "testId": "TEST-GOV-01",
+        "acIds": ["AC-01", "AC-02", "AC-03"],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "scripts/validate-ai-governance.mjs",
+        "selector": "node scripts/validate-ai-governance.mjs"
+      },
+      {
+        "testId": "TEST-GOV-02",
+        "acIds": ["AC-01", "AC-02", "AC-03"],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "scripts/run-ai-governance-gates.mjs",
+        "selector": "node scripts/run-ai-governance-gates.mjs"
+      }
+    ],
+    "blockingAmendments": []
+  },
+  "git": {
+    "automation": "DELIVERY_PUSH",
+    "branch": "codex/p17-sector-analytics-design-20260802",
+    "baselineCommit": "563e84a573426800b3f6aa8e4e0525bc5314b3a8",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-02T00:00:00Z",
+      "actor": "codex-parent-p17-sector-design-1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "TEST_DESIGN_READY",
+      "at": "2026-08-02T00:05:00Z",
+      "actor": "codex-parent-p17-sector-design-1"
+    },
+    {
+      "sequence": 3,
+      "from": "TEST_DESIGN_READY",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-02T00:10:00Z",
+      "actor": "codex-parent-p17-sector-design-1"
+    }
+  ],
+  "candidate": {
+    "mode": "SNAPSHOT",
+    "generation": 0,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "",
+    "diffArtifactSha256": ""
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [
+    {
+      "sequence": 1,
+      "dispatchId": "DISPATCH-TD-1",
+      "role": "TEST_DESIGNER",
+      "roleRunId": "TD-RUN-1",
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-test-designer.md",
+      "capability": "READ_ONLY",
+      "assignedAcIds": ["AC-01", "AC-02", "AC-03"],
+      "candidateGeneration": 0,
+      "repairRound": 0,
+      "dispatchedAt": "2026-08-02T00:05:00Z",
+      "finishedAt": "2026-08-02T00:08:00Z",
+      "status": "COMPLETED",
+      "executionOutcome": "COMPLETED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-TEST-DESIGN.md",
+      "artifactSha256": "4401fd71055f936977cc9ee9d7350579b5fde5ef730414875e3f2aeb7da32ab2",
+      "verdict": "READY_TO_FREEZE",
+      "findingIds": []
+    }
+  ],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "architectureGate": {
+    "required": true,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": -1,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
+      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
