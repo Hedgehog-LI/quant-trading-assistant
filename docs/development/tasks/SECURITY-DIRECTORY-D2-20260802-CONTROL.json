@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 3,
+  "taskId": "SECURITY-DIRECTORY-D2-20260802",
+  "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CONTROL.json",
+  "startedAt": "2026-08-02T01:42:34Z",
+  "lane": "L2",
+  "lifecycleState": "CONTRACT_FROZEN",
+  "contract": {
+    "path": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CONTRACT.md",
+    "version": "1",
+    "sha256": "1d52ca6c43fc7f0eda6cdbe4d4fe290191948bfc2de78e769ae3dba738ab22ba",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-02", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-03", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-04", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-05", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-06", "requiredEvidence": ["STATIC"]}
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "目录 API adapter + 统一类型 + mock 数据与 mock/remote 测试；AC-06 静态门禁归属此 slice（实际在全 slice 完成后跨文件运行 typecheck/lint/build/diff/architecture/inventory，归属仅为满足每 AC 必须分配 slice 的约束）",
+        "acIds": ["AC-01", "AC-06"],
+        "allowedWritePaths": [
+          "src/features/market-data/api/securityDirectoryApi.ts",
+          "src/features/market-data/api/securityDirectoryApi.test.ts",
+          "src/features/market-data/api/securityDirectoryApi.remote.test.ts",
+          "src/shared/types/domain.ts"
+        ],
+        "maxExpectedFiles": 4,
+        "maxProductionLineDelta": 400
+      },
+      {
+        "id": "SLICE-02",
+        "description": "SecuritySelector 共享组件与复合行为测试（AC-02 全部子项）",
+        "acIds": ["AC-02"],
+        "allowedWritePaths": [
+          "src/shared/components/SecuritySelector.tsx",
+          "src/shared/components/SecuritySelector.test.tsx"
+        ],
+        "maxExpectedFiles": 3,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-03",
+        "description": "最新价与历史日 K 两页面接入（含新建 market-data.test.tsx）",
+        "acIds": ["AC-03", "AC-04", "AC-05"],
+        "allowedWritePaths": [
+          "src/pages/market-data.tsx",
+          "src/pages/market-data.test.tsx"
+        ],
+        "maxExpectedFiles": 2,
+        "maxProductionLineDelta": 350
+      },
+      {
+        "id": "SLICE-04",
+        "description": "采集计划结构化 scope 与板块成员两流程接入",
+        "acIds": ["AC-03", "AC-04", "AC-05"],
+        "allowedWritePaths": [
+          "src/pages/market-workspace.tsx",
+          "src/pages/market-workspace.test.tsx",
+          "src/pages/market-segments.tsx",
+          "src/pages/market-segments.test.tsx",
+          "src/features/market-data/utils/syncPlanForm.ts",
+          "src/features/market-data/utils/syncPlanForm.test.ts"
+        ],
+        "maxExpectedFiles": 6,
+        "maxProductionLineDelta": 500
+      }
+    ],
+    "testInventory": [
+      {"testId": "TD-D2-API-01", "acIds": ["AC-01"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/features/market-data/api/securityDirectoryApi.test.ts", "selector": "searchSecurities mock 与 remote 同形：相同关键词返回字段一致且排名一致"},
+      {"testId": "TD-D2-API-02", "acIds": ["AC-01"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/features/market-data/api/securityDirectoryApi.test.ts", "selector": "中文≥1 字符、英文/数字≥2 字符才触发搜索；阈值以下不调用"},
+      {"testId": "TD-D2-API-03", "acIds": ["AC-01"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/features/market-data/api/securityDirectoryApi.test.ts", "selector": "默认 limit=20 且 markets/types/includeDelisted 筛选正确传递"},
+      {"testId": "TD-D2-API-04", "acIds": ["AC-01"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/features/market-data/api/securityDirectoryApi.remote.test.ts", "selector": "searchSecurities remote 调用 GET /market-data/securities/search 并解包 items 与目录元数据"},
+      {"testId": "TD-D2-API-05", "acIds": ["AC-01"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/features/market-data/api/securityDirectoryApi.remote.test.ts", "selector": "getSecurity remote 调用 GET /market-data/securities/{canonicalSymbol} 并在 404 时抛错"},
+      {"testId": "TD-D2-COMP-01", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "250ms debounce：阈值内连续输入只触发一次搜索"},
+      {"testId": "TD-D2-COMP-02", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "过期响应不覆盖新关键词结果（竞态保护）"},
+      {"testId": "TD-D2-COMP-03", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "loading / 空结果 / 失败 / 重试 四态正确"},
+      {"testId": "TD-D2-COMP-04", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "键盘 ArrowDown/ArrowUp 导航、Enter 确认、Esc 关闭"},
+      {"testId": "TD-D2-COMP-05", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "选中后展示名称/canonical symbol/市场交易所/证券类型"},
+      {"testId": "TD-D2-COMP-06", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "再次编辑文本立即失效旧选择（清除已选）"},
+      {"testId": "TD-D2-COMP-07", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "同名跨市场证券并列展示且不自动选择"},
+      {"testId": "TD-D2-COMP-08", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "退市证券默认隐藏；显式筛选后可见并标注状态"},
+      {"testId": "TD-D2-COMP-09", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "目录未初始化 / 正常无匹配 / 请求失败 三态可区分"},
+      {"testId": "TD-D2-COMP-10", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "目录陈旧只提示不阻断本地结果展示"},
+      {"testId": "TD-D2-PAGE-MD-01", "acIds": ["AC-03"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/pages/market-data.test.tsx", "selector": "最新价查询：SecuritySelector 选中后提交的 canonical symbol 与所选一致"},
+      {"testId": "TD-D2-PAGE-MD-02", "acIds": ["AC-03"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/pages/market-data.test.tsx", "selector": "历史日 K 同步：SecuritySelector 选中后提交的 canonical symbol 与所选一致"},
+      {"testId": "TD-D2-PAGE-WS-01", "acIds": ["AC-03"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/pages/market-workspace.test.tsx", "selector": "采集计划 scope：SecuritySelector 选中后 buildPlanInput 的 scopeJson 含正确 canonical symbol"},
+      {"testId": "TD-D2-PAGE-SG-01", "acIds": ["AC-03"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/pages/market-segments.test.tsx", "selector": "板块成员：SecuritySelector 选中后 addSegmentMember 提交的 canonical symbol 与所选一致"},
+      {"testId": "TD-D2-NOSIDEEFFECT-01", "acIds": ["AC-04"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/pages/market-data.test.tsx", "selector": "最新价/日 K 选择证券过程不调用 quote/sync/采集任务创建等写接口"},
+      {"testId": "TD-D2-NOSIDEEFFECT-02", "acIds": ["AC-04"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/shared/components/SecuritySelector.test.tsx", "selector": "SecuritySelector 搜索过程不触发任何业务写请求"},
+      {"testId": "TD-D2-NOSIDEEFFECT-03", "acIds": ["AC-04"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/pages/market-workspace.test.tsx", "selector": "采集计划/板块成员选择过程不触发 quote/K 线同步写"},
+      {"testId": "TD-D2-FALLBACK-01", "acIds": ["AC-05"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/pages/market-data.test.tsx", "selector": "手工输入 canonical symbol 后备路径仍可提交"},
+      {"testId": "TD-D2-LEGACY-01", "acIds": ["AC-05"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/features/market-data/utils/syncPlanForm.test.ts", "selector": "旧 scopeJson {symbols:[...]} 计划可被 planToDraft 解析展示不报错"},
+      {"testId": "TD-D2-LEGACY-02", "acIds": ["AC-05"], "kind": "AUTOMATION", "required": true, "sourcePath": "src/features/market-data/utils/syncPlanForm.test.ts", "selector": "结构化 scope builder 生成正确 scopeJson 且与旧格式读取兼容"},
+      {"testId": "TD-D2-STATIC-TYPECHECK", "acIds": ["AC-06"], "kind": "STATIC", "required": true, "sourcePath": "package.json", "selector": "npm run typecheck"},
+      {"testId": "TD-D2-STATIC-LINT", "acIds": ["AC-06"], "kind": "STATIC", "required": true, "sourcePath": "package.json", "selector": "npm run lint"},
+      {"testId": "TD-D2-STATIC-BUILD", "acIds": ["AC-06"], "kind": "STATIC", "required": true, "sourcePath": "package.json", "selector": "npm run build"},
+      {"testId": "TD-D2-STATIC-DIFF", "acIds": ["AC-06"], "kind": "STATIC", "required": true, "sourcePath": "package.json", "selector": "git diff --check"},
+      {"testId": "TD-D2-STATIC-ARCH", "acIds": ["AC-06"], "kind": "STATIC", "required": true, "sourcePath": "scripts/check-ai-architecture.mjs", "selector": "check-ai-architecture.mjs"},
+      {"testId": "TD-D2-STATIC-INVENTORY", "acIds": ["AC-06"], "kind": "STATIC", "required": true, "sourcePath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-TEST-DESIGN.md", "selector": "SECURITY-DIRECTORY-D2-20260802-TEST-DESIGN.md (frozen-inventory machine receipt; hash-bound via CONTROL contract.testInventory)"}
+    ],
+    "blockingAmendments": []
+  },
+  "git": {
+    "automation": "COMMIT",
+    "branch": "codex/security-directory-d2-20260802",
+    "baselineCommit": "a8b2b1d3ec63be26a2b61dcb5fe8314e25ef127a",
+    "preExistingDirtyPaths": [
+      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CANDIDATE.patch",
+      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTROL.json"
+    ]
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-02T01:42:34Z",
+      "actor": "codex-parent-d2-1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "TEST_DESIGN_READY",
+      "at": "2026-08-02T01:50:00Z",
+      "actor": "codex-parent-d2-1"
+    },
+    {
+      "sequence": 3,
+      "from": "TEST_DESIGN_READY",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-02T01:55:00Z",
+      "actor": "codex-parent-d2-1"
+    }
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "",
+    "diffArtifactSha256": ""
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [
+    {
+      "roleRunId": "TD-D2-20260802-01",
+      "dispatchId": "dispatch-TD-D2-20260802-01",
+      "sessionId": "codex-agent-429ac282-04d8-4a17-add8-d8fec7d63459",
+      "startedAt": "2026-08-02T01:50:00Z",
+      "finishedAt": "2026-08-02T01:53:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/09a7e8cb01628dc982aaf06f45e7c11390cc49c73b9040a7aeef489d4c8035bf/8e65f36ccfff18d089091e8a06fcecfd1db88ef32ef7c8514fc79af3472f99b4.json",
+      "role": "TEST_DESIGNER",
+      "generation": 0,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-test-designer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only test-designer; no edits, no Git, no shell commands, no sub-agents; parent persists the returned artifact",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-TEST-DESIGN.md",
+      "artifactSha256": "aeedd6288c02590833d1b8e4e3353e6a1d7ea7ca7c88b4c06ac5a44d7b24d949"
+    }
+  ],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "architectureGate": {
+    "required": true,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": -1,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
+      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
