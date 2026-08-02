@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-CONTROL.json",
   "startedAt": "2026-08-02T15:00:00Z",
   "lane": "L2",
-  "lifecycleState": "VERIFIED",
+  "lifecycleState": "BLOCKED",
   "contract": {
     "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-CONTRACT.md",
     "version": "2",
@@ -92,7 +92,8 @@
     {"sequence": 5, "from": "IMPLEMENTING", "to": "SELF_CHECKED", "at": "2026-08-02T15:35:00Z", "actor": "qta-implementer/IMPL-RUN-001..004"},
     {"sequence": 6, "from": "SELF_CHECKED", "to": "CANDIDATE_FROZEN", "at": "2026-08-02T15:40:00Z", "actor": "zcode-parent-FRONTEND-GOVERNANCE-BOOTSTRAP-20260802"},
     {"sequence": 7, "from": "CANDIDATE_FROZEN", "to": "REVIEW_CLEAR", "at": "2026-08-02T15:50:00Z", "actor": "qta-code-reviewer/CR-RUN-001"},
-    {"sequence": 8, "from": "REVIEW_CLEAR", "to": "VERIFIED", "at": "2026-08-02T15:55:00Z", "actor": "qta-final-verifier/FV-RUN-001"}
+    {"sequence": 8, "from": "REVIEW_CLEAR", "to": "VERIFIED", "at": "2026-08-02T15:55:00Z", "actor": "qta-final-verifier/FV-RUN-001"},
+    {"sequence": 9, "from": "VERIFIED", "to": "BLOCKED", "at": "2026-08-02T16:08:00Z", "actor": "zcode-parent-FRONTEND-GOVERNANCE-BOOTSTRAP-20260802"}
   ],
   "candidate": {
     "mode": "COMMIT",
