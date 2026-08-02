@@ -42,6 +42,8 @@ Only an independent verifier may set `INDEPENDENTLY_VERIFIED`.
 2. Confirm the lifecycle state, contract hash, candidate hash, repair round, and failure fingerprint.
 3. Validate the task control file and record role-run, wait, poll, context, compaction, and optional usage
    counters.
+   Record every terminated dispatch attempt, including timeout, plan-only, failure, cancellation, and policy
+   violation. Failed attempts are evidence and must not disappear from a compacted handoff.
 4. Record what changed since the previous checkpoint.
 5. Map files and evidence to acceptance criteria.
 6. Record commands actually run and exact outcomes without pasting unchanged logs.
@@ -71,6 +73,8 @@ facts through `$qta-delivery-finalization`, never from an implementation checkpo
 - Invalidate review and verification whenever the candidate hash changes.
 - Persist repair counts across clean contexts; a new conversation does not reset a failure fingerprint.
 - Never reuse a prior implementer, reviewer, or verifier role run after checkpoint.
+- Never let the parent coordinator replace a timed-out specialist. Two timeouts for one implementation slice
+  require `BLOCKED` and a newly frozen smaller slice.
 - A compaction or prohibited tool call invalidates that role artifact and must be recorded as
   `POLICY_VIOLATION`.
 

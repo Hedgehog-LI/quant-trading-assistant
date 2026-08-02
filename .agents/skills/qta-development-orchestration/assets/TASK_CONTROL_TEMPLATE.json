@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "taskId": "<TASK-ID>",
   "controlPath": "docs/development/tasks/<TASK-ID>-CONTROL.json",
   "startedAt": "<ISO-8601>",
@@ -11,6 +11,26 @@
     "sha256": "<SHA-256>",
     "acceptanceCriteria": [
       {"id": "AC-01", "requiredEvidence": ["STATIC"]}
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "<ONE-COHERENT-IMPLEMENTATION-BOUNDARY>",
+        "acIds": ["AC-01"],
+        "allowedWritePaths": ["<PATH>"],
+        "maxExpectedFiles": 5,
+        "maxProductionLineDelta": 500
+      }
+    ],
+    "testInventory": [
+      {
+        "testId": "TEST-01",
+        "acIds": ["AC-01"],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "<TEST-OR-CHECK-SOURCE-PATH>",
+        "selector": "<EXACT-TEST-OR-CHECK-SELECTOR>"
+      }
     ],
     "blockingAmendments": []
   },
@@ -64,7 +84,20 @@
     "architectureVerdict": "NOT_REQUIRED",
     "artifactPath": "",
     "artifactSha256": "",
+    "architectureGateSha256": "",
     "findingIds": []
+  },
+  "architectureGate": {
+    "required": false,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": -1,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
   },
   "verification": {
     "candidateIdentity": "",
@@ -74,6 +107,7 @@
     "architectureVerdict": "NOT_VERIFIED",
     "artifactPath": "",
     "artifactSha256": "",
+    "architectureGateSha256": "",
     "dimensions": {
       "STATIC": {"required": true, "status": "NOT_VERIFIED"},
       "AUTOMATION": {"required": false, "status": "NOT_REQUIRED"},
@@ -81,11 +115,13 @@
       "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
     }
   },
+  "testEvidence": [],
   "finalization": {
     "status": "NOT_STARTED",
     "candidateIdentity": "",
     "artifactPath": "",
     "artifactSha256": "",
+    "completedAt": "",
     "changedPaths": []
   },
   "evidence": []

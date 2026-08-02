@@ -54,6 +54,23 @@ contract does not contain its own hash.
 | RUNTIME | | | |
 | DEPLOYMENT | | | |
 
+## Implementation Slices
+
+Each initial slice owns at most three ACs, eight expected files, and 500 production-line additions. One fresh
+implementer receives one slice. Cross-slice assembly is owned by the parent without editing implementation.
+
+| Slice ID | Coherent boundary | AC IDs | Allowed write paths | Max files | Max production-line delta |
+|---|---|---|---|---:|---:|
+| SLICE-01 | | | | 5 | 500 |
+
+## Frozen Test Inventory
+
+Every mandatory evidence item has a stable test ID and an exact selector observable in a machine receipt.
+
+| Test ID | AC IDs | Kind | Required | Source path | Exact selector | Receipt path |
+|---|---|---|---|---|---|---|
+| TEST-01 | AC-01 | STATIC/AUTOMATION/RUNTIME/DEPLOYMENT | YES | | | |
+
 ## Architecture And Quality Gates
 
 - Required architecture review: `YES | NO`

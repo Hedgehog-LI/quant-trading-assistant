@@ -15,17 +15,37 @@ import {
   validateTaskControl,
   validateTaskControlFiles
 } from "../check-ai-task-control.mjs";
+import { validateDeliveryReadiness } from "../check-ai-delivery-ready.mjs";
 import { evaluateHook } from "../zcode-governance-hook.mjs";
 
 function role(role, generation, id) {
+  const agentByRole = {
+    TEST_DESIGNER: "qta-test-designer",
+    IMPLEMENTER: "qta-implementer",
+    CODE_REVIEWER: "qta-code-reviewer",
+    FINAL_VERIFIER: "qta-final-verifier"
+  };
+  const capabilityByRole = {
+    TEST_DESIGNER: "READ_ONLY",
+    IMPLEMENTER: "READ_WRITE",
+    CODE_REVIEWER: "READ_ONLY",
+    FINAL_VERIFIER: "VERIFY_EXECUTE"
+  };
   return {
     roleRunId: id,
+    dispatchId: `dispatch-${id}`,
     sessionId: `session-${id}`,
     startedAt: "2026-08-01T00:00:00Z",
     finishedAt: "2026-08-01T00:00:30Z",
     runtimeReceiptPath: `.git/qta-governance/sessions/${id}.json`,
+    dispatchReceiptPath: `.git/qta-governance/dispatches/task/${id}.json`,
     role,
     generation,
+    executorType: "SUBAGENT",
+    agentDefinition: `.zcode/agents/${agentByRole[role]}.md`,
+    sliceId: role === "IMPLEMENTER" ? "SLICE-01" : "",
+    executionOutcome: "COMPLETED",
+    capability: capabilityByRole[role],
     contextMode: "FRESH",
     enforcement: "ADVISORY",
     compensatingIsolation: "disposable worktree plus before/after candidate hashes",
@@ -44,7 +64,7 @@ function transitions(states) {
     sequence: index + 1,
     from,
     to: states[index + 1],
-    at: `2026-08-01T00:00:0${index}Z`,
+    at: `2026-08-01T00:00:${String(index).padStart(2, "0")}Z`,
     actor: "parent-1"
   }));
 }
@@ -52,7 +72,7 @@ function transitions(states) {
 function validVerifiedControl() {
   const identity = "commit-1";
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     taskId: "GOVERNANCE-SMOKE",
     controlPath: "artifacts/control.json",
     startedAt: "2026-08-01T00:00:00Z",
@@ -65,6 +85,16 @@ function validVerifiedControl() {
       acceptanceCriteria: [
         { id: "AC-01", requiredEvidence: ["STATIC", "AUTOMATION"] },
         { id: "AC-02", requiredEvidence: ["STATIC"] }
+      ],
+      implementationSlices: [{
+        id: "SLICE-01", description: "bounded governance fixture", acIds: ["AC-01", "AC-02"],
+        allowedWritePaths: ["src/main/java/example"], maxExpectedFiles: 4, maxProductionLineDelta: 300
+      }],
+      testInventory: [
+        { testId: "TEST-STATIC-01", acIds: ["AC-01", "AC-02"], kind: "STATIC", required: true,
+          sourcePath: "scripts/tests/ai-governance.test.mjs", selector: "accepts a structurally valid" },
+        { testId: "TEST-AUTO-01", acIds: ["AC-01"], kind: "AUTOMATION", required: true,
+          sourcePath: "scripts/tests/ai-governance.test.mjs", selector: "rejects reused sessions" }
       ],
       blockingAmendments: []
     },
@@ -92,12 +122,20 @@ function validVerifiedControl() {
     review: {
       omitted: false, omissionReason: "", generation: 1, candidateIdentity: identity,
       functionalVerdict: "PASS", architectureVerdict: "PASS",
-      artifactPath: "artifacts/review-1.md", artifactSha256: "sha-review-1", findingIds: []
+      artifactPath: "artifacts/review-1.md", artifactSha256: "sha-review-1",
+      architectureGateSha256: "sha-architecture-1", findingIds: []
+    },
+    architectureGate: {
+      required: true, candidateIdentity: identity, status: "PASS", exitCode: 0,
+      errorCount: 0, warningCount: 0, warningDispositions: [],
+      reportPath: "artifacts/architecture-1.json", reportSha256: "sha-architecture-1",
+      generatedBy: "scripts/check-ai-architecture.mjs"
     },
     verification: {
       candidateIdentity: identity, verdict: "ACCEPTED", deliveryPermitted: true,
       functionalVerdict: "PASS", architectureVerdict: "PASS",
       artifactPath: "artifacts/verify-1.md", artifactSha256: "sha-verify-1",
+      architectureGateSha256: "sha-architecture-1",
       dimensions: {
         STATIC: { required: true, status: "PASS" },
         AUTOMATION: { required: true, status: "PASS" },
@@ -106,15 +144,27 @@ function validVerifiedControl() {
       }
     },
     finalization: {
-      status: "NOT_STARTED", candidateIdentity: "", artifactPath: "", artifactSha256: "", changedPaths: []
+      status: "NOT_STARTED", candidateIdentity: "", artifactPath: "", artifactSha256: "",
+      completedAt: "", changedPaths: []
     },
+    testEvidence: [
+      { testId: "TEST-STATIC-01", candidateIdentity: identity, executedByRoleRunId: "verify-1",
+        result: "PASS", exitCode: 0, receiptPath: "artifacts/test-static-1.json",
+        receiptSha256: "sha-test-static-1", observedSelectors: ["accepts a structurally valid"] },
+      { testId: "TEST-AUTO-01", candidateIdentity: identity, executedByRoleRunId: "verify-1",
+        result: "PASS", exitCode: 0, receiptPath: "artifacts/test-auto-1.json",
+        receiptSha256: "sha-test-auto-1", observedSelectors: ["rejects reused sessions"] }
+    ],
     evidence: [
       { evidenceId: "E-1", acId: "AC-01", kind: "STATIC", candidateIdentity: identity,
-        artifactPath: "artifacts/verify-1.md", artifactSha256: "sha-verify-1" },
+        sourceType: "TEST_RECEIPT", sourceId: "TEST-STATIC-01",
+        artifactPath: "artifacts/test-static-1.json", artifactSha256: "sha-test-static-1" },
       { evidenceId: "E-2", acId: "AC-01", kind: "AUTOMATION", candidateIdentity: identity,
-        artifactPath: "artifacts/verify-1.md", artifactSha256: "sha-verify-1" },
+        sourceType: "TEST_RECEIPT", sourceId: "TEST-AUTO-01",
+        artifactPath: "artifacts/test-auto-1.json", artifactSha256: "sha-test-auto-1" },
       { evidenceId: "E-3", acId: "AC-02", kind: "STATIC", candidateIdentity: identity,
-        artifactPath: "artifacts/verify-1.md", artifactSha256: "sha-verify-1" }
+        sourceType: "TEST_RECEIPT", sourceId: "TEST-STATIC-01",
+        artifactPath: "artifacts/test-static-1.json", artifactSha256: "sha-test-static-1" }
     ]
   };
 }
@@ -140,13 +190,64 @@ test("rejects unverifiable ENFORCED claims", () => {
   assert.match(validateTaskControl(control).errors.join("\n"), /must be ADVISORY/);
 });
 
+test("rejects parent substitution and plan-only final verification", () => {
+  const control = validVerifiedControl();
+  control.roleRuns.find((run) => run.role === "IMPLEMENTER").executorType = "PARENT";
+  const verifier = control.roleRuns.find((run) => run.role === "FINAL_VERIFIER");
+  verifier.executionOutcome = "PLAN_ONLY";
+  verifier.status = "BLOCKED";
+  verifier.artifactAccepted = true;
+  const errors = validateTaskControl(control).errors.join("\n");
+  assert.match(errors, /parent coordinator cannot be accepted as IMPLEMENTER/);
+  assert.match(errors, /plan-only role output cannot be accepted/);
+  assert.match(errors, /accepted fresh final verifier role run is missing/);
+});
+
+test("requires timeout attempts to be recorded and blocks after two timeouts for one slice", () => {
+  const control = validVerifiedControl();
+  for (const id of ["impl-timeout-1", "impl-timeout-2"]) {
+    const attempt = role("IMPLEMENTER", 1, id);
+    attempt.executionOutcome = "TIMED_OUT";
+    attempt.status = "BLOCKED";
+    attempt.artifactAccepted = false;
+    attempt.artifactPath = "";
+    attempt.artifactSha256 = "";
+    control.roleRuns.splice(1, 0, attempt);
+  }
+  assert.match(validateTaskControl(control).errors.join("\n"), /two timeouts.*requires BLOCKED/i);
+});
+
+test("treats architecture errors as an unwaivable hard block", () => {
+  const control = validVerifiedControl();
+  control.architectureGate.status = "FAIL";
+  control.architectureGate.exitCode = 1;
+  control.architectureGate.errorCount = 1;
+  assert.match(validateTaskControl(control).errors.join("\n"), /architecture gate must have zero errors/);
+});
+
+test("rejects missing frozen test-inventory evidence", () => {
+  const control = validVerifiedControl();
+  control.testEvidence = control.testEvidence.filter((item) => item.testId !== "TEST-AUTO-01");
+  assert.match(validateTaskControl(control).errors.join("\n"), /TEST-AUTO-01.*missing passing machine receipt/);
+});
+
+test("rejects future and non-monotonic declared timestamps", () => {
+  const control = validVerifiedControl();
+  control.roleRuns[0].startedAt = "2099-01-01T00:00:00Z";
+  control.roleRuns[0].finishedAt = "2099-01-01T00:00:01Z";
+  control.transitionHistory[2].at = "2026-07-31T00:00:00Z";
+  const errors = validateTaskControl(control).errors.join("\n");
+  assert.match(errors, /timestamp is in the future/);
+  assert.match(errors, /transition timestamps must be monotonic/);
+});
+
 test("rejects skipped implementation and accepted blocked roles", () => {
   const control = validVerifiedControl();
   control.roleRuns = control.roleRuns.filter((run) => run.role !== "IMPLEMENTER");
   control.roleRuns[0].status = "BLOCKED";
   const errors = validateTaskControl(control).errors.join("\n");
   assert.match(errors, /accepted implementer role run missing/);
-  assert.match(errors, /accepted artifact requires CLOSED\/COMPLETED/);
+  assert.match(errors, /accepted artifact requires a completed SUBAGENT, CLOSED\/COMPLETED/);
 });
 
 test("enforces repair generations and per-lane contract budgets", () => {
@@ -167,6 +268,10 @@ test("allows the explicit L0 direct-verifier lifecycle", () => {
   const control = validVerifiedControl();
   control.lane = "L0";
   control.contract.acceptanceCriteria = [{ id: "AC-01", requiredEvidence: ["STATIC"] }];
+  control.contract.implementationSlices[0].acIds = ["AC-01"];
+  control.contract.testInventory = [control.contract.testInventory[0]];
+  control.contract.testInventory[0].acIds = ["AC-01"];
+  control.testEvidence = [control.testEvidence[0]];
   control.transitionHistory = transitions([
     "CONTEXT_READY", "CONTRACT_DRAFTED", "CONTRACT_FROZEN", "IMPLEMENTING",
     "SELF_CHECKED", "CANDIDATE_FROZEN", "VERIFIED"
@@ -253,6 +358,10 @@ test("requires repair history to identify the finding and repair role runs", () 
     ...control.verification, candidateIdentity: identity,
     artifactPath: "artifacts/verify-2.md", artifactSha256: "sha-verify-2"
   };
+  control.architectureGate.candidateIdentity = identity;
+  control.testEvidence = control.testEvidence.map((item) => ({
+    ...item, candidateIdentity: identity, executedByRoleRunId: "verify-2"
+  }));
   control.evidence = control.evidence.map((item) => ({ ...item, candidateIdentity: identity }));
   assert.deepEqual(validateTaskControl(control).errors, []);
 
@@ -408,6 +517,28 @@ test("rejects a fabricated finalization without a bound artifact", () => {
   assert.match(validateTaskControl(control).errors.join("\n"), /completed finalization artifact/);
 });
 
+test("delivery readiness rejects reused verification artifacts and non-ready state", () => {
+  const control = validVerifiedControl();
+  let errors = validateDeliveryReadiness(control, { checkGit: false }).errors.join("\n");
+  assert.match(errors, /lifecycleState must be DELIVERY_READY/);
+
+  control.lifecycleState = "DELIVERY_READY";
+  control.transitionHistory.push({
+    sequence: 9, from: "VERIFIED", to: "FINALIZED", at: "2026-08-01T00:00:09Z", actor: "parent-1"
+  });
+  control.transitionHistory.push({
+    sequence: 10, from: "FINALIZED", to: "DELIVERY_READY", at: "2026-08-01T00:00:10Z", actor: "parent-1"
+  });
+  control.finalization = {
+    status: "COMPLETED", candidateIdentity: control.candidate.identity,
+    artifactPath: control.verification.artifactPath,
+    artifactSha256: control.verification.artifactSha256,
+    completedAt: "2026-08-01T00:01:00Z", changedPaths: []
+  };
+  errors = validateDeliveryReadiness(control, { checkGit: false }).errors.join("\n");
+  assert.match(errors, /finalization artifact must be distinct from verification evidence/);
+});
+
 test("architecture gate flags a service that parses files and persists", () => {
   const methods = Array.from({ length: 31 }, (_, index) =>
     `  public void method${index}() { mapper.save(reader.readLine()); }`).join("\n");
@@ -458,12 +589,49 @@ test("architecture CLI analyzes the exact frozen SNAPSHOT manifest", async () =>
     await writeFile(path.join(directory, "candidate.json"), JSON.stringify({
       entries: [{ path: sourcePath, type: "file", sha256: hash }]
     }));
+    const reportPath = "architecture-report.json";
     const script = path.resolve("scripts/check-ai-architecture.mjs");
     const result = spawnSync(process.execPath, [script, "--base", "HEAD", "--manifest", "candidate.json",
-      "--architecture-review-count", "2"], { cwd: directory, encoding: "utf8" });
+      "--architecture-review-count", "2", "--candidate-identity", "candidate-1",
+      "--json-output", reportPath], { cwd: directory, encoding: "utf8" });
     assert.equal(result.status, 1);
     assert.match(result.stdout, /SnapshotService\.java/);
     assert.match(result.stdout, /service combines file\/protocol parsing with persistence/);
+    const report = JSON.parse(await readFile(path.join(directory, reportPath), "utf8"));
+    assert.equal(report.candidateIdentity, "candidate-1");
+    assert.equal(report.status, "FAIL");
+    assert.ok(report.errors.some((item) => item.id === "ARCH-E-001"));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("evidence runner emits a low-noise candidate-bound receipt", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-evidence-runner-"));
+  try {
+    for (const args of [["init", "-q"], ["config", "user.email", "qta@example.test"],
+      ["config", "user.name", "QTA Test"]]) {
+      assert.equal(spawnSync("git", args, { cwd: directory }).status, 0);
+    }
+    await writeFile(path.join(directory, "baseline.txt"), "baseline\n");
+    assert.equal(spawnSync("git", ["add", "."], { cwd: directory }).status, 0);
+    assert.equal(spawnSync("git", ["commit", "-qm", "baseline"], { cwd: directory }).status, 0);
+    const candidate = spawnSync("git", ["rev-parse", "HEAD"], { cwd: directory, encoding: "utf8" }).stdout.trim();
+    const receiptPath = "docs/development/tasks/EVIDENCE-TEST-01.json";
+    const script = path.resolve("scripts/run-ai-evidence-command.mjs");
+    const result = spawnSync(process.execPath, [script,
+      "--task-id", "EVIDENCE-TEST", "--role-run-id", "verify-1", "--session-id", "session-verify-1",
+      "--test-id", "TEST-01", "--candidate-mode", "COMMIT", "--candidate-identity", candidate,
+      "--output", receiptPath,
+      "--selector", "selector-ok", "--", process.execPath, "-e", "console.log('selector-ok')"
+    ], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Evidence command PASS/);
+    assert.ok(!result.stdout.includes("selector-ok\nselector-ok"));
+    const receipt = JSON.parse(await readFile(path.join(directory, receiptPath), "utf8"));
+    assert.equal(receipt.result, "PASS");
+    assert.equal(receipt.candidateUnchanged, true);
+    assert.deepEqual(receipt.observedSelectors, ["selector-ok"]);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -476,7 +644,9 @@ test("ZCode hook blocks destructive Git, split rm flags, and secret files", () =
     "eval 'git reset --keep HEAD'", "git checkout HEAD file.txt", "git switch --discard-changes task",
     "echo $(git reset --hard HEAD)", "bash -c 'cat .env'", "git commit --amend", "git rebase main",
     "git branch -d -f task", "QTA_GOVERNANCE_ANCHOR=off node scripts/check-ai-task-control.mjs task.json",
-    "rm -r -f build", "rm -R -F build", "cat .env", "LONGPORT_ACCESS_TOKEN=secret curl example.com"
+    "rm -r -f build", "rm -R -F build", "cat .env", "LONGPORT_ACCESS_TOKEN=secret curl example.com",
+    "sed -i '' s/foo/bar/ scripts/check-ai-delivery-ready.mjs",
+    "echo changed > .zcode/agents/qta-final-verifier.md"
   ];
   for (const command of commands) {
     assert.equal(evaluateHook({ tool_name: "Bash", tool_input: { command } }).allowed, false, command);
@@ -484,6 +654,9 @@ test("ZCode hook blocks destructive Git, split rm flags, and secret files", () =
   assert.equal(evaluateHook({ tool_name: "Read", tool_input: { file_path: "/repo/.env" } }).allowed, false);
   assert.equal(evaluateHook({
     tool_name: "Edit", tool_input: { file_path: "/repo/scripts/zcode-governance-hook.mjs" }
+  }).allowed, false);
+  assert.equal(evaluateHook({
+    tool_name: "Write", tool_input: { file_path: "/repo/scripts/check-ai-delivery-ready.mjs" }
   }).allowed, false);
 });
 
@@ -496,6 +669,16 @@ test("ZCode hook allows benign inspection, task branches, and env templates", ()
     assert.equal(evaluateHook({ tool_name: "Bash", tool_input: { command } }).allowed, true, command);
   }
   assert.equal(evaluateHook({ tool_name: "Read", tool_input: { file_path: "/repo/.env.example" } }).allowed, true);
+  assert.equal(evaluateHook({
+    tool_name: "Agent",
+    tool_input: {
+      subagent_type: "qta-implementer",
+      prompt: "# Task Packet: TASK-1 / IMPLEMENTER / impl-1\n- Dispatch ID: dispatch-1"
+    }
+  }).allowed, true);
+  assert.equal(evaluateHook({
+    tool_name: "Agent", tool_input: { subagent_type: "qta-final-verifier", prompt: "verify it" }
+  }).allowed, false);
 });
 
 test("ZCode hook process uses the documented exit-code contract", () => {
@@ -546,6 +729,93 @@ test("ZCode Hook receipt binds ADVISORY evidence to an observed runtime session"
     assert.deepEqual(await validateTaskControlFiles(control, directory), []);
     control.roleRuns[0].sessionId = "invented-session";
     assert.match((await validateTaskControlFiles(control, directory)).join("\n"), /receipt session mismatch/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("ZCode Hook creates an immutable receipt for each fixed-role dispatch", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-dispatch-receipt-"));
+  const taskId = "DISPATCH-AUDIT";
+  const dispatchId = "dispatch-1";
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    const script = path.resolve("scripts/zcode-governance-hook.mjs");
+    const input = {
+      session_id: "parent-session-1", cwd: directory,
+      tool_name: "Agent",
+      tool_input: {
+        subagent_type: "qta-implementer",
+        prompt: `# Task Packet: ${taskId} / IMPLEMENTER / impl-1\n- Dispatch ID: ${dispatchId}`
+      }
+    };
+    const hook = spawnSync(process.execPath, [script], {
+      input: JSON.stringify(input), encoding: "utf8",
+      env: { ...process.env, ZCODE_PROJECT_DIR: directory }
+    });
+    assert.equal(hook.status, 0, hook.stderr);
+    const taskHash = createHash("sha256").update(taskId).digest("hex");
+    const dispatchHash = createHash("sha256").update(dispatchId).digest("hex");
+    const receipt = JSON.parse(await readFile(path.join(directory, ".git", "qta-governance", "dispatches",
+      taskHash, `${dispatchHash}.json`), "utf8"));
+    assert.equal(receipt.roleRunId, "impl-1");
+    assert.equal(receipt.agentDefinition, ".zcode/agents/qta-implementer.md");
+
+    const duplicate = spawnSync(process.execPath, [script], {
+      input: JSON.stringify(input), encoding: "utf8",
+      env: { ...process.env, ZCODE_PROJECT_DIR: directory }
+    });
+    assert.notEqual(duplicate.status, 0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("ZCode Stop Hook blocks premature qta-run completion and releases BLOCKED tasks", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-stop-gate-"));
+  const sessionId = "parent-stop-session";
+  const taskId = "STOP-GATE-TASK";
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    await mkdir(path.join(directory, "docs", "development", "tasks"), { recursive: true });
+    const script = path.resolve("scripts/zcode-governance-hook.mjs");
+    const environment = { ...process.env, ZCODE_PROJECT_DIR: directory };
+    const activation = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "UserPromptSubmit", session_id: sessionId, cwd: directory,
+        prompt: "/qta-run build a bounded task"
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(activation.status, 0, activation.stderr);
+
+    const premature = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({ hook_event_name: "Stop", session_id: sessionId, cwd: directory }),
+      encoding: "utf8", env: environment
+    });
+    assert.equal(premature.status, 2);
+    assert.match(premature.stderr, /bootstrap has not produced/);
+
+    const dispatch = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory,
+        tool_name: "Agent",
+        tool_input: {
+          subagent_type: "qta-test-designer",
+          prompt: `# Task Packet: ${taskId} / TEST_DESIGNER / test-1\n- Dispatch ID: dispatch-test-1`
+        }
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(dispatch.status, 0, dispatch.stderr);
+    await writeFile(path.join(directory, "docs", "development", "tasks", `${taskId}-CONTROL.json`),
+      JSON.stringify({ taskId, lifecycleState: "BLOCKED" }));
+    const blockedTerminal = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({ hook_event_name: "Stop", session_id: sessionId, cwd: directory }),
+      encoding: "utf8", env: environment
+    });
+    assert.equal(blockedTerminal.status, 0, blockedTerminal.stderr);
+    const activePath = path.join(directory, ".git", "qta-governance", "active",
+      `${createHash("sha256").update(sessionId).digest("hex")}.json`);
+    await assert.rejects(readFile(activePath), { code: "ENOENT" });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

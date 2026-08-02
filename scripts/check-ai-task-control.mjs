@@ -16,12 +16,28 @@ export const LANE_POLICY = Object.freeze({
 
 const ORDERED_STATES = [
   "CONTEXT_READY", "CONTRACT_DRAFTED", "TEST_DESIGN_READY", "CONTRACT_FROZEN",
-  "IMPLEMENTING", "SELF_CHECKED", "CANDIDATE_FROZEN", "REVIEW_CLEAR", "VERIFIED", "FINALIZED"
+  "IMPLEMENTING", "SELF_CHECKED", "CANDIDATE_FROZEN", "REVIEW_CLEAR", "VERIFIED", "FINALIZED",
+  "DELIVERY_READY"
 ];
 const EXTRA_STATES = new Set(["CHECKPOINTED", "BLOCKED"]);
 const ROLE_NAMES = new Set(["TEST_DESIGNER", "IMPLEMENTER", "CODE_REVIEWER", "FINAL_VERIFIER"]);
 const QUALITY_RESULTS = new Set(["PASS", "FAIL", "NOT_VERIFIED", "NOT_REQUIRED"]);
 const DIMENSION_RESULTS = new Set(["PASS", "FAIL", "BLOCKED", "NOT_VERIFIED", "NOT_REQUIRED"]);
+const EVIDENCE_KINDS = new Set(["STATIC", "AUTOMATION", "RUNTIME", "DEPLOYMENT"]);
+const ROLE_AGENT_DEFINITIONS = Object.freeze({
+  TEST_DESIGNER: ".zcode/agents/qta-test-designer.md",
+  IMPLEMENTER: ".zcode/agents/qta-implementer.md",
+  CODE_REVIEWER: ".zcode/agents/qta-code-reviewer.md",
+  FINAL_VERIFIER: ".zcode/agents/qta-final-verifier.md"
+});
+const ROLE_CAPABILITIES = Object.freeze({
+  TEST_DESIGNER: "READ_ONLY",
+  IMPLEMENTER: "READ_WRITE",
+  CODE_REVIEWER: "READ_ONLY",
+  FINAL_VERIFIER: "VERIFY_EXECUTE"
+});
+const ACCEPTED_ROLE_STATUSES = new Set(["COMPLETED", "CLOSED"]);
+const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
 
 function present(value) {
   return typeof value === "string" && value.trim() !== "" && !value.includes("<");
@@ -48,8 +64,20 @@ function duplicateValues(values) {
 }
 
 function roleRunAccepted(run) {
-  return run?.artifactAccepted === true && ["COMPLETED", "CLOSED"].includes(run?.status)
+  return run?.executorType === "SUBAGENT" && run?.executionOutcome === "COMPLETED"
+    && run?.artifactAccepted === true && ACCEPTED_ROLE_STATUSES.has(run?.status)
     && present(run?.artifactPath) && present(run?.artifactSha256);
+}
+
+function parsedTimestamp(value) {
+  return present(value) ? Date.parse(value) : Number.NaN;
+}
+
+function validateTimestamp(value, label, errors, now = Date.now()) {
+  const parsed = parsedTimestamp(value);
+  if (!Number.isFinite(parsed)) errors.push(`${label} must be an ISO-8601 timestamp`);
+  else if (parsed > now + FUTURE_TOLERANCE_MS) errors.push(`${label} timestamp is in the future`);
+  return parsed;
 }
 
 function allowedTransition(from, to, lane) {
@@ -107,12 +135,10 @@ export function validateTaskControl(control) {
   const lane = LANE_POLICY[control?.lane];
   const state = control?.lifecycleState;
 
-  if (control?.schemaVersion !== 2) errors.push("schemaVersion must be 2");
+  if (control?.schemaVersion !== 3) errors.push("schemaVersion must be 3");
   if (!present(control?.taskId)) errors.push("taskId must be populated");
   if (!present(control?.controlPath)) errors.push("controlPath must be populated");
-  if (!present(control?.startedAt) || !Number.isFinite(Date.parse(control.startedAt))) {
-    errors.push("startedAt must be an ISO-8601 timestamp");
-  }
+  const taskStartedAt = validateTimestamp(control?.startedAt, "startedAt", errors);
   if (!lane) errors.push("lane must be one of L0, L1, L2, L3");
   if (!ORDERED_STATES.includes(state) && !EXTRA_STATES.has(state)) errors.push("lifecycleState is invalid");
 
@@ -143,12 +169,62 @@ export function validateTaskControl(control) {
   if (!present(control?.contract?.path) || !present(control?.contract?.sha256)) {
     errors.push("contract path and SHA-256 must be populated");
   }
+  const slices = Array.isArray(control?.contract?.implementationSlices)
+    ? control.contract.implementationSlices : [];
+  if (slices.length === 0) errors.push("contract.implementationSlices must be non-empty");
+  const sliceIds = new Set();
+  const criterionIds = new Set(criteriaList.map((criterion) => criterion.id));
+  const slicedAcIds = new Set();
+  for (const [index, slice] of slices.entries()) {
+    const prefix = `contract.implementationSlices[${index}]`;
+    if (!present(slice?.id)) errors.push(`${prefix}.id is required`);
+    else if (sliceIds.has(slice.id)) errors.push(`duplicate implementation slice ID: ${slice.id}`);
+    else sliceIds.add(slice.id);
+    if (!Array.isArray(slice?.acIds) || slice.acIds.length === 0 || slice.acIds.length > 3) {
+      errors.push(`${prefix}.acIds must contain between 1 and 3 AC IDs`);
+    } else {
+      for (const acId of slice.acIds) {
+        if (!criterionIds.has(acId)) errors.push(`${prefix} references unknown AC ID: ${acId}`);
+        slicedAcIds.add(acId);
+      }
+    }
+    if (!Array.isArray(slice?.allowedWritePaths) || slice.allowedWritePaths.length === 0
+        || slice.allowedWritePaths.length > 8) {
+      errors.push(`${prefix}.allowedWritePaths must contain between 1 and 8 paths`);
+    }
+    if (!Number.isInteger(slice?.maxExpectedFiles) || slice.maxExpectedFiles < 1 || slice.maxExpectedFiles > 8) {
+      errors.push(`${prefix}.maxExpectedFiles must be between 1 and 8`);
+    }
+    if (!Number.isInteger(slice?.maxProductionLineDelta)
+        || slice.maxProductionLineDelta < 1 || slice.maxProductionLineDelta > 500) {
+      errors.push(`${prefix}.maxProductionLineDelta must be between 1 and 500`);
+    }
+  }
+  for (const acId of criterionIds) {
+    if (!slicedAcIds.has(acId)) errors.push(`${acId} is not assigned to an implementation slice`);
+  }
+
+  const testInventory = Array.isArray(control?.contract?.testInventory) ? control.contract.testInventory : [];
+  if (testInventory.length === 0) errors.push("contract.testInventory must be non-empty");
+  const testIds = new Set();
+  for (const [index, item] of testInventory.entries()) {
+    const prefix = `contract.testInventory[${index}]`;
+    if (!present(item?.testId)) errors.push(`${prefix}.testId is required`);
+    else if (testIds.has(item.testId)) errors.push(`duplicate frozen test ID: ${item.testId}`);
+    else testIds.add(item.testId);
+    if (!Array.isArray(item?.acIds) || item.acIds.length === 0) errors.push(`${prefix}.acIds is required`);
+    else for (const acId of item.acIds) if (!criterionIds.has(acId)) errors.push(`${prefix} references unknown AC ID: ${acId}`);
+    if (!EVIDENCE_KINDS.has(item?.kind)) errors.push(`${prefix}.kind is invalid`);
+    if (item?.required !== true) warnings.push(`${item?.testId ?? prefix} is optional and cannot satisfy mandatory AC evidence`);
+    if (!present(item?.sourcePath) || !present(item?.selector)) errors.push(`${prefix} sourcePath and selector are required`);
+  }
 
   const transitions = control?.transitionHistory;
   if (!Array.isArray(transitions) || transitions.length === 0) {
     errors.push("transitionHistory must be a non-empty append-only array");
   } else {
     let expectedFrom = "CONTEXT_READY";
+    let previousTransitionAt = taskStartedAt;
     transitions.forEach((transition, index) => {
       const prefix = `transitionHistory[${index}]`;
       if (transition?.sequence !== index + 1) errors.push(`${prefix}.sequence must be ${index + 1}`);
@@ -156,7 +232,11 @@ export function validateTaskControl(control) {
       if (!allowedTransition(transition?.from, transition?.to, control?.lane)) {
         errors.push(`${prefix} contains an invalid lifecycle transition`);
       }
-      if (!present(transition?.at) || !present(transition?.actor)) errors.push(`${prefix} needs at and actor`);
+      const transitionAt = validateTimestamp(transition?.at, `${prefix}.at`, errors);
+      if (Number.isFinite(previousTransitionAt) && Number.isFinite(transitionAt)
+          && transitionAt < previousTransitionAt) errors.push("transition timestamps must be monotonic");
+      previousTransitionAt = transitionAt;
+      if (!present(transition?.actor)) errors.push(`${prefix} needs actor`);
       expectedFrom = transition?.to;
     });
     if (expectedFrom !== state) errors.push("last transition does not match lifecycleState");
@@ -218,22 +298,63 @@ export function validateTaskControl(control) {
   if (!Array.isArray(control?.roleRuns)) errors.push("roleRuns must be an array");
   const roleRuns = Array.isArray(control?.roleRuns) ? control.roleRuns : [];
   for (const duplicate of duplicateValues(roleRuns.map((run) => run?.roleRunId))) errors.push(`reused roleRunId: ${duplicate}`);
+  for (const duplicate of duplicateValues(roleRuns.map((run) => run?.dispatchId))) errors.push(`reused role dispatchId: ${duplicate}`);
   for (const duplicate of duplicateValues(roleRuns.map((run) => run?.sessionId))) errors.push(`reused role sessionId: ${duplicate}`);
+  let previousRoleFinishedAt = taskStartedAt;
   for (const [index, run] of roleRuns.entries()) {
     const prefix = `roleRuns[${index}]`;
     if (!ROLE_NAMES.has(run?.role)) errors.push(`${prefix}.role is invalid`);
-    if (!present(run?.roleRunId) || !present(run?.sessionId)) errors.push(`${prefix} role/session ID is required`);
-    if (!present(run?.startedAt) || !Number.isFinite(Date.parse(run.startedAt))) {
-      errors.push(`${prefix}.startedAt must be an ISO-8601 timestamp`);
+    if (!present(run?.roleRunId) || !present(run?.dispatchId) || !present(run?.sessionId)) {
+      errors.push(`${prefix} role/dispatch/session ID is required`);
+    }
+    if (!present(run?.dispatchReceiptPath)) errors.push(`${prefix}.dispatchReceiptPath is required`);
+    const roleStartedAt = validateTimestamp(run?.startedAt, `${prefix}.startedAt`, errors);
+    if (Number.isFinite(taskStartedAt) && Number.isFinite(roleStartedAt) && roleStartedAt < taskStartedAt) {
+      errors.push(`${prefix}.startedAt cannot precede task startedAt`);
     }
     const terminalRun = ["COMPLETED", "CLOSED", "POLICY_VIOLATION", "BLOCKED"].includes(run?.status);
     if (!terminalRun) errors.push(`${prefix}.status must be terminal before the role run is appended`);
-    if (terminalRun && (!present(run?.finishedAt) || !Number.isFinite(Date.parse(run.finishedAt)))) {
+    const roleFinishedAt = validateTimestamp(run?.finishedAt, `${prefix}.finishedAt`, errors);
+    if (terminalRun && !Number.isFinite(roleFinishedAt)) {
       errors.push(`${prefix}.finishedAt is required for a terminal role run`);
-    } else if (present(run?.finishedAt) && Date.parse(run.finishedAt) < Date.parse(run.startedAt)) {
+    } else if (Number.isFinite(roleFinishedAt) && roleFinishedAt < roleStartedAt) {
       errors.push(`${prefix}.finishedAt cannot precede startedAt`);
     }
+    if (Number.isFinite(previousRoleFinishedAt) && Number.isFinite(roleFinishedAt)
+        && roleFinishedAt < previousRoleFinishedAt) errors.push("role-run finish timestamps must be monotonic");
+    if (Number.isFinite(roleFinishedAt)) previousRoleFinishedAt = roleFinishedAt;
     if (!Number.isInteger(run?.generation) || run.generation < 0) errors.push(`${prefix}.generation is invalid`);
+    if (!["SUBAGENT", "PARENT"].includes(run?.executorType)) errors.push(`${prefix}.executorType is invalid`);
+    if (run?.agentDefinition !== ROLE_AGENT_DEFINITIONS[run?.role]) {
+      errors.push(`${prefix}.agentDefinition does not match ${run?.role}`);
+    }
+    if (run?.capability !== ROLE_CAPABILITIES[run?.role]) {
+      errors.push(`${prefix}.capability does not match ${run?.role}`);
+    }
+    if (!["COMPLETED", "TIMED_OUT", "PLAN_ONLY", "FAILED", "CANCELLED", "POLICY_VIOLATION"]
+      .includes(run?.executionOutcome)) errors.push(`${prefix}.executionOutcome is invalid`);
+    if (run?.executorType === "PARENT") {
+      if (run?.artifactAccepted === true || run?.status !== "POLICY_VIOLATION") {
+        errors.push(`parent coordinator cannot be accepted as ${run?.role}; record POLICY_VIOLATION and dispatch a subagent`);
+      }
+    }
+    if (run?.executionOutcome === "PLAN_ONLY" && run?.artifactAccepted === true) {
+      errors.push(`${prefix} plan-only role output cannot be accepted`);
+    }
+    if (run?.executionOutcome !== "COMPLETED" && run?.artifactAccepted === true) {
+      errors.push(`${prefix} non-completed role output cannot be accepted`);
+    }
+    if (run?.executionOutcome === "POLICY_VIOLATION" && run?.status !== "POLICY_VIOLATION") {
+      errors.push(`${prefix} policy violation outcome requires POLICY_VIOLATION status`);
+    }
+    if (["TIMED_OUT", "PLAN_ONLY", "FAILED", "CANCELLED"].includes(run?.executionOutcome)
+        && run?.status !== "BLOCKED") errors.push(`${prefix} unsuccessful outcome requires BLOCKED status`);
+    if (run?.role === "IMPLEMENTER") {
+      if (!present(run?.sliceId)) errors.push(`${prefix}.sliceId is required for implementers`);
+      else if (!sliceIds.has(run.sliceId) && !/^REPAIR-[1-2]$/.test(run.sliceId)) {
+        errors.push(`${prefix}.sliceId is not in the frozen implementation plan`);
+      }
+    } else if (run?.sliceId !== "") errors.push(`${prefix}.sliceId must be empty outside implementation`);
     if (run?.contextMode !== "FRESH") errors.push(`${prefix}.contextMode must be FRESH`);
     if (!Number.isInteger(run?.waitCalls) || run.waitCalls < 0 || run.waitCalls > 2) {
       errors.push(`${prefix}.waitCalls must be between 0 and 2`);
@@ -254,7 +375,14 @@ export function validateTaskControl(control) {
       errors.push(`${prefix}.compensatingIsolation is required for ADVISORY enforcement`);
     }
     if (run?.artifactAccepted === true && !roleRunAccepted(run)) {
-      errors.push(`${prefix} accepted artifact requires CLOSED/COMPLETED status and artifact path/hash`);
+      errors.push(`${prefix} accepted artifact requires a completed SUBAGENT, CLOSED/COMPLETED status, and artifact path/hash`);
+    }
+  }
+  for (const slice of slices) {
+    const timeouts = roleRuns.filter((run) => run.role === "IMPLEMENTER" && run.sliceId === slice.id
+      && run.executionOutcome === "TIMED_OUT").length;
+    if (timeouts >= 2 && state !== "BLOCKED") {
+      errors.push(`implementation slice ${slice.id} reached two timeouts and requires BLOCKED before reslicing`);
     }
   }
   repairHistory.forEach((repair, index) => {
@@ -300,6 +428,12 @@ export function validateTaskControl(control) {
         errors.push(`accepted implementer role run missing for generation ${generation}`);
       }
     }
+    for (const slice of slices) {
+      if (!roleRuns.some((run) => run.role === "IMPLEMENTER" && run.generation === 1
+          && run.sliceId === slice.id && roleRunAccepted(run))) {
+        errors.push(`accepted implementer role run missing for initial slice ${slice.id}`);
+      }
+    }
   }
   if (lane && control.lane !== "L0" && atLeast(state, "CONTRACT_FROZEN")
       && !roleRuns.some((run) => run.role === "TEST_DESIGNER" && roleRunAccepted(run))) {
@@ -322,6 +456,9 @@ export function validateTaskControl(control) {
       }
     }
     if (!present(review.artifactPath) || !present(review.artifactSha256)) errors.push("review artifact path/hash is required");
+    if (review.architectureGateSha256 !== control?.architectureGate?.reportSha256) {
+      errors.push("review is not bound to the frozen architecture-gate report");
+    }
     const acceptedReviewer = roleRuns.find((run) => run.role === "CODE_REVIEWER"
       && run.generation === candidate.generation && roleRunAccepted(run));
     if (acceptedReviewer && (acceptedReviewer.artifactPath !== review.artifactPath
@@ -331,6 +468,26 @@ export function validateTaskControl(control) {
   } else {
     for (const value of [review.functionalVerdict, review.architectureVerdict]) {
       if (value !== undefined && !QUALITY_RESULTS.has(value)) errors.push("review quality verdict is invalid");
+    }
+  }
+
+  const architectureGate = control?.architectureGate ?? {};
+  if (atLeast(state, "REVIEW_CLEAR")) {
+    if (architectureGate.required !== true) errors.push("architecture gate is mandatory before REVIEW_CLEAR");
+    if (architectureGate.candidateIdentity !== candidate.identity) errors.push("architecture gate candidate identity mismatch");
+    if (architectureGate.status !== "PASS" || architectureGate.exitCode !== 0
+        || architectureGate.errorCount !== 0) {
+      errors.push("architecture gate must have zero errors and exitCode=0; reviewer prose cannot waive errors");
+    }
+    if (!present(architectureGate.reportPath) || !present(architectureGate.reportSha256)) {
+      errors.push("architecture gate requires a machine report path/hash");
+    }
+    if (architectureGate.generatedBy !== "scripts/check-ai-architecture.mjs") {
+      errors.push("architecture gate must be generated by scripts/check-ai-architecture.mjs");
+    }
+    if (!Array.isArray(architectureGate.warningDispositions)
+        || architectureGate.warningDispositions.length < (architectureGate.warningCount ?? 0)) {
+      errors.push("every architecture warning requires a structured disposition");
     }
   }
 
@@ -347,6 +504,9 @@ export function validateTaskControl(control) {
     if (!present(verification.artifactPath) || !present(verification.artifactSha256)) {
       errors.push("verification artifact path/hash is required");
     }
+    if (verification.architectureGateSha256 !== architectureGate.reportSha256) {
+      errors.push("verification is not bound to the frozen architecture-gate report");
+    }
     const acceptedVerifier = roleRuns.find((run) => run.role === "FINAL_VERIFIER"
       && run.generation === candidate.generation && roleRunAccepted(run));
     if (!acceptedVerifier) errors.push("accepted fresh final verifier role run is missing");
@@ -355,12 +515,32 @@ export function validateTaskControl(control) {
       errors.push("verification artifact is not bound to the accepted final-verifier role run");
     }
 
+    const testEvidence = Array.isArray(control?.testEvidence) ? control.testEvidence : [];
+    const acceptedVerifierId = acceptedVerifier?.roleRunId;
+    for (const testCase of testInventory.filter((item) => item.required === true)) {
+      const receipt = testEvidence.find((item) => item.testId === testCase.testId
+        && item.candidateIdentity === candidate.identity && item.executedByRoleRunId === acceptedVerifierId
+        && item.result === "PASS" && item.exitCode === 0 && present(item.receiptPath)
+        && present(item.receiptSha256) && Array.isArray(item.observedSelectors)
+        && item.observedSelectors.includes(testCase.selector));
+      if (!receipt) errors.push(`${testCase.testId} is missing passing machine receipt from the accepted final verifier`);
+    }
+    for (const receipt of testEvidence) {
+      if (!testIds.has(receipt?.testId)) errors.push(`testEvidence references unknown frozen test: ${receipt?.testId}`);
+    }
+
     const evidence = Array.isArray(control?.evidence) ? control.evidence : [];
     for (const criterion of criteriaList) {
       for (const kind of criterion.requiredEvidence ?? []) {
-        if (!evidence.some((item) => item.acId === criterion.id && item.kind === kind
-          && item.candidateIdentity === candidate.identity && present(item.artifactPath)
-          && present(item.artifactSha256))) {
+        if (!evidence.some((item) => {
+          const testCase = testInventory.find((testItem) => testItem.testId === item.sourceId);
+          const receipt = testEvidence.find((testItem) => testItem.testId === item.sourceId);
+          return item.acId === criterion.id && item.kind === kind && item.sourceType === "TEST_RECEIPT"
+            && testCase?.kind === kind && testCase?.acIds?.includes(criterion.id)
+            && receipt?.result === "PASS" && receipt?.exitCode === 0
+            && receipt?.receiptPath === item.artifactPath && receipt?.receiptSha256 === item.artifactSha256
+            && item.candidateIdentity === candidate.identity;
+        })) {
           errors.push(`${criterion.id} is missing ${kind} evidence for the frozen candidate`);
         }
       }
@@ -382,11 +562,19 @@ export function validateTaskControl(control) {
   }
 
   const finalization = control?.finalization ?? {};
-  if (state === "FINALIZED") {
+  if (atLeast(state, "FINALIZED")) {
     if (verification.deliveryPermitted !== true) errors.push("finalization requires a delivery-permitted verdict");
     if (finalization.status !== "COMPLETED" || finalization.candidateIdentity !== candidate.identity
       || !present(finalization.artifactPath) || !present(finalization.artifactSha256)) {
       errors.push("FINALIZED requires a completed finalization artifact bound to the candidate");
+    }
+    const completedAt = validateTimestamp(finalization.completedAt, "finalization.completedAt", errors);
+    if (Number.isFinite(taskStartedAt) && Number.isFinite(completedAt) && completedAt < taskStartedAt) {
+      errors.push("finalization.completedAt cannot precede task startedAt");
+    }
+    if (finalization.artifactPath === verification.artifactPath
+        || finalization.artifactSha256 === verification.artifactSha256) {
+      errors.push("finalization artifact must be distinct from verification evidence");
     }
   }
 
@@ -457,9 +645,10 @@ function taskMetadataPaths(control) {
   const values = [
     control.controlPath, control.contract?.path, control.candidate?.manifestPath,
     control.candidate?.diffArtifactPath, control.review?.artifactPath,
-    control.verification?.artifactPath, control.finalization?.artifactPath,
+    control.architectureGate?.reportPath, control.verification?.artifactPath, control.finalization?.artifactPath,
     ...(control.git?.preExistingDirtyPaths ?? []), ...(control.finalization?.changedPaths ?? []),
     ...(control.roleRuns ?? []).map((run) => run.artifactPath),
+    ...(control.testEvidence ?? []).map((item) => item.receiptPath),
     ...(control.evidence ?? []).map((item) => item.artifactPath)
   ];
   return new Set(values.filter(present).map((item) => item.split(path.sep).join("/")));
@@ -468,7 +657,7 @@ function taskMetadataPaths(control) {
 async function validateRuntimeReceipt(root, control, run, errors) {
   if (!present(run.runtimeReceiptPath)) return;
   try {
-    const receipt = JSON.parse(await readFile(path.resolve(root, run.runtimeReceiptPath), "utf8"));
+    const receipt = JSON.parse(await readFile(governanceReceiptPath(root, run.runtimeReceiptPath), "utf8"));
     if (receipt.sessionId !== run.sessionId) errors.push(`role ${run.roleRunId} runtime receipt session mismatch`);
     if (receipt.projectRootSha256 !== sha256(path.resolve(root))) {
       errors.push(`role ${run.roleRunId} runtime receipt belongs to another project`);
@@ -481,6 +670,48 @@ async function validateRuntimeReceipt(root, control, run, errors) {
     if (!present(receipt.nonce)) errors.push(`role ${run.roleRunId} runtime receipt has no nonce`);
   } catch (error) {
     errors.push(`role ${run.roleRunId} runtime receipt is unavailable (${error.code ?? error.message})`);
+  }
+}
+
+function governanceReceiptPath(root, relative) {
+  const normalized = relative.replaceAll("\\", "/");
+  if (!normalized.startsWith(".git/qta-governance/")) return path.resolve(root, relative);
+  const gitRelative = normalized.slice(".git/".length);
+  try {
+    const resolved = execFileSync("git", ["rev-parse", "--git-path", gitRelative], {
+      cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
+    }).trim();
+    return path.resolve(root, resolved);
+  } catch {
+    return path.resolve(root, relative);
+  }
+}
+
+async function validateDispatchReceipt(root, control, run, errors) {
+  if (!present(run.dispatchReceiptPath)) return;
+  try {
+    const expectedSuffix = `qta-governance/dispatches/${sha256(control.taskId)}/${sha256(run.dispatchId)}.json`;
+    if (!run.dispatchReceiptPath.replaceAll("\\", "/").endsWith(expectedSuffix)) {
+      errors.push(`role ${run.roleRunId} dispatch receipt path is not deterministic`);
+    }
+    const receipt = JSON.parse(await readFile(governanceReceiptPath(root, run.dispatchReceiptPath), "utf8"));
+    if (receipt.taskId !== control.taskId || receipt.dispatchId !== run.dispatchId
+        || receipt.roleRunId !== run.roleRunId || receipt.agentDefinition !== run.agentDefinition) {
+      errors.push(`role ${run.roleRunId} dispatch receipt identity mismatch`);
+    }
+    if (receipt.projectRootSha256 !== sha256(path.resolve(root))) {
+      errors.push(`role ${run.roleRunId} dispatch receipt belongs to another project`);
+    }
+    if (!present(receipt.parentSessionId) || receipt.parentSessionId === run.sessionId) {
+      errors.push(`role ${run.roleRunId} dispatch receipt does not prove a distinct parent/child session`);
+    }
+    const observedAt = parsedTimestamp(receipt.observedAt);
+    if (!Number.isFinite(observedAt) || observedAt < parsedTimestamp(control.startedAt)
+        || observedAt > parsedTimestamp(run.startedAt) + FUTURE_TOLERANCE_MS) {
+      errors.push(`role ${run.roleRunId} dispatch receipt is outside the declared dispatch window`);
+    }
+  } catch (error) {
+    errors.push(`role ${run.roleRunId} dispatch receipt is unavailable (${error.code ?? error.message})`);
   }
 }
 
@@ -540,15 +771,90 @@ export async function validateTaskControlFiles(control, root = process.cwd()) {
   for (const run of control.roleRuns ?? []) {
     if (run.artifactAccepted) await validateArtifact(root, run.artifactPath, run.artifactSha256, `role ${run.roleRunId} artifact`, errors);
     await validateRuntimeReceipt(root, control, run, errors);
+    await validateDispatchReceipt(root, control, run, errors);
+  }
+  if (atLeast(control.lifecycleState, "REVIEW_CLEAR")) {
+    await validateArtifact(root, control.architectureGate?.reportPath,
+      control.architectureGate?.reportSha256, "architecture gate report", errors);
+    if (present(control.architectureGate?.reportPath)) try {
+      const report = JSON.parse(await readFile(path.resolve(root, control.architectureGate.reportPath), "utf8"));
+      if (report.schemaVersion !== 1 || report.generatedBy !== "scripts/check-ai-architecture.mjs") {
+        errors.push("architecture gate report has invalid generator metadata");
+      }
+      if (report.candidateIdentity !== control.candidate?.identity) {
+        errors.push("architecture gate report candidate identity mismatch");
+      }
+      if (report.status !== control.architectureGate.status
+          || report.exitCode !== control.architectureGate.exitCode
+          || report.errors?.length !== control.architectureGate.errorCount
+          || report.warnings?.length !== control.architectureGate.warningCount) {
+        errors.push("architecture gate summary does not match its machine report");
+      }
+      const warningIds = new Set((report.warnings ?? []).map((warning) => warning.id));
+      const dispositionIds = new Set((control.architectureGate.warningDispositions ?? [])
+        .map((disposition) => disposition.warningId));
+      for (const warningId of warningIds) {
+        if (!dispositionIds.has(warningId)) errors.push(`architecture warning lacks disposition: ${warningId}`);
+      }
+    } catch (error) {
+      errors.push(`architecture gate report cannot be parsed (${error.message})`);
+    }
   }
   if (control.lane !== "L0") await validateArtifact(root, control.review?.artifactPath, control.review?.artifactSha256, "review artifact", errors);
   if (atLeast(control.lifecycleState, "VERIFIED")) {
     await validateArtifact(root, control.verification?.artifactPath, control.verification?.artifactSha256, "verification artifact", errors);
+    const inventoryById = new Map((control.contract?.testInventory ?? []).map((item) => [item.testId, item]));
+    const roleById = new Map((control.roleRuns ?? []).map((run) => [run.roleRunId, run]));
+    for (const item of control.testEvidence ?? []) {
+      await validateArtifact(root, item.receiptPath, item.receiptSha256, `test receipt ${item.testId}`, errors);
+      const testCase = inventoryById.get(item.testId);
+      if (testCase) {
+        try {
+          const source = await readFile(path.resolve(root, testCase.sourcePath), "utf8");
+          if (!source.includes(testCase.selector)) {
+            errors.push(`${item.testId} selector is absent from frozen test source: ${testCase.selector}`);
+          }
+        } catch (error) {
+          errors.push(`${item.testId} frozen test source is unavailable (${error.code ?? error.message})`);
+        }
+      }
+      try {
+        const receipt = JSON.parse(await readFile(path.resolve(root, item.receiptPath), "utf8"));
+        const roleRun = roleById.get(item.executedByRoleRunId);
+        if (receipt.schemaVersion !== 1 || receipt.generatedBy !== "scripts/run-ai-evidence-command.mjs") {
+          errors.push(`${item.testId} receipt has invalid generator metadata`);
+        }
+        if (receipt.taskId !== control.taskId || receipt.roleRunId !== item.executedByRoleRunId
+            || receipt.sessionId !== roleRun?.sessionId || receipt.testId !== item.testId
+            || receipt.candidateMode !== control.candidate?.mode
+            || receipt.candidateIdentity !== item.candidateIdentity) {
+          errors.push(`${item.testId} receipt identity does not match the control ledger`);
+        }
+        if (receipt.exitCode !== item.exitCode || receipt.result !== item.result
+            || receipt.candidateUnchanged !== true) {
+          errors.push(`${item.testId} receipt result does not match or candidate changed during verification`);
+        }
+        if (!Array.isArray(receipt.command) || receipt.command.length === 0
+            || JSON.stringify(receipt.observedSelectors ?? []) !== JSON.stringify(item.observedSelectors ?? [])) {
+          errors.push(`${item.testId} receipt command/selectors do not match the control ledger`);
+        }
+        const receiptStartedAt = parsedTimestamp(receipt.startedAt);
+        const receiptFinishedAt = parsedTimestamp(receipt.finishedAt);
+        if (!Number.isFinite(receiptStartedAt) || !Number.isFinite(receiptFinishedAt)
+            || receiptFinishedAt < receiptStartedAt
+            || receiptStartedAt < parsedTimestamp(roleRun?.startedAt)
+            || receiptFinishedAt > parsedTimestamp(roleRun?.finishedAt)) {
+          errors.push(`${item.testId} receipt timestamps are outside the accepted verifier run`);
+        }
+      } catch (error) {
+        errors.push(`${item.testId} receipt cannot be parsed (${error.message})`);
+      }
+    }
     for (const item of control.evidence ?? []) {
       await validateArtifact(root, item.artifactPath, item.artifactSha256, `evidence ${item.evidenceId ?? item.acId}`, errors);
     }
   }
-  if (control.lifecycleState === "FINALIZED") {
+  if (atLeast(control.lifecycleState, "FINALIZED")) {
     await validateArtifact(root, control.finalization?.artifactPath, control.finalization?.artifactSha256, "finalization artifact", errors);
   }
   return errors;
@@ -596,7 +902,7 @@ export function validateMonotonicControl(previous, current) {
     errors.push("roleRuns rewrote or removed anchored terminal role instances");
   }
   if (atLeast(previous.lifecycleState, "CONTRACT_FROZEN")) {
-    for (const field of ["path", "version", "sha256", "acceptanceCriteria"]) {
+    for (const field of ["path", "version", "sha256", "acceptanceCriteria", "implementationSlices", "testInventory"]) {
       if (JSON.stringify(previous.contract?.[field]) !== JSON.stringify(current.contract?.[field])) {
         errors.push(`frozen contract.${field} changed after anchoring`);
       }
@@ -608,7 +914,7 @@ export function validateMonotonicControl(previous, current) {
       && present(previous.candidate?.identity) && current.candidate?.identity !== previous.candidate.identity) {
     errors.push("candidate identity changed without a new generation");
   }
-  if (["FINALIZED", "BLOCKED"].includes(previous.lifecycleState)
+  if (["DELIVERY_READY", "BLOCKED"].includes(previous.lifecycleState)
       && current.lifecycleState !== previous.lifecycleState) {
     errors.push("terminal lifecycle state changed after anchoring");
   }
@@ -625,7 +931,7 @@ export function validateMonotonicControl(previous, current) {
       errors.push("AC evidence rewrote or removed anchored entries");
     }
   }
-  if (previous.lifecycleState === "FINALIZED" && previous.finalization !== undefined
+  if (atLeast(previous.lifecycleState, "FINALIZED") && previous.finalization !== undefined
       && JSON.stringify(previous.finalization) !== JSON.stringify(current.finalization)) {
     errors.push("finalization evidence changed after anchoring");
   }
@@ -639,8 +945,12 @@ function controlAnchorSnapshot(control) {
     startedAt: control.startedAt,
     lifecycleState: control.lifecycleState,
     contract: {
+      path: control.contract?.path,
       version: control.contract?.version,
       sha256: control.contract?.sha256,
+      acceptanceCriteria: control.contract?.acceptanceCriteria ?? [],
+      implementationSlices: control.contract?.implementationSlices ?? [],
+      testInventory: control.contract?.testInventory ?? [],
       blockingAmendments: control.contract?.blockingAmendments ?? []
     },
     git: {

@@ -14,13 +14,25 @@ $ARGUMENTS
 Do not pass the full conversation to child roles. Select one lane, persist the task packet and state, enforce
 ordered role gates, and stop on the Skill's repair or evidence conditions.
 
-Use L0-L3 risk lanes and create `<TASK-ID>-CONTROL.json` from the Skill's `TASK_CONTROL_TEMPLATE.json`.
+Use L0-L3 risk lanes and create schema-v3 `<TASK-ID>-CONTROL.json` from the Skill's
+`TASK_CONTROL_TEMPLATE.json`. Freeze bounded implementation slices and the test inventory before dispatch.
 Validate it before every dispatch and transition. Every implementation, repair, review generation, and final
 verification uses a fresh role/session and ends after one artifact. Use one long Agent wait plus at most one
 follow-up (two waits total); never perform status polling. Require both functional and architecture gates on
 the frozen candidate before finalization.
 
-Continue through the state machine until `FINALIZED`, `BLOCKED`, or the user explicitly stops. A plan or one
-subagent response is not completion. For reversible choices inside the frozen contract, select the recommended
-option yourself instead of asking the user. Ask only for unresolved product/financial meaning, destructive or
+The parent coordinator must never implement, review, or verify when a specialist times out or returns only a
+plan. Record every failed dispatch. Two timeouts for one slice require `BLOCKED` and reslicing. The final
+verifier must be execution-capable and create machine receipts with `scripts/run-ai-evidence-command.mjs`.
+Architecture errors are hard failures and cannot be reinterpreted by prose.
+
+Continue through the state machine until `DELIVERY_READY`, `BLOCKED`, or the user explicitly stops.
+`FINALIZED`, a plan, or one subagent response is not completion. Goal success is forbidden until
+`node scripts/check-ai-delivery-ready.mjs <TASK_CONTROL>` exits `0`; do not ask a model-only completion judge
+to override that command. For reversible choices inside the frozen contract, select the recommended option
+yourself instead of asking the user. Ask only for unresolved product/financial meaning, destructive or
 credential-bearing authorization, or a genuine external blocker. Do not expand into another product task.
+
+The workspace Stop Hook will request continuation up to the ZCode limit while this parent session is active.
+When progress cannot continue within the frozen repair/timeout limits, persist `BLOCKED` with evidence so the
+Hook releases the task; never create a fake `DELIVERY_READY` state merely to stop.

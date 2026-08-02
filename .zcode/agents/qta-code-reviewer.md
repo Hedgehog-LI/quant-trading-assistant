@@ -45,12 +45,16 @@ packet, authoritative contracts, and frozen diff.
 6. For generation 1, inspect the complete frozen diff. For later generations, inspect the repair diff and
    affected regression surface unless behavior, migration, contract, or candidate scope changed.
 7. Distinguish defects from style preferences and pre-existing issues.
+8. Read the machine-generated architecture report bound to this candidate. Any `errors > 0`, nonzero exit
+   code, missing report hash, or candidate mismatch is `ARCHITECTURE_REVIEW: FAIL`; prose cannot waive it.
+   Disposition every warning by report ID.
 
 # Boundaries
 
 - Do not edit files or run commands.
 - Do not propose broad refactors outside scope.
 - Do not accept implementer summaries without reading the diff.
+- Do not reinterpret a failed machine gate as pass. Repair the candidate or detector in a new governed round.
 - Do not call the task accepted; the final verifier owns the verdict.
 - Do not summon agents or request another expert team.
 - Do not silently broaden the review into the entire repository.

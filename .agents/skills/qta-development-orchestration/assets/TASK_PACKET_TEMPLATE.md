@@ -5,11 +5,16 @@
 - Lane:
 - Lifecycle state:
 - Role instance policy: `FRESH_ONLY`
+- Executor type: `SUBAGENT` (parent substitution is a policy violation)
+- Agent definition:
+- Dispatch ID:
+- Expected dispatch receipt path: `.git/qta-governance/dispatches/<task-hash>/<dispatch-hash>.json`
 - Role session ID:
 - Role started-at timestamp:
 - Runtime session receipt path:
 - Repair round:
 - Assigned AC IDs:
+- Assigned implementation slice ID:
 - Contract path:
 - Contract hash:
 - Baseline commit:
@@ -35,6 +40,10 @@
 - Runtime tool enforcement: `ADVISORY` (local Hook/receipt/anchor are not a same-user security boundary)
 - Compensating isolation check:
 
+For an implementer packet, assign exactly one frozen slice with at most three ACs, eight expected files, and
+500 production-line additions. A timeout/plan-only/failure/cancellation still returns a terminal dispatch
+record. Two timeouts for the same slice require `BLOCKED`; the parent must not implement it.
+
 ## Authority
 
 - Product/design paths:
@@ -52,6 +61,9 @@
 | Gate | Command or inspection | Expected result | Evidence destination |
 |---|---|---|---|
 
+Every frozen test gate has a stable `test_id`, source path, exact selector, and receipt path. The final
+verifier runs it through `scripts/run-ai-evidence-command.mjs`; generic prose is not evidence.
+
 ## Run Budget
 
 - Maximum role turns:
@@ -65,4 +77,5 @@
 
 - Required artifact type/path:
 - Required status vocabulary:
+- Required execution outcome: `COMPLETED | TIMED_OUT | PLAN_ONLY | FAILED | CANCELLED | POLICY_VIOLATION`
 - Stop conditions:

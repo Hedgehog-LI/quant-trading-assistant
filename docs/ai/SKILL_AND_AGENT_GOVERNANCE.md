@@ -2,6 +2,7 @@
 
 > 本文是项目级 Skill、固定 Agent、父协调流程、证据身份、成本预算和 Git 阶段门禁的唯一事实来源。
 > Skill 定流程，Agent 模板定角色，父协调器定顺序，Hook/脚本定强制约束，机器控制文件负责跨对话记忆。
+> 当前控制协议为 schema v3；本地仍是 `ADVISORY` 防误操作边界，不冒充平台级安全隔离。
 
 ## 1. 三阶段路线与原十项映射
 
@@ -38,8 +39,11 @@
 - `scripts/validate-ai-governance.mjs`：结构、镜像、元数据和角色策略静态校验。
 - `scripts/check-ai-task-control.mjs`：任务状态、角色实例、候选身份和 verdict 不变量校验。
 - `scripts/check-ai-architecture.mjs`：变更文件规模、职责和分层风险门禁。
+- `scripts/run-ai-evidence-command.mjs`：低噪声执行冻结验证命令并生成角色/session/候选绑定回执。
+- `scripts/check-ai-delivery-ready.mjs`：Goal 唯一完成门禁，检查角色来源、机器证据、Git 跟踪和脏路径。
 - `scripts/zcode-governance-hook.mjs`：ZCode 通用危险操作前置拦截。
-- `.git/qta-governance/`：Hook 生成的真实 session 首见回执与控制文件哈希链；不入库、禁止角色直接访问。
+- `.git/qta-governance/`：Hook 生成的 session 首见回执、固定角色 dispatch 回执与控制文件哈希链；
+  不入库、禁止角色直接访问。
 
 修改 Skill 时先改规范源与 manifest，再同步 Claude 镜像并运行门禁。禁止长期人工维护不同内容。
 
@@ -69,7 +73,7 @@ ZCode 真实触发使用 `name + description（约前 250 字符）+ when_to_use
 | `qta-test-designer` | 干净 | 只读、不执行命令 | 可证伪 AC、测试矩阵、契约 amendment artifact |
 | `qta-implementer` | 独立实现上下文 | 可读写、自测，不可 Git/子代理 | 代码、自检、变更清单、候选提交建议 |
 | `qta-code-reviewer` | 干净 | 只读、不执行命令 | 绑定 candidate hash 的 findings 或 `REVIEW_CLEAR` |
-| `qta-final-verifier` | 干净临时 worktree | 可执行门禁、不可编辑/Git | 逐 AC 证据、前后 hash、唯一验收结论 |
+| `qta-final-verifier` | 干净临时 worktree | `acceptEdits` 执行模式；无 Edit/Write，仅 Bash 门禁与脚本回执 | 逐 AC 证据、前后 hash、唯一验收结论 |
 
 固定 Agent 是不可变模板，不是可反复续聊的实例。初始实现、每轮 repair、每代 review 和最终
 verification 都创建新的 `role_run_id + session_id`，返回 artifact 后立即结束。每个角色只接收
@@ -81,12 +85,26 @@ TaskPacket，不接收完整聊天历史。只读角色不写仓库；父协调�
 发生会话复用、压缩、禁止工具调用、只读候选变更或子 Agent 创建时，该角色 artifact 记为
 `POLICY_VIOLATION` 并废弃，不能继续流转。
 
+`executorType`、Agent 定义、能力和执行结果是结构化字段。父协调器替代实施者/审查者/核验者时只能
+记录 `POLICY_VIOLATION`，不能接收 artifact。每次已发起的 timeout、plan-only、failed、cancelled
+尝试均以终态事件追加，不能在压缩或交接时省略。两个同 slice timeout 后必须 `BLOCKED` 并重新切片。
+
 Hook 自动生成 session 首见回执，回执中的观测 session、项目哈希和首见时间必须落在任务/角色
 时间窗内。控制文件每次成功校验后向 `.git/qta-governance/tasks/` 追加哈希链快照；正常流程中的
 迁移、repair、amendment、role run 或计数器回退会被拒绝。
 `roleRuns` 只在角色结束后追加终态事件，不能先写 `RUNNING` 再覆盖；已锚定的角色、Git baseline、
 任务开始时 dirty-path 清单、repair/transition 历史、review/verification/finalization/evidence 和累计
 用量不得回退或改写。
+
+父协调器调用固定 `qta-*` Agent/Task 时，PreToolUse Hook 要求完整 TaskPacket header 和唯一
+dispatch ID，并在 `.git/qta-governance/dispatches/` 生成不可覆盖回执。交付门禁双向核对：每个回执
+必须有 roleRuns 终态行，每个 roleRuns dispatch 也必须有 Hook 回执，从而发现被省略的 timeout 或
+plan-only 尝试。它仍是同用户下的防误操作证据，不是密码学签名。
+
+输入 `/qta-run` 时，UserPromptSubmit Hook 为父 session 建立 active-task 记录。ZCode 的 Stop Hook
+随后只允许两种结束：控制状态为 `BLOCKED`，或状态为 `DELIVERY_READY` 且 delivery-ready 脚本返回
+0；其他状态会要求继续（客户端最多回注三次）。这能拦住“只跑一轮就自报完成”，但不是无限循环器：
+同因失败达到上限时必须持久化 `BLOCKED`，Stop Hook 即释放任务。
 
 威胁模型必须说清：本地 Hook、回执和 `.git` 哈希链用于防误操作、漂移和普通重写，不能抵抗拥有
 同一 macOS 用户任意 Bash 权限的恶意代码。后者只有 ZCode 原生签名证明、受保护远程分支/CI 或更高
@@ -113,7 +131,7 @@ candidate generation 都必须有新的 reviewer。repair/failure history 和 bl
 ```text
 CONTEXT_READY -> CONTRACT_DRAFTED -> TEST_DESIGN_READY -> CONTRACT_FROZEN
 -> IMPLEMENTING -> SELF_CHECKED -> CANDIDATE_FROZEN -> REVIEW_CLEAR
--> VERIFIED -> FINALIZED
+-> VERIFIED -> FINALIZED -> DELIVERY_READY
 ```
 
 Candidate identity 使用 `COMMIT`（commit/tree/patch hash）或 `SNAPSHOT`（确定性文件清单和
@@ -124,9 +142,12 @@ manifest/entry-set hash）。无 Git 写授权时使用 SNAPSHOT。Candidate 改
 两种 candidate 都必须生成冻结 diff artifact 及其 SHA-256，供无 Bash 权限的 reviewer 读取；每轮
 repair history 必须绑定发现问题的 reviewer/verifier role run 与下一代 implementer role run。
 
-父协调者必须持续到 `FINALIZED`、`BLOCKED` 或用户明确停止；计划、单个角色返回或一次 repair 都不算
-完成。冻结契约内的可逆选择由父协调者采用推荐方案自行决定，仅产品/金融语义冲突、破坏性/密钥
+父协调者必须持续到 `DELIVERY_READY`、`BLOCKED` 或用户明确停止；`FINALIZED` 只说明交付文档已整理，
+计划、单个角色返回或一次 repair 都不算完成。冻结契约内的可逆选择由父协调者采用推荐方案自行决定，仅产品/金融语义冲突、破坏性/密钥
 授权或真实外部阻塞可以询问用户。当前任务结束后不得为了消耗 Token 自动开启第二个产品任务。
+
+初始实现必须在契约中拆成 bounded slice：每个 slice 最多 3 个 AC、8 个预期文件、500 行生产代码
+增量，一个干净 implementer 只做一个 slice。父协调器只组装状态和 Git，不写业务实现。
 
 ## 6. Git、Commit 和 Push
 
@@ -167,6 +188,8 @@ repair history 必须绑定发现问题的 reviewer/verifier role run 与下一�
 
 - 验收标准在实现前冻结，不能由实现者在失败后降低。
 - 实现者最高只能标记 `SELF_CHECKED`。
+- 测试设计阶段冻结 `test_id + AC 映射 + source path + exact selector`；最终核验必须通过
+  `run-ai-evidence-command.mjs` 生成回执，普通“全量测试通过”文字不算证据。
 - 独立核验分开记录 `STATIC/AUTOMATION/RUNTIME/DEPLOYMENT`。
 - 未执行为 `NOT_VERIFIED`；外部环境缺失为 `BLOCKED`。
 - 测试数量、构建成功或 HTTP 200 不能单独证明业务 AC。
@@ -178,6 +201,10 @@ repair history 必须绑定发现问题的 reviewer/verifier role run 与下一�
 - 实现/repair 期间跑 focused tests；冻结最终候选前跑一次 full/package；verifier 独立再跑一次。
   不得对同一候选重复运行无变化的全量门禁。
 - 验收双轨记录 `FUNCTIONAL` 与 `ARCHITECTURE`；任一失败不能 `VERIFIED`。
+- 架构脚本输出 candidate-bound JSON；`errors > 0`、非零退出、hash/candidate 不一致均为硬失败，审查者
+  无权用文字豁免。
+- Finalization artifact 必须与 verification artifact 分离，所有任务 evidence 必须入 Git；只有
+  `check-ai-delivery-ready.mjs` 在 `DELIVERY_READY` revision 返回 0 才可结束 Goal。
 
 架构复核触发线：类超过 400 有效行、方法超过 20、单方法超过 60 行、直接依赖超过 10 或候选新增
 生产代码超过 800 行。硬阻断线：类超过 600 行且方法超过 30 或职责超过 3、单方法超过 100 行、

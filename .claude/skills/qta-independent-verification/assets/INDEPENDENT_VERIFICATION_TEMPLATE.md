@@ -17,6 +17,7 @@ Review generation:
 Independence confirmed: YES/NO
 Disposable worktree:
 Tracked candidate unchanged: YES/NO
+Execution outcome: `COMPLETED | PLAN_ONLY | FAILED | BLOCKED`
 
 ## Findings
 
@@ -37,6 +38,11 @@ Tracked candidate unchanged: YES/NO
 | RUNTIME | YES/NO | | PASS/FAIL/BLOCKED/NOT_VERIFIED/NOT_REQUIRED | | |
 | DEPLOYMENT | YES/NO | | PASS/FAIL/BLOCKED/NOT_VERIFIED/NOT_REQUIRED | | |
 
+## Machine Test Receipts
+
+| Test ID | AC IDs | Exact selector | Receipt path/SHA-256 | Exit | Candidate unchanged | Result |
+|---|---|---|---|---:|---|---|
+
 `NOT_REQUIRED` is valid only when the frozen contract marks the dimension as not required. A required
 `NOT_VERIFIED` dimension cannot produce `ACCEPTED`.
 
@@ -48,9 +54,12 @@ Tracked candidate unchanged: YES/NO
 | ARCHITECTURE | PASS/FAIL | | |
 
 Architecture gate command:
+Architecture report path/SHA-256:
+Architecture report candidate identity:
+Architecture error/warning count:
 Responsibility-map evidence:
 Architecture score:
-ADR exception and expiry:
+Warning dispositions:
 
 ## Verdict
 

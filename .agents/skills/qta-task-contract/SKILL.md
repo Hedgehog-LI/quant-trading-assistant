@@ -42,15 +42,19 @@ written down before editing.
 6. Define explicit non-goals and prohibited behavior.
 7. Write acceptance criteria as externally observable outcomes and stay within the lane cap: L0=3, L1=5,
    L2=8, L3=10.
-8. Attach an evidence method and owner role to every criterion.
-9. Define required verification dimensions:
+8. Split initial implementation into coherent slices. Each slice owns at most three ACs, eight expected files,
+   500 production-line additions, and an explicit write-path allowlist.
+9. Freeze a test inventory before implementation. Every required case has a stable test ID, mapped AC IDs,
+   evidence kind, source path, and exact selector observable by a machine receipt.
+10. Attach an evidence method and owner role to every criterion.
+11. Define required verification dimensions:
    - `STATIC`
    - `AUTOMATION`
    - `RUNTIME`
    - `DEPLOYMENT`
-10. Define architecture/NFR gates, stop conditions, context budget, wait/poll limits, and repair-round limit.
-11. Define which clean-context role gives the final verdict.
-12. Freeze `contract_version` and `contract_hash` after test-design amendments are accepted.
+12. Define architecture/NFR gates, stop conditions, context budget, wait/poll limits, and repair-round limit.
+13. Define which clean-context role gives the final verdict.
+14. Freeze `contract_version` and `contract_hash` after test-design amendments are accepted.
 
 ## Acceptance Criterion Format
 
@@ -68,6 +72,10 @@ Each criterion must contain:
 Each AC describes one result and uses at most two mandatory evidence types. Avoid criteria such as “code is
 high quality” or “feature is complete.” Replace them with inspectable behavior, response contracts, persisted
 records, or user-visible states. Put detailed test cases in the test matrix, not in the product contract.
+
+“Run full tests”, a test count, or an implementer summary is not a frozen test case. Required automated,
+static, runtime, and deployment evidence must identify the exact selector and later bind to a receipt produced
+by `scripts/run-ai-evidence-command.mjs` from the accepted final-verifier role.
 
 Test-design blockers are limited to ambiguities that prevent falsifiable behavior, safety, data integrity, or
 financial correctness. Lane amendment caps are L0=0, L1=1, L2=3, and L3=5. Nonblocking implementation ideas
@@ -103,3 +111,4 @@ Do not hand off to implementation when:
 - The expected API/data behavior is contradictory.
 - Acceptance evidence cannot be produced.
 - Scope is too broad to checkpoint safely.
+- Any implementation slice exceeds the bounded slice limits.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
@@ -213,8 +213,12 @@ async function main() {
   const filesIndex = process.argv.indexOf("--files");
   const manifestIndex = process.argv.indexOf("--manifest");
   const reviewCountIndex = process.argv.indexOf("--architecture-review-count");
+  const candidateIdentityIndex = process.argv.indexOf("--candidate-identity");
+  const jsonOutputIndex = process.argv.indexOf("--json-output");
   const architectureReviewCount = reviewCountIndex >= 0 ? Number.parseInt(process.argv[reviewCountIndex + 1], 10) || 0 : 0;
   const base = baseIndex >= 0 ? process.argv[baseIndex + 1] : "";
+  const candidateIdentity = candidateIdentityIndex >= 0 ? process.argv[candidateIdentityIndex + 1] : "";
+  const jsonOutput = jsonOutputIndex >= 0 ? process.argv[jsonOutputIndex + 1] : "";
   let files = [];
   let additions = 0;
   const candidateErrors = [];
@@ -234,7 +238,7 @@ async function main() {
     }
   } else if (filesIndex >= 0) files = process.argv.slice(filesIndex + 1);
   else {
-    console.error("Usage: node scripts/check-ai-architecture.mjs --base <git-ref> [--manifest <candidate.json>] [--architecture-review-count N] | --files <paths...>");
+    console.error("Usage: node scripts/check-ai-architecture.mjs --base <git-ref> [--manifest <candidate.json>] [--architecture-review-count N] [--candidate-identity <id> --json-output <report.json>] | --files <paths...>");
     process.exit(2);
   }
 
@@ -250,7 +254,12 @@ async function main() {
     for (const warning of report.warnings) console.log(`  WARN ${warning}`);
     for (const error of report.errors) console.log(`  ERROR ${error}`);
   }
-  if (additions > 800) console.log(`CANDIDATE WARN candidate adds ${additions} production lines across ${files.length} files`);
+  const candidateWarnings = [];
+  if (additions > 800) {
+    const warning = `candidate adds ${additions} production lines across ${files.length} files`;
+    candidateWarnings.push(warning);
+    console.log(`CANDIDATE WARN ${warning}`);
+  }
   if (additions > 3000 && architectureReviewCount < 2) {
     candidateErrors.push("candidate over 3000 production lines requires two clean-context architecture reviews");
   } else if (additions > 1500 && architectureReviewCount < 1) {
@@ -258,9 +267,45 @@ async function main() {
   }
   for (const error of candidateErrors) console.log(`CANDIDATE ERROR ${error}`);
 
-  const warningCount = reports.reduce((sum, report) => sum + report.warnings.length, 0);
+  const warningDetails = [];
+  const errorDetails = [];
+  for (const report of reports) {
+    for (const message of report.warnings) warningDetails.push({ file: report.file, message });
+    for (const message of report.errors) errorDetails.push({ file: report.file, message });
+  }
+  for (const message of candidateWarnings) warningDetails.push({ file: "<candidate>", message });
+  for (const message of candidateErrors) errorDetails.push({ file: "<candidate>", message });
+  const warnings = warningDetails.map((item, index) => ({ id: `ARCH-W-${String(index + 1).padStart(3, "0")}`, ...item }));
+  const errors = errorDetails.map((item, index) => ({ id: `ARCH-E-${String(index + 1).padStart(3, "0")}`, ...item }));
+  const warningCount = warnings.length;
   const errorCount = reports.reduce((sum, report) => sum + report.errors.length, 0) + candidateErrors.length;
   console.log(`Architecture gate: files=${reports.length}, additions=${additions}, warnings=${warningCount}, errors=${errorCount}`);
+  if (jsonOutput) {
+    if (!candidateIdentity) {
+      console.error("--json-output requires --candidate-identity so the report can bind to a frozen candidate");
+      process.exit(2);
+    }
+    const output = path.resolve(jsonOutput);
+    const temporary = `${output}.tmp-${process.pid}`;
+    const payload = {
+      schemaVersion: 1,
+      generatedBy: "scripts/check-ai-architecture.mjs",
+      generatedAt: new Date().toISOString(),
+      candidateIdentity,
+      base,
+      manifestPath: manifestIndex >= 0 ? process.argv[manifestIndex + 1] : "",
+      architectureReviewCount,
+      files: reports,
+      additions,
+      warnings,
+      errors,
+      status: errorCount === 0 ? "PASS" : "FAIL",
+      exitCode: errorCount === 0 ? 0 : 1
+    };
+    await mkdir(path.dirname(output), { recursive: true });
+    await writeFile(temporary, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporary, output);
+  }
   if (errorCount > 0) process.exit(1);
 }
 

@@ -23,8 +23,12 @@
 ### 1.3 任务契约
 - 非简单任务使用 `qta-task-contract` 冻结范围、非目标、AC、证据、验证维度、角色和停止条件。
 - 在实现前由独立测试设计者检查 AC 是否可证伪；测试设计者不改代码。
+- 冻结实现切片与测试清单：每个初始 slice 最多 3 个 AC、8 个预期文件、500 行生产代码增量；每个
+  required test 必须有稳定 test ID、AC 映射、source path 和 exact selector。
 - 标准/长任务由父上下文启用 `qta-development-orchestration` 或 `/qta-run`，选择 L0-L3 风险 lane 并冻结
   `contract_hash`。子角色只接收 TaskPacket。
+- `/qta-run` 会激活父 session 的 Stop Hook；未达到 `DELIVERY_READY` 或持久化 `BLOCKED` 时，父任务
+  不允许仅凭一轮输出结束。Stop 回注最多三次，不能替代 repair/timeout 的硬上限。
 - 父协调者创建 `<TASK-ID>-CONTROL.json`，每次角色派发和状态迁移前运行
   `node scripts/check-ai-task-control.mjs <control-file>`。
 - Codex 沙箱若因 `.git/qta-governance` 只读返回 `EPERM/EACCES`，仅为上述控制命令申请受限 `.git`
@@ -37,12 +41,15 @@
 - **前端**：feature-based，mock/remote 双模式，不用 `any`，覆盖 loading/empty/error/retry 状态，盈利红亏损绿。
 - **测试**：覆盖核心场景与边界（参考 `acceptance/ACCEPTANCE_LOG.md` 已有覆盖度）。
 - **角色边界**：实施者可实现和运行自测，但只能标记 `SELF_CHECKED`，不得给出最终验收结论。
+- **实施切片**：一个干净 implementer 只接一个 frozen slice。父协调者不得在子角色超时后接管实现；
+  两次同 slice timeout 后记录 `BLOCKED` 并重新切片。
 - **角色实例**：初始实现、每轮 repair、每代 review、最终 verifier 都使用新的 role/session；禁止
   延续旧子会话。
 - **测试节奏**：开发/repair 跑聚焦测试；最终候选冻结前跑一次 full/package；独立 verifier 再跑
   一次，不对未变化候选重复跑全量门禁。
 - **架构自检**：候选冻结前运行 `node scripts/check-ai-architecture.mjs --base <baseline>
-  --architecture-review-count <count>`；SNAPSHOT 模式增加 `--manifest <candidate-manifest>`。
+  --architecture-review-count <count> --candidate-identity <candidate> --json-output <report>`；SNAPSHOT
+  模式增加 `--manifest <candidate-manifest>`。任何 error/非零退出均阻断，不能由 reviewer 文字豁免。
 - **断点**：阶段完成、重复失败、外部阻塞或达到上下文预算时启用 `qta-task-checkpoint`。
 - **候选版本**：自检通过后由父协调者创建 `candidate` 提交，记录 tree hash 和 patch SHA-256；
   该版本尚未独立验收，不能标记可部署。
@@ -61,6 +68,8 @@
 - 验收输出 `ACCEPTED/CONDITIONALLY_ACCEPTED/REJECTED/BLOCKED`，不得用笼统“全绿”代替逐 AC 证据。
 - Reviewer 与 verifier 必须绑定同一 contract/candidate/patch hash。候选变化后旧结论自动失效。
 - Verifier 在 disposable worktree 中执行门禁，前后 tracked tree 必须不变。
+- Verifier 必须处于可执行命令的模式，并用 `scripts/run-ai-evidence-command.mjs` 为冻结 test inventory
+  逐项生成机器回执；plan-only、旧报告、泛化“测试全绿”或父角色代跑均不算验收。
 
 ### 1.7 交付收口
 - 只有独立验收允许交付后才启用 `qta-delivery-finalization`。
@@ -70,6 +79,8 @@
 - 长任务 / 中断任务 / 跨模型接力任务：用 `docs/templates/TASK_HANDOFF_TEMPLATE.md` 新增 `docs/ai/HANDOFF_YYYY-MM-DD_<topic>.md`，记录当前 git 状态、变更文件、已跑命令、失败点和下一步提示词。
 - 父协调者创建 `finalization` 提交。可先 checkpoint-push 任务分支备份；只有 accepted revision
   才能 delivery-push，禁止自动直推受保护/default 分支。
+- `FINALIZED` 后将控制状态推进到 `DELIVERY_READY`，确认所有任务 artifact 已跟踪且工作树无新增脏
+  路径，再运行 `node scripts/check-ai-delivery-ready.mjs <control-file>`。只有 exit 0 才允许 Goal 完成。
 
 ## 2. 开发结束文档同步检查（必做）
 

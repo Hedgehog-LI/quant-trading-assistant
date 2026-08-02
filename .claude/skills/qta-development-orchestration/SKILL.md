@@ -54,6 +54,7 @@ CONTEXT_READY
   -> REVIEW_CLEAR
   -> VERIFIED
   -> FINALIZED
+  -> DELIVERY_READY
 ```
 
 Allowed backward transitions:
@@ -67,9 +68,10 @@ Allowed backward transitions:
 Never run code review and final verification in parallel. Never finalize before verification. `VERIFIED`
 requires both `FUNCTIONAL=PASS` and `ARCHITECTURE=PASS` for the same candidate identity.
 
-The parent continues until one terminal state: `FINALIZED`, `BLOCKED`, or an explicit user stop. Producing a
-plan, one role artifact, or one repair is not task completion. Do not start a second product task merely to
-keep an overnight run busy.
+The parent continues until one terminal state: `DELIVERY_READY`, `BLOCKED`, or an explicit user stop.
+`FINALIZED` means finalization records exist; it is not permission to end Goal mode. A plan, one role artifact,
+one repair, or self-reported acceptance is not completion. Do not start a second product task merely to keep
+an overnight run busy.
 
 ## Autonomous Decision Policy
 
@@ -96,7 +98,8 @@ Give every role only:
   Hook-observed session receipt.
 
 Do not pass the complete parent conversation or unrelated repository history.
-Create or update the machine control file from `assets/TASK_CONTROL_TEMPLATE.json`. Run
+Create or update the schema-v3 machine control file from `assets/TASK_CONTROL_TEMPLATE.json`. Freeze bounded
+implementation slices and a stable test inventory before implementation. Run
 `node scripts/check-ai-task-control.mjs <control-file>` before each role dispatch and lifecycle transition.
 This gate validates the JSON schema, actual contract/candidate/artifact hashes, transition and repair history,
 role generations, ZCode runtime session receipts, hash-chained control anchors, SNAPSHOT changed-path coverage,
@@ -107,7 +110,8 @@ AC evidence, quality verdicts, and finalization identity. A prose status cannot 
 1. Parent drafts the contract with `$qta-task-contract`.
 2. A fresh `qta-test-designer` instance challenges the draft and returns an artifact payload.
 3. Parent persists accepted amendments and freezes `contract_hash`.
-4. A fresh `qta-implementer` instance changes only assigned paths and returns `SELF_CHECKED` evidence.
+4. Dispatch one fresh `qta-implementer` per frozen slice. One slice has at most three ACs, eight expected
+   files, and 500 production-line additions. The parent assembles slices but never edits implementation.
 5. Parent freezes candidate identity:
    - `COMMIT`: create the candidate commit and record commit/tree/patch hashes.
    - `SNAPSHOT`: create a deterministic allowlisted candidate manifest and record manifest/entry-set hashes.
@@ -119,12 +123,19 @@ AC evidence, quality verdicts, and finalization identity. A prose status cannot 
 8. Every candidate generation receives a new reviewer instance. Never reuse the prior reviewer conversation.
 9. After `REVIEW_CLEAR`, a fresh `qta-final-verifier` verifies the same candidate in a disposable worktree.
 10. Parent persists the verdict. Only permitted acceptance routes to `$qta-delivery-finalization`.
+11. Parent creates a distinct finalization artifact, tracks all task evidence when authorized, sets
+    `DELIVERY_READY`, and runs `node scripts/check-ai-delivery-ready.mjs <control-file>`.
 
 Read-only roles return structured artifact payloads. The parent writes those payloads to task-local files.
 A fixed role is an immutable template, not a persistent Agent. Every role run has a unique `role_run_id` and
-session identifier, receives no inherited child history, and is destroyed after returning its artifact. A
-role run that compacts, invokes a prohibited tool, or reuses a prior session is `POLICY_VIOLATION`; discard its
-artifact and rerun once in a fresh instance.
+session identifier, receives no inherited child history, and is destroyed after returning its artifact. The
+parent is never a fallback implementer, reviewer, or verifier. Parent substitution is a `POLICY_VIOLATION`
+and cannot be accepted. A role run that compacts, invokes a prohibited tool, or reuses a prior session is also
+`POLICY_VIOLATION`; discard its artifact and rerun once in a fresh instance.
+
+Record every dispatched attempt after it terminates, including `TIMED_OUT`, `PLAN_ONLY`, `FAILED`,
+`CANCELLED`, and `POLICY_VIOLATION`. Do not omit failed attempts from `roleRuns`. Two timeouts for the same
+slice require `BLOCKED` and a new bounded contract/reslice; never launch another whole-task implementer.
 
 The workspace Hook may create a session first-seen receipt under `.git/qta-governance/sessions/`; record its
 path and the role start/finish timestamps. The control gate rejects a reused, wrong-project, or out-of-window
@@ -132,8 +143,12 @@ receipt. Every successful control validation appends a hash-chained anchor under
 `.git/qta-governance/tasks/`; direct role access to that store is prohibited. These same-user local controls
 are tamper-evident workflow guards, not platform-authenticated security evidence, so current runs must remain
 `ADVISORY` plus compensating isolation.
-Append a role-run row only after that role reaches a terminal status; anchored role rows are immutable events,
-not mutable RUNNING records.
+For every fixed `qta-*` Agent/Task dispatch, the Hook also requires the TaskPacket header plus unique dispatch
+ID and creates an exclusive receipt under `.git/qta-governance/dispatches/`. Delivery readiness reconciles
+those receipts bidirectionally with terminal `roleRuns`, exposing omitted failed attempts.
+Append a role-run row only after that role reaches a terminal status. Accepted rows require
+`executorType=SUBAGENT`, the exact `.zcode/agents/` definition, matching capability, and
+`executionOutcome=COMPLETED`. Anchored role rows are immutable events, not mutable RUNNING records.
 
 Codex sandbox profiles may expose `.git` as read-only. In that case, request scoped permission only for
 `node scripts/check-ai-task-control.mjs`; never disable the anchor. The validator returns this recovery
@@ -200,8 +215,9 @@ the recorded candidate commit/tree or snapshot manifest, not task-branch `HEAD`.
 
 A checkpoint push may push the task branch after a complete stage commit when remote access is available.
 It is backup only and must not be described as deployable. A delivery push is allowed only after the accepted
-candidate remains unchanged and finalization completes. Never automatically push directly to the protected or
-default branch, force-push, or hide a push failure.
+candidate remains unchanged, finalization completes, and the delivery-ready gate passes. Contract, control,
+diff, role, review, verification, architecture, test-receipt, and finalization artifacts must all be tracked.
+Never automatically push directly to the protected/default branch, force-push, or hide a push failure.
 
 ## Repair And Stop Rules
 
@@ -214,6 +230,9 @@ default branch, force-push, or hide a push failure.
   repairs receive incremental review unless identity or behavior changed.
 - Run focused tests during implementation and repair. Run the full suite/package once before freezing the
   final candidate and once independently in verification; do not repeat an unchanged full gate.
+- The frozen test inventory is immutable with the contract. The final verifier executes every required test
+  through `scripts/run-ai-evidence-command.mjs`; a missing selector, nonzero exit, changed candidate, absent
+  receipt, or receipt from another role/session is not verified.
 - At 25% context, persist discoveries. At 40%, do not open a new stage; checkpoint. At 60%, terminate the
   role and continue in a fresh context. The first compaction forces handoff; a second is prohibited.
 - Record `contextMeasurement=UNAVAILABLE` and `contextPercent=null` when the runtime exposes no reliable
@@ -226,11 +245,28 @@ default branch, force-push, or hide a push failure.
 ## Architecture Gate
 
 Before `REVIEW_CLEAR`, run `node scripts/check-ai-architecture.mjs --base <baseline>
---architecture-review-count <count>` in COMMIT mode, or add `--manifest <candidate-manifest>` in SNAPSHOT mode,
-and require an explicit responsibility map for triggered files.
-Architecture warnings require reviewer disposition; architecture
-errors block the candidate. A contract that explicitly requires a layer cannot omit it without a time-bounded
-ADR exception.
+--architecture-review-count <count> --candidate-identity <candidate> --json-output <report>` in COMMIT mode,
+or add `--manifest <candidate-manifest>` in SNAPSHOT mode. Bind the report hash to review and verification.
+Every warning requires a structured disposition by report ID. Any machine `errors > 0`, nonzero exit, report
+hash mismatch, or candidate mismatch blocks the candidate; reviewer prose cannot waive it. Fixing an invalid
+detector is a separate governed change, never an inline reinterpretation.
+
+## Goal Completion Gate
+
+Goal mode may report success only after the control file is `DELIVERY_READY` and
+`node scripts/check-ai-delivery-ready.mjs <control-file>` exits `0` on a tracked, clean delivery revision.
+The gate rejects parent-authored specialist artifacts, plan-only verification, missing test receipts,
+architecture errors, reused verification/finalization artifacts, untracked evidence, candidate drift, branch
+mismatch, and unapproved dirty paths. If it fails, transition to `BLOCKED` or a governed repair; never ask the
+model-only Goal completion judge to reinterpret the failure.
+
+`/qta-run` activates a parent-session Stop Hook. ZCode may request continuation at most three times, so this is
+not a retry budget: move deterministically to the next lifecycle state, or persist an evidence-backed
+`BLOCKED` state when the frozen repair/timeout limit is reached. The Hook releases only `BLOCKED` or a passing
+`DELIVERY_READY` task.
+
+Generate event timestamps from the runtime clock. Transition and role timestamps must be monotonic, inside
+the task window, and not in the future; do not invent convenient ISO values.
 
 ## Required Output
 

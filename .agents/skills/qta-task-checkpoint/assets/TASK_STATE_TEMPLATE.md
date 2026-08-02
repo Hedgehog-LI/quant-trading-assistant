@@ -6,6 +6,8 @@ Task branch:
 Lane:
 Lifecycle state:
 Current role:
+Current dispatch ID:
+Current implementation slice:
 Role run ID:
 Role session ID:
 Role instance status: `FRESH | POLICY_VIOLATION | CLOSED`
@@ -30,6 +32,11 @@ Wait calls in current role:
 Maximum shell polls for one command:
 Machine control file:
 
+## Dispatch Attempts
+
+| Dispatch ID | Role | Slice/generation | Outcome | Artifact accepted | Next action |
+|---|---|---|---|---|---|
+
 ## Acceptance Status
 
 | AC-ID | Status | Changed files | Evidence | Remaining action |
@@ -43,6 +50,11 @@ Machine control file:
 | AUTOMATION | NOT_VERIFIED | | |
 | RUNTIME | NOT_VERIFIED | | |
 | DEPLOYMENT | NOT_VERIFIED | | |
+
+## Frozen Test Inventory Progress
+
+| Test ID | AC IDs | Selector | Receipt | Result |
+|---|---|---|---|---|
 
 ## Quality Verdicts
 

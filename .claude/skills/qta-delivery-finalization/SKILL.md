@@ -43,7 +43,11 @@ Do not invoke merely because implementation or self-tests finished.
 7. Write deployment/restart/migration steps when deployment is in scope.
 8. Refresh `docs/AI_HANDOFF.md` with the smallest useful current-state summary.
 9. Run documentation and governance consistency checks.
-10. Ask the parent Git owner to create the finalization commit; this Skill does not stage unrelated files.
+10. Create a finalization artifact distinct from the verification report.
+11. Ask the parent Git owner to track and commit all task contract/control/diff/role/review/verification/
+    architecture/test-receipt/finalization artifacts; this Skill does not stage unrelated files.
+12. After the parent sets `DELIVERY_READY`, require
+    `node scripts/check-ai-delivery-ready.mjs <control-file>` to exit `0`. `FINALIZED` alone is not delivery.
 
 ## Document Ownership Matrix
 
@@ -68,6 +72,7 @@ Do not duplicate the same full narrative across every document.
 - `BLOCKED`: external or internal blocker recorded.
 
 Never mark `DEPLOYED` from local tests alone.
+Never mark Goal complete from model prose, an untracked control file, or a reused verification artifact.
 
 ## Required Output
 

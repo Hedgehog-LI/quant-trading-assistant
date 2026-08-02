@@ -26,9 +26,10 @@ a parent-owned written exception before implementation.
 - A role that compacts, uses a prohibited tool, mutates a read-only snapshot, or creates a child Agent is a
   `POLICY_VIOLATION`. Its artifact is invalid even when the candidate hash is unchanged.
 
-Every role-run record contains `roleRunId`, runtime `sessionId`, role, candidate generation, `FRESH` context,
-enforcement level, wait/poll/compaction counters, terminal status, artifact path, artifact SHA-256, and whether
-the parent accepted the artifact. Only `COMPLETED/CLOSED` artifacts may be accepted. The control file also
+Every role-run record contains `roleRunId`, dispatch ID, runtime `sessionId`, role, candidate generation,
+executor type, exact Agent definition, capability, execution outcome, `FRESH` context, enforcement level,
+wait/poll/compaction counters, terminal status, artifact path, artifact SHA-256, and whether the parent accepted
+the artifact. Only completed `SUBAGENT` artifacts may be accepted. The control file also
 keeps ordered transition history, blocking amendments, repair/failure history, AC evidence bound to candidate
 identity, and finalization artifact identity.
 Role-run rows are appended only after terminal return and are immutable after anchoring; pending dispatch state
@@ -49,6 +50,11 @@ control-file validations append a hash-chained snapshot under `.git/qta-governan
 transition, repair, amendment, role, and counter rollback. Direct model access to this audit store is blocked
 by the Hook. These are tamper-evident workflow controls, not a security boundary against malicious arbitrary
 code running as the same OS user. `ENFORCED` remains unavailable until native signed attestation exists.
+
+Every dispatched attempt is recorded after termination, including timeout, plan-only, failure, cancellation,
+and policy violation. The parent cannot substitute for a specialist role. Initial implementation is split
+into one fresh implementer per coherent slice; one slice has at most three ACs, eight expected files, and 500
+production-line additions. Two timeouts on one slice require `BLOCKED` and reslicing.
 
 ## Context And Control Budget
 
@@ -80,6 +86,8 @@ above are the hard proxy.
   contract, migration, or candidate-scope changes.
 - Final verifier: one independent focused gate and one required full/package gate on the frozen candidate.
 - Benchmark runs only when the contract has a performance AC or the repair touched a measured path.
+- Test design freezes stable test IDs, AC mapping, source paths, and exact selectors. Final verification creates
+  machine receipts with `scripts/run-ai-evidence-command.mjs`; implementer summaries are not receipts.
 
 ## Architecture Gate
 
@@ -93,7 +101,7 @@ Review trigger, requiring a responsibility map and six-dimension score:
 - more than 10 direct dependencies;
 - candidate adds more than 800 production lines.
 
-Hard block unless a time-bounded ADR exception exists:
+Hard block:
 
 - class over 600 significant lines together with more than 30 methods or more than three responsibilities;
 - method over 100 lines;
@@ -102,6 +110,9 @@ Hard block unless a time-bounded ADR exception exists:
 - candidate adds over 1500 production lines without independent architecture review;
 - candidate adds over 3000 production lines without a second clean-context architecture review;
 - an explicitly contracted layer is omitted.
+
+A reviewer cannot waive a machine architecture error. If the detector itself is wrong, repair and validate
+the detector in a separate governed task, then regenerate the candidate-bound report.
 
 Score responsibility cohesion, layering, readability, transaction/error semantics, testability, and change
 impact from 0-2. Passing requires at least 9/12 and no zero. A nonblocking debt record needs impact, owner,
@@ -114,3 +125,6 @@ target version, and a deadline no later than 30 days or the next feature in that
   explicitly permitted; never use it to hide a required L3 dimension.
 - `REJECTED`: an AC, mandatory gate, candidate identity, or architecture gate fails.
 - `BLOCKED`: required evidence or environment cannot be obtained without an external change.
+
+`FINALIZED` is not a Goal terminal state. Only `DELIVERY_READY`, confirmed by
+`scripts/check-ai-delivery-ready.mjs` on tracked evidence and an approved-clean worktree, may end Goal mode.

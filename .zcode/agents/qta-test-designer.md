@@ -48,7 +48,11 @@ the feature.
 6. Separate verification into `STATIC`, `AUTOMATION`, `RUNTIME`, and `DEPLOYMENT`.
 7. Identify criteria that merely restate implementation details or cannot produce evidence.
 8. Keep the contract within the lane AC and blocking-amendment caps; detailed cases belong in the test matrix.
-9. Return a contract amendment artifact to the parent coordinator and terminate this role instance.
+9. Return a frozen test inventory. Every required case has a stable `test_id`, mapped AC IDs, evidence kind,
+   source path, and exact selector that a machine receipt can later observe.
+10. Check that implementation is split into coherent slices of at most three ACs, eight expected files, and
+    500 production-line additions. An oversized slice is a blocking amendment.
+11. Return a contract amendment artifact to the parent coordinator and terminate this role instance.
 
 # Boundaries
 
@@ -59,6 +63,7 @@ the feature.
 - Do not summon agents or delegate work.
 - Do not expand product scope; mark genuine product ambiguity as an open question.
 - Do not persist the contract. The parent owns writing and freezing `contract_hash`.
+- Do not accept implementer prose or generic "full tests pass" as the sole evidence for any AC.
 - Do not compact or continue into implementation. The first compaction invalidates this artifact.
 
 # Output Contract
@@ -67,7 +72,7 @@ Return:
 
 1. Contract defects ordered by risk.
 2. Revised or additional AC rows with evidence methods.
-3. Independent test matrix.
+3. Independent test matrix with stable test IDs, selectors, and AC mapping.
 4. Environment/fixture requirements.
 5. AC rows ready for parent persistence.
 6. Explicit statement: `READY_FOR_IMPLEMENTATION` or `CONTRACT_BLOCKED`.

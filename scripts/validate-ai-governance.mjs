@@ -48,7 +48,7 @@ const expectedAgentPolicies = {
     skills: ["qta-context-bootstrap"]
   },
   "qta-final-verifier": {
-    permissionMode: "plan",
+    permissionMode: "acceptEdits",
     maxTurns: "12",
     tools: ["Read", "Glob", "Grep", "Bash", "Skill"],
     disallowedTools: [
@@ -255,7 +255,9 @@ const requiredGovernanceFiles = [
   ".agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md",
   ".zcode/config.json",
   "scripts/check-ai-task-control.mjs",
+  "scripts/check-ai-delivery-ready.mjs",
   "scripts/check-ai-architecture.mjs",
+  "scripts/run-ai-evidence-command.mjs",
   "scripts/zcode-governance-hook.mjs",
   "scripts/tests/ai-governance.test.mjs"
 ];
@@ -299,8 +301,19 @@ try {
   if (!governanceMatchers[0]?.matcher?.includes("Bash")
       || !governanceMatchers[0]?.matcher?.includes("Read")
       || !governanceMatchers[0]?.matcher?.includes("Write")
-      || !governanceMatchers[0]?.matcher?.includes("Edit")) {
-    errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit aliases");
+      || !governanceMatchers[0]?.matcher?.includes("Edit")
+      || !governanceMatchers[0]?.matcher?.includes("Agent")
+      || !governanceMatchers[0]?.matcher?.includes("Task")) {
+    errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit and Agent/Task dispatches");
+  }
+  for (const event of ["UserPromptSubmit", "Stop"]) {
+    const groups = hooks?.events?.[event] ?? [];
+    const configured = groups.some((group) => (group.hooks ?? []).some((hook) => hook.type === "process"
+      && hook.command === "node" && hook.args?.includes("${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs")));
+    if (!configured) errors.push(`ZCode ${event} must invoke zcode-governance-hook.mjs`);
+  }
+  if (!(hooks?.events?.UserPromptSubmit ?? []).some((group) => group.matcher?.includes("/qta-run"))) {
+    errors.push("ZCode UserPromptSubmit hook must activate /qta-run sessions");
   }
 } catch (error) {
   errors.push(`governance V2 JSON configuration is invalid (${error.message})`);
@@ -340,7 +353,7 @@ if (!orchestrationCommand.includes("skills: qta-development-orchestration")
     || !orchestrationCommand.includes("$ARGUMENTS")) {
   errors.push("qta-run command must mount qta-development-orchestration and forward task arguments");
 }
-for (const required of ["TASK_CONTROL", "fresh", "two waits", "architecture"]) {
+for (const required of ["TASK_CONTROL", "fresh", "two waits", "architecture", "delivery-ready", "parent coordinator"]) {
   if (!orchestrationCommand.toLowerCase().includes(required.toLowerCase())) {
     errors.push(`qta-run command missing V2 instruction: ${required}`);
   }

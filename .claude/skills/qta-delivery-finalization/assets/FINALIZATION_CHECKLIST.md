@@ -13,6 +13,11 @@ Verified candidate entry-set SHA-256:
 |---|---|---|
 | Independent verdict permits delivery | | |
 | Task control machine validation passes | | |
+| Lifecycle is DELIVERY_READY, not merely FINALIZED | | |
+| Every accepted specialist artifact comes from a completed SUBAGENT | | |
+| Every dispatched failed/timeout/plan-only attempt is recorded | | |
+| Frozen test inventory has passing final-verifier machine receipts | | |
+| Architecture report is candidate-bound with errors=0 | | |
 | Functional and architecture verdicts both pass | | |
 | Verifier role/session differs from implementer and reviewer | | |
 | Verified contract and mode-specific candidate identity are unchanged | | |
@@ -26,5 +31,8 @@ Verified candidate entry-set SHA-256:
 | Deployment/migration instructions are present when required | | |
 | No secret, local credential, or runtime artifact is tracked | | |
 | Governance validation passes | | |
+| Finalization artifact is distinct from verification artifact | | |
+| Every task artifact/control/receipt is tracked and approved dirty-path check passes | | |
+| `check-ai-delivery-ready.mjs` exits 0 | | |
 | Parent prepared the finalization commit without unrelated paths | | |
 | Delivery push targets the accepted task-branch revision | | |

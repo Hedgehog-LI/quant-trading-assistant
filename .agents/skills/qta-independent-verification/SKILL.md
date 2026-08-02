@@ -33,6 +33,7 @@ Before verification, confirm:
   either commit/tree/patch hashes or snapshot manifest/entry-set hashes.
 - The verifier `role_run_id` and session identifier are new and differ from all implementer and reviewer runs.
 - The task control file passes `scripts/check-ai-task-control.mjs`.
+- This role is execution-capable. A plan-only return is `BLOCKED`, not an acceptance artifact.
 
 If this context implemented the change, report only `SELF_CHECK`; start a clean top-level task or dedicated
 verifier role for independent acceptance.
@@ -52,11 +53,13 @@ Do not accept the implementer's prose as proof without inspecting the underlying
 1. Check scope: required changes present, prohibited changes absent.
 2. Review the diff on two independent tracks: `FUNCTIONAL` and `ARCHITECTURE`.
 3. Derive or inspect tests independently from implementation details.
-4. Execute the cheapest decisive gates first.
+4. Execute the cheapest decisive gates first through `scripts/run-ai-evidence-command.mjs`, using the frozen
+   test ID, selector, candidate identity, role/session ID, and assigned receipt path.
 5. Verify every AC separately.
 6. Record each verification dimension independently.
 7. Compare tracked candidate state before and after executable gates.
-8. Run the architecture gate and inspect any triggered responsibility map or ADR exception.
+8. Inspect the candidate-bound machine architecture report. Any error, nonzero exit, hash mismatch, or
+   candidate mismatch is a hard failure that reviewer prose cannot waive.
 9. Classify findings by severity and cite file/line or command evidence.
 10. Produce a verdict without editing production files.
 
@@ -71,6 +74,8 @@ Missing evidence is `NOT_VERIFIED`, not `PASS`.
 An environment blocker is `BLOCKED`, not a code pass or failure.
 Build outputs may be created only in the disposable verifier worktree. Any tracked candidate or snapshot
 manifest mismatch invalidates the run and produces `REJECTED`.
+Generic verification prose is not AC evidence. Every required frozen test must have a passing machine receipt
+from this accepted verifier role, with its selector observed and candidate unchanged.
 
 ## Verdicts
 
