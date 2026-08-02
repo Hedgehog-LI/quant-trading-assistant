@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CLOSEOUT-CONTROL.json",
   "startedAt": "2026-08-02T12:05:00Z",
   "lane": "L0",
-  "lifecycleState": "CONTRACT_FROZEN",
+  "lifecycleState": "SELF_CHECKED",
   "contract": {
     "path": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CLOSEOUT-CONTRACT.md",
     "version": "1",
@@ -138,6 +138,22 @@
       "at": "2026-08-02T12:10:00Z",
       "actor": "codex-parent-d2-closeout-1",
       "note": "L0 contract-lite: test-designer omitted (RESLICE already froze D2 ACs/test inventory; user forbids re-dispatch). Parent-run close-out slice (no source edits); fresh independent reviewer + final verifier to follow."
+    },
+    {
+      "sequence": 3,
+      "from": "CONTRACT_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-02T12:11:00Z",
+      "actor": "codex-parent-d2-closeout-1",
+      "note": "Parent-run close-out slice; IMP-D2CO-1 confirms gates (no source edits)."
+    },
+    {
+      "sequence": 4,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-02T12:12:00Z",
+      "actor": "codex-parent-d2-closeout-1",
+      "note": "IMP-D2CO-1 SELF_CHECKED: repaired arch gate PASS (9 pre-existing, 0 blocking); patch SHA 479d6bf4 matches RESLICE freeze; governance 50/50."
     }
   ],
   "candidate": {
@@ -173,7 +189,34 @@
     "weeklyAllowancePercent": null
   },
   "repairHistory": [],
-  "roleRuns": [],
+  "roleRuns": [
+    {
+      "roleRunId": "IMP-D2CO-1",
+      "dispatchId": "dispatch-IMP-D2CO-1",
+      "sessionId": "agent_1f63906f-ee4b-42b1-b86c-eb26e262b502",
+      "startedAt": "2026-08-02T12:07:30Z",
+      "finishedAt": "2026-08-02T12:12:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/be989b333ab3c86ded9da09c2e2850a843cbff37e7fb22ae9e5fe61ca96396bd/66f25f8ba663d6b82d8e5929a545f4e79b2e567c2e5adb82617a30a708033e04.json",
+      "role": "IMPLEMENTER",
+      "generation": 1,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "sliceId": "SLICE-CLOSEOUT",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_WRITE",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "disposable close-out implementer; only wrote the evidence artifact; no source/test edits; parent re-ran gates independently",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 1,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CLOSEOUT-EVIDENCE.md",
+      "artifactSha256": "ee750e5d35a89cce7f0cc263f14e7dfc18239bcfba54fe959c5428facea42bd4"
+    }
+  ],
   "review": {
     "omitted": true,
     "omissionReason": "L0 contract-lite structured-review flag. A fresh independent qta-code-reviewer IS dispatched and recorded in roleRuns; its REVIEW_CLEAR result is consumed by the final verifier. The L0 machine gate does not bind a structured review block.",
