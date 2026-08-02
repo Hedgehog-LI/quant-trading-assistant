@@ -28,6 +28,8 @@ node scripts/check-ai-architecture.mjs \
   --base <git-ref> \
   --files <candidate-files...> \
   --baseline <baseline-dir> \
+  --candidate-root <candidate-repo-root> \
+  --baseline-commit <frozen-baseline-commit> \
   --candidate-identity <frozen-candidate-id> \
   --json-output <report.json>
 ```
@@ -39,6 +41,18 @@ strict path; the baseline directory only supplies baseline source for per-file c
 
 When no `--baseline` is supplied, the detector is byte-for-byte unchanged: every error blocks and the report
 contains no baseline fields.
+
+### `--candidate-root` (cwd-independent cross-repo baseline path)
+
+By default a candidate file path is mapped to its repo-relative path using `process.cwd()`, so the same
+candidate + baseline can classify differently when the gate is run from the backend repo root versus the
+frontend repo root. Pass `--candidate-root <dir>` to resolve the candidate file's repo-relative path
+lexically against `<dir>` (with `path.resolve`, independent of `process.cwd()`): the candidate's
+repo-relative path is `path.relative(path.resolve(candidateRoot), path.resolve(candidateFile))`, and the
+baseline file is read at `<baseline-dir>/<repo-relative-path>`. With a fixed `--candidate-root`, the same
+candidate + baseline + candidate-root classify identically regardless of the process cwd. When
+`--candidate-root` is absent, the legacy `process.cwd()`-relative resolution is used unchanged
+(backward compatible).
 
 ## Classification semantics
 
@@ -54,15 +68,40 @@ each candidate file error, the same rule is evaluated against the baseline sourc
 A brand-new offending method that causes a file to newly cross a threshold is `introduced` (band-crossing),
 never `worsened`, so it blocks regardless of delta.
 
-**Default allowed worsen delta = 20** quantifiable units (lines or method-line count). This permits small
-integration additions without false `worsened` labels, while blocking material growth. Candidate-level errors
-(review-count thresholds) are always blocking and are not classified against the baseline.
+**Per-method identity for the `longest-method` rule.** When both the baseline and candidate files trip the
+`longest-method` rule, the classifier compares the **per-method** over-100 methods, not just the file-level
+`longestMethod` aggregate. A candidate over-100 method whose name has no matching over-100 method in the
+baseline file is `introduced` (blocking), even if the file-level aggregate stayed within the allowed delta.
+This catches the case where an offending baseline method is replaced by a brand-new, different, over-threshold
+method: the new method is genuinely new debt and blocks. A candidate over-100 method that matches a baseline
+over-100 method (same method identity, allowing for the parser's name extraction) is `worsened` when it grew
+by more than the delta, and `pre-existing` when it grew by at most the delta. Band-crossing (baseline had no
+over-100 method at all, candidate does) stays `introduced`. Because a single file can now produce multiple
+`introduced`/`worsened` longest-method details, the classified splits may contain more than one longest-method
+entry per file; each detail still carries `classification`, `candidateMetric`, `baselineMetric` (null when
+unmatched/introduced), and `delta` (null when introduced). The coherence invariant below still holds.
+
+**Default allowed worsen delta = 0.** Any growth of an already-firing quantifiable metric (delta > 0) is
+classified `worsened` (blocking) unless a run explicitly passes a larger delta via
+`--allowed-worsen-delta <int>`. Band-crossing is always `introduced` regardless of delta. To opt in to the
+historical tolerance for small integration additions, pass the delta explicitly, e.g.
+`--allowed-worsen-delta 20`. Candidate-level errors (review-count thresholds) are always blocking and are not
+classified against the baseline.
 
 ## Report fields
 
 In baseline-aware mode the JSON report carries, alongside the existing fields:
 
-- `baselineIdentity` — the verbatim `--baseline` argument.
+- `baselineIdentity` — the verbatim `--baseline` argument (preserved for compatibility).
+- `baselineCommit` — the verbatim `--baseline-commit` argument, recording the frozen baseline commit the
+  baseline directory was extracted from. `""` when `--baseline-commit` was not supplied; the content hash
+  below still binds the compared sources either way.
+- `baselineFileContentsSha256` — the sha256 of the JSON array of `{file, sha256(content)}` for every file
+  that participated in the baseline comparison (every candidate file for which a baseline file was read,
+  whether the baseline tripped the rule or not), sorted by repo-relative file path. This makes the baseline
+  sources that produced the classification auditable.
+- `allowedWorsenDelta` — the worsen delta actually used (the value of `--allowed-worsen-delta`, or `0` when
+  the flag was not supplied).
 - `blockingErrorCount` — count of blocking errors (`introduced` + `worsened` + candidate-level).
 - `introducedErrors[]`, `worsenedErrors[]`, `preExistingErrors[]` — the classified split.
 - Each detail records `id`, `file`, `message`, `classification`, `candidateMetric`, `baselineMetric`

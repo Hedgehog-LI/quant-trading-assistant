@@ -52,17 +52,34 @@ function methodBraceIndexes(content, extension) {
       /\b(?:const|let)\s+[A-Za-z_$][\w$]*\s*=\s*(?:async\s*)?\([^;{}]*\)\s*(?::\s*[^=]+)?=>\s*\{/gm,
       /(?:^|\n)\s*(?:(?:public|private|protected|static|async|readonly|get|set)\s+)*(?!(?:if|for|while|switch|catch)\b)[A-Za-z_$][\w$]*\s*(?:<[^>{}]+>)?\s*\([^;{}]*\)\s*(?::\s*[^={]+)?\s*\{/gm
     ];
-  const indexes = new Set();
+  const byIndex = new Map();
   for (const expression of expressions) {
-    for (const match of source.matchAll(expression)) indexes.add(match.index + match[0].lastIndexOf("{"));
+    for (const match of source.matchAll(expression)) {
+      const braceIndex = match.index + match[0].lastIndexOf("{");
+      if (!byIndex.has(braceIndex)) byIndex.set(braceIndex, match[0]);
+    }
   }
-  return { source, indexes: [...indexes].sort((left, right) => left - right) };
+  const indexes = [...byIndex.keys()].sort((left, right) => left - right);
+  return { source, indexes, matches: indexes.map((index) => byIndex.get(index)) };
+}
+
+function extractMethodName(signature) {
+  const sig = signature.replace(/\s*\{$/, "");
+  let match = sig.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]*)?=/);
+  if (match) return match[1];
+  match = sig.match(/\bfunction\s+([A-Za-z_$][\w$]*)/);
+  if (match) return match[1];
+  match = sig.match(/([A-Za-z_$][\w$]*)\s*(?:<[^>{}]*>)?\s*\(/);
+  if (match) return match[1];
+  return sig.replace(/\s+/g, " ").trim();
 }
 
 function methodMetrics(content, extension) {
-  const { source, indexes } = methodBraceIndexes(content, extension);
+  const { source, indexes, matches } = methodBraceIndexes(content, extension);
   let longest = 0;
-  for (const start of indexes) {
+  const methods = [];
+  for (let i = 0; i < indexes.length; i += 1) {
+    const start = indexes[i];
     let depth = 0;
     let end = start;
     for (; end < source.length; end += 1) {
@@ -72,9 +89,11 @@ function methodMetrics(content, extension) {
     }
     const before = source.slice(0, start).split("\n").length;
     const after = source.slice(0, end).split("\n").length;
-    longest = Math.max(longest, after - before + 1);
+    const lines = after - before + 1;
+    longest = Math.max(longest, lines);
+    methods.push({ name: extractMethodName(matches[i]), lines });
   }
-  return { count: indexes.length, longest };
+  return { count: indexes.length, longest, methods };
 }
 
 function directDependencies(content, extension) {
@@ -144,11 +163,10 @@ export function analyzeSource(file, content) {
   }
   return {
     file, lines, methods: method.count, longestMethod: method.longest,
+    methodLengths: method.methods,
     dependencies, responsibilities, warnings, errors
   };
 }
-
-const ALLOWED_WORSEN_DELTA = 20;
 
 function errorRuleKind(message) {
   if (message.startsWith("longest method ")) return "longest-method";
@@ -171,39 +189,101 @@ function errorMetricForKind(message) {
   return null;
 }
 
-function classifyError(message, baselineReport) {
+function classifyError(message, baselineReport, candidateReport, allowedWorsenDelta) {
   const kind = errorRuleKind(message);
   const candidateMetric = errorMetricForKind(message);
   if (!baselineReport) {
-    return { classification: "introduced", candidateMetric, baselineMetric: null, delta: null };
+    return [{ classification: "introduced", candidateMetric, baselineMetric: null, delta: null }];
   }
   const baselineMatch = baselineReport.errors.find((entry) => errorRuleKind(entry) === kind);
   if (!baselineMatch) {
-    return { classification: "introduced", candidateMetric, baselineMetric: null, delta: null };
+    return [{ classification: "introduced", candidateMetric, baselineMetric: null, delta: null }];
   }
   const baselineMetric = errorMetricForKind(baselineMatch);
   if (candidateMetric !== null && baselineMetric !== null) {
-    const delta = candidateMetric - baselineMetric;
-    if (delta > ALLOWED_WORSEN_DELTA) {
-      return { classification: "worsened", candidateMetric, baselineMetric, delta };
+    if (kind === "longest-method" && candidateReport && baselineReport
+        && Array.isArray(candidateReport.methodLengths) && Array.isArray(baselineReport.methodLengths)) {
+      return classifyLongestMethods(candidateReport.methodLengths, baselineReport.methodLengths, allowedWorsenDelta);
     }
-    return { classification: "pre-existing", candidateMetric, baselineMetric, delta };
+    const delta = candidateMetric - baselineMetric;
+    if (delta > allowedWorsenDelta) {
+      return [{ classification: "worsened", candidateMetric, baselineMetric, delta }];
+    }
+    return [{ classification: "pre-existing", candidateMetric, baselineMetric, delta }];
   }
-  return { classification: "pre-existing", candidateMetric: null, baselineMetric: null, delta: null };
+  return [{ classification: "pre-existing", candidateMetric: null, baselineMetric: null, delta: null }];
 }
 
-async function baselineReportFor(file, baselineDir) {
+function classifyLongestMethods(candidateMethods, baselineMethods, allowedWorsenDelta) {
+  const candidates = candidateMethods.filter((method) => method.lines > 100);
+  const baselines = baselineMethods.filter((method) => method.lines > 100);
+  if (candidates.length === 0) {
+    return [{ classification: "pre-existing", candidateMetric: null, baselineMetric: null, delta: null }];
+  }
+  const used = new Array(baselines.length).fill(false);
+  const classifications = [];
+  for (const candidate of candidates) {
+    let matchedBaseline = -1;
+    for (let i = 0; i < baselines.length; i += 1) {
+      if (used[i]) continue;
+      if (baselineNamesEqual(baselines[i].name, candidate.name)) {
+        matchedBaseline = i;
+        used[i] = true;
+        break;
+      }
+    }
+    if (matchedBaseline === -1) {
+      classifications.push({
+        classification: "introduced", candidateMetric: candidate.lines, baselineMetric: null, delta: null
+      });
+    } else {
+      const baseLine = baselines[matchedBaseline].lines;
+      const delta = candidate.lines - baseLine;
+      if (delta > allowedWorsenDelta) {
+        classifications.push({
+          classification: "worsened", candidateMetric: candidate.lines, baselineMetric: baseLine, delta
+        });
+      } else {
+        classifications.push({
+          classification: "pre-existing", candidateMetric: candidate.lines, baselineMetric: baseLine, delta
+        });
+      }
+    }
+  }
+  return classifications;
+}
+
+function baselineNamesEqual(left, right) {
+  if (left === right) return true;
+  if (left && right) {
+    const normalize = (value) => value.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+    if (normalize(left) === normalize(right)) return true;
+    const tail = (value) => {
+      const parts = value.split(/[.\s]/).filter(Boolean);
+      return parts[parts.length - 1];
+    };
+    if (tail(left) === tail(right)) return true;
+  }
+  return false;
+}
+
+async function baselineReportFor(file, baselineDir, candidateRoot) {
   let relativeFile = file;
-  if (path.isAbsolute(file)) {
-    const candidateRoot = fs.realpathSync(process.cwd());
+  if (candidateRoot) {
+    const resolvedRoot = path.resolve(candidateRoot);
+    const resolvedFile = path.resolve(file);
+    const fromRoot = path.relative(resolvedRoot, resolvedFile);
+    relativeFile = fromRoot && !fromRoot.startsWith("..") && !path.isAbsolute(fromRoot) ? fromRoot : file;
+  } else if (path.isAbsolute(file)) {
+    const cwdRoot = fs.realpathSync(process.cwd());
     const resolvedFile = fs.realpathSync(file);
-    const fromResolved = path.relative(candidateRoot, resolvedFile);
+    const fromResolved = path.relative(cwdRoot, resolvedFile);
     relativeFile = fromResolved && !fromResolved.startsWith("..") ? fromResolved : path.relative(process.cwd(), file);
   }
   const baselinePath = path.join(baselineDir, relativeFile);
   try {
     const content = await readFile(baselinePath, "utf8");
-    return analyzeSource(file, content);
+    return { report: analyzeSource(file, content), relativeFile, content };
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;
@@ -279,11 +359,26 @@ async function main() {
   const candidateIdentityIndex = process.argv.indexOf("--candidate-identity");
   const jsonOutputIndex = process.argv.indexOf("--json-output");
   const baselineIndex = process.argv.indexOf("--baseline");
+  const candidateRootIndex = process.argv.indexOf("--candidate-root");
+  const baselineCommitIndex = process.argv.indexOf("--baseline-commit");
+  const allowedWorsenDeltaIndex = process.argv.indexOf("--allowed-worsen-delta");
   const architectureReviewCount = reviewCountIndex >= 0 ? Number.parseInt(process.argv[reviewCountIndex + 1], 10) || 0 : 0;
   const base = baseIndex >= 0 ? process.argv[baseIndex + 1] : "";
   const candidateIdentity = candidateIdentityIndex >= 0 ? process.argv[candidateIdentityIndex + 1] : "";
   const jsonOutput = jsonOutputIndex >= 0 ? process.argv[jsonOutputIndex + 1] : "";
   const baselineDir = baselineIndex >= 0 ? path.resolve(process.argv[baselineIndex + 1]) : "";
+  const candidateRoot = candidateRootIndex >= 0 ? process.argv[candidateRootIndex + 1] : "";
+  const baselineCommit = baselineCommitIndex >= 0 ? process.argv[baselineCommitIndex + 1] : "";
+  let allowedWorsenDelta = 0;
+  if (allowedWorsenDeltaIndex >= 0) {
+    const rawValue = process.argv[allowedWorsenDeltaIndex + 1];
+    const parsed = Number.parseInt(rawValue, 10);
+    if (!/^\d+$/.test(rawValue ?? "") || parsed < 0 || Number.isNaN(parsed)) {
+      console.error("--allowed-worsen-delta must be a non-negative integer");
+      process.exit(2);
+    }
+    allowedWorsenDelta = parsed;
+  }
   let files = [];
   let additions = 0;
   const candidateErrors = [];
@@ -336,31 +431,44 @@ async function main() {
   const introducedErrors = [];
   const worsenedErrors = [];
   const preExistingErrors = [];
+  let baselineFileContentsSha256 = "";
   if (baselineDir) {
+    const baselineComparedEntries = [];
     for (const report of reports) {
-      const baselineReport = await baselineReportFor(report.file, baselineDir);
+      const baseline = await baselineReportFor(report.file, baselineDir, candidateRoot);
+      const baselineReport = baseline ? baseline.report : null;
+      if (baselineReport) {
+        baselineComparedEntries.push({
+          file: baseline.relativeFile,
+          sha256: sha256(baseline.content)
+        });
+      }
       for (const message of report.errors) {
-        const verdict = classifyError(message, baselineReport);
-        const detail = {
-          file: report.file,
-          message,
-          classification: verdict.classification,
-          candidateMetric: verdict.candidateMetric,
-          baselineMetric: verdict.baselineMetric,
-          delta: verdict.delta
-        };
-        if (verdict.classification === "introduced") {
-          introducedErrors.push(detail);
-          console.log(`BASELINE-INTRODUCED ${report.file}: ${message}`);
-        } else if (verdict.classification === "worsened") {
-          worsenedErrors.push(detail);
-          console.log(`BASELINE-WORSENED ${report.file}: ${message} (candidate ${verdict.candidateMetric}, baseline ${verdict.baselineMetric}, delta ${verdict.delta})`);
-        } else {
-          preExistingErrors.push(detail);
-          console.log(`BASELINE-PRE-EXISTING ${report.file}: ${message}`);
+        const verdicts = classifyError(message, baselineReport, report, allowedWorsenDelta);
+        for (const verdict of verdicts) {
+          const detail = {
+            file: report.file,
+            message,
+            classification: verdict.classification,
+            candidateMetric: verdict.candidateMetric,
+            baselineMetric: verdict.baselineMetric,
+            delta: verdict.delta
+          };
+          if (verdict.classification === "introduced") {
+            introducedErrors.push(detail);
+            console.log(`BASELINE-INTRODUCED ${report.file}: ${message}`);
+          } else if (verdict.classification === "worsened") {
+            worsenedErrors.push(detail);
+            console.log(`BASELINE-WORSENED ${report.file}: ${message} (candidate ${verdict.candidateMetric}, baseline ${verdict.baselineMetric}, delta ${verdict.delta})`);
+          } else {
+            preExistingErrors.push(detail);
+            console.log(`BASELINE-PRE-EXISTING ${report.file}: ${message}`);
+          }
         }
       }
     }
+    baselineComparedEntries.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+    baselineFileContentsSha256 = sha256(JSON.stringify(baselineComparedEntries));
   }
   const errorDetails = [];
   for (const report of reports) {
@@ -423,6 +531,9 @@ async function main() {
     };
     if (baselineDir) {
       payload.baselineIdentity = process.argv[baselineIndex + 1];
+      payload.baselineCommit = baselineCommit;
+      payload.baselineFileContentsSha256 = baselineFileContentsSha256;
+      payload.allowedWorsenDelta = allowedWorsenDelta;
       payload.blockingErrorCount = blockingErrorCount;
       payload.introducedErrors = introducedDetailed;
       payload.worsenedErrors = worsenedDetailed;
