@@ -1,0 +1,1817 @@
+diff --git a/src/features/market-data/api/securityDirectoryApi.remote.test.ts b/src/features/market-data/api/securityDirectoryApi.remote.test.ts
+new file mode 100644
+index 0000000..5211681
+--- /dev/null
++++ b/src/features/market-data/api/securityDirectoryApi.remote.test.ts
+@@ -0,0 +1,60 @@
++import { describe, expect, it, beforeEach, vi } from 'vitest';
++import { saveSettings } from '../../settings/api/settingsApi';
++import { clearAll } from '../../../shared/api/localStorageClient';
++import { client } from '../../../shared/api/client';
++import { searchSecurities, getSecurity } from './securityDirectoryApi';
++
++describe('securityDirectoryApi remote', () => {
++  beforeEach(() => {
++    clearAll();
++    saveSettings({ apiMode: 'remote', apiBaseUrl: '' });
++  });
++
++  it('searchSecurities remote 调用 GET /market-data/securities/search 并解包 items 与目录元数据', async () => {
++    const mockGet = vi.spyOn(client, 'get').mockResolvedValueOnce({
++      data: {
++        success: true, code: 'OK',
++        data: {
++          items: [{
++            canonicalSymbol: 'SH.603308', symbol: '603308', displayName: '应流股份', name: '应流股份',
++            nameCn: '应流股份', nameHk: null, nameEn: null, shortName: '应流股份',
++            market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'PINYIN_ABBR_PREFIX',
++          }],
++          catalogStatus: 'READY', catalogUpdatedAt: '2026-07-29T10:00:00', stale: false, degraded: false,
++        },
++        timestamp: '',
++      },
++    });
++    const r = await searchSecurities({ q: 'ylgf' });
++    expect(mockGet).toHaveBeenCalledWith('/market-data/securities/search', expect.objectContaining({ params: expect.objectContaining({ q: 'ylgf' }) }));
++    expect(r.items[0].canonicalSymbol).toBe('SH.603308');
++    expect(r.catalogStatus).toBe('READY');
++    expect(r.stale).toBe(false);
++    mockGet.mockRestore();
++  });
++
++  it('getSecurity remote 调用 GET /market-data/securities/{canonicalSymbol} 并在 404 时抛错', async () => {
++    // 成功路径
++    const mockOk = vi.spyOn(client, 'get').mockResolvedValueOnce({
++      data: {
++        success: true, code: 'OK',
++        data: {
++          canonicalSymbol: 'SH.603308', symbol: '603308', displayName: '应流股份', name: '应流股份',
++          market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT',
++        },
++        timestamp: '',
++      },
++    });
++    const r = await getSecurity('SH.603308');
++    expect(mockOk).toHaveBeenCalledWith('/market-data/securities/SH.603308');
++    expect(r.canonicalSymbol).toBe('SH.603308');
++    mockOk.mockRestore();
++
++    // 404 失败路径：unwrap 在 success=false 或 data=null 时抛错
++    const mockFail = vi.spyOn(client, 'get').mockResolvedValueOnce({
++      data: { success: false, code: 'NOT_FOUND', message: '证券不存在', data: null, timestamp: '' },
++    });
++    await expect(getSecurity('SH.999999')).rejects.toThrow();
++    mockFail.mockRestore();
++  });
++});
+diff --git a/src/features/market-data/api/securityDirectoryApi.test.ts b/src/features/market-data/api/securityDirectoryApi.test.ts
+new file mode 100644
+index 0000000..77d2581
+--- /dev/null
++++ b/src/features/market-data/api/securityDirectoryApi.test.ts
+@@ -0,0 +1,66 @@
++import { describe, expect, it, beforeEach } from 'vitest';
++import { saveSettings } from '../../settings/api/settingsApi';
++import { clearAll } from '../../../shared/api/localStorageClient';
++import { searchSecurities } from './securityDirectoryApi';
++
++describe('securityDirectoryApi mock', () => {
++  beforeEach(() => {
++    clearAll();
++    saveSettings({ apiMode: 'mock', apiBaseUrl: '' });
++  });
++
++  it('searchSecurities mock 与 remote 同形：相同关键词返回字段一致且排名一致', async () => {
++    const r = await searchSecurities({ q: 'ylgf' });
++    expect(r.catalogStatus).toBe('READY');
++    expect(r.catalogUpdatedAt).toBe('2026-07-29T10:00:00');
++    expect(r.stale).toBe(false);
++    expect(r.degraded).toBe(false);
++    expect(r.items.length).toBeGreaterThan(0);
++    const top = r.items[0];
++    // 同形：每个 SecuritySummary 字段都存在
++    expect(top).toEqual(expect.objectContaining({
++      canonicalSymbol: expect.any(String),
++      symbol: expect.any(String),
++      displayName: expect.any(String),
++      market: expect.any(String),
++      securityType: expect.any(String),
++      listStatus: expect.any(String),
++      matchedBy: expect.any(String),
++    }));
++    // 排名：拼音首字母 ylgf 精确命中 SH.603308，matchedBy=PINYIN_ABBR_PREFIX
++    expect(top.canonicalSymbol).toBe('SH.603308');
++    expect(top.matchedBy).toBe('PINYIN_ABBR_PREFIX');
++  });
++
++  it('中文≥1 字符、英文/数字≥2 字符才触发搜索；阈值以下不调用', async () => {
++    // 中文单字触发
++    const cn = await searchSecurities({ q: '应' });
++    expect(cn.items.some((i) => i.canonicalSymbol === 'SH.603308')).toBe(true);
++    // 单个拉丁字符不触发 → 空结果
++    const oneLatin = await searchSecurities({ q: 'A' });
++    expect(oneLatin.items.length).toBe(0);
++    // 两个拉丁字符触发（命中 US.AAPL：symbol AAPL 的 displayName 'Apple Inc.' 含 'AP'... 用 'AP' 前缀命中 displayName）
++    const twoLatin = await searchSecurities({ q: 'AP' });
++    expect(twoLatin.items.length).toBeGreaterThan(0);
++    expect(twoLatin.items.some((i) => i.canonicalSymbol === 'US.AAPL')).toBe(true);
++  });
++
++  it('默认 limit=20 且 markets/types/includeDelisted 筛选正确传递', async () => {
++    // 默认 limit=20 截断：seed 有 25 个 样本N + 其它，'样本' 前缀匹配 >20 条
++    const all = await searchSecurities({ q: '样本' });
++    expect(all.items.length).toBe(20);
++    // markets 筛选
++    const hkOnly = await searchSecurities({ q: '速腾', markets: ['HK'] });
++    expect(hkOnly.items.some((i) => i.canonicalSymbol === 'HK.02498')).toBe(true);
++    const noMatch = await searchSecurities({ q: '速腾', markets: ['US'] });
++    expect(noMatch.items.length).toBe(0);
++    // types 筛选
++    const etf = await searchSecurities({ q: '沪深300ETF', types: ['ETF'] });
++    expect(etf.items.some((i) => i.securityType === 'ETF')).toBe(true);
++    // includeDelisted
++    const hidden = await searchSecurities({ q: '退市样本' });
++    expect(hidden.items.length).toBe(0);
++    const shown = await searchSecurities({ q: '退市样本', includeDelisted: true });
++    expect(shown.items.some((i) => i.canonicalSymbol === 'SH.600001' && i.listStatus === 'DELISTED')).toBe(true);
++  });
++});
+diff --git a/src/features/market-data/api/securityDirectoryApi.ts b/src/features/market-data/api/securityDirectoryApi.ts
+new file mode 100644
+index 0000000..7469a1a
+--- /dev/null
++++ b/src/features/market-data/api/securityDirectoryApi.ts
+@@ -0,0 +1,156 @@
++import { client } from '../../../shared/api/client';
++import { unwrap } from '../../../shared/api/unwrappers';
++import { getSettings } from '../../settings/api/settingsApi';
++import { normalizeCanonicalSymbol } from '../utils/canonicalSymbol';
++import type { Security, SecuritySummary, ListStatus, MatchedBy } from '../../../shared/types/domain';
++
++export interface SecuritySearchInput {
++  q: string;
++  markets?: string[];
++  types?: string[];
++  includeDelisted?: boolean;
++  limit?: number;
++}
++
++export interface SecuritySearchResult {
++  items: SecuritySummary[];
++  catalogStatus: string;
++  catalogUpdatedAt: string | null;
++  stale: boolean;
++  degraded: boolean;
++}
++
++const CATALOG_UPDATED_AT = '2026-07-29T10:00:00';
++
++const SEED_CATALOG: Security[] = [
++  { canonicalSymbol: 'SH.603308', symbol: '603308', displayName: '应流股份', name: '应流股份', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', pinyinFull: 'yingliugufen', pinyinAbbr: 'ylgf', matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'HK.02498', symbol: '02498', displayName: '速腾聚创', name: '速腾聚创', market: 'HK', exchange: 'HKEX', currency: 'HKD', securityType: 'STOCK', listStatus: 'LISTED', aliases: ['RoboSense', '速腾'], pinyinFull: 'sutengjuchuang', pinyinAbbr: 'stjch', matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'US.AAPL', symbol: 'AAPL', displayName: 'Apple Inc.', name: 'Apple Inc.', market: 'US', exchange: 'NASDAQ', currency: 'USD', securityType: 'STOCK', listStatus: 'LISTED', aliases: ['Apple', '苹果'], pinyinFull: null, pinyinAbbr: null, matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'SH.600600', symbol: '600600', displayName: '同名X', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'HK.06000', symbol: '06000', displayName: '同名X', market: 'HK', exchange: 'HKEX', currency: 'HKD', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'SH.600000', symbol: '600000', displayName: '当前名', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', aliases: ['旧名称'], pinyinFull: 'dangqianming', matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'SH.600001', symbol: '600001', displayName: '退市样本', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'DELISTED', delisted: true, matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'SZ.000001', symbol: '000001', displayName: '平安银行', market: 'SZ', exchange: 'SZSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'BJ.430047', symbol: '430047', displayName: '北交所样本', market: 'BJ', exchange: 'BSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'SH.510300', symbol: '510300', displayName: '沪深300ETF', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'ETF', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
++  { canonicalSymbol: 'SH.000300', symbol: '000300', displayName: '沪深300指数', market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'INDEX', listStatus: 'LISTED', matchedBy: 'FORMAL_NAME_EXACT' },
++  ...Array.from({ length: 25 }, (_, i) => {
++    const n = String(i + 2).padStart(3, '0');
++    return {
++      canonicalSymbol: `SH.600${n}`, symbol: `600${n}`, displayName: `样本${i + 2}`, market: 'SH', exchange: 'SSE', currency: 'CNY', securityType: 'STOCK', listStatus: 'LISTED' as ListStatus, matchedBy: 'FORMAL_NAME_EXACT' as MatchedBy,
++    } as Security;
++  }),
++];
++
++const CJK_REGEX = /[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/;
++const LATIN_OR_DIGIT_REGEX = /^[A-Za-z0-9]+$/;
++
++function meetsThreshold(q: string): boolean {
++  if (!q) return false;
++  if (CJK_REGEX.test(q)) return true;
++  if (LATIN_OR_DIGIT_REGEX.test(q)) return q.length >= 2;
++  return false;
++}
++
++interface RankedItem { item: Security; score: number; matchedBy: MatchedBy; marketOrder: number; }
++
++function rankItem(item: Security, qUpper: string): { score: number; matchedBy: MatchedBy } {
++  if (item.canonicalSymbol === qUpper) return { score: 100, matchedBy: 'CANONICAL_SYMBOL_EXACT' };
++  if (item.symbol === qUpper) return { score: 95, matchedBy: 'RAW_SYMBOL_EXACT' };
++  if (item.displayName === qUpper) return { score: 90, matchedBy: 'FORMAL_NAME_EXACT' };
++  if (item.displayName.startsWith(qUpper)) return { score: 80, matchedBy: 'FORMAL_NAME_PREFIX' };
++  const aliasesUpper = (item.aliases ?? []).map((a) => a.toUpperCase());
++  if (aliasesUpper.some((a) => a === qUpper)) return { score: 75, matchedBy: 'ALIAS_EXACT' };
++  if (aliasesUpper.some((a) => a.startsWith(qUpper))) return { score: 75, matchedBy: 'ALIAS_PREFIX' };
++  const qLower = qUpper.toLowerCase();
++  if (item.pinyinAbbr && item.pinyinAbbr.startsWith(qLower)) return { score: 70, matchedBy: 'PINYIN_ABBR_PREFIX' };
++  if (item.pinyinFull && item.pinyinFull.startsWith(qLower)) return { score: 70, matchedBy: 'PINYIN_FULL_PREFIX' };
++  if (item.displayName.includes(qUpper)) return { score: 50, matchedBy: 'NAME_CONTAINS' };
++  if (aliasesUpper.some((a) => a.includes(qUpper))) return { score: 50, matchedBy: 'ALIAS_CONTAINS' };
++  return { score: 0, matchedBy: 'FORMAL_NAME_EXACT' };
++}
++
++function marketIndex(market: string, markets?: string[]): number {
++  if (!markets || markets.length === 0) return 0;
++  const idx = markets.indexOf(market);
++  return idx < 0 ? markets.length : idx;
++}
++
++function toSummary(sec: Security, matchedBy: MatchedBy): SecuritySummary {
++  return {
++    canonicalSymbol: sec.canonicalSymbol, symbol: sec.symbol, displayName: sec.displayName,
++    name: sec.name, nameCn: sec.nameCn, nameHk: sec.nameHk, nameEn: sec.nameEn, shortName: sec.shortName,
++    market: sec.market, exchange: sec.exchange, currency: sec.currency,
++    securityType: sec.securityType, listStatus: sec.listStatus as ListStatus, matchedBy,
++  };
++}
++
++const mockApi = {
++  search: async (params: SecuritySearchInput): Promise<SecuritySearchResult> => {
++    const q = (params.q ?? '').trim();
++    if (!meetsThreshold(q)) {
++      return { items: [], catalogStatus: 'READY', catalogUpdatedAt: CATALOG_UPDATED_AT, stale: false, degraded: false };
++    }
++    const qUpper = q.toUpperCase();
++    const { markets, types, includeDelisted } = params;
++    const ranked: RankedItem[] = [];
++    for (const item of SEED_CATALOG) {
++      if (markets && markets.length > 0 && !markets.includes(item.market)) continue;
++      if (types && types.length > 0 && !types.includes(item.securityType)) continue;
++      if (!includeDelisted && item.listStatus === 'DELISTED') continue;
++      const { score, matchedBy } = rankItem(item, qUpper);
++      if (score < 50) continue;
++      ranked.push({ item, score, matchedBy, marketOrder: marketIndex(item.market, markets) });
++    }
++    ranked.sort((a, b) => {
++      if (b.score !== a.score) return b.score - a.score;
++      const aListed = a.item.listStatus === 'LISTED' ? 0 : 1;
++      const bListed = b.item.listStatus === 'LISTED' ? 0 : 1;
++      if (aListed !== bListed) return aListed - bListed;
++      if (a.marketOrder !== b.marketOrder) return a.marketOrder - b.marketOrder;
++      if (a.item.displayName !== b.item.displayName) return a.item.displayName.localeCompare(b.item.displayName);
++      return a.item.canonicalSymbol.localeCompare(b.item.canonicalSymbol);
++    });
++    const requestedLimit = params.limit;
++    const limit = requestedLimit === undefined ? 20 : Math.min(Math.max(0, requestedLimit), 100);
++    const items = ranked.slice(0, limit).map((r) => toSummary(r.item, r.matchedBy));
++    return { items, catalogStatus: 'READY', catalogUpdatedAt: CATALOG_UPDATED_AT, stale: false, degraded: false };
++  },
++  get: async (canonicalSymbol: string): Promise<Security> => {
++    const normalized = normalizeCanonicalSymbol(canonicalSymbol);
++    const found = SEED_CATALOG.find((s) => s.canonicalSymbol === normalized);
++    if (!found) throw new Error('证券不存在');
++    return { ...found };
++  },
++};
++
++const remoteApi = {
++  search: (params: SecuritySearchInput) =>
++    unwrap<SecuritySearchResult>(
++      client.get('/market-data/securities/search', {
++        params: {
++          q: params.q,
++          ...(params.markets?.length ? { markets: params.markets.join(',') } : {}),
++          ...(params.types?.length ? { types: params.types.join(',') } : {}),
++          ...(params.includeDelisted !== undefined ? { includeDelisted: params.includeDelisted } : {}),
++          ...(params.limit !== undefined ? { limit: params.limit } : {}),
++        },
++      }),
++    ),
++  get: (canonicalSymbol: string) =>
++    unwrap<Security>(
++      client.get(`/market-data/securities/${encodeURIComponent(normalizeCanonicalSymbol(canonicalSymbol))}`),
++    ),
++};
++
++function pick<T>(mock: T, remote: T): T {
++  return getSettings().apiMode === 'remote' ? remote : mock;
++}
++
++export function searchSecurities(params: SecuritySearchInput) {
++  return pick(mockApi.search, remoteApi.search)(params);
++}
++
++export function getSecurity(canonicalSymbol: string) {
++  return pick(mockApi.get, remoteApi.get)(canonicalSymbol);
++}
+diff --git a/src/features/market-data/utils/syncPlanForm.test.ts b/src/features/market-data/utils/syncPlanForm.test.ts
+index ae2a620..134e225 100644
+--- a/src/features/market-data/utils/syncPlanForm.test.ts
++++ b/src/features/market-data/utils/syncPlanForm.test.ts
+@@ -1,5 +1,6 @@
+ import { describe, expect, it } from 'vitest';
+-import { buildPlanInput, fallbackConfigurationErrors } from './syncPlanForm';
++import { buildPlanInput, fallbackConfigurationErrors, planToDraft, type SyncPlanDraft } from './syncPlanForm';
++import type { MarketDataSyncPlan } from '../../../shared/types/domain';
+ 
+ describe('syncPlanForm', () => {
+   it('分钟补档生成 MANUAL + 日期 scope', () => {
+@@ -25,3 +26,89 @@ describe('syncPlanForm', () => {
+       includeAuction: false, enabled: true, createdAt: '', updatedAt: '' })).not.toHaveLength(0);
+   });
+ });
++
++describe('syncPlanForm 旧 scopeJson 兼容', () => {
++  it('旧 scopeJson {symbols:[...]} 计划可被 planToDraft 解析展示不报错', () => {
++    // 旧结构化 scopeJson: {symbols:[...], startDate, endDate}
++    const structuredPlan: MarketDataSyncPlan = {
++      id: 'p-legacy-1',
++      planName: '旧计划-结构化',
++      taskType: 'DAILY_BAR_BACKFILL',
++      provider: 'LONGPORT',
++      scopeJson: JSON.stringify({
++        symbols: ['SH.600519', 'HK.02498'],
++        startDate: '2026-07-01',
++        endDate: '2026-07-10',
++      }),
++      adjustType: 'NONE',
++      triggerType: 'MANUAL',
++      includeAuction: false,
++      enabled: true,
++      createdAt: '',
++      updatedAt: '',
++    };
++
++    const draft = planToDraft(structuredPlan);
++    expect(draft.symbols).toBe('SH.600519, HK.02498');
++    expect(draft.startDate).toBe('2026-07-01');
++    expect(draft.endDate).toBe('2026-07-10');
++
++    // 旧单标的 scopeJson: {canonicalSymbol:'SH.600519'}
++    const singleSymbolPlan: MarketDataSyncPlan = {
++      id: 'p-legacy-2',
++      planName: '旧计划-单标的',
++      taskType: 'DAILY_BAR_BACKFILL',
++      provider: 'LONGPORT',
++      scopeJson: JSON.stringify({ canonicalSymbol: 'SH.600519' }),
++      adjustType: 'NONE',
++      triggerType: 'MANUAL',
++      includeAuction: false,
++      enabled: true,
++      createdAt: '',
++      updatedAt: '',
++    };
++
++    const singleDraft = planToDraft(singleSymbolPlan);
++    expect(singleDraft.symbols).toBe('SH.600519');
++  });
++
++  it('结构化 scope builder 生成正确 scopeJson 且与旧格式读取兼容', () => {
++    const draft: SyncPlanDraft = {
++      planName: '计划-结构化',
++      taskType: 'DAILY_BAR_BACKFILL',
++      provider: 'LONGPORT',
++      symbols: 'SH.600519, HK.02498',
++      startDate: '2026-07-01',
++      endDate: '2026-07-10',
++      adjustType: 'NONE',
++    };
++
++    const input = buildPlanInput(draft);
++
++    expect(JSON.parse(input.scopeJson)).toEqual({
++      symbols: ['SH.600519', 'HK.02498'],
++      startDate: '2026-07-01',
++      endDate: '2026-07-10',
++    });
++
++    // 读兼容：把生成的 scopeJson 装回一个计划，再走 planToDraft，应能完整还原。
++    const roundTripPlan: MarketDataSyncPlan = {
++      id: 'p-rt',
++      planName: draft.planName,
++      taskType: draft.taskType,
++      provider: draft.provider,
++      scopeJson: input.scopeJson,
++      adjustType: draft.adjustType ?? 'NONE',
++      triggerType: 'MANUAL',
++      includeAuction: false,
++      enabled: true,
++      createdAt: '',
++      updatedAt: '',
++    };
++
++    const roundTripped = planToDraft(roundTripPlan);
++    expect(roundTripped.symbols).toBe('SH.600519, HK.02498');
++    expect(roundTripped.startDate).toBe('2026-07-01');
++    expect(roundTripped.endDate).toBe('2026-07-10');
++  });
++});
+diff --git a/src/pages/market-data.test.tsx b/src/pages/market-data.test.tsx
+new file mode 100644
+index 0000000..51031da
+--- /dev/null
++++ b/src/pages/market-data.test.tsx
+@@ -0,0 +1,215 @@
++import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
++import { ConfigProvider } from 'antd';
++import zhCN from 'antd/locale/zh_CN';
++import type { ReactNode } from 'react';
++import { QuoteSnapshotsTab, SyncTasksTab } from './market-data';
++import { saveSettings } from '../features/settings/api/settingsApi';
++import { clearAll } from '../shared/api/localStorageClient';
++
++// Hoisted API fns that we assert on.
++const mocks = vi.hoisted(() => ({
++  fetchLatestQuotes: vi.fn(),
++  createDailyBarSync: vi.fn(),
++  getQuoteSnapshots: vi.fn(),
++  getSyncTasks: vi.fn(),
++  getProviderStatus: vi.fn(),
++  searchSecurities: vi.fn(),
++}));
++
++// Mock the market-data write/list API: keep importActual so unrelated exports survive,
++// override only the fns we drive or assert on.
++vi.mock('../features/market-data/api/marketDataApi', async () => {
++  const actual = await vi.importActual<typeof import('../features/market-data/api/marketDataApi')>(
++    '../features/market-data/api/marketDataApi',
++  );
++  return {
++    ...actual,
++    fetchLatestQuotes: mocks.fetchLatestQuotes,
++    createDailyBarSync: mocks.createDailyBarSync,
++    getQuoteSnapshots: mocks.getQuoteSnapshots,
++    getSyncTasks: mocks.getSyncTasks,
++    getProviderStatus: mocks.getProviderStatus,
++  };
++});
++
++// Mock the security directory search so the selector resolves a known result for a query.
++vi.mock('../features/market-data/api/securityDirectoryApi', async () => {
++  const actual =
++    await vi.importActual<typeof import('../features/market-data/api/securityDirectoryApi')>(
++      '../features/market-data/api/securityDirectoryApi',
++    );
++  return {
++    ...actual,
++    searchSecurities: mocks.searchSecurities,
++  };
++});
++
++// Mock antd message (page calls message.info/success/error/warning).
++import { message as antdMessage } from 'antd';
++vi.spyOn(antdMessage, 'success').mockImplementation(() => ({} as never));
++vi.spyOn(antdMessage, 'error').mockImplementation(() => ({} as never));
++vi.spyOn(antdMessage, 'info').mockImplementation(() => ({} as never));
++vi.spyOn(antdMessage, 'warning').mockImplementation(() => ({} as never));
++
++const emptyPage = { items: [], total: 0, page: 1, size: 20 };
++const readyProvider = { configured: true, reachable: true };
++
++const SH603308_RESULT = {
++  items: [
++    {
++      canonicalSymbol: 'SH.603308',
++      symbol: '603308',
++      displayName: '应流股份',
++      name: '应流股份',
++      market: 'SH',
++      exchange: 'SSE',
++      currency: 'CNY',
++      securityType: 'STOCK',
++      listStatus: 'LISTED',
++      matchedBy: 'FORMAL_NAME_EXACT',
++    },
++  ],
++  catalogStatus: 'READY',
++  catalogUpdatedAt: '2026-07-29T10:00:00',
++  stale: false,
++  degraded: false,
++};
++
++function withProvider(ui: ReactNode): ReactNode {
++  return <ConfigProvider locale={zhCN}>{ui}</ConfigProvider>;
++}
++
++/**
++ * Drive the SecuritySelector to a deterministic selection for `SH.603308`.
++ * - types a query into the selector input (placeholder contains "检索证券")
++ * - waits past the 250ms debounce + mocked searchSecurities promise resolution
++ * - clicks the result item with data-canonical-symbol="SH.603308"
++ *
++ * Uses real timers (waitFor default timeout comfortably exceeds the 250ms debounce) so that
++ * antd v6 Popconfirm portals still render when a submit step follows.
++ */
++async function selectSh603308ViaSelector(): Promise<void> {
++  const input = screen.getByPlaceholderText(/检索证券/);
++  await act(async () => {
++    fireEvent.change(input, { target: { value: '应流' } });
++  });
++  // The selector debounces search by 250ms; let the timer + microtask resolve.
++  await waitFor(() => {
++    expect(screen.getByText('应流股份')).toBeInTheDocument();
++  });
++  const item = document.querySelector('[data-canonical-symbol="SH.603308"]');
++  expect(item).not.toBeNull();
++  await act(async () => {
++    fireEvent.click(item as Element);
++  });
++}
++
++describe('market-data SecuritySelector integration', () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    clearAll();
++    saveSettings({ apiMode: 'mock', apiBaseUrl: '' });
++    // Defaults: list endpoints return empty page, provider is ready so submit can proceed,
++    // selector search resolves the known SH.603308 result for any qualifying query.
++    mocks.getQuoteSnapshots.mockResolvedValue(emptyPage);
++    mocks.getSyncTasks.mockResolvedValue(emptyPage);
++    mocks.getProviderStatus.mockResolvedValue(readyProvider);
++    mocks.searchSecurities.mockResolvedValue(SH603308_RESULT);
++    // Write fns return benign payloads so submit handlers complete.
++    mocks.fetchLatestQuotes.mockResolvedValue([]);
++    mocks.createDailyBarSync.mockResolvedValue({ id: 'mock', status: 'FAILED', createdAt: '' } as never);
++    vi.useRealTimers();
++  });
++
++  afterEach(() => {
++    vi.useRealTimers();
++  });
++
++  // TD-D2-PAGE-MD-01, AC-03
++  it('最新价查询：SecuritySelector 选中后提交的 canonical symbol 与所选一致', async () => {
++    render(withProvider(<QuoteSnapshotsTab />));
++    await selectSh603308ViaSelector();
++
++    // The manual textarea should now carry the selected canonical symbol.
++    await waitFor(() => {
++      expect((screen.getByPlaceholderText(/输入证券代码/) as HTMLTextAreaElement).value).toContain(
++        'SH.603308',
++      );
++    });
++
++    // Trigger the latest-price fetch (Popconfirm), then click the confirm (OK) button.
++    // antd v6 Popconfirm OK button carries the `ant-btn-primary` class; selecting by class
++    // keeps the test independent of locale-dependent OK button text (确定 / OK).
++    fireEvent.click(screen.getByText('拉取最新价'));
++    const okBtn = await waitFor(() => {
++      const btn = document.querySelector('.ant-popover .ant-btn-primary') as HTMLButtonElement | null;
++      if (!btn) throw new Error('Popconfirm OK button not rendered yet');
++      return btn;
++    });
++    await act(async () => {
++      fireEvent.click(okBtn);
++    });
++
++    await waitFor(() => {
++      expect(mocks.fetchLatestQuotes).toHaveBeenCalledTimes(1);
++    });
++    const args = mocks.fetchLatestQuotes.mock.calls.at(-1);
++    expect(args?.[0]).toEqual(expect.arrayContaining(['SH.603308']));
++  });
++
++  // TD-D2-PAGE-MD-02, AC-03
++  it('历史日 K 同步：SecuritySelector 选中后提交的 canonical symbol 与所选一致', async () => {
++    render(withProvider(<SyncTasksTab />));
++    await selectSh603308ViaSelector();
++
++    // The manual sync input should now carry the selected canonical symbol.
++    await waitFor(() => {
++      expect((screen.getByPlaceholderText(/SH\.600519/) as HTMLInputElement).value).toContain(
++        'SH.603308',
++      );
++    });
++
++    // Submit the daily-bar sync task.
++    fireEvent.click(screen.getByText('创建同步'));
++
++    await waitFor(() => {
++      expect(mocks.createDailyBarSync).toHaveBeenCalledTimes(1);
++    });
++    const args = mocks.createDailyBarSync.mock.calls.at(-1) ?? [];
++    // createDailyBarSync(taskType, provider, canonicalSymbol, startDate?, endDate?, adjustType?)
++    expect(args[2]).toBe('SH.603308');
++  });
++
++  // TD-D2-NOSIDEEFFECT-01, AC-04 — drives BOTH tabs through search+selection WITHOUT submitting.
++  it('最新价/日 K 选择证券过程不调用 quote/sync/采集任务创建等写接口', async () => {
++    // QuoteSnapshotsTab: select via selector, do not submit.
++    const { unmount: unmountQuote } = render(withProvider(<QuoteSnapshotsTab />));
++    await selectSh603308ViaSelector();
++    expect(mocks.fetchLatestQuotes).not.toHaveBeenCalled();
++    unmountQuote();
++
++    // SyncTasksTab: select via selector, do not submit.
++    const { unmount: unmountSync } = render(withProvider(<SyncTasksTab />));
++    await selectSh603308ViaSelector();
++    expect(mocks.createDailyBarSync).not.toHaveBeenCalled();
++    unmountSync();
++  });
++
++  // TD-D2-FALLBACK-01, AC-05
++  it('手工输入 canonical symbol 后备路径仍可提交', async () => {
++    render(withProvider(<SyncTasksTab />));
++    const manualInput = screen.getByPlaceholderText(/SH\.600519/) as HTMLInputElement;
++    await act(async () => {
++      fireEvent.change(manualInput, { target: { value: 'SH.600519' } });
++    });
++
++    fireEvent.click(screen.getByText('创建同步'));
++
++    await waitFor(() => {
++      expect(mocks.createDailyBarSync).toHaveBeenCalledTimes(1);
++    });
++    const args = mocks.createDailyBarSync.mock.calls.at(-1) ?? [];
++    expect(args[2]).toBe('SH.600519');
++  });
++});
+diff --git a/src/pages/market-data.tsx b/src/pages/market-data.tsx
+index 5c21b5f..c272e5f 100644
+--- a/src/pages/market-data.tsx
++++ b/src/pages/market-data.tsx
+@@ -11,6 +11,7 @@ import {
+   getAlerts, resolveAlert, createDailyBarSync,
+ } from '../features/market-data/api/marketDataApi';
+ import { normalizeCanonicalSymbol, parseCanonicalSymbols } from '../features/market-data/utils/canonicalSymbol';
++import { SecuritySelector } from '../shared/components/SecuritySelector';
+ import type { StockBasic, StockDailyBar, DailyBarImportResult, EntityId,
+   ProviderStatus, StockQuoteSnapshot, MarketDataSyncTask, MarketDataAlert } from '../shared/types/domain';
+ 
+@@ -65,7 +66,7 @@ export function MarketDataPage() {
+ }
+ 
+ // ===== 最新价快照 Tab =====
+-function QuoteSnapshotsTab() {
++export function QuoteSnapshotsTab() {
+   const [snapshots, setSnapshots] = useState<StockQuoteSnapshot[]>([]);
+   const [total, setTotal] = useState(0);
+   const [loading, setLoading] = useState(true);
+@@ -132,6 +133,7 @@ function QuoteSnapshotsTab() {
+           <Input.TextArea placeholder="输入证券代码，逗号或换行分隔（如 SH.600519、HK.02498、US.AAPL）"
+             style={{ width: 400 }} rows={1} value={fetchSymbols}
+             onChange={(e) => setFetchSymbols(e.target.value)} />
++          <SecuritySelector value={fetchSymbols} onChange={(symbol) => setFetchSymbols(symbol)} />
+           <Popconfirm title="拉取并保存最新行情？不覆盖手工当前价。" onConfirm={() => void handleFetchLatest()}>
+             <Button type="primary" loading={fetching} icon={<ReloadOutlined />}>拉取最新价</Button>
+           </Popconfirm>
+@@ -446,7 +448,7 @@ function BarsTab() {
+ }
+ 
+ // ===== 历史数据同步 Tab =====
+-function SyncTasksTab() {
++export function SyncTasksTab() {
+   const [data, setData] = useState<MarketDataSyncTask[]>([]);
+   const [total, setTotal] = useState(0);
+   const [loading, setLoading] = useState(true);
+@@ -516,6 +518,7 @@ function SyncTasksTab() {
+         <Space wrap>
+           <Input allowClear placeholder="如 SH.600519 / HK.02498 / US.AAPL" style={{ width: 260 }} value={syncSymbol}
+             onChange={(e) => setSyncSymbol(e.target.value)} />
++          <SecuritySelector value={syncSymbol} onChange={(symbol) => setSyncSymbol(symbol)} />
+           <DatePicker placeholder="起始日期" value={syncStartDate ? dayjs(syncStartDate) : null}
+             onChange={(d) => setSyncStartDate(d?.format('YYYY-MM-DD'))} />
+           <DatePicker placeholder="截止日期" value={syncEndDate ? dayjs(syncEndDate) : null}
+diff --git a/src/pages/market-segments.test.tsx b/src/pages/market-segments.test.tsx
+index 5b387f0..9a5ef4b 100644
+--- a/src/pages/market-segments.test.tsx
++++ b/src/pages/market-segments.test.tsx
+@@ -1,5 +1,9 @@
+ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+-import { describe, it, expect, vi, beforeEach } from 'vitest';
++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
++import { searchSecurities } from '../features/market-data/api/securityDirectoryApi';
++import { saveSettings } from '../features/settings/api/settingsApi';
++import { clearAll } from '../shared/api/localStorageClient';
++import type { MarketSegment } from '../shared/types/domain';
+ 
+ const mockApi = vi.hoisted(() => ({
+   listSegments: vi.fn(),
+@@ -14,8 +18,19 @@ const mockApi = vi.hoisted(() => ({
+ 
+ vi.mock('../features/market-data/api/segmentApi', () => mockApi);
+ 
++// Mock the security directory API so SecuritySelector never touches the network/seed catalog.
++vi.mock('../features/market-data/api/securityDirectoryApi', async () => {
++  const actual = await vi.importActual<typeof import('../features/market-data/api/securityDirectoryApi')>(
++    '../features/market-data/api/securityDirectoryApi',
++  );
++  return {
++    ...actual,
++    searchSecurities: vi.fn(),
++  };
++});
++
+ import { message as antdMessage } from 'antd';
+-import { MarketSegmentsPage } from './market-segments';
++import { MarketSegmentsPage, MembersDrawer } from './market-segments';
+ 
+ vi.spyOn(antdMessage, 'success').mockImplementation(() => ({} as never));
+ vi.spyOn(antdMessage, 'error').mockImplementation(() => ({} as never));
+@@ -208,3 +223,118 @@ describe('MarketSegmentsPage 行为测试', () => {
+     unmount();
+   });
+ });
++
++// ==================== 板块成员 SecuritySelector 集成 (RS-05) ====================
++
++/**
++ * Advance fake timers past the SecuritySelector 250ms debounce and flush the
++ * microtask queue that resolves the mocked searchSecurities promise + React
++ * state updates. Under fake timers waitFor cannot self-advance, so we settle
++ * microtasks via repeated `await Promise.resolve()`.
++ */
++async function flushSelectorDebounce(ms = 250) {
++  await act(async () => {
++    vi.advanceTimersByTime(ms);
++    for (let i = 0; i < 10; i += 1) {
++      await Promise.resolve();
++    }
++  });
++}
++
++describe('板块成员 SecuritySelector 集成', () => {
++  const stubSegment: MarketSegment = {
++    id: 'seg-selector',
++    segmentName: '选择器测试板块',
++    segmentType: 'CUSTOM',
++    enabled: true,
++    memberCount: 0,
++    segmentCode: 'SEG_SEL',
++    createdAt: '',
++    updatedAt: '',
++  };
++
++  beforeEach(() => {
++    vi.useFakeTimers();
++    vi.clearAllMocks();
++    clearAll();
++    saveSettings({ apiMode: 'mock', apiBaseUrl: '' });
++    mockApi.listSegmentMembers.mockResolvedValue([]);
++    mockApi.addSegmentMember.mockResolvedValue({ id: 'm-sel', segmentId: stubSegment.id, canonicalSymbol: 'SH.603308', sortOrder: 0, createdAt: '' });
++    vi.mocked(searchSecurities).mockReset();
++    vi.mocked(searchSecurities).mockResolvedValue({
++      items: [
++        {
++          canonicalSymbol: 'SH.603308',
++          symbol: '603308',
++          displayName: '应流股份',
++          name: '应流股份',
++          market: 'SH',
++          exchange: 'SSE',
++          currency: 'CNY',
++          securityType: 'STOCK',
++          listStatus: 'LISTED',
++          matchedBy: 'FORMAL_NAME_EXACT',
++        },
++      ],
++      catalogStatus: 'READY',
++      catalogUpdatedAt: '2026-07-29T10:00:00',
++      stale: false,
++      degraded: false,
++    });
++  });
++  afterEach(() => {
++    vi.useRealTimers();
++  });
++
++  it('板块成员：SecuritySelector 选中后 addSegmentMember 提交的 canonical symbol 与所选一致', async () => {
++    await act(async () => {
++      render(<MembersDrawer segment={stubSegment} onClose={vi.fn()} />);
++      // 让 useEffect(listSegmentMembers) 的 microtask 在 fake timers 下落地。
++      for (let i = 0; i < 10; i += 1) {
++        await Promise.resolve();
++      }
++    });
++    const selectorInput = screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
++
++    // 驱动 SecuritySelector：输入 → debounce → 点击 data-canonical-symbol="SH.603308"
++    fireEvent.change(selectorInput, { target: { value: '应流' } });
++    await flushSelectorDebounce();
++    const listItem = screen.getByTestId('security-selector-results')
++      .querySelector('[data-canonical-symbol="SH.603308"]') as HTMLElement;
++    expect(listItem).toBeTruthy();
++    fireEvent.click(listItem);
++    await flushSelectorDebounce(0);
++
++    // 点击添加成员
++    const addBtn = Array.from(document.querySelectorAll('.ant-drawer button'))
++      .find((b) => b.textContent?.replace(/\s/g, '') === '添加成员') as HTMLButtonElement;
++    expect(addBtn).toBeTruthy();
++    await act(async () => { fireEvent.click(addBtn); });
++    // 让 addSegmentMember promise 的 microtask 落地。
++    await flushSelectorDebounce(0);
++
++    // 断言 addSegmentMember 被调用，canonicalSymbol 与所选一致
++    expect(mockApi.addSegmentMember).toHaveBeenCalledTimes(1);
++    expect(mockApi.addSegmentMember).toHaveBeenCalledWith(stubSegment.id, expect.objectContaining({ canonicalSymbol: 'SH.603308' }));
++  });
++
++  it('板块成员：仅选择不提交时 addSegmentMember 不被调用', async () => {
++    await act(async () => {
++      render(<MembersDrawer segment={stubSegment} onClose={vi.fn()} />);
++      for (let i = 0; i < 10; i += 1) {
++        await Promise.resolve();
++      }
++    });
++    const selectorInput = screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
++
++    fireEvent.change(selectorInput, { target: { value: '应流' } });
++    await flushSelectorDebounce();
++    const listItem = screen.getByTestId('security-selector-results')
++      .querySelector('[data-canonical-symbol="SH.603308"]') as HTMLElement;
++    fireEvent.click(listItem);
++    await flushSelectorDebounce(0);
++
++    // 未点添加：addSegmentMember 不应被调用
++    expect(mockApi.addSegmentMember).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/pages/market-segments.tsx b/src/pages/market-segments.tsx
+index c0fcb91..615d249 100644
+--- a/src/pages/market-segments.tsx
++++ b/src/pages/market-segments.tsx
+@@ -17,6 +17,7 @@ import {
+ import type { MarketSegment, MarketSegmentMember, EntityId, MarketSectorMemberSnapshot,
+   MarketSectorPeer, MarketSectorRank, MarketSectorRankingBatch, MarketSectorRankingConfig,
+   MarketSectorRankingItem, MarketSectorSnapshot, MarketSectorWatch } from '../shared/types/domain';
++import { SecuritySelector } from '../shared/components/SecuritySelector';
+ 
+ interface PageResult<T> { items: T[]; total: number; page: number; size: number; }
+ 
+@@ -566,7 +567,7 @@ function SegmentListTab() {
+   );
+ }
+ 
+-function MembersDrawer({ segment, onClose }: { segment: MarketSegment | null; onClose: () => void }) {
++export function MembersDrawer({ segment, onClose }: { segment: MarketSegment | null; onClose: () => void }) {
+   const [members, setMembers] = useState<MarketSegmentMember[]>([]);
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+@@ -639,6 +640,7 @@ function MembersDrawer({ segment, onClose }: { segment: MarketSegment | null; on
+       )}
+       <Card size="small" style={{ marginBottom: 16 }}>
+         <Space orientation="vertical" style={{ width: '100%' }}>
++          <SecuritySelector value={symbol} onChange={(s) => setSymbol(s)} />
+           <Input placeholder="如 SH.600519 / HK.02498 / US.AAPL" value={symbol} onChange={(e) => setSymbol(e.target.value)} disabled={adding} />
+           <Input placeholder="备注（可选）" value={remark} onChange={(e) => setRemark(e.target.value)} disabled={adding} />
+           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} loading={adding} disabled={adding}>添加成员</Button>
+diff --git a/src/pages/market-workspace.test.tsx b/src/pages/market-workspace.test.tsx
+index 7ab12ac..c3b5ede 100644
+--- a/src/pages/market-workspace.test.tsx
++++ b/src/pages/market-workspace.test.tsx
+@@ -1,12 +1,19 @@
+ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+-import { describe, it, expect, vi, beforeEach } from 'vitest';
+-import { TaskItemsDrawer } from './market-workspace';
++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
++import { TaskItemsDrawer, PlansTab } from './market-workspace';
++import { buildPlanInput } from '../features/market-data/utils/syncPlanForm';
++import { searchSecurities } from '../features/market-data/api/securityDirectoryApi';
++import { saveSettings } from '../features/settings/api/settingsApi';
++import { clearAll } from '../shared/api/localStorageClient';
+ import type { MarketDataSyncPlan, MarketDataSyncTaskItem } from '../shared/types/domain';
+ 
+ // Mock the workbench API module
+ const mockApi = vi.hoisted(() => ({
+   listTaskItems: vi.fn(),
+   reconcileTask: vi.fn(),
++  createSyncPlan: vi.fn(),
++  updateSyncPlan: vi.fn(),
++  listSyncPlans: vi.fn(),
+ }));
+ 
+ vi.mock('../features/market-data/api/workbenchApi', async () => {
+@@ -17,6 +24,20 @@ vi.mock('../features/market-data/api/workbenchApi', async () => {
+     ...actual,
+     listTaskItems: mockApi.listTaskItems,
+     reconcileTask: mockApi.reconcileTask,
++    createSyncPlan: mockApi.createSyncPlan,
++    updateSyncPlan: mockApi.updateSyncPlan,
++    listSyncPlans: mockApi.listSyncPlans,
++  };
++});
++
++// Mock the security directory API so SecuritySelector never touches the network/seed catalog.
++vi.mock('../features/market-data/api/securityDirectoryApi', async () => {
++  const actual = await vi.importActual<typeof import('../features/market-data/api/securityDirectoryApi')>(
++    '../features/market-data/api/securityDirectoryApi',
++  );
++  return {
++    ...actual,
++    searchSecurities: vi.fn(),
+   };
+ });
+ 
+@@ -175,3 +196,132 @@ describe('TaskItemsDrawer', () => {
+     });
+   });
+ });
++
++// ==================== 采集计划 SecuritySelector 集成 (RS-05) ====================
++
++/**
++ * Advance fake timers past the SecuritySelector 250ms debounce and flush the
++ * microtask queue that resolves the mocked searchSecurities promise + React
++ * state updates. Under fake timers waitFor cannot self-advance, so we settle
++ * microtasks via repeated `await Promise.resolve()`.
++ */
++async function flushSelectorDebounce(ms = 250) {
++  await act(async () => {
++    vi.advanceTimersByTime(ms);
++    for (let i = 0; i < 10; i += 1) {
++      await Promise.resolve();
++    }
++  });
++}
++
++describe('采集计划 SecuritySelector 集成', () => {
++  beforeEach(() => {
++    vi.useFakeTimers();
++    vi.clearAllMocks();
++    clearAll();
++    saveSettings({ apiMode: 'mock', apiBaseUrl: '' });
++    mockApi.listSyncPlans.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
++    mockApi.createSyncPlan.mockResolvedValue({} as never);
++    mockApi.updateSyncPlan.mockResolvedValue({} as never);
++    vi.mocked(searchSecurities).mockReset();
++    vi.mocked(searchSecurities).mockResolvedValue({
++      items: [
++        {
++          canonicalSymbol: 'SH.603308',
++          symbol: '603308',
++          displayName: '应流股份',
++          name: '应流股份',
++          market: 'SH',
++          exchange: 'SSE',
++          currency: 'CNY',
++          securityType: 'STOCK',
++          listStatus: 'LISTED',
++          matchedBy: 'FORMAL_NAME_EXACT',
++        },
++      ],
++      catalogStatus: 'READY',
++      catalogUpdatedAt: '2026-07-29T10:00:00',
++      stale: false,
++      degraded: false,
++    });
++  });
++  afterEach(() => {
++    vi.useRealTimers();
++  });
++
++  it('采集计划 scope：SecuritySelector 选中后 buildPlanInput 的 scopeJson 含正确 canonical symbol', async () => {
++    await act(async () => {
++      render(<PlansTab />);
++      // 让 useEffect(listSyncPlans) 的 microtask 在 fake timers 下落地。
++      for (let i = 0; i < 10; i += 1) {
++        await Promise.resolve();
++      }
++    });
++    expect(mockApi.listSyncPlans).toHaveBeenCalled();
++    // 打开新建 Drawer
++    fireEvent.click(screen.getByText('新建采集计划'));
++    await flushSelectorDebounce(0);
++    const selectorInput = screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
++
++    // 驱动 SecuritySelector：输入 → debounce → 点击 data-canonical-symbol="SH.603308"
++    fireEvent.change(selectorInput, { target: { value: '应流' } });
++    await flushSelectorDebounce();
++    const listItem = screen.getByTestId('security-selector-results')
++      .querySelector('[data-canonical-symbol="SH.603308"]') as HTMLElement;
++    expect(listItem).toBeTruthy();
++    fireEvent.click(listItem);
++    await flushSelectorDebounce(0);
++
++    // SecurityVerificationField 是 symbols Form.Item 的受控子组件，会把 form 的 symbols
++    // 值渲染成“已选标的”下的 Tag。这里读取它，证明 selector → form 字段写入成功。
++    // 限定在“已选标的”区块内，避免命中 SecuritySelector 自身的已选/结果 Tag。
++    const selectedLabel = Array.from(document.querySelectorAll('.ant-drawer-body *'))
++      .find((el) => el.childNodes.length === 1 && el.textContent?.trim() === '已选标的') as HTMLElement | undefined;
++    expect(selectedLabel).toBeTruthy();
++    // “已选标的”与 Tag 列表在同一父容器内。
++    const selectedRegion = selectedLabel!.parentElement!;
++    const selectedTags = Array.from(selectedRegion.querySelectorAll('.ant-tag'))
++      .map((t) => t.textContent ?? '');
++    expect(selectedTags).toContain('SH.603308');
++
++    // 用真实生产函数 buildPlanInput 把该 symbols 值转成 scopeJson，断言 canonical symbol 进入。
++    // （采用 TaskPacket 允许的回退断言：跳过 antd v6 Select/日期保存的脆弱事件交互。）
++    const symbolsValue = selectedTags.join(', ');
++    const input = buildPlanInput({
++      planName: '日K计划-选择器',
++      taskType: 'DAILY_BAR_BACKFILL',
++      provider: 'LONGPORT',
++      symbols: symbolsValue,
++      startDate: '2026-07-01',
++      endDate: '2026-07-10',
++      adjustType: 'NONE',
++    });
++    const scope = JSON.parse(input.scopeJson);
++    expect(scope.symbols).toContain('SH.603308');
++  });
++
++  it('采集计划/板块成员选择过程不触发 quote/K 线同步写', async () => {
++    await act(async () => {
++      render(<PlansTab />);
++      for (let i = 0; i < 10; i += 1) {
++        await Promise.resolve();
++      }
++    });
++    expect(mockApi.listSyncPlans).toHaveBeenCalled();
++    fireEvent.click(screen.getByText('新建采集计划'));
++    await flushSelectorDebounce(0);
++    const selectorInput = screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
++
++    // 仅驱动选择过程，不提交
++    fireEvent.change(selectorInput, { target: { value: '应流' } });
++    await flushSelectorDebounce();
++    const listItem = screen.getByTestId('security-selector-results')
++      .querySelector('[data-canonical-symbol="SH.603308"]') as HTMLElement;
++    fireEvent.click(listItem);
++    await flushSelectorDebounce(0);
++
++    // 未提交：createSyncPlan / updateSyncPlan 都不应被调用
++    expect(mockApi.createSyncPlan).not.toHaveBeenCalled();
++    expect(mockApi.updateSyncPlan).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/pages/market-workspace.tsx b/src/pages/market-workspace.tsx
+index 1f58cbc..89e4888 100644
+--- a/src/pages/market-workspace.tsx
++++ b/src/pages/market-workspace.tsx
+@@ -10,6 +10,7 @@ import {
+ } from '../features/market-data/api/workbenchApi';
+ import { buildPlanInput, fallbackConfigurationErrors, planToDraft, type SyncPlanDraft } from '../features/market-data/utils/syncPlanForm';
+ import { SecurityVerificationField } from '../features/market-data/components/SecurityVerificationField';
++import { SecuritySelector } from '../shared/components/SecuritySelector';
+ import type {
+   WorkbenchOverview, MarketDataSyncPlan, MarketDataSyncTask, MarketDataSyncTaskItem,
+   StockMinuteBar,
+@@ -135,7 +136,7 @@ function OverviewTab() {
+ 
+ // ==================== 采集计划 Tab ====================
+ 
+-function PlansTab() {
++export function PlansTab() {
+   const [data, setData] = useState<PageResult<MarketDataSyncPlan>>({ items: [], total: 0, page: 1, size: 20 });
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+@@ -302,6 +303,17 @@ function PlansTab() {
+             ]} />
+           </Form.Item>
+           <Form.Item name="provider" label="Provider" rules={[{ required: true }]}><Select options={[{ value: 'LONGPORT', label: 'LongPort（只读行情）' }]} /></Form.Item>
++          <Form.Item label="从目录选择标的">
++            <SecuritySelector
++              onChange={(symbol) => {
++                if (!symbol) return;
++                const current = (form.getFieldValue('symbols') ?? '').trim();
++                const existing = current.split(/[\s,，;；]+/).filter(Boolean);
++                if (existing.includes(symbol)) return;
++                form.setFieldValue('symbols', current ? `${current}, ${symbol}` : symbol);
++              }}
++            />
++          </Form.Item>
+           <Form.Item name="symbols" label="标的" rules={[{ required: true, message: '至少验证并加入一个标的' }]}>
+             <SecurityVerificationField remoteMode={remoteMode} taskType={taskType} />
+           </Form.Item>
+diff --git a/src/shared/components/SecuritySelector.test.tsx b/src/shared/components/SecuritySelector.test.tsx
+new file mode 100644
+index 0000000..052f99b
+--- /dev/null
++++ b/src/shared/components/SecuritySelector.test.tsx
+@@ -0,0 +1,354 @@
++import { act, fireEvent, render, screen } from '@testing-library/react';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { SecuritySelector } from './SecuritySelector';
++import { searchSecurities } from '../../features/market-data/api/securityDirectoryApi';
++
++vi.mock('../../features/market-data/api/securityDirectoryApi', () => ({
++  searchSecurities: vi.fn(),
++}));
++
++function summary(
++  canonicalSymbol: string,
++  displayName: string,
++  market: string,
++  exchange: string,
++  securityType = 'STOCK',
++  listStatus: 'LISTED' | 'DELISTED' = 'LISTED',
++) {
++  return {
++    canonicalSymbol,
++    symbol: canonicalSymbol.split('.')[1] ?? canonicalSymbol,
++    displayName,
++    name: displayName,
++    market,
++    exchange,
++    currency: market === 'HK' ? 'HKD' : market === 'US' ? 'USD' : 'CNY',
++    securityType,
++    listStatus,
++    matchedBy: 'FORMAL_NAME_EXACT' as const,
++  };
++}
++
++function result(
++  items: ReturnType<typeof summary>[],
++  overrides: Record<string, unknown> = {},
++) {
++  return {
++    items,
++    catalogStatus: 'READY',
++    catalogUpdatedAt: '2026-07-29T10:00:00',
++    stale: false,
++    degraded: false,
++    ...overrides,
++  };
++}
++
++/**
++ * Advance fake timers by the debounce window and flush the microtask queue
++ * that resolves the mocked searchSecurities promise + the React state update.
++ * Under fake timers, waitFor/findBy cannot self-advance, so we synchronously
++ * settle microtasks via repeated `await Promise.resolve()`.
++ */
++async function flush(ms = 250) {
++  await act(async () => {
++    vi.advanceTimersByTime(ms);
++    // Drain the resolved-promise microtasks (mock search + .then + setState).
++    for (let i = 0; i < 10; i += 1) {
++      await Promise.resolve();
++    }
++  });
++}
++
++/** Resolve a deferred promise and flush the resulting microtask chain. */
++async function settle(resolveFn: (value: unknown) => void, value: unknown) {
++  await act(async () => {
++    resolveFn(value);
++    for (let i = 0; i < 10; i += 1) {
++      await Promise.resolve();
++    }
++  });
++}
++
++function inputEl(): HTMLInputElement {
++  return screen.getByPlaceholderText(/检索证券/) as HTMLInputElement;
++}
++
++describe('SecuritySelector', () => {
++  beforeEach(() => {
++    vi.useFakeTimers();
++    vi.mocked(searchSecurities).mockReset();
++  });
++  afterEach(() => {
++    vi.useRealTimers();
++  });
++
++  it('250ms debounce：阈值内连续输入只触发一次搜索', () => {
++    vi.mocked(searchSecurities).mockResolvedValue(result([]));
++    render(<SecuritySelector onChange={vi.fn()} />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: 'a' } });
++    fireEvent.change(input, { target: { value: 'ap' } });
++    expect(searchSecurities).not.toHaveBeenCalled();
++    act(() => {
++      vi.advanceTimersByTime(250);
++    });
++    expect(searchSecurities).toHaveBeenCalledTimes(1);
++    expect(searchSecurities).toHaveBeenLastCalledWith(
++      expect.objectContaining({ q: 'ap' }),
++    );
++  });
++
++  it('过期响应不覆盖新关键词结果（竞态保护）', async () => {
++    let resolveFirst!: (value: unknown) => void;
++    vi.mocked(searchSecurities)
++      .mockImplementationOnce(
++        () =>
++          new Promise((resolve) => {
++            resolveFirst = resolve as (value: unknown) => void;
++          }),
++      )
++      .mockResolvedValueOnce(
++        result([summary('SH.600002', '新关键词结果', 'SH', 'SSE')]),
++      );
++
++    render(<SecuritySelector onChange={vi.fn()} />);
++    const input = inputEl();
++
++    fireEvent.change(input, { target: { value: 'old' } });
++    await flush();
++    // second keyword
++    fireEvent.change(input, { target: { value: 'new' } });
++    await flush();
++
++    // late old response resolves — must be ignored
++    await settle(
++      resolveFirst,
++      result([summary('SH.600001', '旧关键词结果', 'SH', 'SSE')]),
++    );
++
++    expect(screen.getByTestId('security-selector-results')).toBeInTheDocument();
++    expect(screen.getByText('新关键词结果')).toBeInTheDocument();
++    expect(screen.queryByText('旧关键词结果')).not.toBeInTheDocument();
++  });
++
++  it('loading / 空结果 / 失败 / 重试 四态正确', async () => {
++    // loading: deferred
++    let resolveSearch!: (value: unknown) => void;
++    vi.mocked(searchSecurities).mockImplementationOnce(
++      () =>
++        new Promise((resolve) => {
++          resolveSearch = resolve as (value: unknown) => void;
++        }),
++    );
++
++    render(<SecuritySelector onChange={vi.fn()} />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: 'abc' } });
++    await flush();
++
++    // loading state visible while pending
++    expect(screen.getByTestId('security-selector-loading')).toBeInTheDocument();
++
++    // empty result
++    await settle(resolveSearch, result([]));
++    expect(screen.queryByTestId('security-selector-loading')).not.toBeInTheDocument();
++    expect(screen.getByText('无匹配结果')).toBeInTheDocument();
++
++    // error state
++    vi.mocked(searchSecurities).mockRejectedValueOnce(new Error('网络错误'));
++    fireEvent.change(input, { target: { value: 'def' } });
++    await flush();
++    expect(screen.getByText('请求失败')).toBeInTheDocument();
++    // antd renders CJK button text with an inserted space ("重 试"); match by
++    // accessible name, which aggregates descendant text and ignores the span wrapper.
++    const retryButton = screen.getByRole('button', { name: /重\s*试/ });
++    expect(retryButton).toBeInTheDocument();
++
++    // retry re-invokes search
++    vi.mocked(searchSecurities).mockResolvedValueOnce(
++      result([summary('SH.600003', '重试结果', 'SH', 'SSE')]),
++    );
++    fireEvent.click(retryButton);
++    await flush();
++    expect(screen.getByText('重试结果')).toBeInTheDocument();
++  });
++
++  it('键盘 ArrowDown/ArrowUp 导航、Enter 确认、Esc 关闭', async () => {
++    vi.mocked(searchSecurities).mockResolvedValue(
++      result([
++        summary('SH.600010', '第一项', 'SH', 'SSE'),
++        summary('SH.600011', '第二项', 'SH', 'SSE'),
++      ]),
++    );
++    const onChange = vi.fn();
++    render(<SecuritySelector onChange={onChange} />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: '项' } });
++    await flush();
++
++    expect(screen.getByTestId('security-selector-results')).toBeInTheDocument();
++
++    fireEvent.keyDown(input, { key: 'ArrowDown' });
++    fireEvent.keyDown(input, { key: 'Enter' });
++    expect(onChange).toHaveBeenCalledWith('SH.600011');
++
++    // reopen and Esc closes
++    fireEvent.change(input, { target: { value: '再项' } });
++    await flush();
++    expect(screen.getByTestId('security-selector-results')).toBeInTheDocument();
++    fireEvent.keyDown(input, { key: 'Escape' });
++    expect(screen.queryByTestId('security-selector-results')).not.toBeInTheDocument();
++  });
++
++  it('选中后展示名称/canonical symbol/市场交易所/证券类型', async () => {
++    vi.mocked(searchSecurities).mockResolvedValue(
++      result([summary('SH.600600', '样本展示', 'SH', 'SSE', 'STOCK')]),
++    );
++    const onChange = vi.fn();
++    render(<SecuritySelector onChange={onChange} />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: '展示' } });
++    await flush();
++    expect(screen.getByText('样本展示')).toBeInTheDocument();
++    fireEvent.click(screen.getByText('样本展示'));
++
++    expect(onChange).toHaveBeenCalledWith('SH.600600');
++    expect(screen.getByTestId('security-selector-selected')).toBeInTheDocument();
++    expect(screen.getByTestId('selected-displayName')).toHaveTextContent('样本展示');
++    expect(screen.getByTestId('selected-canonicalSymbol')).toHaveTextContent('SH.600600');
++    expect(screen.getByTestId('selected-market')).toHaveTextContent('沪市 · SSE');
++    expect(screen.getByTestId('selected-securityType')).toHaveTextContent('股票');
++  });
++
++  it('再次编辑文本立即失效旧选择（清除已选）', async () => {
++    vi.mocked(searchSecurities).mockResolvedValue(
++      result([summary('SH.600600', '失效样本', 'SH', 'SSE')]),
++    );
++    const onChange = vi.fn();
++    render(<SecuritySelector onChange={onChange} />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: '失效' } });
++    await flush();
++    expect(screen.getByText('失效样本')).toBeInTheDocument();
++    fireEvent.click(screen.getByText('失效样本'));
++    await flush();
++    expect(screen.getByTestId('security-selector-selected')).toBeInTheDocument();
++
++    // edit text again → invalidate
++    fireEvent.change(input, { target: { value: '失效改' } });
++    expect(onChange).toHaveBeenLastCalledWith('');
++    expect(screen.queryByTestId('security-selector-selected')).not.toBeInTheDocument();
++  });
++
++  it('同名跨市场证券并列展示且不自动选择', async () => {
++    vi.mocked(searchSecurities).mockResolvedValue(
++      result([
++        summary('SH.600600', '同名X', 'SH', 'SSE'),
++        summary('HK.06000', '同名X', 'HK', 'HKEX'),
++      ]),
++    );
++    const onChange = vi.fn();
++    render(<SecuritySelector onChange={onChange} />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: '同名' } });
++    await flush();
++    const list = screen.getByTestId('security-selector-results');
++    const shItem = list.querySelector('[data-canonical-symbol="SH.600600"]');
++    const hkItem = list.querySelector('[data-canonical-symbol="HK.06000"]');
++    expect(shItem).not.toBeNull();
++    expect(hkItem).not.toBeNull();
++    // not auto-selected
++    expect(onChange).not.toHaveBeenCalled();
++    expect(screen.queryByTestId('security-selector-selected')).not.toBeInTheDocument();
++  });
++
++  it('退市证券默认隐藏；显式筛选后可见并标注状态', async () => {
++    // default search (includeDelisted=false) returns only listed items
++    vi.mocked(searchSecurities).mockImplementation((params) => {
++      const base = [summary('SH.600600', '在市样本', 'SH', 'SSE', 'STOCK', 'LISTED')];
++      if (params.includeDelisted) {
++        base.push(summary('SH.600001', '退市样本', 'SH', 'SSE', 'STOCK', 'DELISTED'));
++      }
++      return Promise.resolve(result(base));
++    });
++
++    render(<SecuritySelector onChange={vi.fn()} includeDelistedToggle />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: '样本' } });
++    await flush();
++    expect(searchSecurities).toHaveBeenCalledWith(
++      expect.objectContaining({ includeDelisted: false }),
++    );
++    // default excludes delisted
++    expect(screen.queryByText('退市样本')).not.toBeInTheDocument();
++
++    // toggle the switch
++    const switchInput = screen.getByRole('switch');
++    fireEvent.click(switchInput);
++    await flush();
++
++    expect(searchSecurities).toHaveBeenLastCalledWith(
++      expect.objectContaining({ includeDelisted: true }),
++    );
++    expect(screen.getByText('退市样本')).toBeInTheDocument();
++    expect(screen.getByText('退市')).toBeInTheDocument();
++  });
++
++  it('目录未初始化 / 正常无匹配 / 请求失败 三态可区分', async () => {
++    // (a) catalogStatus='EMPTY'
++    vi.mocked(searchSecurities).mockResolvedValueOnce(
++      result([], { catalogStatus: 'EMPTY' }),
++    );
++    const { unmount } = render(<SecuritySelector onChange={vi.fn()} />);
++    let input = inputEl();
++    fireEvent.change(input, { target: { value: 'init' } });
++    await flush();
++    expect(screen.getByText('目录尚未初始化')).toBeInTheDocument();
++    unmount();
++
++    // (b) items=[] catalogStatus='READY'
++    vi.mocked(searchSecurities).mockResolvedValueOnce(
++      result([], { catalogStatus: 'READY' }),
++    );
++    render(<SecuritySelector onChange={vi.fn()} />);
++    input = inputEl();
++    fireEvent.change(input, { target: { value: 'nomatch' } });
++    await flush();
++    expect(screen.getByText('无匹配结果')).toBeInTheDocument();
++    expect(screen.queryByText('目录尚未初始化')).not.toBeInTheDocument();
++    expect(screen.queryByText('请求失败')).not.toBeInTheDocument();
++  });
++
++  it('目录陈旧只提示不阻断本地结果展示', async () => {
++    vi.mocked(searchSecurities).mockResolvedValue(
++      result([summary('SH.600600', '陈旧样本', 'SH', 'SSE')], { stale: true }),
++    );
++    render(<SecuritySelector onChange={vi.fn()} />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: '陈旧' } });
++    await flush();
++    // items still displayed
++    expect(screen.getByTestId('security-selector-results')).toBeInTheDocument();
++    expect(screen.getByText('陈旧样本')).toBeInTheDocument();
++    // stale alert shown
++    expect(screen.getByText(/目录可能陈旧/)).toBeInTheDocument();
++  });
++
++  it('SecuritySelector 搜索过程不触发任何业务写请求', async () => {
++    vi.mocked(searchSecurities).mockResolvedValue(
++      result([summary('SH.600600', '无副作用', 'SH', 'SSE')]),
++    );
++    render(<SecuritySelector onChange={vi.fn()} />);
++    const input = inputEl();
++    fireEvent.change(input, { target: { value: 'noeffect' } });
++    await flush();
++    expect(screen.getByText('无副作用')).toBeInTheDocument();
++    // The mocked module only exposes searchSecurities; only this fn was called.
++    expect(searchSecurities).toHaveBeenCalled();
++    // Reinforce: every call was to searchSecurities with a query payload,
++    // never a quote/sync/collection operation.
++    for (const call of vi.mocked(searchSecurities).mock.calls) {
++      expect(call[0]).toMatchObject({ q: 'noeffect' });
++    }
++  });
++});
+diff --git a/src/shared/components/SecuritySelector.tsx b/src/shared/components/SecuritySelector.tsx
+new file mode 100644
+index 0000000..fb87950
+--- /dev/null
++++ b/src/shared/components/SecuritySelector.tsx
+@@ -0,0 +1,314 @@
++import { useCallback, useEffect, useRef, useState } from 'react';
++import { Alert, Button, Input, Space, Spin, Switch, Tag } from 'antd';
++import { searchSecurities } from '../../features/market-data/api/securityDirectoryApi';
++import type { SecuritySummary } from '../types/domain';
++
++const DEBOUNCE_MS = 250;
++
++const MARKET_LABEL: Record<string, string> = {
++  SH: '沪市',
++  SZ: '深市',
++  BJ: '北交所',
++  HK: '港股',
++  US: '美股',
++};
++
++const TYPE_LABEL: Record<string, string> = {
++  STOCK: '股票',
++  ETF: 'ETF',
++  INDEX: '指数',
++  REIT: 'REIT',
++  FUND: '基金',
++  BOND: '债券',
++  WARRANT: '权证',
++  OPTION: '期权',
++  FUTURE: '期货',
++  OTHER: '其他',
++};
++
++interface Props {
++  value?: string;
++  onChange?: (value: string) => void;
++  markets?: string[];
++  types?: string[];
++  includeDelistedToggle?: boolean;
++}
++
++interface SearchState {
++  status: 'idle' | 'loading' | 'success' | 'error';
++  items: SecuritySummary[];
++  catalogStatus: string;
++  catalogUpdatedAt: string | null;
++  stale: boolean;
++}
++
++const INITIAL_STATE: SearchState = {
++  status: 'idle',
++  items: [],
++  catalogStatus: 'READY',
++  catalogUpdatedAt: null,
++  stale: false,
++};
++
++function marketLabel(market: string): string {
++  return MARKET_LABEL[market] ?? market;
++}
++
++function typeLabel(securityType: string): string {
++  return TYPE_LABEL[securityType] ?? securityType;
++}
++
++export function SecuritySelector({
++  value,
++  onChange,
++  markets,
++  types,
++  includeDelistedToggle = false,
++}: Props) {
++  const [query, setQuery] = useState(value ?? '');
++  const [open, setOpen] = useState(false);
++  const [highlight, setHighlight] = useState(0);
++  const [selected, setSelected] = useState<SecuritySummary | null>(null);
++  const [state, setState] = useState<SearchState>(INITIAL_STATE);
++  const [includeDelisted, setIncludeDelisted] = useState(false);
++
++  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
++  const requestRef = useRef(0);
++  const lastQueryRef = useRef('');
++
++  const runSearch = useCallback(
++    (q: string) => {
++      const trimmed = q.trim();
++      lastQueryRef.current = trimmed;
++      if (!trimmed) {
++        requestRef.current += 1;
++        setState({ ...INITIAL_STATE, status: 'idle' });
++        setOpen(false);
++        return;
++      }
++      const requestId = (requestRef.current += 1);
++      setState((prev) => ({ ...prev, status: 'loading' }));
++      setOpen(true);
++      searchSecurities({
++        q: trimmed,
++        markets,
++        types,
++        includeDelisted,
++      })
++        .then((result) => {
++          if (requestId !== requestRef.current) return;
++          setState({
++            status: result.items.length === 0 && !result.catalogStatus ? 'success' : 'success',
++            items: result.items,
++            catalogStatus: result.catalogStatus,
++            catalogUpdatedAt: result.catalogUpdatedAt,
++            stale: result.stale,
++          });
++          setHighlight(0);
++        })
++        .catch(() => {
++          if (requestId !== requestRef.current) return;
++          setState((prev) => ({ ...prev, status: 'error' }));
++        });
++    },
++    [markets, types, includeDelisted],
++  );
++
++  const didMountRef = useRef(false);
++  useEffect(() => {
++    return () => {
++      if (debounceRef.current) clearTimeout(debounceRef.current);
++    };
++  }, []);
++
++  // Re-run the search when the delisted toggle changes (no debounce), so the
++  // user immediately sees delisted items alongside the current query.
++  useEffect(() => {
++    if (!didMountRef.current) {
++      didMountRef.current = true;
++      return;
++    }
++    if (lastQueryRef.current) {
++      runSearch(lastQueryRef.current);
++    }
++  }, [includeDelisted, runSearch]);
++
++  const invalidateSelection = useCallback(() => {
++    if (selected) {
++      setSelected(null);
++      onChange?.('');
++    }
++  }, [selected, onChange]);
++
++  const handleQueryChange = (next: string) => {
++    setQuery(next);
++    invalidateSelection();
++    if (debounceRef.current) clearTimeout(debounceRef.current);
++    debounceRef.current = setTimeout(() => {
++      runSearch(next);
++    }, DEBOUNCE_MS);
++  };
++
++  const handleRetry = () => {
++    runSearch(lastQueryRef.current);
++  };
++
++  const confirmItem = (item: SecuritySummary) => {
++    setSelected(item);
++    setQuery(item.displayName);
++    onChange?.(item.canonicalSymbol);
++    setOpen(false);
++  };
++
++  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
++    const items = state.items;
++    if (event.key === 'ArrowDown') {
++      if (items.length === 0) return;
++      event.preventDefault();
++      setOpen(true);
++      setHighlight((prev) => (prev + 1) % items.length);
++    } else if (event.key === 'ArrowUp') {
++      if (items.length === 0) return;
++      event.preventDefault();
++      setOpen(true);
++      setHighlight((prev) => (prev - 1 + items.length) % items.length);
++    } else if (event.key === 'Enter') {
++      if (open && items.length > 0) {
++        event.preventDefault();
++        confirmItem(items[highlight] ?? items[0]);
++      }
++    } else if (event.key === 'Escape') {
++      event.preventDefault();
++      setOpen(false);
++    }
++  };
++
++  const showEmptyMessage =
++    open &&
++    state.status !== 'loading' &&
++    state.status !== 'error' &&
++    state.items.length === 0;
++  const isCatalogEmpty = showEmptyMessage && state.catalogStatus === 'EMPTY';
++  const isNoMatch =
++    showEmptyMessage && state.catalogStatus !== 'EMPTY';
++
++  return (
++    <Space orientation="vertical" style={{ width: '100%' }} size="small">
++      <Input
++        value={query}
++        placeholder="输入代码 / 名称 / 拼音检索证券"
++        onChange={(event) => handleQueryChange(event.target.value)}
++        onKeyDown={handleKeyDown}
++        onFocus={() => {
++          if (state.items.length > 0) setOpen(true);
++        }}
++        suffix={
++          <span data-testid="security-selector-input-suffix">
++            {state.status === 'loading' ? <Spin size="small" /> : null}
++          </span>
++        }
++      />
++
++      {includeDelistedToggle && (
++        <Space size="small">
++          <Switch
++            checked={includeDelisted}
++            onChange={(checked) => setIncludeDelisted(checked)}
++          />
++          <span>包含退市</span>
++        </Space>
++      )}
++
++      {state.status === 'error' && (
++        <Alert
++          type="error"
++          title="请求失败"
++          action={
++            <Button size="small" onClick={handleRetry}>
++              重试
++            </Button>
++          }
++        />
++      )}
++
++      {state.stale && state.items.length > 0 && state.catalogUpdatedAt && (
++        <Alert
++          type="info"
++          title={`目录可能陈旧（最近更新：${state.catalogUpdatedAt}）`}
++        />
++      )}
++
++      {selected && (
++        <div
++          data-testid="security-selector-selected"
++          style={{ border: '1px solid #d9d9d9', padding: 8, borderRadius: 6 }}
++        >
++          <div>
++            <strong data-testid="selected-displayName">
++              {selected.displayName}
++            </strong>
++          </div>
++          <Space size={4} wrap>
++            <Tag data-testid="selected-canonicalSymbol">
++              {selected.canonicalSymbol}
++            </Tag>
++            <Tag data-testid="selected-market">
++              {marketLabel(selected.market)}
++              {selected.exchange ? ` · ${selected.exchange}` : ''}
++            </Tag>
++            <Tag data-testid="selected-securityType">
++              {typeLabel(selected.securityType)}
++            </Tag>
++          </Space>
++        </div>
++      )}
++
++      {open && state.status === 'loading' && (
++        <div data-testid="security-selector-loading" role="status">
++          <Spin size="small" /> <span>检索中…</span>
++        </div>
++      )}
++
++      {open && state.status === 'success' && (
++        <ul
++          data-testid="security-selector-results"
++          role="listbox"
++          style={{ listStyle: 'none', margin: 0, padding: 0 }}
++        >
++          {state.items.map((item, index) => (
++            <li
++              key={`${item.canonicalSymbol}-${index}`}
++              role="option"
++              aria-selected={index === highlight}
++              data-canonical-symbol={item.canonicalSymbol}
++              onClick={() => confirmItem(item)}
++              style={{
++                padding: '6px 8px',
++                cursor: 'pointer',
++                background: index === highlight ? '#e6f4ff' : 'transparent',
++                borderBottom: '1px solid #f0f0f0',
++              }}
++            >
++              <span data-testid={`result-displayName-${index}`}>
++                {item.displayName}
++              </span>{' '}
++              <Tag>{item.canonicalSymbol}</Tag>
++              <Tag>{marketLabel(item.market)}</Tag>
++              <Tag>{typeLabel(item.securityType)}</Tag>
++              {item.listStatus === 'DELISTED' && (
++                <Tag color="default" data-testid={`result-delisted-${index}`}>
++                  退市
++                </Tag>
++              )}
++            </li>
++          ))}
++        </ul>
++      )}
++
++      {isCatalogEmpty && (
++        <Alert type="info" title="目录尚未初始化" />
++      )}
++      {isNoMatch && <Alert type="info" title="无匹配结果" />}
++    </Space>
++  );
++}
+diff --git a/src/shared/types/domain.ts b/src/shared/types/domain.ts
+index 64a8ac8..b691878 100644
+--- a/src/shared/types/domain.ts
++++ b/src/shared/types/domain.ts
+@@ -628,3 +628,60 @@ export interface MarketSectorMemberSnapshot {
+   tradeStatus?: number;
+   delayed: boolean;
+ }
++
++// ==================== D2 证券目录（证券检索 / 标准化匹配） ====================
++
++export type SecurityMarket = 'SH' | 'SZ' | 'BJ' | 'HK' | 'US';
++export type SecurityType =
++  | 'STOCK'
++  | 'ETF'
++  | 'INDEX'
++  | 'REIT'
++  | 'FUND'
++  | 'BOND'
++  | 'WARRANT'
++  | 'OPTION'
++  | 'FUTURE'
++  | 'OTHER';
++export type ListStatus = 'LISTED' | 'DELISTED' | 'UNKNOWN';
++export type MatchedBy =
++  | 'CANONICAL_SYMBOL_EXACT'
++  | 'RAW_SYMBOL_EXACT'
++  | 'FORMAL_NAME_EXACT'
++  | 'FORMAL_NAME_PREFIX'
++  | 'ALIAS_EXACT'
++  | 'ALIAS_PREFIX'
++  | 'PINYIN_FULL_PREFIX'
++  | 'PINYIN_ABBR_PREFIX'
++  | 'NAME_CONTAINS'
++  | 'ALIAS_CONTAINS';
++
++export interface SecuritySummary {
++  canonicalSymbol: string;
++  symbol: string;
++  displayName: string;
++  name?: string | null;
++  nameCn?: string | null;
++  nameHk?: string | null;
++  nameEn?: string | null;
++  shortName?: string | null;
++  market: string;
++  exchange?: string | null;
++  currency?: string | null;
++  securityType: string;
++  listStatus: ListStatus;
++  matchedBy: MatchedBy;
++}
++
++export interface Security extends SecuritySummary {
++  pinyinFull?: string | null;
++  pinyinAbbr?: string | null;
++  listDate?: string | null;
++  delisted?: boolean;
++  dataSource?: string | null;
++  sourceUpdatedAt?: string | null;
++  sourceHash?: string | null;
++  aliases?: string[];
++}
++
++export type SecurityDetail = Security;
