@@ -184,7 +184,7 @@ npm run build
 
 - V17 扩展既有 `stock_basic` 并新增 `stock_alias`；没有建立 `security_master` 等平行主表，旧 `/stocks` CRUD 保持兼容。
 - `SecurityDirectoryImportService` 负责 UTF-8/RFC 4180 CSV 的原子幂等导入；`SecurityDirectoryManager` 通过 MyBatis/XML 做本地过滤并在 Java 中执行确定性匹配分档与稳定排序。
-- `/security-directory/import`、`/securities/search`、`/securities/{canonicalSymbol}` 只访问本地目录，不调用报价、K 线或 LongPort，也不创建采集任务。D2 前端 selector 和 D3 外部目录同步仍未实现。
+- `/security-directory/import`、`/securities/search`、`/securities/{canonicalSymbol}` 只访问本地目录，不调用报价、K 线或 LongPort，也不创建采集任务。D2 前端 selector 与 D3 外部目录同步已进入 main。
 - `stock_quote_snapshot` 存外部最新价快照，不覆盖 `portfolio_price_snapshot`。
 - `market_data_sync_task` 存历史日 K 同步任务和失败留痕。
 - `market_data_alert` 存 provider 未配置、同步失败、数据质量等提醒。

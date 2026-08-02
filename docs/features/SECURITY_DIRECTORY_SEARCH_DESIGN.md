@@ -1,12 +1,12 @@
 # 证券目录与智能检索产品设计
 
-> 状态：P1.4b-D1 已于 2026-07-29 独立验收；D2 共享选择器、D3 外部目录同步、D4 跨模块推广仍待实施。精确在线验证见 `EXACT_SECURITY_VERIFICATION_DESIGN.md`。
+> 状态：P1.4b-D1 已于 2026-07-29 独立验收；D2/D3 已完成并进入 main；D4 跨模块推广仍待实施。精确在线验证见 `EXACT_SECURITY_VERIFICATION_DESIGN.md`。
 
 ## 0. 分阶段决策
 
 - **P1.4a 已完成**：用户选择市场、输入精确代码，通过 LongPort Static Info + Quote 验证并确认加入采集计划。无需下载全量目录，接口和验收见 `EXACT_SECURITY_VERIFICATION_DESIGN.md`。
 - **P1.4b-D1 已完成**：V17 扩展 `stock_basic`、新增 `stock_alias`，交付可重复 CSV 导入、本地名称/拼音/别名确定性搜索和证券详情 API。
-- **P1.4b-D2-D4 待实施**：共享 `SecuritySelector`、外部目录同步/元数据补全和跨模块推广。
+- **P1.4b-D2/D3 已完成并进入 main**；D4 跨模块推广待实施：D2/D3 覆盖共享 `SecuritySelector`、外部目录同步/元数据补全；D4 后续推广到自选/计划/交易/风控/快照。
 - P1.4a 不建设平行主数据，也不妨碍 P1.4b；它将成为目录未命中时的在线精确补全通道。
 
 ## 1. 背景与目标
@@ -160,7 +160,7 @@ GET /api/v1/market-data/securities/search?q=应流股份&markets=SH,SZ&types=STO
 GET /api/v1/market-data/securities/{canonicalSymbol}
 ```
 
-D3 尚未实现：
+D3 已实现并进入 main：
 
 ```http
 POST /api/v1/market-data/security-directory/sync

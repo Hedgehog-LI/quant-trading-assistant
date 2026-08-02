@@ -32,7 +32,7 @@ Quant Trading Assistant 是个人交易辅助工作台。它帮助用户把短�
 | Workflow Optimization 基础闭环优化 | 串联计划、交易、账本、快照和复盘 | v0.1.1 已完成 | 原始数据落 DB，差异实时计算 |
 | Market Data Foundation 行情基础 | 统一证券代码并沉淀价格和日 K | P1.0 证券主数据 + CSV 日 K 已完成；P1.1 LongPort 只读行情源真实外联已完成 | 行情需记录来源和抓取时间 |
 | Market Data Workbench 行情工作台 | 一屏看重点股票、板块、采集任务和异动提醒 | P1.2 工作台、LongPort 分钟 K、手工补档与 A 股盘中 scheduler 已通过自动化、Docker 和真实外联验收 | 最新价、分钟线、任务、水位、提醒落 DB |
-| Security Directory 证券目录与智能检索 | 输入代码或名称选择 A/H/US 证券并自动填充 | P1.4a 已完成；P1.4b-D1 后端本地目录/导入/搜索/详情已验收，D2-D4 待开发 | 精确验证只读；目录搜索只读本地 DB，不触发行情 |
+| Security Directory 证券目录与智能检索 | 输入代码或名称选择 A/H/US 证券并自动填充 | P1.4a 已完成；P1.4b-D1 后端本地目录/导入/搜索/详情已验收，D2/D3 已完成并进入 main；D4 待开发 | 精确验证只读；目录搜索只读本地 DB，不触发行情 |
 | Market Sector Catalog 市场板块目录 | 查看 A/H/US 行业排行，自动沉淀全市场强弱榜和关注板块/成分资金快照 | P1.6 双层自动采集、5/10/15/30/60 分钟或仅收盘、历史榜单与质量状态已完成代码交付 | 市场板块与自定义分组分离；外部权限/鉴权异常会阻断或退避，不伪造数据 |
 | AI Image Import 图片识别导入 | 从券商截图生成持仓草稿 | 暂缓 | 识别草稿需人工确认 |
 
@@ -107,7 +107,7 @@ Quant Trading Assistant 是个人交易辅助工作台。它帮助用户把短�
 - P1.0 已完成：`stock_basic`、统一证券标识、CSV 日 K 导入和幂等写入。
 - P1.1 已完成：LongPort provider facade + DB + API + 前端已完成；后端反射式 SDK adapter 已完成；官方 Java SDK 已装入 `runtime-libs/`（`io.github.longportapp:openapi-sdk:4.3.3`，vendor jar 被 gitignore），真实单 symbol 外联已于 2026-07-12 验收通过（latest quote + daily bar 落 `dataSource=LONGPORT`）。部署需配 `LONGPORT_HTTP_URL=https://openapi.longbridge.cn` + `LONGPORT_QUOTE_WEBSOCKET_URL=wss://openapi-quote.longbridge.cn/v2`（SDK 默认域名已废弃）。
 - P1.2/P1.3 已实现并验收：行情工作台、结构化采集计划、LongPort 分钟 K、历史补档、A 股盘中自动调度、任务明细/水位、板块/自定义分组。异动观察尚未完成；港美股盘中任务在时区/日历补齐前明确禁用。详见 `docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`。
-- P1.4a 已实现并真实验收：采集计划支持 A/H/US 市场 + 精确代码，通过 LongPort Static Info + Quote 展示名称、统一代码、当前价和报价时间，用户确认后加入 scope；验证过程不落库。P1.4b-D1 已于 2026-07-29 独立验收：V17 扩展 `stock_basic`、新增 `stock_alias`，交付 CSV 原子幂等导入、本地确定性搜索和证券详情 API；D2 共享选择器与 D3 目录同步尚未实现。详见 `docs/features/EXACT_SECURITY_VERIFICATION_DESIGN.md` 与 `docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`。
+- P1.4a 已实现并真实验收：采集计划支持 A/H/US 市场 + 精确代码，通过 LongPort Static Info + Quote 展示名称、统一代码、当前价和报价时间，用户确认后加入 scope；验证过程不落库。P1.4b-D1 已于 2026-07-29 独立验收：V17 扩展 `stock_basic`、新增 `stock_alias`，交付 CSV 原子幂等导入、本地确定性搜索和证券详情 API；D2 共享选择器与 D3 目录同步已完成并进入 main。详见 `docs/features/EXACT_SECURITY_VERIFICATION_DESIGN.md` 与 `docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md`。
 - 手工估值与外部行情严格分离：外部行情不得自动覆盖 `portfolio_price_snapshot`。
 - LongPort 仅作为行情 provider，不接交易、账户、订单、真实持仓能力。
 - P1.6 已在 P1.5 上建设全市场排行快照与关注板块明细双层采集；CN/HK/US 独立交易时区，盘中频率可选 5/10/15/30/60 分钟或仅收盘，并保留立即采集入口、DB claim、时间桶幂等、失败退避和质量状态。下一步基于连续快照计算相对强弱、资金趋势、轮动持续性和异动解释。

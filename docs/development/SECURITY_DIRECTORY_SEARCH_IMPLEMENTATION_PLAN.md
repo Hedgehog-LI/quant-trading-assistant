@@ -1,6 +1,6 @@
 # 证券目录与智能检索实施计划
 
-> 状态：D1 已于 2026-07-29 独立验收；D2-D4 待实施。每阶段独立验收、独立同步文档；不得把未完成项提前标记为 DONE。
+> 状态：D1 已于 2026-07-29 独立验收；D2/D3 已完成并进入 main；D4 待实施。每阶段独立验收、独立同步文档；不得把未完成项提前标记为 DONE。
 
 ## 1. 目标与交付边界
 
@@ -75,7 +75,7 @@
 - 仅用最小外部调用验证连接，不做全市场行情下载。
 
 交付证据：任务契约与角色记录见 `tasks/SECURITY-DIRECTORY-D3-20260802-*.md`。冻结候选
-`ff393bc69279a85eddf0d54897df4f0cb67eb4fd`（gen3/repair2）。代码条件验收：H2 集成测试通过，全量
+`ff393bc69279a85eddf0d54897df4f0cb67eb4fd`（gen3/repair2）。代码验收完成，已进入 main：H2 集成测试通过，全量
 `406 tests / 0 failures / 0 errors` 与 `./mvnw package` 通过，架构门禁通过（file-protocol ERROR 已修复）。
 独立 gen3 `qta-code-reviewer` 返回 `REVIEW_CLEAR`（CR-1 原子发布 self-invocation、CR-2 缺失 UNIQUENESS
 门禁已修复）。诚实偏差：三次 implementer 子代理超时后由父上下文实现/修复；`qta-final-verifier` 子

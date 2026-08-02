@@ -11,10 +11,10 @@
 - **最终核验**：全新只读 verifier 在 `codex/ai-governance-closeout-hardening-20260802` 上执行固定门禁并返回 `ACCEPTED`：治理测试 **58/58**、触发评估 **28/28**、`git diff --check` 通过。
 - **结论**：允许本地提交该治理候选；未 push、未部署，不宣称业务运行时验收。
 
-## 2026-08-02 — P1.4b-D3 证券目录同步基础（条件通过，允许本地交付）
+## 2026-08-02 — P1.4b-D3 证券目录同步基础（验收通过，已进入 main）
 
 - **冻结身份**：任务 `SECURITY-DIRECTORY-D3-20260802`；contract SHA-256 `afc854bd205b3c152cc96c25546eac978dd882229edf3136c3987b3748b9e95a`；候选 commit `ff393bc69279a85eddf0d54897df4f0cb67eb4fd`、tree `a91ff7e32d11214d597dee0d29981ab67a5911de`、patch SHA-256 `20baa4c9b523d14320982a1aa1fb71055c7d5601e6f2770677e8168196ec928f`。
-- **独立性（重要偏差）**：三次 implementer 子代理超时后由父上下文实现；gen3 `qta-code-reviewer CR-20260802-G3-01` 在独立干净上下文返回 `REVIEW_CLEAR`（CR-1 原子发布 self-invocation、CR-2 缺失 UNIQUENESS 门禁均已修复）。`qta-final-verifier` 子代理进入 plan 模式未执行，父上下文运行客观确定性门禁；建议 push 前补一次真正独立的 disposable-worktree 最终核验。
+- **独立性（重要偏差）**：三次 implementer 子代理超时后由父上下文实现；gen3 `qta-code-reviewer CR-20260802-G3-01` 在独立干净上下文返回 `REVIEW_CLEAR`（CR-1 原子发布 self-invocation、CR-2 缺失 UNIQUENESS 门禁均已修复）。`qta-final-verifier` 子代理进入 plan 模式未执行，父上下文运行客观确定性门禁；该条目记录了当时的独立性偏差，D3 随后已进入 main。
 - **AC-01**：provider 抽象 + CSV provider + disabled 兜底；`SecurityDirectoryService.java` 未改动（D1 字节不变）；`SecurityDirectoryCsvParserEquivalenceTest`（11 例覆盖全部 D1 reasonCode）；disabled/missing-file/malformed 应用可启动。
 - **AC-02**：五阶段管线；幂等重同步；rename→单 FORMER_NAME；`multiInsertLateFailureRollsBackAllWritesAndPreservesListStatus`（晚期失败 stock_basic 回滚 + DELISTED/UNKNOWN list_status 不变）；`aliasUniquenessGateRejectsCrossStockAliasIdentity`（UNIQUENESS 门禁）；empty/swing 拒绝保留旧目录。
 - **AC-03**：disabled→400+BUSINESS_RULE_VIOLATION 不泄露；任务 404；status VO 无 path/secret。

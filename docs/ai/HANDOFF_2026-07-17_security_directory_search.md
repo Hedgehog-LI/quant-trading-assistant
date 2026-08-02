@@ -5,7 +5,7 @@
 - 产品设计与 ADR：已完成。
 - D0 精确代码在线验证：已完成并验收，详见 `HANDOFF_2026-07-17_exact_security_verification.md`。
 - D1 后端本地目录、CSV 导入、确定性搜索和详情 API：已于 2026-07-29 独立验收。
-- D2-D4 共享选择器、目录同步与跨模块推广：未开始。
+- D2/D3 已完成并进入 main；D4 跨模块推广尚未开始。
 - 技术接手入口：`docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md`。
 
 ## 新会话最小读取顺序
