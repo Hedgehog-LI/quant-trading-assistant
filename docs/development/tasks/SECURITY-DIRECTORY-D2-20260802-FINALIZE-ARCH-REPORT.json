@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/check-ai-architecture.mjs",
+  "generatedAt": "2026-08-02T12:36:45.108Z",
+  "candidateIdentity": "be4dd5e3ed100668c3ac412f5d79fa601099a39f",
+  "base": "d9cb052bcde9e69a03bcee787ecb806d4783c2ac",
+  "manifestPath": "",
+  "architectureReviewCount": 0,
+  "files": [],
+  "additions": 0,
+  "warnings": [],
+  "errorCount": 0,
+  "errors": [],
+  "status": "PASS",
+  "exitCode": 0
+}

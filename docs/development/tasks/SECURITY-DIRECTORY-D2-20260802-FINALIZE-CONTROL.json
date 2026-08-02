@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-FINALIZE-CONTROL.json",
   "startedAt": "2026-08-02T12:15:00Z",
   "lane": "L0",
-  "lifecycleState": "CONTRACT_FROZEN",
+  "lifecycleState": "CANDIDATE_FROZEN",
   "contract": {
     "path": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-FINALIZE-CONTRACT.md",
     "version": "1",
@@ -102,20 +102,44 @@
       "at": "2026-08-02T12:16:00Z",
       "actor": "codex-parent-d2-finalize-1",
       "note": "L0 contract-lite (renamed from CLOSEOUT after a baseline-hash typo). Re-uses RESLICE-frozen D2 ACs/test inventory."
+    },
+    {
+      "sequence": 3,
+      "from": "CONTRACT_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-02T12:30:00Z",
+      "actor": "codex-parent-d2-finalize-2",
+      "note": "Stale active locks cleared (RESLICE+ARCH-GATE-REPAIR); cross-repo candidate frozen (backend be4dd5e, frontend 0cf382f); arch report + diff artifact generated."
+    },
+    {
+      "sequence": 4,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-02T12:35:00Z",
+      "actor": "codex-parent-d2-finalize-2",
+      "note": "Parent-run deterministic gates all green: backend test 422/0/0 + package; frontend typecheck/lint/test 303/build; arch gate PASS both cwds (9 pre-existing, 0 blocking); governance 50/50. Candidates unchanged."
+    },
+    {
+      "sequence": 5,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-02T12:36:00Z",
+      "actor": "codex-parent-d2-finalize-2",
+      "note": "Backend candidate be4dd5e frozen; strict arch report PASS. Independent reviewer/verifier dispatch blocked by Agent-tool/orchestration layer (see FINALIZE-EVIDENCE.md); cannot reach VERIFIED."
     }
   ],
   "candidate": {
     "mode": "COMMIT",
     "generation": 1,
-    "identity": "",
-    "commit": "",
-    "treeHash": "",
-    "patchSha256": "",
+    "identity": "be4dd5e3ed100668c3ac412f5d79fa601099a39f",
+    "commit": "be4dd5e3ed100668c3ac412f5d79fa601099a39f",
+    "treeHash": "e5fba1a00fc7e654087ca974754f17e8564467ec",
+    "patchSha256": "45f1cab5738a59dadd937eb60bc9bf27ccc54d502d067ad6df7defa007cee856",
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
-    "diffArtifactPath": "",
-    "diffArtifactSha256": ""
+    "diffArtifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-FINALIZE-BASELINE-CANDIDATE.patch",
+    "diffArtifactSha256": "45f1cab5738a59dadd937eb60bc9bf27ccc54d502d067ad6df7defa007cee856"
   },
   "crossRepoCandidateRecord": {
     "frontendRepo": "/Users/joker/code/quant-trading-assistant-web",
@@ -153,14 +177,14 @@
   "testDesignerOmissionReason": "L0 contract-lite; RESLICE froze D2 ACs/test inventory; user forbids re-dispatching a test designer.",
   "architectureGate": {
     "required": true,
-    "candidateIdentity": "",
-    "status": "NOT_RUN",
+    "candidateIdentity": "be4dd5e3ed100668c3ac412f5d79fa601099a39f",
+    "status": "PASS",
     "exitCode": 0,
     "errorCount": 0,
     "warningCount": 0,
     "warningDispositions": [],
-    "reportPath": "",
-    "reportSha256": "",
+    "reportPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-FINALIZE-ARCH-REPORT.json",
+    "reportSha256": "189a796662c8c508a4b5f275504e8568cfb88a09375e6839af1e9864833d3f66",
     "generatedBy": "scripts/check-ai-architecture.mjs"
   },
   "verification": {
