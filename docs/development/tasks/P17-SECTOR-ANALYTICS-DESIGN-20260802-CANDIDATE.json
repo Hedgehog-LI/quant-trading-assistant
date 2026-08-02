@@ -2,7 +2,7 @@
   "version": 1,
   "algorithm": "sha256(sorted JSON entries: path,type,sha256)",
   "root": ".",
-  "entrySetSha256": "001cc8217b8352af50108748bd5e51a4f3d8a00b9b792ea61925e9cb6b55b01f",
+  "entrySetSha256": "5c3e4d8b3ba2e3cf3bf235172e56b7d7a43999b170002ef33dfd07752fab957d",
   "entries": [
     {
       "path": "docs/api/MARKET_DATA_API.md",
@@ -18,26 +18,6 @@
       "path": "docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md",
       "type": "file",
       "sha256": "bc29ae2bbe99e8f447d4e447d69b4e3fdc8bcbee5323e9000f816a56a024c3be"
-    },
-    {
-      "path": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md",
-      "type": "file",
-      "sha256": "d55ef734e49108259f58bfd90e45d3bdbde5163a457f817f0b5f8872bb57a182"
-    },
-    {
-      "path": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json",
-      "type": "file",
-      "sha256": "8d9219f100a87a6b4becc76caf9fea6b8e553611fcc8cccb4cb393f82186328f"
-    },
-    {
-      "path": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md",
-      "type": "file",
-      "sha256": "62afc42315dc72b11432b065982bd798a3459fb4ac4c2618d1fad89c7262a810"
-    },
-    {
-      "path": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-TEST-DESIGN.md",
-      "type": "file",
-      "sha256": "4401fd71055f936977cc9ee9d7350579b5fde5ef730414875e3f2aeb7da32ab2"
     },
     {
       "path": "docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md",
