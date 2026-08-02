@@ -260,6 +260,20 @@
       "runtimeReceiptPath": "",
       "dispatchReceiptPath": ".git/qta-governance/dispatches/b8e2ac7b180a067269d81a070de04200ea9efa798b31e95939fcccc0e7801d78/f0d2a74a3b991f6476c49ca7208f864088e95e24e7c251ff518f8313c7bc38c3.json",
       "verdict": "NOT_VERIFIED", "findingIds": []
+    },
+    {
+      "roleRunId": "FV-RUN-10", "dispatchId": "DISPATCH-FV-10", "sessionId": "FV-RUN-10",
+      "role": "FINAL_VERIFIER", "generation": 1, "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-final-verifier.md", "sliceId": "",
+      "executionOutcome": "COMPLETED", "capability": "VERIFY_EXECUTE", "contextMode": "FRESH", "enforcement": "ADVISORY",
+      "compensatingIsolation": "clean verify-execute subagent; delivery-ready gate confirmation (only self-dispatch residual)",
+      "waitCalls": 0, "maxShellPollsForOneCommand": 1, "compactionCount": 0,
+      "status": "CLOSED", "artifactAccepted": false,
+      "artifactPath": "", "artifactSha256": "",
+      "startedAt": "2026-08-02T15:55:00Z", "finishedAt": "2026-08-02T15:56:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/b8e2ac7b180a067269d81a070de04200ea9efa798b31e95939fcccc0e7801d78/ddcad5299a16eeb1b2d18f8edf7d924230e00c10d9caf9a016d7861115693ea4.json",
+      "verdict": "NOT_VERIFIED", "findingIds": []
     }
   ],
   "review": {
