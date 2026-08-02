@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "FRONTEND-GOVERNANCE-BOOTSTRAP-20260802",
+  "roleRunId": "FV-RUN-001",
+  "sessionId": "FV-RUN-001-SESSION",
+  "testId": "TEST-02",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+  "command": [
+    "node",
+    "scripts/sync-governance-from-source.mjs",
+    "--check",
+    "--source",
+    "/Users/joker/code/qta-worktrees/frontend-governance-control",
+    "--baseline",
+    "563e84a"
+  ],
+  "startedAt": "2026-08-02T15:47:10.818Z",
+  "finishedAt": "2026-08-02T15:47:11.587Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "4f1a654b3463e59e1cda76b9a2f4e7c42853214474046865d7614758c501143a",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "0 byte diffs"
+  ],
+  "observedSelectors": [
+    "0 byte diffs"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "tree": "377a2dc42c43eadf0f3cec9d495d8927718229b1",
+    "statusSha256": "e924130d94711411ef1b9d343fa65624cca27d6be47e1dde759a7dfdc4370bd9",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "tree": "377a2dc42c43eadf0f3cec9d495d8927718229b1",
+    "statusSha256": "e924130d94711411ef1b9d343fa65624cca27d6be47e1dde759a7dfdc4370bd9",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

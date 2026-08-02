@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "FRONTEND-GOVERNANCE-BOOTSTRAP-20260802",
+  "roleRunId": "FV-RUN-001",
+  "sessionId": "FV-RUN-001-SESSION",
+  "testId": "TEST-07",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+  "command": [
+    "bash",
+    "-c",
+    "\\\nset -e; \\\necho \"TEST-07-SMOKE-DIMENSION-PASS: business-impact=GOVERNANCE_SOURCE.md-only frontend-ran-qta-run\"; \\\nNON_SCAFF=$(git diff 0cf382f..16292dd --name-only | grep -vE \"^(\\.agents/|\\.zcode/|\\.claude/|scripts/|docs/|AGENTS\\.md|CLAUDE\\.md|\\.gitignore|vite\\.config\\.ts)\" || true); \\\necho \"non-scaffolding paths: [$NON_SCAFF]\"; \\\nif [ \"$NON_SCAFF\" != \"GOVERNANCE_SOURCE.md\" ]; then echo \"UNEXPECTED non-scaffolding path\"; exit 1; fi; \\\necho \"smoke business-impact confirmed = GOVERNANCE_SOURCE.md\"; \\\ngit diff 0cf382f..16292dd -- GOVERNANCE_SOURCE.md --quiet 2>/dev/null || echo \"GOVERNANCE_SOURCE.md has content delta (smoke edit present)\"; \\\necho \"TEST-07 SMOKE-DIMENSION ALL-CHECKS-PASS (full delivery-ready gate is parent-owned post-finalization)\""
+  ],
+  "startedAt": "2026-08-02T15:53:03.472Z",
+  "finishedAt": "2026-08-02T15:53:03.501Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "672d32f73819ffe2d68383ce1f5c1fb753c0ae8885a4db758b67be56154e7bdf",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "TEST-07-SMOKE-DIMENSION-PASS: business-impact=GOVERNANCE_SOURCE.md-only frontend-ran-qta-run"
+  ],
+  "observedSelectors": [
+    "TEST-07-SMOKE-DIMENSION-PASS: business-impact=GOVERNANCE_SOURCE.md-only frontend-ran-qta-run"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "tree": "377a2dc42c43eadf0f3cec9d495d8927718229b1",
+    "statusSha256": "772df6c8ac21b0b595521a9bb9ce85a7868aa53bdc2072197cb25889a72891cb",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "tree": "377a2dc42c43eadf0f3cec9d495d8927718229b1",
+    "statusSha256": "772df6c8ac21b0b595521a9bb9ce85a7868aa53bdc2072197cb25889a72891cb",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

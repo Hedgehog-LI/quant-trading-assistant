@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "FRONTEND-GOVERNANCE-BOOTSTRAP-20260802",
+  "roleRunId": "FV-RUN-001",
+  "sessionId": "FV-RUN-001-SESSION",
+  "testId": "TEST-08b",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+  "command": [
+    "node",
+    "scripts/check-ai-architecture.mjs",
+    "--base",
+    "0cf382f",
+    "--candidate-identity",
+    "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "--json-output",
+    "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-web-arch-report.json"
+  ],
+  "startedAt": "2026-08-02T15:48:24.587Z",
+  "finishedAt": "2026-08-02T15:48:24.728Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "3c5fc0daaa196a8ce68a92585ad289b0f22851a182e1b9bc389bf83b05680669",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-web-arch-report.json",
+      "sha256": "6ba8d10ee0dc30f42310c80453128cdc2cc989451569a8ca9a615be20a24bdcc"
+    }
+  ],
+  "expectedSelectors": [
+    "\"status\": \"PASS\"",
+    "\"errorCount\": 0"
+  ],
+  "observedSelectors": [
+    "\"status\": \"PASS\"",
+    "\"errorCount\": 0"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "tree": "377a2dc42c43eadf0f3cec9d495d8927718229b1",
+    "statusSha256": "6014fd827cba116d4bf4472cd7b64f3ba410d530568e019749d99b8feef4c6c0",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "tree": "377a2dc42c43eadf0f3cec9d495d8927718229b1",
+    "statusSha256": "6014fd827cba116d4bf4472cd7b64f3ba410d530568e019749d99b8feef4c6c0",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

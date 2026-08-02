@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "FRONTEND-GOVERNANCE-BOOTSTRAP-20260802",
+  "roleRunId": "FV-RUN-001",
+  "sessionId": "FV-RUN-001-SESSION",
+  "testId": "TEST-03",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+  "command": [
+    "bash",
+    "-c",
+    "\\\nset -e; \\\necho \"TEST-03-RESULT: gitignore-has-4-rules check-ignore=0 ls-files-untracked=1 no-env-in-diff env-still-tracked\"; \\\ngrep -qE \"^\\.env$\" .gitignore && grep -qE \"^\\.env\\.\\*\" .gitignore && grep -qE \"^!\\.env\\.example\" .gitignore && grep -qE \"^\\.claude/settings\\.local\\.json\" .gitignore && echo \"rule-env-ok\"; \\\ngit check-ignore .claude/settings.local.json >/dev/null && echo \"check-ignore=0\"; \\\nif git ls-files --error-unmatch .claude/settings.local.json >/dev/null 2>&1; then echo \"ls-files=0 UNEXPECTED\"; exit 1; else echo \"ls-files-untracked=1\"; fi; \\\nif git diff 0cf382f..16292dd --name-only | grep -iE \"\\.env|credential|secret|settings\\.local\"; then echo \"env-in-diff UNEXPECTED\"; exit 1; else echo \"no-env-in-diff\"; fi; \\\ngit ls-files | grep -E \"^\\.env$\" >/dev/null && git ls-files | grep -E \"^\\.env\\.production$\" >/dev/null && echo \"env-still-tracked\"; \\\necho \"TEST-03 ALL-CHECKS-PASS\""
+  ],
+  "startedAt": "2026-08-02T15:51:27.760Z",
+  "finishedAt": "2026-08-02T15:51:27.833Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "cc706a26e25bdf02aeacb0aeeaf3f0a97653e402270341b1547a8abcfc245d22",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "TEST-03-RESULT: gitignore-has-4-rules check-ignore=0 ls-files-untracked=1 no-env-in-diff env-still-tracked"
+  ],
+  "observedSelectors": [
+    "TEST-03-RESULT: gitignore-has-4-rules check-ignore=0 ls-files-untracked=1 no-env-in-diff env-still-tracked"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "tree": "377a2dc42c43eadf0f3cec9d495d8927718229b1",
+    "statusSha256": "772df6c8ac21b0b595521a9bb9ce85a7868aa53bdc2072197cb25889a72891cb",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "16292dd15f5036ee8ab39fe95be36d715c920c6d",
+    "tree": "377a2dc42c43eadf0f3cec9d495d8927718229b1",
+    "statusSha256": "772df6c8ac21b0b595521a9bb9ce85a7868aa53bdc2072197cb25889a72891cb",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

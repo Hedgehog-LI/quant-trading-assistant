@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "FRONTEND-GOVERNANCE-BOOTSTRAP-20260802",
+  "roleRunId": "FV-RUN-001",
+  "sessionId": "FV-RUN-001-SESSION",
+  "testId": "TEST-06",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "9d258427802dedd611aa19dc7aad002af5cf690c",
+  "command": [
+    "bash",
+    "-c",
+    "\\\nset -e; \\\necho \"TEST-06-RESULT: negative-grep-0hits adr-frozen-zerodiff factfiles-corrected\"; \\\nif grep -rnE \"条件验收|D2.*仍未实现|D3.*仍未实现\" \\\n  docs/AI_HANDOFF.md docs/BUILD_CHECKLIST.md docs/CURRENT_ARCHITECTURE_AND_MODULES.md \\\n  docs/PRODUCT_BLUEPRINT.md docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md \\\n  docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md \\\n  docs/ai/HANDOFF_2026-07-17_security_directory_search.md docs/acceptance/ACCEPTANCE_LOG.md; \\\nthen echo \"NEGATIVE-GREP FOUND HITS UNEXPECTED\"; exit 1; else echo \"negative-grep-0hits\"; fi; \\\nADR_DIFF=$(git diff --name-only 563e84a..9d25842 -- docs/decisions/ \"docs/development/tasks/SECURITY-DIRECTORY-D2*\" \"docs/development/tasks/SECURITY-DIRECTORY-D3*\"); \\\nif [ -n \"$ADR_DIFF\" ]; then echo \"ADR/FROZEN DIFF UNEXPECTED: $ADR_DIFF\"; exit 1; else echo \"adr-frozen-zerodiff\"; fi; \\\nCHANGED=$(git diff --name-only 563e84a..9d25842 | grep -vE \"^(docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-(CONTRACT|CONTROL))\" | sort | tr \"\\n\" \" \"); \\\necho \"factfiles-changed: $CHANGED\"; \\\necho \"TEST-06 ALL-CHECKS-PASS\""
+  ],
+  "startedAt": "2026-08-02T15:52:05.784Z",
+  "finishedAt": "2026-08-02T15:52:05.844Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "f5d963a6f84de9ecd94f087c7d73509256ba98c79b20292ebb72227a11cb1af4",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "TEST-06-RESULT: negative-grep-0hits adr-frozen-zerodiff factfiles-corrected"
+  ],
+  "observedSelectors": [
+    "TEST-06-RESULT: negative-grep-0hits adr-frozen-zerodiff factfiles-corrected"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "9d258427802dedd611aa19dc7aad002af5cf690c",
+    "tree": "a247ba0ee88a9047a5ced8311b8c1c1555692c5c",
+    "statusSha256": "f3f9610331a7af6ab3be222431c9e162fd919a66fc4a8bb31adb7306c5e72976",
+    "diffSha256": "7991a9f8bf4da13877216089ae45f9baf07b2a43feb4cf1dc2457d7ada1d3044"
+  },
+  "candidateAfter": {
+    "head": "9d258427802dedd611aa19dc7aad002af5cf690c",
+    "tree": "a247ba0ee88a9047a5ced8311b8c1c1555692c5c",
+    "statusSha256": "f3f9610331a7af6ab3be222431c9e162fd919a66fc4a8bb31adb7306c5e72976",
+    "diffSha256": "7991a9f8bf4da13877216089ae45f9baf07b2a43feb4cf1dc2457d7ada1d3044"
+  },
+  "candidateUnchanged": true
+}
