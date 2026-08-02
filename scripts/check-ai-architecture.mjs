@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import fs from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -147,6 +148,68 @@ export function analyzeSource(file, content) {
   };
 }
 
+const ALLOWED_WORSEN_DELTA = 20;
+
+function errorRuleKind(message) {
+  if (message.startsWith("longest method ")) return "longest-method";
+  if (message.startsWith("class/module ")) return "class-module";
+  if (message === "controller crosses transaction/persistence boundary") return "controller-cross";
+  if (message === "service combines file/protocol parsing with persistence") return "service-file-persist";
+  if (message === "SQL appears outside mapper/persistence boundary") return "sql-outside-mapper";
+  return null;
+}
+
+function errorMetricForKind(message) {
+  if (message.startsWith("longest method ")) {
+    const match = message.match(/^longest method (\d+) lines/);
+    return match ? Number.parseInt(match[1], 10) : null;
+  }
+  if (message.startsWith("class/module ")) {
+    const match = message.match(/^class\/module (\d+) lines/);
+    return match ? Number.parseInt(match[1], 10) : null;
+  }
+  return null;
+}
+
+function classifyError(message, baselineReport) {
+  const kind = errorRuleKind(message);
+  const candidateMetric = errorMetricForKind(message);
+  if (!baselineReport) {
+    return { classification: "introduced", candidateMetric, baselineMetric: null, delta: null };
+  }
+  const baselineMatch = baselineReport.errors.find((entry) => errorRuleKind(entry) === kind);
+  if (!baselineMatch) {
+    return { classification: "introduced", candidateMetric, baselineMetric: null, delta: null };
+  }
+  const baselineMetric = errorMetricForKind(baselineMatch);
+  if (candidateMetric !== null && baselineMetric !== null) {
+    const delta = candidateMetric - baselineMetric;
+    if (delta > ALLOWED_WORSEN_DELTA) {
+      return { classification: "worsened", candidateMetric, baselineMetric, delta };
+    }
+    return { classification: "pre-existing", candidateMetric, baselineMetric, delta };
+  }
+  return { classification: "pre-existing", candidateMetric: null, baselineMetric: null, delta: null };
+}
+
+async function baselineReportFor(file, baselineDir) {
+  let relativeFile = file;
+  if (path.isAbsolute(file)) {
+    const candidateRoot = fs.realpathSync(process.cwd());
+    const resolvedFile = fs.realpathSync(file);
+    const fromResolved = path.relative(candidateRoot, resolvedFile);
+    relativeFile = fromResolved && !fromResolved.startsWith("..") ? fromResolved : path.relative(process.cwd(), file);
+  }
+  const baselinePath = path.join(baselineDir, relativeFile);
+  try {
+    const content = await readFile(baselinePath, "utf8");
+    return analyzeSource(file, content);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 function gitOutput(args, options = {}) {
   return execFileSync("git", args, { encoding: "utf8", ...options });
 }
@@ -215,10 +278,12 @@ async function main() {
   const reviewCountIndex = process.argv.indexOf("--architecture-review-count");
   const candidateIdentityIndex = process.argv.indexOf("--candidate-identity");
   const jsonOutputIndex = process.argv.indexOf("--json-output");
+  const baselineIndex = process.argv.indexOf("--baseline");
   const architectureReviewCount = reviewCountIndex >= 0 ? Number.parseInt(process.argv[reviewCountIndex + 1], 10) || 0 : 0;
   const base = baseIndex >= 0 ? process.argv[baseIndex + 1] : "";
   const candidateIdentity = candidateIdentityIndex >= 0 ? process.argv[candidateIdentityIndex + 1] : "";
   const jsonOutput = jsonOutputIndex >= 0 ? process.argv[jsonOutputIndex + 1] : "";
+  const baselineDir = baselineIndex >= 0 ? path.resolve(process.argv[baselineIndex + 1]) : "";
   let files = [];
   let additions = 0;
   const candidateErrors = [];
@@ -268,17 +333,70 @@ async function main() {
   for (const error of candidateErrors) console.log(`CANDIDATE ERROR ${error}`);
 
   const warningDetails = [];
+  const introducedErrors = [];
+  const worsenedErrors = [];
+  const preExistingErrors = [];
+  if (baselineDir) {
+    for (const report of reports) {
+      const baselineReport = await baselineReportFor(report.file, baselineDir);
+      for (const message of report.errors) {
+        const verdict = classifyError(message, baselineReport);
+        const detail = {
+          file: report.file,
+          message,
+          classification: verdict.classification,
+          candidateMetric: verdict.candidateMetric,
+          baselineMetric: verdict.baselineMetric,
+          delta: verdict.delta
+        };
+        if (verdict.classification === "introduced") {
+          introducedErrors.push(detail);
+          console.log(`BASELINE-INTRODUCED ${report.file}: ${message}`);
+        } else if (verdict.classification === "worsened") {
+          worsenedErrors.push(detail);
+          console.log(`BASELINE-WORSENED ${report.file}: ${message} (candidate ${verdict.candidateMetric}, baseline ${verdict.baselineMetric}, delta ${verdict.delta})`);
+        } else {
+          preExistingErrors.push(detail);
+          console.log(`BASELINE-PRE-EXISTING ${report.file}: ${message}`);
+        }
+      }
+    }
+  }
   const errorDetails = [];
   for (const report of reports) {
     for (const message of report.warnings) warningDetails.push({ file: report.file, message });
-    for (const message of report.errors) errorDetails.push({ file: report.file, message });
+    if (!baselineDir) {
+      for (const message of report.errors) errorDetails.push({ file: report.file, message });
+    }
   }
   for (const message of candidateWarnings) warningDetails.push({ file: "<candidate>", message });
   for (const message of candidateErrors) errorDetails.push({ file: "<candidate>", message });
   const warnings = warningDetails.map((item, index) => ({ id: `ARCH-W-${String(index + 1).padStart(3, "0")}`, ...item }));
-  const errors = errorDetails.map((item, index) => ({ id: `ARCH-E-${String(index + 1).padStart(3, "0")}`, ...item }));
   const warningCount = warnings.length;
-  const errorCount = reports.reduce((sum, report) => sum + report.errors.length, 0) + candidateErrors.length;
+  let errors;
+  let errorCount;
+  let blockingErrorCount = null;
+  let introducedDetailed = [];
+  let worsenedDetailed = [];
+  let preExistingDetailed = [];
+  if (baselineDir) {
+    let idCounter = 0;
+    const nextId = () => `ARCH-E-${String(idCounter += 1).padStart(3, "0")}`;
+    introducedDetailed = introducedErrors.map((item) => ({ id: nextId(), ...item }));
+    worsenedDetailed = worsenedErrors.map((item) => ({ id: nextId(), ...item }));
+    const candidateErrorDetailed = candidateErrors.map((message) => ({
+      id: nextId(), file: "<candidate>", message, classification: "candidate",
+      candidateMetric: null, baselineMetric: null, delta: null
+    }));
+    preExistingDetailed = preExistingErrors.map((item) => ({ id: nextId(), ...item }));
+    errors = [...introducedDetailed, ...worsenedDetailed, ...candidateErrorDetailed];
+    blockingErrorCount = errors.length;
+    errorCount = blockingErrorCount;
+    console.log(`Architecture gate (baseline-aware): introduced=${introducedDetailed.length} worsened=${worsenedDetailed.length} pre-existing=${preExistingDetailed.length} blocking=${blockingErrorCount}`);
+  } else {
+    errors = errorDetails.map((item, index) => ({ id: `ARCH-E-${String(index + 1).padStart(3, "0")}`, ...item }));
+    errorCount = errors.length;
+  }
   console.log(`Architecture gate: files=${reports.length}, additions=${additions}, warnings=${warningCount}, errors=${errorCount}`);
   if (jsonOutput) {
     if (!candidateIdentity) {
@@ -298,10 +416,18 @@ async function main() {
       files: reports,
       additions,
       warnings,
+      errorCount,
       errors,
       status: errorCount === 0 ? "PASS" : "FAIL",
       exitCode: errorCount === 0 ? 0 : 1
     };
+    if (baselineDir) {
+      payload.baselineIdentity = process.argv[baselineIndex + 1];
+      payload.blockingErrorCount = blockingErrorCount;
+      payload.introducedErrors = introducedDetailed;
+      payload.worsenedErrors = worsenedDetailed;
+      payload.preExistingErrors = preExistingDetailed;
+    }
     await mkdir(path.dirname(output), { recursive: true });
     await writeFile(temporary, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
     await rename(temporary, output);

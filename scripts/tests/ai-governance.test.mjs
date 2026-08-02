@@ -856,3 +856,322 @@ test("ZCode Stop Hook blocks premature qta-run completion and releases BLOCKED t
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+function methodBodyFixture(lineCount) {
+  const lines = ["export function Comp() {"];
+  for (let index = 0; index < lineCount; index += 1) lines.push(`  const a${index} = 0;`);
+  lines.push("}");
+  return `${lines.join("\n")}\n`;
+}
+
+function securitySelectorIntegrationFixture(baselineBodyLines) {
+  const lines = ["export function Comp() {"];
+  for (let index = 0; index < baselineBodyLines; index += 1) lines.push(`  const a${index} = 0;`);
+  lines.push("  const permissions = useSecuritySelector((state) => state.permissions);");
+  lines.push("  const identity = useSecuritySelector((state) => state.identity);");
+  lines.push("  const profile = useSecuritySelector((state) => state.profile);");
+  lines.push("  const entitlements = useSecuritySelector((state) => state.entitlements);");
+  lines.push("  const session = useSecuritySelector((state) => state.session);");
+  lines.push("  return null;");
+  lines.push("}");
+  return `${lines.join("\n")}\n`;
+}
+
+async function runBaselineAwareGate({ candidateDir, baselineDir, candidateFile, reportPath }) {
+  const script = path.resolve("scripts/check-ai-architecture.mjs");
+  const baselineAbs = path.resolve(baselineDir);
+  const candidateAbs = path.resolve(candidateDir, candidateFile);
+  return spawnSync(process.execPath, [script,
+    "--files", candidateAbs,
+    "--baseline", baselineAbs,
+    "--candidate-identity", "candidate-baseline-aware",
+    "--json-output", reportPath
+  ], { cwd: candidateDir, encoding: "utf8" });
+}
+
+test("baseline-aware gate does not block unchanged pre-existing React method debt", async () => {
+  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-preexisting-cand-"));
+  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-preexisting-base-"));
+  try {
+    const relativeFile = "src/pages/Example.tsx";
+    const baselineBodyLines = 148;
+    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
+    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
+    await writeFile(path.join(baselineDir, relativeFile), methodBodyFixture(baselineBodyLines));
+    await writeFile(path.join(candidateDir, relativeFile),
+      securitySelectorIntegrationFixture(baselineBodyLines));
+    const reportPath = path.join(candidateDir, "architecture-report.json");
+    const result = await runBaselineAwareGate({
+      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
+    });
+    assert.equal(result.status, 0, result.stdout);
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(report.status, "PASS");
+    assert.equal(report.exitCode, 0);
+    assert.equal(report.blockingErrorCount, 0);
+    assert.equal(report.errors.length, 0);
+    assert.equal(report.baselineIdentity, path.resolve(baselineDir));
+    const longestMethodErrors = [
+      ...report.introducedErrors, ...report.worsenedErrors, ...report.preExistingErrors
+    ].filter((entry) => entry.message.includes("longest method"));
+    assert.ok(longestMethodErrors.length >= 1);
+    assert.deepEqual(report.introducedErrors, []);
+    assert.deepEqual(report.worsenedErrors, []);
+    for (const entry of report.preExistingErrors) {
+      assert.equal(entry.classification, "pre-existing");
+      assert.equal(typeof entry.candidateMetric, "number");
+      assert.equal(typeof entry.baselineMetric, "number");
+      assert.equal(typeof entry.delta, "number");
+    }
+  } finally {
+    await rm(candidateDir, { recursive: true, force: true });
+    await rm(baselineDir, { recursive: true, force: true });
+  }
+});
+
+test("baseline-aware gate blocks a newly introduced over-threshold method", async () => {
+  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-introduced-cand-"));
+  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-introduced-base-"));
+  try {
+    const relativeFile = "src/pages/Example.tsx";
+    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
+    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
+    await writeFile(path.join(baselineDir, relativeFile), methodBodyFixture(93));
+    await writeFile(path.join(candidateDir, relativeFile), methodBodyFixture(118));
+    const reportPath = path.join(candidateDir, "architecture-report.json");
+    const result = await runBaselineAwareGate({
+      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
+    });
+    assert.equal(result.status, 1, result.stdout);
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(report.status, "FAIL");
+    assert.equal(report.exitCode, 1);
+    assert.ok(report.blockingErrorCount >= 1);
+    assert.equal(report.errors.length, report.blockingErrorCount);
+    const introduced = report.introducedErrors.filter((entry) => entry.message.includes("longest method"));
+    assert.ok(introduced.length >= 1);
+    for (const entry of introduced) {
+      assert.equal(entry.classification, "introduced");
+      assert.equal(entry.baselineMetric, null);
+      assert.equal(entry.delta, null);
+      assert.equal(typeof entry.candidateMetric, "number");
+    }
+    assert.ok(report.errors.some((entry) => introduced.some((match) => match.id === entry.id)));
+    assert.deepEqual(report.worsenedErrors, []);
+  } finally {
+    await rm(candidateDir, { recursive: true, force: true });
+    await rm(baselineDir, { recursive: true, force: true });
+  }
+});
+
+test("baseline-aware gate blocks a worsened pre-existing method beyond the allowed delta", async () => {
+  const worsenedCandidate = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-worsened-cand-"));
+  const worsenedBaseline = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-worsened-base-"));
+  const boundaryCandidate = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-boundary-cand-"));
+  const boundaryBaseline = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-boundary-base-"));
+  try {
+    const relativeFile = "src/pages/Example.tsx";
+    for (const directory of [worsenedCandidate, worsenedBaseline, boundaryCandidate, boundaryBaseline]) {
+      await mkdir(path.join(directory, path.dirname(relativeFile)), { recursive: true });
+    }
+    await writeFile(path.join(worsenedBaseline, relativeFile), methodBodyFixture(103));
+    await writeFile(path.join(worsenedCandidate, relativeFile), methodBodyFixture(128));
+    await writeFile(path.join(boundaryBaseline, relativeFile), methodBodyFixture(108));
+    await writeFile(path.join(boundaryCandidate, relativeFile), methodBodyFixture(128));
+
+    const worsenedReportPath = path.join(worsenedCandidate, "architecture-report.json");
+    const worsened = await runBaselineAwareGate({
+      candidateDir: worsenedCandidate, baselineDir: worsenedBaseline,
+      candidateFile: relativeFile, reportPath: worsenedReportPath
+    });
+    assert.equal(worsened.status, 1, worsened.stdout);
+    const worsenedReport = JSON.parse(await readFile(worsenedReportPath, "utf8"));
+    assert.equal(worsenedReport.status, "FAIL");
+    assert.equal(worsenedReport.exitCode, 1);
+    assert.ok(worsenedReport.blockingErrorCount >= 1);
+    const worsenedEntries = worsenedReport.worsenedErrors
+      .filter((entry) => entry.message.includes("longest method"));
+    assert.ok(worsenedEntries.length >= 1);
+    for (const entry of worsenedEntries) {
+      assert.equal(entry.classification, "worsened");
+      assert.equal(entry.delta, 25);
+      assert.equal(entry.candidateMetric, 130);
+      assert.equal(entry.baselineMetric, 105);
+    }
+    assert.ok(worsenedReport.errors.some((entry) => worsenedEntries.some((match) => match.id === entry.id)));
+
+    const boundaryReportPath = path.join(boundaryCandidate, "architecture-report.json");
+    const boundary = await runBaselineAwareGate({
+      candidateDir: boundaryCandidate, baselineDir: boundaryBaseline,
+      candidateFile: relativeFile, reportPath: boundaryReportPath
+    });
+    assert.equal(boundary.status, 0, boundary.stdout);
+    const boundaryReport = JSON.parse(await readFile(boundaryReportPath, "utf8"));
+    assert.equal(boundaryReport.status, "PASS");
+    assert.equal(boundaryReport.exitCode, 0);
+    assert.equal(boundaryReport.blockingErrorCount, 0);
+    assert.deepEqual(boundaryReport.introducedErrors, []);
+    assert.deepEqual(boundaryReport.worsenedErrors, []);
+    const boundaryPreExisting = boundaryReport.preExistingErrors
+      .filter((entry) => entry.message.includes("longest method"));
+    assert.ok(boundaryPreExisting.length >= 1);
+    for (const entry of boundaryPreExisting) {
+      assert.equal(entry.classification, "pre-existing");
+      assert.equal(entry.delta, 20);
+      assert.equal(entry.candidateMetric, 130);
+      assert.equal(entry.baselineMetric, 110);
+    }
+  } finally {
+    await rm(worsenedCandidate, { recursive: true, force: true });
+    await rm(worsenedBaseline, { recursive: true, force: true });
+    await rm(boundaryCandidate, { recursive: true, force: true });
+    await rm(boundaryBaseline, { recursive: true, force: true });
+  }
+});
+
+function javaMethodBodyFixture(lineCount) {
+  const lines = ["class LongMethod {", "  public void calculate(int input) {"];
+  for (let index = 0; index < lineCount; index += 1) lines.push(`    int value${index} = ${index};`);
+  lines.push("    return;");
+  lines.push("  }");
+  lines.push("}");
+  return `${lines.join("\n")}\n`;
+}
+
+test("baseline-aware gate still blocks over-long Java methods", async () => {
+  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-java-cand-"));
+  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-java-base-"));
+  try {
+    const relativeFile = "src/main/java/demo/LongMethod.java";
+    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
+    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
+    await writeFile(path.join(baselineDir, relativeFile), javaMethodBodyFixture(95));
+    await writeFile(path.join(candidateDir, relativeFile), javaMethodBodyFixture(120));
+    const reportPath = path.join(candidateDir, "architecture-report.json");
+    const result = await runBaselineAwareGate({
+      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
+    });
+    assert.equal(result.status, 1, result.stdout);
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(report.status, "FAIL");
+    assert.ok(report.blockingErrorCount >= 1);
+    const introduced = report.introducedErrors
+      .filter((entry) => entry.message.includes("longest method"));
+    assert.ok(introduced.length >= 1);
+    for (const entry of introduced) {
+      assert.equal(entry.classification, "introduced");
+      assert.equal(entry.baselineMetric, null);
+      assert.equal(entry.delta, null);
+      assert.equal(typeof entry.candidateMetric, "number");
+      assert.ok(entry.candidateMetric > 100);
+    }
+    assert.ok(report.errors.some((entry) => introduced.some((match) => match.id === entry.id)));
+    assert.deepEqual(report.worsenedErrors, []);
+    assert.equal(report.candidateIdentity, "candidate-baseline-aware");
+  } finally {
+    await rm(candidateDir, { recursive: true, force: true });
+    await rm(baselineDir, { recursive: true, force: true });
+  }
+});
+
+test("architecture gate keeps strict behavior when no baseline is supplied", async () => {
+  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-strict-no-baseline-"));
+  try {
+    const relativeFile = "src/pages/Example.tsx";
+    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
+    await writeFile(path.join(candidateDir, relativeFile), methodBodyFixture(118));
+    const reportPath = path.join(candidateDir, "architecture-report.json");
+    const script = path.resolve("scripts/check-ai-architecture.mjs");
+    const result = spawnSync(process.execPath, [script,
+      "--files", path.resolve(candidateDir, relativeFile),
+      "--candidate-identity", "strict-candidate",
+      "--json-output", reportPath
+    ], { cwd: candidateDir, encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout);
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(report.status, "FAIL");
+    assert.equal(report.errors.length, report.errorCount);
+    assert.ok(report.errors.length >= 1);
+    assert.ok(report.errors.some((entry) => entry.message.includes("longest method")));
+    assert.equal(report.baselineIdentity, undefined);
+    assert.equal(report.blockingErrorCount, undefined);
+    assert.equal(report.introducedErrors, undefined);
+    assert.equal(report.worsenedErrors, undefined);
+    assert.equal(report.preExistingErrors, undefined);
+  } finally {
+    await rm(candidateDir, { recursive: true, force: true });
+  }
+});
+
+test("architecture report binds candidate and baseline identity and the full governance suite passes", async () => {
+  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-identity-bind-cand-"));
+  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-identity-bind-base-"));
+  try {
+    const relativeFile = "src/pages/Example.tsx";
+    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
+    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
+    await writeFile(path.join(baselineDir, relativeFile), methodBodyFixture(148));
+    await writeFile(path.join(candidateDir, relativeFile),
+      securitySelectorIntegrationFixture(148));
+    const reportPath = path.join(candidateDir, "architecture-report.json");
+    const script = path.resolve("scripts/check-ai-architecture.mjs");
+    const baselineAbs = path.resolve(baselineDir);
+    const candidateAbs = path.resolve(candidateDir, relativeFile);
+    const result = spawnSync(process.execPath, [script,
+      "--files", candidateAbs,
+      "--baseline", baselineAbs,
+      "--candidate-identity", "cand-X",
+      "--json-output", reportPath
+    ], { cwd: candidateDir, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stdout);
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(report.candidateIdentity, "cand-X");
+    assert.equal(report.baselineIdentity, baselineAbs);
+    assert.equal(report.errorCount, 0);
+    assert.equal(report.status, "PASS");
+    assert.equal(report.exitCode, 0);
+
+    const suiteScript = path.resolve("scripts/run-ai-governance-gates.mjs");
+    const suite = spawnSync(process.execPath, [suiteScript],
+      { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" });
+    assert.equal(suite.status, 0, suite.stderr);
+  } finally {
+    await rm(candidateDir, { recursive: true, force: true });
+    await rm(baselineDir, { recursive: true, force: true });
+  }
+});
+
+test("baseline-aware gate treats a missing baseline file as introduced not silently dropped", async () => {
+  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-missing-cand-"));
+  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-missing-base-"));
+  try {
+    const relativeFile = "src/pages/Example.tsx";
+    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
+    await mkdir(path.join(baselineDir, "src", "unrelated"), { recursive: true });
+    await writeFile(path.join(candidateDir, relativeFile), methodBodyFixture(118));
+    await writeFile(path.join(baselineDir, "src/unrelated/Other.tsx"), methodBodyFixture(10));
+    const reportPath = path.join(candidateDir, "architecture-report.json");
+    const result = await runBaselineAwareGate({
+      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
+    });
+    assert.equal(result.status, 1, result.stdout);
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(report.status, "FAIL");
+    assert.ok(report.blockingErrorCount >= 1);
+    const introduced = report.introducedErrors
+      .filter((entry) => entry.message.includes("longest method"));
+    assert.ok(introduced.length >= 1);
+    for (const entry of introduced) {
+      assert.equal(entry.classification, "introduced");
+      assert.equal(entry.baselineMetric, null);
+      assert.equal(entry.delta, null);
+      assert.equal(typeof entry.candidateMetric, "number");
+    }
+    assert.ok(report.errors.some((entry) => introduced.some((match) => match.id === entry.id)));
+    assert.deepEqual(report.worsenedErrors, []);
+    assert.deepEqual(report.preExistingErrors, []);
+  } finally {
+    await rm(candidateDir, { recursive: true, force: true });
+    await rm(baselineDir, { recursive: true, force: true });
+  }
+});
