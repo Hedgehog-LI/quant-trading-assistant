@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "ARCH-GATE-BASELINE-AWARE-20260802",
+  "roleRunId": "VER-AGBA-1",
+  "sessionId": "ver-agba-1-session",
+  "testId": "TEST-AG-STATIC",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+  "command": [
+    "node",
+    "scripts/run-ai-governance-gates.mjs"
+  ],
+  "startedAt": "2026-08-02T10:16:13.549Z",
+  "finishedAt": "2026-08-02T10:16:16.935Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "29ffce3f66a884da36b78a5b19d0c7a4a69f8ec93b20c7c0f8e6d041ac8fc68d",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "QTA AI governance gates passed"
+  ],
+  "observedSelectors": [
+    "QTA AI governance gates passed"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "8e92182b3e5abbf056931bc5bbb8c4e7efd1986b2fc94763ca9323e08f6dfb26",
+    "diffSha256": "f62f98ee271dbb0388028e99cb737b685b296d2745f0e1824ec0fcf0d21c7027"
+  },
+  "candidateAfter": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "8e92182b3e5abbf056931bc5bbb8c4e7efd1986b2fc94763ca9323e08f6dfb26",
+    "diffSha256": "f62f98ee271dbb0388028e99cb737b685b296d2745f0e1824ec0fcf0d21c7027"
+  },
+  "candidateUnchanged": true
+}

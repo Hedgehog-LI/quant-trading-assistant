@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "ARCH-GATE-BASELINE-AWARE-20260802",
+  "roleRunId": "VER-AGBA-1",
+  "sessionId": "ver-agba-1-session",
+  "testId": "TEST-AG-07",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/ai-governance.test.mjs"
+  ],
+  "startedAt": "2026-08-02T10:11:44.829Z",
+  "finishedAt": "2026-08-02T10:11:47.757Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "631ee91c7b4e67b4e7f621e6c606c46daff26e1b60c81e11f46ebcddeda8d1fa",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "baseline-aware gate treats a missing baseline file as introduced not silently dropped"
+  ],
+  "observedSelectors": [
+    "baseline-aware gate treats a missing baseline file as introduced not silently dropped"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "9dc06dea1c7a6d2683eb2b7ba15ce7c0ff721de5663b35cb8ea0e217072f12db",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "9dc06dea1c7a6d2683eb2b7ba15ce7c0ff721de5663b35cb8ea0e217072f12db",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

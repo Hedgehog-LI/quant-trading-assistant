@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "ARCH-GATE-BASELINE-AWARE-20260802",
+  "roleRunId": "VER-AGBA-1",
+  "sessionId": "ver-agba-1-session",
+  "testId": "TEST-AG-04",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/ai-governance.test.mjs"
+  ],
+  "startedAt": "2026-08-02T10:11:35.024Z",
+  "finishedAt": "2026-08-02T10:11:38.074Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "362bcb560c20fc70518a6e4368971bbb3998d6793d9beacca99a95fe5d6ff184",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "baseline-aware gate still blocks over-long Java methods"
+  ],
+  "observedSelectors": [
+    "baseline-aware gate still blocks over-long Java methods"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "c39667d1cedd22ad76ea02d31c3b6c6248b8ea06cd6b0eece55498fc2637e38c",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "c39667d1cedd22ad76ea02d31c3b6c6248b8ea06cd6b0eece55498fc2637e38c",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

@@ -3,11 +3,15 @@
 ## Contract Identity
 
 - Status: `FROZEN`
-- Contract version: 2
-- Frozen at: 2026-08-02T09:20:00Z
+- Contract version: 3
+- Frozen at: 2026-08-02T10:20:00Z
 - Frozen by parent run: codex-parent-arch-gate-baseline-aware-1
 - Lane: `L2`
 - Test-designer amendment accepted: BA-1/BA-2/BA-3 + TEST-AG-07 (within L2 cap of 3 blocking amendments).
+- Version 3 amendment: AC-06 requiredEvidence corrected to AUTOMATION only. The STATIC governance-suite gate
+  is asserted inside TEST-AG-06's body (spawnSync run-ai-governance-gates.mjs exit 0), so the AUTOMATION
+  receipt already proves the STATIC suite. This corrects a version-2 inventory/evidence mismatch (AC-06
+  required STATIC but the inventory had no STATIC test). The candidate code/tests/doc are unchanged.
 
 This is a governance/tooling task. It does **not** change any business code, the three large React page
 files, or D2's frontend implementation. It changes the architecture detector so pre-existing baseline debt
@@ -97,7 +101,7 @@ methods in pages D2 only touched with small integration code. D2 restoration is 
 | AC-03 | A pre-existing offending metric that the candidate worsens beyond the allowed delta blocks as `worsened`; a worsening within the delta is `pre-existing`. | Candidate dir grows the offending metric beyond baseline+delta (delta=25 case, e.g., 105→130) AND a delta-exactly-equal-to-default case (e.g., 100→120 with default 20). | delta>default ⇒ `status=FAIL`, `exitCode=1`, error in `worsenedErrors[]`/`errors[]` with `delta` recorded; delta==default ⇒ `pre-existing`, non-blocking. | AUTOMATION | AUTOMATION | IMPLEMENTER | NOT_STARTED |
 | AC-04 | Java over-long methods still block under baseline mode and the report binds to candidate identity. | Candidate dir adds/grows a >100-line Java method; `--baseline` + `--candidate-identity` set. | Java method error blocks (introduced or worsened per BA-2); `report.candidateIdentity == input`. | AUTOMATION | AUTOMATION | IMPLEMENTER | NOT_STARTED |
 | AC-05 | Without `--baseline` the detector keeps strict behavior and emits no baseline fields. | Same `--files`/`--base` invocation as today, no `--baseline`. | Any emitted error ⇒ `exitCode=1`; report has no `baselineIdentity`/`introducedErrors`/`worsenedErrors`/`preExistingErrors` fields (or they are empty); `errorCount == errors.length`; existing architecture tests unchanged. | AUTOMATION+STATIC | AUTOMATION | IMPLEMENTER | NOT_STARTED |
-| AC-06 | Report binds candidate+baseline identity, the report is self-coherent, and the full governance suite passes. | Baseline-aware run with `--candidate-identity`, `--baseline`, `--json-output`. | `candidateIdentity`/`baselineIdentity == inputs`; a report with only pre-existing errors has `errorCount==0`; `node scripts/run-ai-governance-gates.mjs` exits 0 (asserted inside the test body via spawnSync status 0). | AUTOMATION+STATIC | AUTOMATION | IMPLEMENTER | NOT_STARTED |
+| AC-06 | Report binds candidate+baseline identity, the report is self-coherent, and the full governance suite passes. | Baseline-aware run with `--candidate-identity`, `--baseline`, `--json-output`. | `candidateIdentity`/`baselineIdentity == inputs`; a report with only pre-existing errors has `errorCount==0`; `node scripts/run-ai-governance-gates.mjs` exits 0 (asserted inside the test body via spawnSync status 0). | AUTOMATION | AUTOMATION | IMPLEMENTER | NOT_STARTED |
 
 ## Verification Plan
 

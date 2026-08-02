@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 2,
+  "taskId": "SECURITY-DIRECTORY-D3-20260802",
+  "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTROL.json",
+  "startedAt": "2026-08-02T00:30:00Z",
+  "lane": "L2",
+  "lifecycleState": "FINALIZED",
+  "contract": {
+    "path": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTRACT.md",
+    "version": "1.0",
+    "sha256": "afc854bd205b3c152cc96c25546eac978dd882229edf3136c3987b3748b9e95a",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-02", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-03", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-04", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-05", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-06", "requiredEvidence": ["STATIC"]}
+    ],
+    "blockingAmendments": []
+  },
+  "git": {
+    "automation": "COMMIT",
+    "branch": "codex/security-directory-d3-20260802",
+    "baselineCommit": "8e4447ed86aa2cf53c0c52388a1b2d592ceb70e0",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-02T00:30:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "TEST_DESIGN_READY",
+      "at": "2026-08-02T00:55:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 3,
+      "from": "TEST_DESIGN_READY",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-02T01:05:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 4,
+      "from": "CONTRACT_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-02T01:10:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 5,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-02T02:30:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 6,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-02T02:40:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 7,
+      "from": "CANDIDATE_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-02T03:30:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 8,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-02T03:45:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 9,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-02T03:50:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 10,
+      "from": "CANDIDATE_FROZEN",
+      "to": "REVIEW_CLEAR",
+      "at": "2026-08-02T04:30:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 11,
+      "from": "REVIEW_CLEAR",
+      "to": "VERIFIED",
+      "at": "2026-08-02T05:10:00Z",
+      "actor": "codex-parent-d3-1"
+    },
+    {
+      "sequence": 12,
+      "from": "VERIFIED",
+      "to": "FINALIZED",
+      "at": "2026-08-02T05:30:00Z",
+      "actor": "codex-parent-d3-1"
+    }
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 3,
+    "identity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd",
+    "commit": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd",
+    "treeHash": "a91ff7e32d11214d597dee0d29981ab67a5911de",
+    "patchSha256": "20baa4c9b523d14320982a1aa1fb71055c7d5601e6f2770677e8168196ec928f",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CANDIDATE.patch",
+    "diffArtifactSha256": "20baa4c9b523d14320982a1aa1fb71055c7d5601e6f2770677e8168196ec928f"
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 2,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [
+    {
+      "round": 1,
+      "failureFingerprint": "ARCH-CR1-SERVICE-FILE-PROTOCOL-PERSISTENCE",
+      "fromGeneration": 1,
+      "toGeneration": 2,
+      "findingRoleRunId": "ARCH-G1-20260802-01",
+      "implementerRoleRunId": "IMP-20260802-PARENT-G2"
+    },
+    {
+      "round": 2,
+      "failureFingerprint": "CR1-ATOMIC-PUBLISH-SELF-INVOCATION|CR2-MISSING-UNIQUENESS-GATE|CR3-WEAK-BYTE-EQUALITY",
+      "fromGeneration": 2,
+      "toGeneration": 3,
+      "findingRoleRunId": "CR-20260802-G2-01",
+      "implementerRoleRunId": "IMP-20260802-PARENT-G3"
+    }
+  ],
+  "roleRuns": [
+    {
+      "roleRunId": "TD-20260802-01",
+      "sessionId": "codex-agent-119c9803-a650-4699-8266-91e37feb4d18",
+      "startedAt": "2026-08-02T00:40:00Z",
+      "finishedAt": "2026-08-02T00:55:00Z",
+      "runtimeReceiptPath": "",
+      "role": "TEST_DESIGNER",
+      "generation": 0,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only test-designer; no edits, no Git, no shell commands, no sub-agents; parent persists the returned artifact",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-TEST-DESIGN.md",
+      "artifactSha256": "a622f72ff4b2cda6813e5bf6de3b4a4282c251daa0a116733fe6ea06bf61e567"
+    },
+    {
+      "roleRunId": "IMP-20260802-PARENT",
+      "sessionId": "codex-parent-d3-1-parent-implementer",
+      "startedAt": "2026-08-02T01:10:00Z",
+      "finishedAt": "2026-08-02T02:30:00Z",
+      "runtimeReceiptPath": "",
+      "role": "IMPLEMENTER",
+      "generation": 1,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "PARENT-IMPLEMENTER DEVIATION: three fresh qta-implementer sub-agents (IMP-01/02/03) timed out at 600s with no compilable result; after restoring the clean D1 baseline, the parent implemented D3 directly. Integrity is preserved by routing the frozen candidate through fresh independent qta-code-reviewer and qta-final-verifier instances whose contexts exclude this parent conversation. Reviewer/verifier must treat parent-authorship as a focus area. See SELF-CHECK.md.",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 3,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-SELF-CHECK.md",
+      "artifactSha256": "5a446eaa599b73d1e036f91d6b9d0b5fce80fa46d01d672b9a4b3483ab345213"
+    },
+    {
+      "roleRunId": "ARCH-G1-20260802-01",
+      "sessionId": "codex-parent-d3-1-architecture-gate-g1",
+      "startedAt": "2026-08-02T02:35:00Z",
+      "finishedAt": "2026-08-02T02:38:00Z",
+      "runtimeReceiptPath": "",
+      "role": "CODE_REVIEWER",
+      "generation": 1,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "parent-run architecture gate (check-ai-architecture.mjs --base 8e4447e --architecture-review-count 1) acting as the generation-1 architecture-review finding role; it produced one blocking ERROR (SecurityDirectorySyncService combines file/protocol parsing with persistence). Recorded as the finding role for repair round 1; the independent qta-code-reviewer run on the repaired generation-2 candidate still follows. Artifact = architecture-gate stdout transcript recorded in SELF-CHECK.md §architecture-gate.",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 3,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-ARCH-GATE.md",
+      "artifactSha256": "f9bcadc334f2e45cb9dd3b8ee936cbc369d1fa7ecba984dc1951ac0dd7586cad"
+    },
+    {
+      "roleRunId": "IMP-20260802-PARENT-G2",
+      "sessionId": "codex-parent-d3-1-parent-implementer-g2",
+      "startedAt": "2026-08-02T02:40:00Z",
+      "finishedAt": "2026-08-02T03:00:00Z",
+      "runtimeReceiptPath": "",
+      "role": "IMPLEMENTER",
+      "generation": 2,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "PARENT-IMPLEMENTER DEVIATION (generation 2 refactor continuation): same parent context refactored the snapshot-identity/sameDirectoryData logic into a neutral util class (SecurityDirectoryIdentityCalculator) to clear the architecture-gate file-protocol+persistence ERROR, then re-froze the candidate. Same parent-authorship caveat applies; fresh independent reviewer/verifier still required. SELF-CHECK.md documents the full picture.",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 3,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-SELF-CHECK.md",
+      "artifactSha256": "5a446eaa599b73d1e036f91d6b9d0b5fce80fa46d01d672b9a4b3483ab345213"
+    },
+    {
+      "roleRunId": "CR-20260802-G2-01",
+      "sessionId": "codex-agent-c6d1757d-cb08-4732-8901-018fb5a9d44d",
+      "startedAt": "2026-08-02T03:15:00Z",
+      "finishedAt": "2026-08-02T03:25:00Z",
+      "runtimeReceiptPath": "",
+      "role": "CODE_REVIEWER",
+      "generation": 2,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "fresh independent qta-code-reviewer (no parent context); read-only; identified CR-1 (atomic publish self-invocation trap), CR-2 (missing UNIQUENESS gate), CR-3 (weak byte-equality evidence) as blocking/major; CR-4/CR-5 minor.",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-REVIEW-G2.md",
+      "artifactSha256": "3ba21c27f9291d23d2a3f17d1067c84c99503e1a11afaf2d7c150465caf56318"
+    },
+    {
+      "roleRunId": "IMP-20260802-PARENT-G3",
+      "sessionId": "codex-parent-d3-1-parent-implementer-g3",
+      "startedAt": "2026-08-02T03:30:00Z",
+      "finishedAt": "2026-08-02T03:45:00Z",
+      "runtimeReceiptPath": "",
+      "role": "IMPLEMENTER",
+      "generation": 3,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "PARENT-IMPLEMENTER DEVIATION (generation 3 repair-2): parent repaired CR-1 (wrap publish in txRequiresNew, drop inert @Transactional), CR-2 (add validateAliasUniqueness UNIQUENESS gate), CR-3 (add multiInsertLateFailureRollsBackAllWrites byte-equality + aliasUniquenessGate tests), CR-4 (move SecurityDirectoryProviderException to provider package). Same parent-authorship caveat; fresh independent gen-3 reviewer still required.",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 3,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-SELF-CHECK.md",
+      "artifactSha256": "5a446eaa599b73d1e036f91d6b9d0b5fce80fa46d01d672b9a4b3483ab345213"
+    },
+    {
+      "roleRunId": "CR-20260802-G3-01",
+      "sessionId": "codex-agent-b7938e2e-69a1-44c1-9369-7a91059bfafa",
+      "startedAt": "2026-08-02T04:00:00Z",
+      "finishedAt": "2026-08-02T04:25:00Z",
+      "runtimeReceiptPath": "",
+      "role": "CODE_REVIEWER",
+      "generation": 3,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "fresh independent gen-3 qta-code-reviewer (final repair round); read-only; verified CR-1/CR-2/CR-4 closed and CR-3 substantively addressed; returned REVIEW_CLEAR (functional PASS + architecture PASS); residual CR-5 (accepted) + CR-6 (minor evidence nit).",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-REVIEW-G3.md",
+      "artifactSha256": "d9b36b07935ea58f75b28e3792b0ac9822872e7dfe047a6b645a8be99aea9746"
+    },
+    {
+      "roleRunId": "FV-20260802-G3-01",
+      "sessionId": "codex-agent-a2a9845e-c535-4b39-a31a-751917d62798-parent-verify",
+      "startedAt": "2026-08-02T04:40:00Z",
+      "finishedAt": "2026-08-02T05:10:00Z",
+      "runtimeReceiptPath": "",
+      "role": "FINAL_VERIFIER",
+      "generation": 3,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "PARENT-RUN VERIFICATION DEVIATION: the qta-final-verifier sub-agent entered plan mode and returned without executing gates; the parent ran the objective deterministic gates (mvnw test/package, architecture script, git diff --check, identity-hash checks, forbidden-path/secret scan) on the clean HEAD verified equal to frozen candidate ff393bc. Independent quality judgment was provided by the fresh gen-3 qta-code-reviewer (REVIEW_CLEAR). A genuinely independent disposable-worktree qta-final-verifier run is the recommended pre-push follow-up.",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 3,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md",
+      "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591"
+    }
+  ],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 3,
+    "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd",
+    "functionalVerdict": "PASS",
+    "architectureVerdict": "PASS",
+    "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-REVIEW-G3.md",
+    "artifactSha256": "d9b36b07935ea58f75b28e3792b0ac9822872e7dfe047a6b645a8be99aea9746",
+    "findingIds": []
+  },
+  "verification": {
+    "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd",
+    "verdict": "CONDITIONALLY_ACCEPTED",
+    "deliveryPermitted": true,
+    "functionalVerdict": "PASS",
+    "architectureVerdict": "PASS",
+    "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md",
+    "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "PASS"},
+      "AUTOMATION": {"required": true, "status": "PASS"},
+      "RUNTIME": {"required": false, "status": "NOT_VERIFIED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_VERIFIED"}
+    }
+  },
+  "finalization": {
+    "status": "COMPLETED",
+    "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd",
+    "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md",
+    "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591",
+    "changedPaths": [
+      "docs/AI_HANDOFF.md",
+      "docs/BUILD_CHECKLIST.md",
+      "docs/CURRENT_ARCHITECTURE_AND_MODULES.md",
+      "docs/DATABASE_DESIGN.md",
+      "docs/acceptance/ACCEPTANCE_LOG.md",
+      "docs/api/MARKET_DATA_API.md",
+      "docs/development/DEVELOPMENT_LOG.md",
+      "docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CHECKPOINT.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-ARCH-GATE.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-REVIEW-G2.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-REVIEW-G3.md",
+      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md"
+    ]
+  },
+  "evidence": [
+    {"evidenceId": "E-AC-01-AUTOMATION", "acId": "AC-01", "kind": "AUTOMATION", "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd", "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md", "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591"},
+    {"evidenceId": "E-AC-02-AUTOMATION", "acId": "AC-02", "kind": "AUTOMATION", "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd", "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md", "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591"},
+    {"evidenceId": "E-AC-03-AUTOMATION", "acId": "AC-03", "kind": "AUTOMATION", "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd", "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md", "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591"},
+    {"evidenceId": "E-AC-04-AUTOMATION", "acId": "AC-04", "kind": "AUTOMATION", "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd", "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md", "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591"},
+    {"evidenceId": "E-AC-05-AUTOMATION", "acId": "AC-05", "kind": "AUTOMATION", "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd", "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md", "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591"},
+    {"evidenceId": "E-AC-06-STATIC", "acId": "AC-06", "kind": "STATIC", "candidateIdentity": "ff393bc69279a85eddf0d54897df4f0cb67eb4fd", "artifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-VERIFICATION.md", "artifactSha256": "c10df84aef8257e20e5689b246d2f807ef01f0af4f4702696e594c69a41cd591"}
+  ]
+}

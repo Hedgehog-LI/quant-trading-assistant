@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "ARCH-GATE-BASELINE-AWARE-20260802",
+  "roleRunId": "VER-AGBA-1",
+  "sessionId": "ver-agba-1-session",
+  "testId": "TEST-AG-03",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/ai-governance.test.mjs"
+  ],
+  "startedAt": "2026-08-02T10:11:31.865Z",
+  "finishedAt": "2026-08-02T10:11:34.837Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "2a9a50444bf029cbfb3397112f064d0742515996b10af1201f99b03383fe5186",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "baseline-aware gate blocks a worsened pre-existing method beyond the allowed delta"
+  ],
+  "observedSelectors": [
+    "baseline-aware gate blocks a worsened pre-existing method beyond the allowed delta"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "386ee736b632403df100159c1f411a6ee7d89c8e0fbb95d75e1cb671104bb905",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "386ee736b632403df100159c1f411a6ee7d89c8e0fbb95d75e1cb671104bb905",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

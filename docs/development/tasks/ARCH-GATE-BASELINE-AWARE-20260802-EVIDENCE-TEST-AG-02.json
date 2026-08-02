@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "ARCH-GATE-BASELINE-AWARE-20260802",
+  "roleRunId": "VER-AGBA-1",
+  "sessionId": "ver-agba-1-session",
+  "testId": "TEST-AG-02",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/ai-governance.test.mjs"
+  ],
+  "startedAt": "2026-08-02T10:11:28.550Z",
+  "finishedAt": "2026-08-02T10:11:31.687Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "6fcc901e52e4aa6e76fb426ef8cceda4d01c50bafb3dc04973699994b5b7b021",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "baseline-aware gate blocks a newly introduced over-threshold method"
+  ],
+  "observedSelectors": [
+    "baseline-aware gate blocks a newly introduced over-threshold method"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "8b331fc3ff43e9e8a0bb50b8124b2bff9c4a3c6a06a78e196171385146ba4af7",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "5aceef0aeb77b701c1f34dc0ee96b4c30ba404af",
+    "tree": "8c97abc4de33ae50166cb78515f70367811759bc",
+    "statusSha256": "8b331fc3ff43e9e8a0bb50b8124b2bff9c4a3c6a06a78e196171385146ba4af7",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

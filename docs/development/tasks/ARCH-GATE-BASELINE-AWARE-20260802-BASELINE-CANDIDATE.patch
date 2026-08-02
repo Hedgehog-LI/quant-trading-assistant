@@ -1,0 +1,1900 @@
+diff --git a/docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md b/docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md
+new file mode 100644
+index 0000000..37982c7
+--- /dev/null
++++ b/docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md
+@@ -0,0 +1,93 @@
++# Architecture Gate: Baseline-Aware Mode
++
++## Purpose
++
++`scripts/check-ai-architecture.mjs` can run in **baseline-aware** mode so that architecture debt a candidate
++does **not** worsen is recorded as debt instead of a hard block, while newly introduced or materially
++worsened violations still block. This lets cross-cutting tasks land small integration changes against files
++that already carry pre-existing architecture debt, without masking new violations.
++
++## When to use
++
++Pass a baseline when the candidate touches files with **KNOWN, pre-existing** architecture debt (for example,
++the three large React page files in the Security Directory work, whose `longest method > 100` errors pre-date
++the candidate). Baseline-aware mode is the detector-repair route prescribed by
++`GOVERNANCE_V2_POLICY.md` §Architecture Gate for cases where a machine architecture error is pre-existing
++rather than introduced by the candidate.
++
++Do **not** use baseline-aware mode to mask new violations. A brand-new offending method/component that crosses
++a hard threshold the baseline did not cross always blocks, regardless of delta.
++
++## How to use
++
++Provide `--baseline <dir>`, where `<dir>` is a directory holding the baseline source files at their
++repo-relative paths, together with the usual gate options:
++
++```sh
++node scripts/check-ai-architecture.mjs \
++  --base <git-ref> \
++  --files <candidate-files...> \
++  --baseline <baseline-dir> \
++  --candidate-identity <frozen-candidate-id> \
++  --json-output <report.json>
++```
++
++The baseline directory **must be the real frozen baseline**. Never omit files to hide debt: a candidate file
++that is missing from the baseline directory is classified `introduced` (blocking) — a missing baseline file is
++never silently dropped. Reuse `--base <git-ref>` for candidate-file selection and additions exactly as in the
++strict path; the baseline directory only supplies baseline source for per-file comparison.
++
++When no `--baseline` is supplied, the detector is byte-for-byte unchanged: every error blocks and the report
++contains no baseline fields.
++
++## Classification semantics
++
++Classification is per **candidate file × error rule** (the granularity `analyzeSource` supports today). For
++each candidate file error, the same rule is evaluated against the baseline source of that file:
++
++| Classification | When | Blocking |
++|---|---|---|
++| `introduced` | The rule fires for the candidate but did **not** fire for the baseline file (band-crossing), **or** the candidate file is absent from the baseline directory (anti-masking). | yes |
++| `worsened` | The rule fires for **both** baseline and candidate AND the candidate's offending metric exceeds the baseline metric by more than the allowed delta. Applies to quantifiable metrics (significant lines, longest method, methods, dependencies). | yes |
++| `pre-existing` | The rule fires for both and the candidate is within the allowed delta, **or** the rule is a non-quantifiable binary rule (SQL-outside-mapper, layer-crossing, service-file-persist) that fires for both. | no |
++
++A brand-new offending method that causes a file to newly cross a threshold is `introduced` (band-crossing),
++never `worsened`, so it blocks regardless of delta.
++
++**Default allowed worsen delta = 20** quantifiable units (lines or method-line count). This permits small
++integration additions without false `worsened` labels, while blocking material growth. Candidate-level errors
++(review-count thresholds) are always blocking and are not classified against the baseline.
++
++## Report fields
++
++In baseline-aware mode the JSON report carries, alongside the existing fields:
++
++- `baselineIdentity` — the verbatim `--baseline` argument.
++- `blockingErrorCount` — count of blocking errors (`introduced` + `worsened` + candidate-level).
++- `introducedErrors[]`, `worsenedErrors[]`, `preExistingErrors[]` — the classified split.
++- Each detail records `id`, `file`, `message`, `classification`, `candidateMetric`, `baselineMetric`
++  (`null` when the rule did not fire at baseline, i.e. `introduced`), and `delta` (`null` for `introduced`
++  and for non-quantifiable rules).
++
++**Coherence invariant:** `errors[]` contains **only** blocking errors; `preExistingErrors[]` holds the
++non-blocking pre-existing errors. `errorCount == errors.length == blockingErrorCount`, and
++`errorCount == 0` iff `status == "PASS"` iff `exitCode == 0`. The exit code is decided solely by
++`blockingErrorCount`.
++
++`check-ai-task-control.mjs` validates the candidate-bound report against `report.errors.length`, so a
++candidate records `architectureGate.errorCount = blockingErrorCount`.
++
++## Honesty rule
++
++The baseline must be the real frozen baseline at the candidate's repo-relative paths. Omitting a file from the
++baseline directory to suppress its errors classifies every error for that file as `introduced` (blocking) —
++debt cannot be hidden by absence. Classification is per-error vs the baseline, never a wholesale file-category
++exclusion.
++
++## Motivating case
++
++This mode unblocks `SECURITY-DIRECTORY-D2-20260802-RESLICE`, whose three architecture errors are pre-existing
++`longest method > 100` errors in React page files that the D2 candidate touched only with small
++`SecuritySelector` integration additions. See `GOVERNANCE_V2_POLICY.md` §Architecture Gate for the detector
++repair route and `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTRACT.md` for the governing
++contract.
+diff --git a/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTRACT.md b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTRACT.md
+new file mode 100644
+index 0000000..8bcc6ee
+--- /dev/null
++++ b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTRACT.md
+@@ -0,0 +1,182 @@
++# Task Contract: ARCH-GATE-BASELINE-AWARE-20260802 Architecture gate baseline/diff-aware detection
++
++## Contract Identity
++
++- Status: `FROZEN`
++- Contract version: 2
++- Frozen at: 2026-08-02T09:20:00Z
++- Frozen by parent run: codex-parent-arch-gate-baseline-aware-1
++- Lane: `L2`
++- Test-designer amendment accepted: BA-1/BA-2/BA-3 + TEST-AG-07 (within L2 cap of 3 blocking amendments).
++
++This is a governance/tooling task. It does **not** change any business code, the three large React page
++files, or D2's frontend implementation. It changes the architecture detector so pre-existing baseline debt
++that a candidate does not worsen is recorded as debt instead of a hard block, while newly introduced or
++worsened errors still block.
++
++## Objective
++
++Make `scripts/check-ai-architecture.mjs` baseline-aware/diff-aware. When an explicit baseline source is
++provided, the gate classifies each candidate file's errors into `introducedErrors`, `worsenedErrors`, and
++`preExistingErrors`. Exit code is decided solely by `blockingErrorCount` (introduced + worsened). Pre-existing
++debt that the candidate does not worsen is recorded but does not block. When no baseline is provided the
++detector keeps its current strict behavior (every error blocks).
++
++This unblocks SECURITY-DIRECTORY-D2-20260802-RESLICE, whose 3 architecture errors are pre-existing long React
++methods in pages D2 only touched with small integration code. D2 restoration is a **separate** later task.
++
++## Authority
++
++- Product/design: none (governance tooling).
++- Architecture/governance authority:
++  `.agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md` §Architecture Gate
++  ("A reviewer cannot waive a machine architecture error. If the detector itself is wrong, repair and
++  validate the detector in a separate governed task, then regenerate the candidate-bound report.").
++- Skill authority: `.agents/skills/qta-development-orchestration/SKILL.md` §Architecture Gate.
++- Existing detector + tests: `scripts/check-ai-architecture.mjs`, `scripts/tests/ai-governance.test.mjs`.
++- Baseline commit (backend/governance): `979b080` (current `codex/security-directory-d2-20260802` HEAD).
++- Baseline branch: `codex/security-directory-d2-20260802`.
++- Pre-existing dirty paths: `docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CANDIDATE.patch`,
++  `docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTROL.json`, and all
++  `SECURITY-DIRECTORY-D2-20260802*` task artifacts already present.
++- Allowed write paths: `scripts/check-ai-architecture.mjs`, `scripts/tests/ai-governance.test.mjs`,
++  `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-*.md|.json|.patch`, and the governance doc
++  `docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md` (new). No other paths.
++
++## Facts And Decisions
++
++| Type | Item |
++|---|---|
++| FACT | D2 RESLICE is BLOCKED only by 3 architecture errors, all `longest method > 100` from 3 React page files (`market-data.tsx` 115, `market-workspace.tsx` 210, `market-segments.tsx` 148). D2 added 3–13 lines of SecuritySelector integration to each and did not create those methods. |
++| FACT | Measured against the frozen frontend baseline `80c38324`: `market-data.tsx` longest=115 (candidate 115, unchanged), `market-workspace.tsx` longest=199 (candidate 210, +11 within allowed delta, no new error category), `market-segments.tsx` longest=148 (candidate 148, unchanged). All three errors pre-existed; none is newly introduced and none crosses a new hard threshold the baseline did not already cross. |
++| FACT | The detector (`analyzeSource`/`main`) currently treats every emitted `error` as blocking regardless of whether it pre-existed. It supports `--base` (git ref) and `--manifest` for selecting candidate files and counting additions, but it does not compare candidate file metrics against baseline metrics. |
++| FACT | GOVERNANCE_V2_POLICY explicitly prescribes the detector-repair route for detector-side issues; it forbids reviewer-prose waivers and forbids shrinking the file scan to mask debt. This task is the prescribed detector-repair route. |
++| DECISION | Implement baseline-aware classification at **per-file × per-error-rule** granularity (the only granularity the detector supports today: `analyzeSource` emits aggregate metrics per file, not per method). For each candidate file error, compute the same rule against the baseline source and classify as: `introduced` (the rule fires for the candidate file but did NOT fire for the baseline file — e.g., baseline `longest ≤ 100`, candidate `longest > 100`); `worsened` (the rule fires for BOTH baseline and candidate AND the candidate's offending metric exceeds the baseline metric by more than the allowed delta — applies only to quantifiable metrics: significant lines, longest method, methods, dependencies); or `pre-existing` (the rule fires for both and the candidate is not worsened beyond the delta; or the rule is a non-quantifiable binary rule — e.g., SQL-outside-mapper, layer-crossing — that fires for both). A brand-new offending method that causes the file to newly cross a threshold is `introduced` (band-crossing), never `worsened`. Exit code is decided solely by `blockingErrorCount = introduced + worsened`. |
++| DECISION | Default allowed worsen delta = **20** quantifiable units (lines or method-line count). This is large enough to permit small integration additions without false "worsened" labels (D2's largest growth is +11: market-workspace.tsx 199→210) and small enough to block material growth (e.g., 105→130 = +25 blocks). Band-crossing (`introduced`) is delta-independent, so a brand-new over-threshold method/component always blocks regardless of delta. This resolves the BA-2 contradiction: 199→210 (+11 ≤ 20) is `pre-existing`/non-blocking, while 95→120 is `introduced`/blocking. |
++| DECISION | Backward compatibility: when no baseline source is supplied, behavior is byte-for-byte unchanged (every error blocks, no baseline fields emitted). Baseline is supplied via a new `--baseline <dir>` option pointing at a directory containing baseline source files at their repo-relative paths (clean, read-only, no git writes), plus the existing `--base <git-ref>` is reused for candidate-file selection and additions. This keeps the gate runnable from the backend root without needing the frontend repo on the detector's PATH, and avoids the governed-run shell-substitution restriction. |
++| DECISION | Report coherence invariant (BA-3): in baseline-aware mode the JSON report's `errors[]` array contains ONLY blocking errors (introduced + worsened), `preExistingErrors[]` contains the non-blocking pre-existing errors, and `introducedErrors[]`/`worsenedErrors[]` are the blocking split. `errorCount == errors.length == blockingErrorCount` and `status == (errorCount === 0 ? "PASS" : "FAIL")` and `exitCode == (errorCount === 0 ? 0 : 1)`, so `errorCount==0 ⟺ PASS ⟺ exitCode 0`. This keeps the report self-coherent and compatible with the unchanged `check-ai-task-control.mjs` file-validation path (which checks `report.errors.length === control.architectureGate.errorCount` and `report.status === control.architectureGate.status`); D2 will record `architectureGate.errorCount = blockingErrorCount`. `check-ai-task-control.mjs` and `check-ai-delivery-ready.mjs` are NOT modified in this task. |
++| DECISION | The classification must be deterministic and evidence-backed: each error detail (in whichever bucket) records `classification`, `candidateMetric`, `baselineMetric` (absent/`null` when the rule did not fire at baseline, i.e., `introduced`), and `delta` so a reviewer/verifier can audit why a pre-existing error did not block. Anti-masking honesty rule: if a candidate file is absent from the `--baseline` directory, every error for that file classifies as `introduced` (blocking) — a missing baseline file is never silently dropped (TEST-AG-07). |
++| DECISION | Test-designer amendment BA-1/BA-2/BA-3 + TEST-AG-07 accepted and folded into this contract (within the L2 amendment cap of 3). OQ-1 resolved by parent: band-crossing introduced + delta(20) worsened. OQ-2 resolved by parent: TEST-AG-07 is Required. |
++| DECISION | This task does not modify the three React page files or any D2 frontend implementation. It does not merge main, push, deploy, or start any business feature. |
++| ASSUMPTION | The detector's existing brace/line accounting is accurate enough to compare two measurements of the same metric; the baseline-aware feature reuses `analyzeSource` for both baseline and candidate, so any pre-existing measurement bias cancels in the diff. |
++
++## Scope
++
++### In Scope
++
++- `scripts/check-ai-architecture.mjs`: add baseline-aware classification + report fields + `--baseline` option;
++  preserve strict behavior when no baseline is supplied.
++- `scripts/tests/ai-governance.test.mjs`: add deterministic tests for the 6 required scenarios (see Test
++  Inventory). Existing tests must continue to pass unchanged.
++- `docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md`: short governance doc describing when/how to pass a baseline,
++  the classification semantics, the default delta, and the honesty rule (baseline must be the real frozen
++  baseline; never omit files to mask debt).
++
++### Out Of Scope
++
++- D2 frontend restoration (separate task; uses the new feature after this task is DELIVERY_READY).
++- Refactoring the three large React pages.
++- Modifying `check-ai-task-control.mjs` or `check-ai-delivery-ready.mjs` (their `errorCount` field semantics
++  are reused as "blocking error count").
++- Any backend Java business code, MyBatis, Flyway, schedulers, providers.
++
++### Prohibited
++
++- Editing the three React page files or any D2 frontend implementation.
++- Any Git merge/rebase/push/deploy, any main-branch write, any force-push.
++- Calling `AskUserQuestion`.
++- Removing or weakening existing architecture tests.
++- Excluding file categories wholesale (e.g., "all React components"); classification is per-error vs baseline.
++
++## Acceptance Criteria
++
++| AC-ID | Observable behavior | Preconditions/input | Expected result | Evidence | Dimension | Owner | Status |
++|---|---|---|---|---|---|---|---|
++| AC-01 | Baseline-aware classifier labels each candidate file×rule error against a supplied baseline dir as `introduced`/`worsened`/`pre-existing` and blocks only on introduced+worsened. | Candidate dir where a baseline file already tripping `longest>100` is touched by a small integration that does not increase `longest` beyond baseline+delta (e.g., 199→210, delta 11 ≤ default 20); `--baseline` set. | `status=PASS`, `exitCode=0`, `blockingErrorCount=0`; the pre-existing error is in `preExistingErrors[]` and absent from `introducedErrors[]`/`worsenedErrors[]`; each error detail carries `classification`, `candidateMetric`, `baselineMetric`, `delta`. Classification granularity = per-file×per-error-rule. `errors[]`/`errorCount` contain only blocking errors; `errorCount==0 ⟺ PASS ⟺ exitCode 0`. | AUTOMATION | AUTOMATION | IMPLEMENTER | NOT_STARTED |
++| AC-02 | A candidate file crossing a hard threshold the baseline file did not cross blocks as `introduced`. | Candidate dir with a file whose `longest` goes from ≤100 at baseline to >100 at candidate (e.g., 95→120); `--baseline` set. | `status=FAIL`, `exitCode=1`, `blockingErrorCount>=1`; the error is in `introducedErrors[]` with `baselineMetric` absent/`null` and `delta` absent; in `errors[]`/`errorCount`. | AUTOMATION | AUTOMATION | IMPLEMENTER | NOT_STARTED |
++| AC-03 | A pre-existing offending metric that the candidate worsens beyond the allowed delta blocks as `worsened`; a worsening within the delta is `pre-existing`. | Candidate dir grows the offending metric beyond baseline+delta (delta=25 case, e.g., 105→130) AND a delta-exactly-equal-to-default case (e.g., 100→120 with default 20). | delta>default ⇒ `status=FAIL`, `exitCode=1`, error in `worsenedErrors[]`/`errors[]` with `delta` recorded; delta==default ⇒ `pre-existing`, non-blocking. | AUTOMATION | AUTOMATION | IMPLEMENTER | NOT_STARTED |
++| AC-04 | Java over-long methods still block under baseline mode and the report binds to candidate identity. | Candidate dir adds/grows a >100-line Java method; `--baseline` + `--candidate-identity` set. | Java method error blocks (introduced or worsened per BA-2); `report.candidateIdentity == input`. | AUTOMATION | AUTOMATION | IMPLEMENTER | NOT_STARTED |
++| AC-05 | Without `--baseline` the detector keeps strict behavior and emits no baseline fields. | Same `--files`/`--base` invocation as today, no `--baseline`. | Any emitted error ⇒ `exitCode=1`; report has no `baselineIdentity`/`introducedErrors`/`worsenedErrors`/`preExistingErrors` fields (or they are empty); `errorCount == errors.length`; existing architecture tests unchanged. | AUTOMATION+STATIC | AUTOMATION | IMPLEMENTER | NOT_STARTED |
++| AC-06 | Report binds candidate+baseline identity, the report is self-coherent, and the full governance suite passes. | Baseline-aware run with `--candidate-identity`, `--baseline`, `--json-output`. | `candidateIdentity`/`baselineIdentity == inputs`; a report with only pre-existing errors has `errorCount==0`; `node scripts/run-ai-governance-gates.mjs` exits 0 (asserted inside the test body via spawnSync status 0). | AUTOMATION+STATIC | AUTOMATION | IMPLEMENTER | NOT_STARTED |
++
++## Verification Plan
++
++| Dimension | Required | Command or inspection | Pass rule |
++|---|---|---|---|
++| STATIC | Yes | `node scripts/run-ai-governance-gates.mjs` (runs `validate-ai-governance.mjs` + `node --test scripts/tests/ai-governance.test.mjs`) | exit 0; all existing + new arch-gate tests pass |
++| AUTOMATION | Yes | `node --test scripts/tests/ai-governance.test.mjs` (focused) and the new baseline-aware tests create temp dirs and assert classification/exit codes | all required test IDs pass via `scripts/run-ai-evidence-command.mjs` |
++| RUNTIME | No | n/a (governance tooling, no runtime/deployment) | NOT_REQUIRED |
++| DEPLOYMENT | No | n/a | NOT_REQUIRED |
++
++## Implementation Slices
++
++| Slice ID | Coherent boundary | AC IDs | Allowed write paths | Max files | Max production-line delta |
++|---|---|---|---|---:|---:|
++| SLICE-DET | Baseline-aware detector: classify candidate errors vs a baseline directory into introduced/worsened/pre-existing; exit code from blockingErrorCount only; preserve strict behavior with no baseline; tests TEST-AG-01..03 | AC-01, AC-02, AC-03 | `scripts/check-ai-architecture.mjs`, `scripts/tests/ai-governance.test.mjs` | 2 | 450 |
++| SLICE-IDX | Identity-binding + suite-pass tests TEST-AG-04 (Java block), TEST-AG-05 (strict no-baseline), TEST-AG-06 (candidate+baseline identity + governance suite) + governance doc | AC-04, AC-05, AC-06 | `scripts/tests/ai-governance.test.mjs`, `docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md` | 2 | 300 |
++
++## Frozen Test Inventory
++
++| Test ID | AC IDs | Kind | Required | Source path | Exact selector | Receipt path |
++|---|---|---|---|---|---|---|
++| TEST-AG-01 | AC-01 | AUTOMATION | YES | `scripts/tests/ai-governance.test.mjs` | `baseline-aware gate does not block unchanged pre-existing React method debt` | `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-EVIDENCE-TEST-AG-01.json` |
++| TEST-AG-02 | AC-02 | AUTOMATION | YES | `scripts/tests/ai-governance.test.mjs` | `baseline-aware gate blocks a newly introduced over-threshold method` | `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-EVIDENCE-TEST-AG-02.json` |
++| TEST-AG-03 | AC-03 | AUTOMATION | YES | `scripts/tests/ai-governance.test.mjs` | `baseline-aware gate blocks a worsened pre-existing method beyond the allowed delta` | `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-EVIDENCE-TEST-AG-03.json` |
++| TEST-AG-04 | AC-04 | AUTOMATION | YES | `scripts/tests/ai-governance.test.mjs` | `baseline-aware gate still blocks over-long Java methods` | `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-EVIDENCE-TEST-AG-04.json` |
++| TEST-AG-05 | AC-05 | AUTOMATION | YES | `scripts/tests/ai-governance.test.mjs` | `architecture gate keeps strict behavior when no baseline is supplied` | `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-EVIDENCE-TEST-AG-05.json` |
++| TEST-AG-06 | AC-06 | AUTOMATION | YES | `scripts/tests/ai-governance.test.mjs` | `architecture report binds candidate and baseline identity and the full governance suite passes` | `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-EVIDENCE-TEST-AG-06.json` |
++| TEST-AG-07 | AC-01, AC-02 | AUTOMATION | YES | `scripts/tests/ai-governance.test.mjs` | `baseline-aware gate treats a missing baseline file as introduced not silently dropped` | `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-EVIDENCE-TEST-AG-07.json` |
++
++Selector rule (binding on the implementer): each selector string above is the verbatim first argument to
++`test("…", …)` in `scripts/tests/ai-governance.test.mjs`. The evidence runner matches selectors as substrings
++of the `node --test` output, so the implementer must use each string verbatim.
++
++## Architecture And Quality Gates
++
++- Required architecture review: `YES` (the detector change is itself architecture-relevant).
++- Triggered thresholds: this task's own candidate must not introduce new detector errors. The detector is in
++  `scripts/`, so its own file is not analyzed by `analyzeSource` unless explicitly listed; the task runs the
++  architecture gate on its candidate to confirm no production-source regressions (none expected, scripts-only).
++- Required layers/boundaries: none changed.
++- Responsibility-map evidence: classification fields make pre-existing vs blocking auditable per error.
++- ADR exception and expiry: none.
++
++## Role Assignments
++
++- Test designer: fresh `qta-test-designer` (challenges ACs/test inventory before freeze).
++- Implementer: fresh `qta-implementer` per slice (SLICE-DET then SLICE-IDX; backend/governance tooling).
++- Code reviewer: fresh `qta-code-reviewer` (functional + architecture on frozen candidate).
++- Final verifier: fresh `qta-final-verifier` (disposable worktree, machine receipts).
++- Omitted roles and justification: none (full L2 four-role lifecycle).
++
++## Candidate And Git Policy
++
++- Git automation: `COMMIT` (local stage commits on the existing task branch; no push).
++- User authorization evidence: task input explicitly authorizes local commits for the governance fix and D2
++  restoration, and explicitly forbids push/merge/deploy.
++- Task branch: `codex/security-directory-d2-20260802` (reuse; this is a governance sub-task of the D2 effort).
++- Contract commit: `contract(arch-gate): freeze baseline-aware detector governance task`.
++- Candidate mode: `COMMIT`.
++- Candidate commit: (set at freeze).
++- Candidate tree hash: (set at freeze).
++- Patch SHA-256: (set at freeze).
++- Candidate manifest path/hash: n/a (COMMIT mode).
++- Checkpoint push allowed: `NO`.
++- Delivery push target: none.
++- Protected/default branch direct push: `NO`.
++
++## Checkpoint Policy
++
++- Context budget: `UNAVAILABLE` + null (no reliable runtime telemetry); enforce deterministic limits.
++- Persist discoveries at: 25%.
++- Stop opening stages at: 40%.
++- Mandatory fresh-context handoff at: 60% or first compaction.
++- Maximum waits per role run: 2.
++- Maximum shell polls per command: 3.
++- Automatic compaction policy: first compaction forces handoff; second is prohibited.
++- Maximum repair rounds for one failure fingerprint: 2.
++- Lane AC cap: 8 (this task uses 6).
++- Blocking amendment cap: 3.
++- Blocking amendment history: (none yet).
++- Stop conditions: `DELIVERY_READY` (`node scripts/check-ai-delivery-ready.mjs <CONTROL>` exit 0) or `BLOCKED`
++  with evidence; never ask the user.
+diff --git a/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTROL.json b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTROL.json
+new file mode 100644
+index 0000000..20a1a0f
+--- /dev/null
++++ b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTROL.json
+@@ -0,0 +1,318 @@
++{
++  "schemaVersion": 3,
++  "taskId": "ARCH-GATE-BASELINE-AWARE-20260802",
++  "controlPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTROL.json",
++  "startedAt": "2026-08-02T09:10:00Z",
++  "lane": "L2",
++  "lifecycleState": "SELF_CHECKED",
++  "contract": {
++    "path": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTRACT.md",
++    "version": "2",
++    "sha256": "79ec00e82eb4a797fa3767b34f9567ddd56b45507d531d121c36caa6769af148",
++    "acceptanceCriteria": [
++      {"id": "AC-01", "requiredEvidence": ["AUTOMATION"]},
++      {"id": "AC-02", "requiredEvidence": ["AUTOMATION"]},
++      {"id": "AC-03", "requiredEvidence": ["AUTOMATION"]},
++      {"id": "AC-04", "requiredEvidence": ["AUTOMATION"]},
++      {"id": "AC-05", "requiredEvidence": ["AUTOMATION"]},
++      {"id": "AC-06", "requiredEvidence": ["AUTOMATION", "STATIC"]}
++    ],
++    "implementationSlices": [
++      {
++        "id": "SLICE-DET",
++        "description": "Baseline-aware detector: classify candidate errors vs a baseline directory into introduced/worsened/pre-existing; exit code from blockingErrorCount only; preserve strict behavior with no baseline. Add tests TEST-AG-01..05.",
++        "acIds": ["AC-01", "AC-02", "AC-03"],
++        "allowedWritePaths": [
++          "scripts/check-ai-architecture.mjs",
++          "scripts/tests/ai-governance.test.mjs"
++        ],
++        "maxExpectedFiles": 2,
++        "maxProductionLineDelta": 450
++      },
++      {
++        "id": "SLICE-IDX",
++        "description": "Identity-binding + suite-pass tests TEST-AG-04 (Java block), TEST-AG-05 (strict no-baseline), TEST-AG-06 (candidate+baseline identity + governance suite) and the governance doc.",
++        "acIds": ["AC-04", "AC-05", "AC-06"],
++        "allowedWritePaths": [
++          "scripts/tests/ai-governance.test.mjs",
++          "docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md"
++        ],
++        "maxExpectedFiles": 2,
++        "maxProductionLineDelta": 300
++      }
++    ],
++    "testInventory": [
++      {"testId": "TEST-AG-01", "acIds": ["AC-01"], "kind": "AUTOMATION", "required": true,
++        "sourcePath": "scripts/tests/ai-governance.test.mjs",
++        "selector": "baseline-aware gate does not block unchanged pre-existing React method debt"},
++      {"testId": "TEST-AG-02", "acIds": ["AC-02"], "kind": "AUTOMATION", "required": true,
++        "sourcePath": "scripts/tests/ai-governance.test.mjs",
++        "selector": "baseline-aware gate blocks a newly introduced over-threshold method"},
++      {"testId": "TEST-AG-03", "acIds": ["AC-03"], "kind": "AUTOMATION", "required": true,
++        "sourcePath": "scripts/tests/ai-governance.test.mjs",
++        "selector": "baseline-aware gate blocks a worsened pre-existing method beyond the allowed delta"},
++      {"testId": "TEST-AG-04", "acIds": ["AC-04"], "kind": "AUTOMATION", "required": true,
++        "sourcePath": "scripts/tests/ai-governance.test.mjs",
++        "selector": "baseline-aware gate still blocks over-long Java methods"},
++      {"testId": "TEST-AG-05", "acIds": ["AC-05"], "kind": "AUTOMATION", "required": true,
++        "sourcePath": "scripts/tests/ai-governance.test.mjs",
++        "selector": "architecture gate keeps strict behavior when no baseline is supplied"},
++      {"testId": "TEST-AG-06", "acIds": ["AC-06"], "kind": "AUTOMATION", "required": true,
++        "sourcePath": "scripts/tests/ai-governance.test.mjs",
++        "selector": "architecture report binds candidate and baseline identity and the full governance suite passes"},
++      {"testId": "TEST-AG-07", "acIds": ["AC-01", "AC-02"], "kind": "AUTOMATION", "required": true,
++        "sourcePath": "scripts/tests/ai-governance.test.mjs",
++        "selector": "baseline-aware gate treats a missing baseline file as introduced not silently dropped"}
++    ],
++    "blockingAmendments": []
++  },
++  "git": {
++    "automation": "COMMIT",
++    "branch": "codex/security-directory-d2-20260802",
++    "baselineCommit": "979b080",
++    "preExistingDirtyPaths": [
++      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CANDIDATE.patch",
++      "docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-CONTROL.json"
++    ]
++  },
++  "transitionHistory": [
++    {"sequence": 1, "from": "CONTEXT_READY", "to": "CONTRACT_DRAFTED", "at": "2026-08-02T09:10:00Z", "actor": "codex-parent-arch-gate-baseline-aware-1"},
++    {"sequence": 2, "from": "CONTRACT_DRAFTED", "to": "TEST_DESIGN_READY", "at": "2026-08-02T09:19:00Z", "actor": "codex-parent-arch-gate-baseline-aware-1"},
++    {"sequence": 3, "from": "TEST_DESIGN_READY", "to": "CONTRACT_FROZEN", "at": "2026-08-02T09:20:00Z", "actor": "codex-parent-arch-gate-baseline-aware-1"},
++    {"sequence": 4, "from": "CONTRACT_FROZEN", "to": "IMPLEMENTING", "at": "2026-08-02T09:25:00Z", "actor": "codex-parent-arch-gate-baseline-aware-1"},
++    {"sequence": 5, "from": "IMPLEMENTING", "to": "SELF_CHECKED", "at": "2026-08-02T09:58:00Z", "actor": "codex-parent-arch-gate-baseline-aware-1"}
++  ],
++  "candidate": {
++    "mode": "COMMIT",
++    "generation": 1,
++    "identity": "",
++    "commit": "",
++    "treeHash": "",
++    "patchSha256": "",
++    "manifestPath": "",
++    "manifestSha256": "",
++    "entrySetSha256": "",
++    "diffArtifactPath": "",
++    "diffArtifactSha256": ""
++  },
++  "budget": {
++    "contextPercent": null,
++    "contextMeasurement": "UNAVAILABLE",
++    "compactionCount": 0,
++    "repairRound": 0,
++    "maxRepairRounds": 2,
++    "maxWaitCallsPerRole": 2,
++    "maxShellPollsPerCommand": 3,
++    "rawTokens": null,
++    "weeklyAllowancePercent": null
++  },
++  "repairHistory": [],
++  "roleRuns": [
++    {
++      "roleRunId": "TD-AGBA-1",
++      "dispatchId": "dispatch-td-agba-1",
++      "sessionId": "session-td-agba-1-cancelled",
++      "startedAt": "2026-08-02T09:12:00Z",
++      "finishedAt": "2026-08-02T09:13:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/58fb839d55b6ac360f36f7fbd5806db6d12ed9f4a1579c03975a13c4bd9f0e18/cc817eec8521bf283b0bb07a10b2c284728dd9b120accd7e650d284a8139d7fb.json",
++      "role": "TEST_DESIGNER",
++      "generation": 0,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-test-designer.md",
++      "sliceId": "",
++      "executionOutcome": "CANCELLED",
++      "capability": "READ_ONLY",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "read-only challenge; no candidate yet",
++      "waitCalls": 1,
++      "maxShellPollsForOneCommand": 0,
++      "compactionCount": 0,
++      "status": "BLOCKED",
++      "artifactAccepted": false,
++      "artifactPath": "",
++      "artifactSha256": ""
++    },
++    {
++      "roleRunId": "TD-AGBA-2",
++      "dispatchId": "dispatch-td-agba-2",
++      "sessionId": "session-td-agba-2",
++      "startedAt": "2026-08-02T09:28:00Z",
++      "finishedAt": "2026-08-02T09:29:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/58fb839d55b6ac360f36f7fbd5806db6d12ed9f4a1579c03975a13c4bd9f0e18/b5bffa7b049637c29f5df92ab69e5ef48ff5e35413f8d22f2ac3414f4e7c6cb0.json",
++      "role": "TEST_DESIGNER",
++      "generation": 0,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-test-designer.md",
++      "sliceId": "",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_ONLY",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "read-only challenge; no candidate yet",
++      "waitCalls": 1,
++      "maxShellPollsForOneCommand": 0,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-TEST-DESIGN.md",
++      "artifactSha256": "6d1f8e791f70eccc9e903be0728b8122ff3dfd2a7ed4ae0653b0a1e7cc854ae5"
++    },
++    {
++      "roleRunId": "IMP-AGBA-DET-1",
++      "dispatchId": "dispatch-imp-agba-det-1",
++      "sessionId": "session-imp-agba-det-1",
++      "startedAt": "2026-08-02T09:35:00Z",
++      "finishedAt": "2026-08-02T09:48:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/58fb839d55b6ac360f36f7fbd5806db6d12ed9f4a1579c03975a13c4bd9f0e18/35f1d229a052ad4a0d34b1d5cad72fb44be87878d060bdf9d3e794049935e56a.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "SLICE-DET",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "disposable implementer; candidate hashed before review",
++      "waitCalls": 1,
++      "maxShellPollsForOneCommand": 2,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET.md",
++      "artifactSha256": "098f87aa68539b33d2e75132261791bdf3caf8bb8b4d3b7f05d16239bbfb4e34"
++    },
++    {
++      "roleRunId": "IMP-AGBA-IDX-1",
++      "dispatchId": "dispatch-imp-agba-idx-1",
++      "sessionId": "session-imp-agba-idx-1-cancelled",
++      "startedAt": "2026-08-02T09:45:00Z",
++      "finishedAt": "2026-08-02T09:48:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/58fb839d55b6ac360f36f7fbd5806db6d12ed9f4a1579c03975a13c4bd9f0e18/dd0552005d2c52cb2b70c8e38f826e0f8a37979dca01b2755b745f520e86bf63.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "SLICE-IDX",
++      "executionOutcome": "CANCELLED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "disposable implementer; candidate hashed before review",
++      "waitCalls": 1,
++      "maxShellPollsForOneCommand": 2,
++      "compactionCount": 0,
++      "status": "BLOCKED",
++      "artifactAccepted": false,
++      "artifactPath": "",
++      "artifactSha256": ""
++    },
++    {
++      "roleRunId": "IMP-AGBA-IDX-2",
++      "dispatchId": "dispatch-imp-agba-idx-2",
++      "sessionId": "session-imp-agba-idx-2",
++      "startedAt": "2026-08-02T09:50:00Z",
++      "finishedAt": "2026-08-02T09:55:30Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/58fb839d55b6ac360f36f7fbd5806db6d12ed9f4a1579c03975a13c4bd9f0e18/8ec6e80a38822c790d91009e81b3ee438695d72e75039445798ba85567160c83.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "SLICE-IDX",
++      "executionOutcome": "FAILED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "disposable implementer; candidate hashed before review",
++      "waitCalls": 1,
++      "maxShellPollsForOneCommand": 2,
++      "compactionCount": 0,
++      "status": "BLOCKED",
++      "artifactAccepted": false,
++      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-IDX.md",
++      "artifactSha256": "399210b783834895c11fd220e50051e54d58c2ea35df6a19123bd6a940f34925"
++    },
++    {
++      "roleRunId": "IMP-AGBA-DET-2",
++      "dispatchId": "dispatch-imp-agba-det-2",
++      "sessionId": "session-imp-agba-det-2",
++      "startedAt": "2026-08-02T09:56:00Z",
++      "finishedAt": "2026-08-02T09:58:00Z",
++      "runtimeReceiptPath": "",
++      "dispatchReceiptPath": ".git/qta-governance/dispatches/58fb839d55b6ac360f36f7fbd5806db6d12ed9f4a1579c03975a13c4bd9f0e18/052ffab713fc3dc51b4559a4505c241ece4e785d7ea3e592c5faa2493207c13d.json",
++      "role": "IMPLEMENTER",
++      "generation": 1,
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-implementer.md",
++      "sliceId": "SLICE-DET",
++      "executionOutcome": "COMPLETED",
++      "capability": "READ_WRITE",
++      "contextMode": "FRESH",
++      "enforcement": "ADVISORY",
++      "compensatingIsolation": "disposable implementer; candidate hashed before review",
++      "waitCalls": 1,
++      "maxShellPollsForOneCommand": 2,
++      "compactionCount": 0,
++      "status": "CLOSED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET2.md",
++      "artifactSha256": "2cd01635e90d0e8c41c91b627eecf733cc42aec3fcef3ceb0d260283e969cf8f"
++    }
++  ],
++  "review": {
++    "omitted": false,
++    "omissionReason": "",
++    "generation": 0,
++    "candidateIdentity": "",
++    "functionalVerdict": "NOT_VERIFIED",
++    "architectureVerdict": "NOT_VERIFIED",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "architectureGateSha256": "",
++    "findingIds": []
++  },
++  "architectureGate": {
++    "required": true,
++    "candidateIdentity": "",
++    "status": "NOT_RUN",
++    "exitCode": -1,
++    "errorCount": 0,
++    "warningCount": 0,
++    "warningDispositions": [],
++    "reportPath": "",
++    "reportSha256": "",
++    "generatedBy": "scripts/check-ai-architecture.mjs"
++  },
++  "verification": {
++    "candidateIdentity": "",
++    "verdict": "NOT_VERIFIED",
++    "deliveryPermitted": false,
++    "functionalVerdict": "NOT_VERIFIED",
++    "architectureVerdict": "NOT_VERIFIED",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "architectureGateSha256": "",
++    "dimensions": {
++      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
++      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
++      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
++      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
++    }
++  },
++  "testEvidence": [],
++  "finalization": {
++    "status": "NOT_STARTED",
++    "candidateIdentity": "",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "completedAt": "",
++    "changedPaths": []
++  },
++  "evidence": []
++}
+diff --git a/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET.md b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET.md
+new file mode 100644
+index 0000000..9d4e718
+--- /dev/null
++++ b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET.md
+@@ -0,0 +1,242 @@
++# Self-Check Artifact: ARCH-GATE-BASELINE-AWARE-20260802 / SLICE-DET
++
++- Status: `SELF_CHECKED`
++- Slice ID: `SLICE-DET`
++- Dispatch ID: `dispatch-imp-agba-det-1`
++- Role instance policy: `FRESH_ONLY`
++- Lane: `L2`
++- Assigned AC IDs: AC-01, AC-02, AC-03
++- Contract hash: `79ec00e82eb4a797fa3767b34f9567ddd56b45507d531d121c36caa6769af148`
++- Baseline commit: `979b080` (branch `codex/security-directory-d2-20260802`)
++- Repair round: 0
++- Role started-at: `2026-08-02T09:25:00Z` (approx; role session start)
++- Role finished-at: `2026-08-02T09:38:42Z`
++- Executor type: `SUBAGENT`
++- Enforcement level: `ADVISORY` (self-tests are SELF_CHECKED only; not independent acceptance)
++- Runtime receipt path: created by the workspace hook for this dispatch session
++- Wait calls: 0
++- Shell polls for one command: at most 2 (focused test runs)
++- Context/compaction status: no compaction occurred; well under threshold
++
++## Files changed
++
++1. `scripts/check-ai-architecture.mjs` — added baseline-aware classification, `--baseline`
++   CLI option, baseline report lookup, and the baseline-aware JSON report shape; strict
++   no-baseline behavior is byte-for-byte preserved.
++2. `scripts/tests/ai-governance.test.mjs` — added tests TEST-AG-01, TEST-AG-02, TEST-AG-03
++   using the verbatim selectors from the Frozen Test Inventory.
++
++## Behavioral summary
++
++### New module-level constant
++- `ALLOWED_WORSEN_DELTA = 20` (significant lines / method-line count). A quantifiable
++  candidate metric that exceeds the baseline metric by strictly more than this delta is
++  classified `worsened` (blocking); a delta `<= 20` with the rule firing on both sides is
++  `pre-existing` (non-blocking).
++
++### New helpers (added before `gitOutput`)
++- `errorRuleKind(message)` maps a detector error string to its rule kind:
++  `longest-method`, `class-module`, `controller-cross`, `service-file-persist`,
++  `sql-outside-mapper`. Returns `null` for unknown messages.
++- `errorMetricForKind(message)` parses the leading integer metric from the two
++  quantifiable templates (`longest method <N> lines > 100` → `N`; `class/module <lines>
++  lines, ...` → `<lines>`). Returns `null` for binary rules.
++- `classifyError(message, baselineReport)` implements the exact predicate from the
++  contract:
++  - `baselineReport === null` (file absent from `--baseline` dir) → `introduced`
++    (anti-masking; a missing baseline file is never silently dropped).
++  - Rule did not fire on the baseline file (no baseline error of the same kind) →
++    `introduced` (band-crossing; delta-independent; always blocking).
++  - Rule fired on both:
++    - quantifiable: `delta = candidateMetric - baselineMetric`; `delta > ALLOWED_WORSEN_DELTA`
++      → `worsened` (blocking); else → `pre-existing` (non-blocking).
++    - binary rule: → `pre-existing` (non-blocking).
++  Each verdict returns `{ classification, candidateMetric, baselineMetric, delta }`.
++- `baselineReportFor(file, baselineDir)` resolves the candidate file to its repo-relative
++  path and reads `<baselineDir>/<repo-relative-path>`. If the file is missing from the
++  baseline dir it returns `null` (→ all candidate errors for that file are `introduced`).
++  The repo-relative path is computed with `fs.realpathSync` on both the candidate file
++  and `process.cwd()` so symlinked temp dirs (e.g. macOS `/tmp` ↔ `/private/tmp`) do not
++  cause the baseline lookup to fall back onto the candidate file.
++
++### CLI / main changes
++- New `--baseline <dir>` option. `baselineDir = path.resolve(argv)`.
++- In baseline-aware mode, each candidate file×rule error is classified; introduced and
++  worsened (plus candidate-level errors like the >1500/>3000 review-count rules, which
++  are ALWAYS blocking and never classified against baseline) populate the top-level
++  `errors[]`; pre-existing errors appear ONLY in `preExistingErrors[]`.
++- Report coherence invariant (BA-3): `errorCount == errors.length == blockingErrorCount`
++  and `status == (errorCount === 0 ? "PASS" : "FAIL")` and
++  `exitCode == (errorCount === 0 ? 0 : 1)`. Thus `errorCount == 0 ⟺ PASS ⟺ exitCode 0`.
++- Added report fields (baseline-aware mode only): `baselineIdentity` (the verbatim
++  `--baseline` argument), `blockingErrorCount`, `introducedErrors[]`, `worsenedErrors[]`,
++  `preExistingErrors[]`. Each detail carries `id`, `file`, `message`, `classification`,
++  `candidateMetric`, `baselineMetric`, `delta`.
++- Console output: in baseline-aware mode prints `BASELINE-INTRODUCED`, `BASELINE-WORSENED`,
++  and `BASELINE-PRE-EXISTING <file>: <message>` lines, keeps existing `ERROR`/`WARN`
++  lines, keeps the existing summary line, and adds
++  `Architecture gate (baseline-aware): introduced=<n> worsened=<n> pre-existing=<n> blocking=<n>`.
++- Exit code: baseline-aware → `process.exit(1)` iff `blockingErrorCount > 0`.
++
++### No-baseline path (backward compatibility, AC-05 reserved for SLICE-IDX)
++When `--baseline` is absent, EVERYTHING is unchanged: same console output, same
++`errors[]`/`errorCount`/`status`/`exitCode`, and the report has none of the
++`baselineIdentity`/`introducedErrors`/`worsenedErrors`/`preExistingErrors`/`blockingErrorCount`
++fields. The only refactor in the no-baseline branch is that `errorCount` is now computed
++as `errors.length` instead of `reports.reduce(sum, report.errors) + candidateErrors.length`;
++these are algebraically equal because `errorDetails` already accumulates every report
++error plus every candidate error. The existing SNAPSHOT-manifest test (which exercises
++candidateErrors) passes unchanged, confirming equivalence.
++
++## Exact diff applied to scripts/check-ai-architecture.mjs (added/changed functions)
++
++```diff
++@@ -1,6 +1,7 @@
++ #!/usr/bin/env node
++
++ import { createHash } from "node:crypto";
+++import fs from "node:fs";
++ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
++ import { execFileSync } from "node:child_process";
++ import path from "node:path";
++@@ -147,6 +148,68 @@ export function analyzeSource(file, content) {
++   };
++ }
++
+++const ALLOWED_WORSEN_DELTA = 20;
+++
+++function errorRuleKind(message) {
+++  if (message.startsWith("longest method ")) return "longest-method";
+++  if (message.startsWith("class/module ")) return "class-module";
+++  if (message === "controller crosses transaction/persistence boundary") return "controller-cross";
+++  if (message === "service combines file/protocol parsing with persistence") return "service-file-persist";
+++  if (message === "SQL appears outside mapper/persistence boundary") return "sql-outside-mapper";
+++  return null;
+++}
+++
+++function errorMetricForKind(message) {
+++  if (message.startsWith("longest method ")) {
+++    const match = message.match(/^longest method (\d+) lines/);
+++    return match ? Number.parseInt(match[1], 10) : null;
+++  }
+++  if (message.startsWith("class/module ")) {
+++    const match = message.match(/^class\/module (\d+) lines/);
+++    return match ? Number.parseInt(match[1], 10) : null;
+++  }
+++  return null;
+++}
+++
+++function classifyError(message, baselineReport) {
+++  const kind = errorRuleKind(message);
+++  const candidateMetric = errorMetricForKind(message);
+++  if (!baselineReport) {
+++    return { classification: "introduced", candidateMetric, baselineMetric: null, delta: null };
+++  }
+++  const baselineMatch = baselineReport.errors.find((entry) => errorRuleKind(entry) === kind);
+++  if (!baselineMatch) {
+++    return { classification: "introduced", candidateMetric, baselineMetric: null, delta: null };
+++  }
+++  const baselineMetric = errorMetricForKind(baselineMatch);
+++  if (candidateMetric !== null && baselineMetric !== null) {
+++    const delta = candidateMetric - baselineMetric;
+++    if (delta > ALLOWED_WORSEN_DELTA) {
+++      return { classification: "worsened", candidateMetric, baselineMetric, delta };
+++    }
+++    return { classification: "pre-existing", candidateMetric, baselineMetric, delta };
+++  }
+++  return { classification: "pre-existing", candidateMetric: null, baselineMetric: null, delta: null };
+++}
+++
+++async function baselineReportFor(file, baselineDir) {
+++  let relativeFile = file;
+++  if (path.isAbsolute(file)) {
+++    const candidateRoot = fs.realpathSync(process.cwd());
+++    const resolvedFile = fs.realpathSync(file);
+++    const fromResolved = path.relative(candidateRoot, resolvedFile);
+++    relativeFile = fromResolved && !fromResolved.startsWith("..") ? fromResolved : path.relative(process.cwd(), file);
+++  }
+++  const baselinePath = path.join(baselineDir, relativeFile);
+++  try {
+++    const content = await readFile(baselinePath, "utf8");
+++    return analyzeSource(file, content);
+++  } catch (error) {
+++    if (error.code === "ENOENT") return null;
+++    throw error;
+++  }
+++}
+++
++ function gitOutput(args, options = {}) {
++   return execFileSync("git", args, { encoding: "utf8", ...options });
++ }
++```
++
++(`main` is changed as described in Behavioral summary: parse `--baseline`, classify
++per-file×per-rule, build baseline-aware report, preserve strict no-baseline path.)
++
++## Tests added (verbatim selectors)
++
++- `baseline-aware gate does not block unchanged pre-existing React method debt` (TEST-AG-01, AC-01)
++- `baseline-aware gate blocks a newly introduced over-threshold method` (TEST-AG-02, AC-02)
++- `baseline-aware gate blocks a worsened pre-existing method beyond the allowed delta` (TEST-AG-03, AC-03)
++
++Fixture pattern: `export function Comp() {` + N `const aN = 0;` body lines + `}`. The
++detector's brace counter reports `longestMethod = N + 2`. TEST-AG-01's candidate also
++appends 5 `useSecuritySelector(...)` integration lines + `return null;` so the longest
++method grows by only a few lines (well within delta 20) while baseline already fires.
++
++Note on TEST-AG-03 Case B (delta-equal-boundary): the task packet's literal numbers
++"baseline longest=100, candidate longest=120" are inconsistent with the detector's strict
++`longest > 100` predicate, because longest=100 does NOT fire an error and so could not be
++"pre-existing". To honor the authoritative contract predicate (`delta > ALLOWED_WORSEN_DELTA
++→ worsened; else pre-existing`, with both sides firing), Case B uses baseline longest=110
++(n=108, fires) and candidate longest=130 (n=128, fires), delta=20 which is NOT `> 20`, so
++the classification is `pre-existing` and the gate passes. This exercises the exact
++boundary the contract specifies (delta == default ⇒ pre-existing).
++
++## Required gates
++
++| Gate | Command | Result |
++|---|---|---|
++| focused | `node --test --test-name-pattern="baseline-aware" scripts/tests/ai-governance.test.mjs` | exit 0; tests 3, pass 3, fail 0 |
++| focused no-baseline regression | `node --test scripts/tests/ai-governance.test.mjs` | exit 0; tests 41, pass 41, fail 0 |
++| governance suite | `node scripts/run-ai-governance-gates.mjs` | exit 0; "QTA AI governance gates passed." |
++
++## Changed-path manifest
++
++- `scripts/check-ai-architecture.mjs` (modified; +128 / -3 lines per `git diff --stat`)
++- `scripts/tests/ai-governance.test.mjs` (modified; +172 / -0 lines per `git diff --stat`)
++- `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET.md` (new; this artifact)
++
++Production-line delta in the detector is 131 added lines — within the SLICE-DET cap of 450.
++
++## Remaining risks / blockers
++
++- None blocking SELF_CHECKED. The detector change is scripts-only; no runtime/deployment
++  dimensions apply (governance tooling). RUNTIME/DEPLOYMENT are NOT_REQUIRED per the
++  contract Verification Plan and are not exercised here.
++- The TEST-AG-03 Case B fixture numbers deviate from the packet's literal "100/120"
++  because those numbers are incompatible with the detector's strict `> 100` predicate;
++  the contract predicate is authoritative and the chosen 110/130 (delta 20) exercises the
++  exact boundary. Flagged for the reviewer.
++- AC-04, AC-05, AC-06 and TEST-AG-04/05/06/07 belong to SLICE-IDX and are intentionally
++  not implemented in this slice.
++
++## Proposed commit message for the parent
++
++```
++feat(governance): baseline-aware architecture gate classification (SLICE-DET)
++
++Add --baseline <dir> to scripts/check-ai-architecture.mjs. When supplied, each
++candidate file x rule error is classified introduced / worsened / pre-existing
++against the same file's baseline analyzeSource report; exit code is decided
++solely by blockingErrorCount (introduced + worsened + candidate errors). The
++JSON report gains baselineIdentity, blockingErrorCount, introducedErrors,
++worsenedErrors, preExistingErrors and keeps errors[] == blocking only
++(report coherence invariant). Strict no-baseline behavior is byte-for-byte
++unchanged. Adds TEST-AG-01..03 (AC-01..03).
++```
++
++## Candidate handoff
++
++Candidate ready for `qta-code-reviewer` (functional + architecture on the frozen
++candidate). Final verification is NOT dispatched until review is clear.
+diff --git a/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET2.md b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET2.md
+new file mode 100644
+index 0000000..749b48e
+--- /dev/null
++++ b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-DET2.md
+@@ -0,0 +1,151 @@
++# Self-Check Artifact — ARCH-GATE-BASELINE-AWARE-20260802 / SLICE-DET (fix continuation)
++
++- Task: ARCH-GATE-BASELINE-AWARE-20260802 (baseline/diff-aware architecture gate)
++- Slice: SLICE-DET (continuation/fix within generation 1; prior candidate never frozen/reviewed)
++- Dispatch ID: dispatch-imp-agba-det-2
++- Role instance policy: FRESH_ONLY (executor type SUBAGENT; no parent substitution)
++- Role start time: 2026-08-02 (recorded at dispatch)
++- Repair round: 0 (continuation/fix, not a repair round; SLICE-DET candidate was not yet frozen)
++- Contract path: `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-CONTRACT.md`
++- Contract hash (verified byte-for-byte): `79ec00e82eb4a797fa3767b34f9567ddd56b45507d531d121c36caa6769af148`
++- Baseline commit (verified): `979b080f6ccbcf9e2af2b435f360735e130cbff8`
++- Assigned AC IDs (unblocked by this fix): AC-01, AC-02, AC-03, AC-05, AC-06
++- Allowed write paths (only): `scripts/check-ai-architecture.mjs`, this self-check artifact
++- Candidate mode: COMMIT (no Git operations performed; parent owns Git)
++- Status: SELF_CHECKED
++
++## The concrete finding (from SLICE-IDX self-check)
++
++`scripts/check-ai-architecture.mjs` computes the local variable `errorCount` (used for console
++output, `status`, and `exitCode`) but the JSON `payload` object literal written to `--json-output`
++did NOT serialize `errorCount` as a field. Consumers reading the report JSON could not observe
++`errorCount`, breaking two acceptance assertions the contract requires verbatim:
++
++- AC-05 / TEST-AG-05 (line 1093): `assert.equal(report.errors.length, report.errorCount)` in the
++  no-baseline path.
++- AC-06 / TEST-AG-06 (line 1130): `assert.equal(report.errorCount, 0)` for a baseline-aware run
++  whose only errors are pre-existing.
++
++## Reproduction of the finding (before the fix)
++
++`node --test --test-name-pattern="baseline-aware|strict behavior|architecture report binds" ...`
++produced exactly two failures before the fix:
++
++- TEST-AG-05: `Expected values to be strictly equal: 1 !== undefined`
++  (`report.errorCount` was `undefined`; `report.errors.length` was 1).
++- TEST-AG-06: `Expected values to be strictly equal: undefined !== 0`
++  (`report.errorCount` was `undefined`; expected 0).
++
++This confirmed the exact, single missing field: `errorCount` was never serialized into `payload`.
++
++## Surgical fix
++
++The ONLY behavioral change is that the report JSON now includes a top-level `errorCount` field set
++to the already-computed local `errorCount`. This applies to BOTH the baseline-aware path and the
++no-baseline path (they share the same `payload` object literal). No classification logic, predicate,
++console-output semantics, or exit-code logic was changed; no other fields were added or removed.
++
++### Before / after of the `payload` object literal
++
++Before (single shared literal, around line 408 in the pre-fix file):
++
++```js
++const payload = {
++  schemaVersion: 1,
++  generatedBy: "scripts/check-ai-architecture.mjs",
++  generatedAt: new Date().toISOString(),
++  candidateIdentity,
++  base,
++  manifestPath: manifestIndex >= 0 ? process.argv[manifestIndex + 1] : "",
++  architectureReviewCount,
++  files: reports,
++  additions,
++  warnings,
++  errors,
++  status: errorCount === 0 ? "PASS" : "FAIL",
++  exitCode: errorCount === 0 ? 0 : 1
++};
++```
++
++After (one line added: `errorCount,` adjacent to `errors`/`warnings`):
++
++```js
++const payload = {
++  schemaVersion: 1,
++  generatedBy: "scripts/check-ai-architecture.mjs",
++  generatedAt: new Date().toISOString(),
++  candidateIdentity,
++  base,
++  manifestPath: manifestIndex >= 0 ? process.argv[manifestIndex + 1] : "",
++  architectureReviewCount,
++  files: reports,
++  additions,
++  warnings,
++  errorCount,
++  errors,
++  status: errorCount === 0 ? "PASS" : "FAIL",
++  exitCode: errorCount === 0 ? 0 : 1
++};
++```
++
++The baseline-aware branch still appends `baselineIdentity`, `blockingErrorCount`,
++`introducedErrors`, `worsenedErrors`, `preExistingErrors` to the same payload (unchanged).
++
++### Field-set confirmation (unchanged fields)
++
++The pre-existing report fields are all still present and unchanged:
++`schemaVersion`, `generatedBy`, `generatedAt`, `candidateIdentity`, `base`, `manifestPath`,
++`architectureReviewCount`, `files`, `additions`, `warnings`, `errors`, `status`, `exitCode` — and,
++in baseline-aware mode only: `baselineIdentity`, `blockingErrorCount`, `introducedErrors`,
++`worsenedErrors`, `preExistingErrors`. The ONLY field added is `errorCount`.
++
++### Diff scope note
++
++`git diff scripts/check-ai-architecture.mjs` shows the full SLICE-DET working-tree change vs the
++`979b080` baseline, because the SLICE-DET implementation was already present in the working tree
++when this dispatch began (continuation within generation 1; candidate never frozen). The change
++made by THIS dispatch is exactly the single line `+      errorCount,` in the `payload` literal
++hunk. Everything else in the diff is the pre-existing SLICE-DET implementation, which is in-scope
++for the contract (SLICE-DET allowed write path) and outside this dispatch's modification set.
++
++## Required gates
++
++| Gate | Command | Exit code | Result |
++|---|---|---:|---|
++| focused baseline-aware | `node --test --test-name-pattern="baseline-aware" scripts/tests/ai-governance.test.mjs` | 0 | pass 5 / fail 0 (TEST-AG-01, 02, 03, 04, 07) |
++| full regression | `node --test scripts/tests/ai-governance.test.mjs` | 0 | pass 45 / fail 0 (TEST-AG-05/06 now pass; TEST-AG-04/07 already passed) |
++| governance suite | `node scripts/run-ai-governance-gates.mjs` | 0 | "QTA AI governance gates passed." (45/45 tests pass) |
++
++### Confirmation TEST-AG-05 / TEST-AG-06 now pass
++
++- TEST-AG-05 (`architecture gate keeps strict behavior when no baseline is supplied`):
++  PASS. `report.errors.length === report.errorCount` (1 === 1); no-baseline fields
++  (`baselineIdentity`, `blockingErrorCount`, `introducedErrors`, `worsenedErrors`,
++  `preExistingErrors`) all `undefined` as required.
++- TEST-AG-06 (`architecture report binds candidate and baseline identity and the full governance
++  suite passes`): PASS. `report.errorCount === 0`; `report.status === "PASS"`;
++  `report.exitCode === 0`; `report.candidateIdentity === "cand-X"`;
++  `report.baselineIdentity === baselineAbs`; spawned `run-ai-governance-gates.mjs` exits 0.
++
++## Self-test standard disclosure
++
++Testing done here is SELF_CHECKED only (not independently verified). Exact commands and exit codes
++are recorded above. RUNTIME and DEPLOYMENT dimensions are NOT_REQUIRED for this governance-tooling
++task per the contract's Verification Plan, and were not exercised.
++
++## AC → evidence map
++
++- AC-01 (TEST-AG-01): pass — baseline-aware gate does not block unchanged pre-existing debt.
++- AC-02 (TEST-AG-02): pass — newly introduced over-threshold method blocks as `introduced`.
++- AC-03 (TEST-AG-03): pass — worsened beyond delta blocks; within-delta is pre-existing.
++- AC-05 (TEST-AG-05): pass — strict no-baseline behavior; `errorCount == errors.length` (this fix).
++- AC-06 (TEST-AG-06): pass — identity binding, self-coherent report, suite exit 0 (this fix unblocks
++  the `errorCount === 0` assertion).
++- (AC-04 / TEST-AG-04 and AC-01,02 / TEST-AG-07 also pass; not the focus of this fix dispatch but
++  share the same detector + report.)
++
++## Remaining risks / blockers
++
++- None at the implementer level. The candidate is SELF_CHECKED with all gates green.
++- The candidate has NOT been frozen, committed, or pushed (parent owns Git). Candidate handoff
++  proceeds to `qta-code-reviewer`; final verification is not dispatched until review is clear.
+diff --git a/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-IDX.md b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-IDX.md
+new file mode 100644
+index 0000000..5e1408d
+--- /dev/null
++++ b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-IDX.md
+@@ -0,0 +1,304 @@
++# Self-Check Artifact: ARCH-GATE-BASELINE-AWARE-20260802 / SLICE-IDX
++
++- Status: `BLOCKED` (concrete cross-slice blocker; see Blocker section)
++- Slice ID: `SLICE-IDX`
++- Dispatch ID: `dispatch-imp-agba-idx-2`
++- Role instance policy: `FRESH_ONLY` (fresh retry; prior `IMP-AGBA-IDX-1` was CANCELLED before returning — not inherited)
++- Lane: `L2`
++- Assigned AC IDs: AC-04, AC-05, AC-06
++- Contract hash: `79ec00e82eb4a797fa3767b34f9567ddd56b45507d531d121c36caa6769af148`
++- Baseline commit: `979b080` (branch `codex/security-directory-d2-20260802`; verified == HEAD at role start)
++- Repair round: 0
++- Role started-at: `2026-08-02T10:05:00Z` (approx; role session start)
++- Role finished-at: `2026-08-02T10:31:00Z`
++- Executor type: `SUBAGENT`
++- Enforcement level: `ADVISORY` (self-tests are SELF_CHECKED only; not independent acceptance)
++- Runtime receipt path: created by the workspace hook for this dispatch session
++- Wait calls: 0
++- Shell polls for one command: at most 2 (focused test selectors)
++- Context/compaction status: no compaction occurred; well under threshold
++
++## Files changed
++
++1. `scripts/tests/ai-governance.test.mjs` — added 4 tests (TEST-AG-04, TEST-AG-05, TEST-AG-06, TEST-AG-07)
++   using the verbatim selectors from the Frozen Test Inventory, plus one local helper
++   `javaMethodBodyFixture(lineCount)`. +319 lines. TEST-AG-04 and TEST-AG-07 PASS. TEST-AG-05 and TEST-AG-06
++   FAIL on a single shared root cause (see Blocker) that is outside this slice's allowed write paths.
++2. `docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md` — NEW governance doc (93 lines, within the 120-line cap).
++   Unaffected by the blocker; documents classification semantics, default delta 20, report fields, the
++   coherence invariant, and the honesty rule.
++
++Allowed write paths respected: ONLY `scripts/tests/ai-governance.test.mjs` and
++`docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md` were edited, plus this self-check artifact. The detector
++`scripts/check-ai-architecture.mjs` was READ ONLY and was NOT modified. No Git stage/commit/push performed.
++
++## Gate results
++
++| Gate | Command | Exit | Result |
++|---|---|---|---|
++| focused (verbatim contract cmd) | `node --test --test-name-pattern="baseline-aware\|architecture gate keeps strict\|architecture report binds" scripts/tests/ai-governance.test.mjs` | 0 | NOTE: the `\|` pattern is a literal escaped pipe in JS RegExp, so it matches ZERO test names; Node reports the file module as trivially passing (pass 1). This verbatim command does NOT exercise the 4 new tests. See "Focused-gate pattern caveat" below. |
++| focused (correct alternation) | `node --test --test-name-pattern="baseline-aware|architecture gate keeps strict|architecture report binds" scripts/tests/ai-governance.test.mjs` | 1 | AG-04 PASS, AG-07 PASS; AG-05 FAIL, AG-06 FAIL (both on `report.errorCount` — see Blocker) |
++| full regression | `node --test scripts/tests/ai-governance.test.mjs` | 1 | tests 45, pass 43, fail 2 (AG-05, AG-06 only). All 41 pre-existing tests still pass — no regression from this slice's additions. |
++| governance suite | `node scripts/run-ai-governance-gates.mjs` | 1 | Fails because the suite runs the full test file, which includes the 2 failing new tests. The `validate-ai-governance.mjs` leg is independent of this work. |
++
++## Blocker (concrete, cross-slice, outside allowed write paths)
++
++**Root cause:** `scripts/check-ai-architecture.mjs` (owned by SLICE-DET; READ-ONLY for SLICE-IDX) does NOT
++serialize an `errorCount` field in the JSON report payload. The `errorCount` local variable exists (line 377;
++set at lines 394 and 398) and is correctly used for the summary log (line 400), `status` (line 420),
++`exitCode` (line 421), and `process.exit` (line 434), but the payload object (lines 408-422) only carries
++`errors`, `status`, `exitCode` (and, in baseline-aware mode, `baselineIdentity`/`blockingErrorCount`/
++`introducedErrors`/`worsenedErrors`/`preExistingErrors`). No `errorCount` key is ever assigned to the payload.
++
++Verified payload keys for the baseline-aware PASS path: `schemaVersion, generatedBy, generatedAt,
++candidateIdentity, base, manifestPath, architectureReviewCount, files, additions, warnings, errors, status,
++exitCode` (+ `baselineIdentity, blockingErrorCount, introducedErrors, worsenedErrors, preExistingErrors`).
++`Object.prototype.hasOwnProperty.call(report, "errorCount") === false`. Same omission in the no-baseline path.
++
++**Why this blocks AC-05 and AC-06 (as written):**
++- AC-05 Expected result requires "`errorCount == errors.length`". With `report.errorCount === undefined`,
++  `undefined == errors.length` is false.
++- AC-06 Expected result requires "`report.errorCount === 0`" for an only-pre-existing report. With the field
++  absent, the assertion fails (`undefined !== 0`).
++- The Task Packet's TEST-AG-05/TEST-AG-06 specs both reference `report.errorCount` literally.
++
++**Evidence (reproducible):** an only-pre-existing baseline-aware run yields
++`status: PASS, exitCode: 0, errors.length: 0, blockingErrorCount: 0, preExistingErrors: 1` but
++`report.errorCount === undefined`. The report IS otherwise coherent (`errors.length === blockingErrorCount
++=== 0`; `status === PASS`; `exitCode === 0`); only the serialized scalar `errorCount` field is missing.
++
++**Operational impact (low):** `scripts/check-ai-task-control.mjs` line 789 validates the candidate-bound
++report via `report.errors?.length !== control.architectureGate.errorCount`, i.e. it reads the report's
++`errors.length`, NOT `report.errorCount`. So D2's operational path is unaffected. The gap is purely that the
++contract's AC-05/AC-06 test assertions reference a serialized `errorCount` field the detector does not emit.
++
++**Why SLICE-IDX cannot resolve it:** the Task Packet scope states "Allowed write paths (ONLY these two files):
++`scripts/tests/ai-governance.test.mjs`, `docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md`" and "You MAY read (not
++edit) `scripts/check-ai-architecture.mjs` ... Do NOT modify the detector." Adding `errorCount` to the payload
++requires editing the detector, which is prohibited.
++
++**Boundary-respecting options for the parent:**
++1. Governed SLICE-DET repair round: add `errorCount` to the payload object (one line:
++   `errorCount,` inside the payload literal at line ~419). Once serialized, TEST-AG-05 and TEST-AG-06 pass
++   UNCHANGED as written below (they already encode the contract verbatim). This is the prescribed route per
++   `GOVERNANCE_V2_POLICY.md` §Architecture Gate ("If the detector itself is wrong, repair and validate the
++   detector in a separate governed task").
++2. Contract amendment to relax the AC-05/AC-06 `errorCount` assertion to `errors.length` (operationally
++   equivalent and what downstream already uses). NOT done here — weakening an AC is explicitly prohibited for
++   the implementer.
++
++I did NOT substitute `errors.length` for `errorCount` in the tests, because silently substituting an assertion
++would weaken an explicit AC ("Do not change product meaning or weaken acceptance criteria"; "Do not add fake
++success paths, permissive fallbacks"). The failing assertions are left in place as evidence of the exact gap.
++
++## Focused-gate pattern caveat
++
++The Required-gates table specifies the focused command with the pattern
++`baseline-aware\|architecture gate keeps strict\|architecture report binds`. In JavaScript RegExp, `\|` is a
++literal escaped pipe (not alternation), so this pattern matches NO test name (none contains a literal `|`).
++Node's test runner then reports the file module as passing with zero matched subtests. To actually exercise
++the 4 new tests, the alternation must be unescaped: `baseline-aware|architecture gate keeps strict|
++architecture report binds`. Recommend the parent/verifier use the unescaped form. This is a contract-gate
++wording issue, not a code defect; flagged here for the reviewer.
++
++## New test bodies
++
++### TEST-AG-04 (PASS) — selector: `baseline-aware gate still blocks over-long Java methods`
++
++```js
++function javaMethodBodyFixture(lineCount) {
++  const lines = ["class LongMethod {", "  public void calculate(int input) {"];
++  for (let index = 0; index < lineCount; index += 1) lines.push(`    int value${index} = ${index};`);
++  lines.push("    return;");
++  lines.push("  }");
++  lines.push("}");
++  return `${lines.join("\n")}\n`;
++}
++
++test("baseline-aware gate still blocks over-long Java methods", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-java-cand-"));
++  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-java-base-"));
++  try {
++    const relativeFile = "src/main/java/demo/LongMethod.java";
++    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await writeFile(path.join(baselineDir, relativeFile), javaMethodBodyFixture(95));
++    await writeFile(path.join(candidateDir, relativeFile), javaMethodBodyFixture(120));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const result = await runBaselineAwareGate({
++      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
++    });
++    assert.equal(result.status, 1, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.status, "FAIL");
++    assert.ok(report.blockingErrorCount >= 1);
++    const introduced = report.introducedErrors
++      .filter((entry) => entry.message.includes("longest method"));
++    assert.ok(introduced.length >= 1);
++    for (const entry of introduced) {
++      assert.equal(entry.classification, "introduced");
++      assert.equal(entry.baselineMetric, null);
++      assert.equal(entry.delta, null);
++      assert.equal(typeof entry.candidateMetric, "number");
++      assert.ok(entry.candidateMetric > 100);
++    }
++    assert.ok(report.errors.some((entry) => introduced.some((match) => match.id === entry.id)));
++    assert.deepEqual(report.worsenedErrors, []);
++    assert.equal(report.candidateIdentity, "candidate-baseline-aware");
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++    await rm(baselineDir, { recursive: true, force: true });
++  }
++});
++```
++
++### TEST-AG-05 (FAIL — `errorCount` serialization gap) — selector: `architecture gate keeps strict behavior when no baseline is supplied`
++
++```js
++test("architecture gate keeps strict behavior when no baseline is supplied", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-strict-no-baseline-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await writeFile(path.join(candidateDir, relativeFile), methodBodyFixture(118));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const script = path.resolve("scripts/check-ai-architecture.mjs");
++    const result = spawnSync(process.execPath, [script,
++      "--files", path.resolve(candidateDir, relativeFile),
++      "--candidate-identity", "strict-candidate",
++      "--json-output", reportPath
++    ], { cwd: candidateDir, encoding: "utf8" });
++    assert.equal(result.status, 1, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.status, "FAIL");
++    assert.equal(report.errors.length, report.errorCount);   // FAILS: report.errorCount === undefined
++    assert.ok(report.errors.length >= 1);
++    assert.ok(report.errors.some((entry) => entry.message.includes("longest method")));
++    assert.equal(report.baselineIdentity, undefined);
++    assert.equal(report.blockingErrorCount, undefined);
++    assert.equal(report.introducedErrors, undefined);
++    assert.equal(report.worsenedErrors, undefined);
++    assert.equal(report.preExistingErrors, undefined);
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++  }
++});
++```
++
++### TEST-AG-06 (FAIL — `errorCount` serialization gap) — selector: `architecture report binds candidate and baseline identity and the full governance suite passes`
++
++```js
++test("architecture report binds candidate and baseline identity and the full governance suite passes", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-identity-bind-cand-"));
++  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-identity-bind-base-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await writeFile(path.join(baselineDir, relativeFile), methodBodyFixture(148));
++    await writeFile(path.join(candidateDir, relativeFile),
++      securitySelectorIntegrationFixture(148));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const script = path.resolve("scripts/check-ai-architecture.mjs");
++    const baselineAbs = path.resolve(baselineDir);
++    const candidateAbs = path.resolve(candidateDir, relativeFile);
++    const result = spawnSync(process.execPath, [script,
++      "--files", candidateAbs,
++      "--baseline", baselineAbs,
++      "--candidate-identity", "cand-X",
++      "--json-output", reportPath
++    ], { cwd: candidateDir, encoding: "utf8" });
++    assert.equal(result.status, 0, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.candidateIdentity, "cand-X");
++    assert.equal(report.baselineIdentity, baselineAbs);
++    assert.equal(report.errorCount, 0);                     // FAILS: report.errorCount === undefined
++    assert.equal(report.status, "PASS");
++    assert.equal(report.exitCode, 0);
++
++    const suiteScript = path.resolve("scripts/run-ai-governance-gates.mjs");
++    const suite = spawnSync(process.execPath, [suiteScript],
++      { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" });
++    assert.equal(suite.status, 0, suite.stderr);
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++    await rm(baselineDir, { recursive: true, force: true });
++  }
++});
++```
++
++### TEST-AG-07 (PASS) — selector: `baseline-aware gate treats a missing baseline file as introduced not silently dropped`
++
++```js
++test("baseline-aware gate treats a missing baseline file as introduced not silently dropped", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-missing-cand-"));
++  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-missing-base-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await mkdir(path.join(baselineDir, "src", "unrelated"), { recursive: true });
++    await writeFile(path.join(candidateDir, relativeFile), methodBodyFixture(118));
++    await writeFile(path.join(baselineDir, "src/unrelated/Other.tsx"), methodBodyFixture(10));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const result = await runBaselineAwareGate({
++      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
++    });
++    assert.equal(result.status, 1, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.status, "FAIL");
++    assert.ok(report.blockingErrorCount >= 1);
++    const introduced = report.introducedErrors
++      .filter((entry) => entry.message.includes("longest method"));
++    assert.ok(introduced.length >= 1);
++    for (const entry of introduced) {
++      assert.equal(entry.classification, "introduced");
++      assert.equal(entry.baselineMetric, null);
++      assert.equal(entry.delta, null);
++      assert.equal(typeof entry.candidateMetric, "number");
++    }
++    assert.ok(report.errors.some((entry) => introduced.some((match) => match.id === entry.id)));
++    assert.deepEqual(report.worsenedErrors, []);
++    assert.deepEqual(report.preExistingErrors, []);
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++    await rm(baselineDir, { recursive: true, force: true });
++  }
++});
++```
++
++## AC status
++
++| AC | Status | Evidence |
++|---|---|---|
++| AC-04 | SELF_CHECKED | TEST-AG-04 PASS (Java >100 method blocks as introduced; `candidateIdentity == input`). |
++| AC-05 | BLOCKED | TEST-AG-05 FAILS solely on `report.errorCount` (detector omits the field). Strict no-baseline behavior itself is preserved (exitCode 1, no baseline fields). |
++| AC-06 | BLOCKED | TEST-AG-06 FAILS solely on `report.errorCount` (detector omits the field). Identity binding (`candidateIdentity`/`baselineIdentity`), `status`, `exitCode`, and the only-pre-existing ⇒ blocking=0 coherence all PASS. |
++
++## Remaining risks / next action
++
++- **Next smallest action (parent-owned):** governed SLICE-DET repair round adding `errorCount` to the JSON
++  payload in `scripts/check-ai-architecture.mjs` (one line in the payload literal). TEST-AG-05 and TEST-AG-06
++  then pass unchanged. This role's tests and doc are ready for that fix; no further SLICE-IDX work is needed.
++- No Git operations performed (parent owns Git). Candidate is NOT frozen.
++- Dimensions: AUTOMATION partially SELF_CHECKED (AG-04/07 green; AG-05/06 blocked on detector field).
++  STATIC/validate-ai-governance leg independent of this slice. RUNTIME/DEPLOYMENT NOT_REQUIRED (governance
++  tooling).
++
++## Changed-path manifest (proposed commit message for the parent)
++
++Changed paths:
++- `scripts/tests/ai-governance.test.mjs` (modified; +319 lines: 4 tests + 1 helper)
++- `docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md` (new; 93 lines)
++- `docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-SELF-CHECK-IDX.md` (new; this artifact)
++
++Proposed commit message (NOT committed by this role; parent owns Git):
++```
++test(arch-gate): add SLICE-IDX identity/suite tests + baseline-aware governance doc
++
++Add TEST-AG-04 (Java over-long method blocks), TEST-AG-05 (strict no-baseline),
++TEST-AG-06 (candidate+baseline identity + governance suite), TEST-AG-07 (missing
++baseline file => introduced), and the ARCHITECTURE_GATE_BASELINE_AWARE.md doc.
++
++TEST-AG-05/06 are blocked on a SLICE-DET gap: the detector does not serialize
++`errorCount` in the JSON payload. See SELF-CHECK-IDX for the repair request.
++```
+diff --git a/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-TEST-DESIGN.md b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-TEST-DESIGN.md
+new file mode 100644
+index 0000000..99a429a
+--- /dev/null
++++ b/docs/development/tasks/ARCH-GATE-BASELINE-AWARE-20260802-TEST-DESIGN.md
+@@ -0,0 +1,54 @@
++# Test-Design Amendment: ARCH-GATE-BASELINE-AWARE-20260802 / TD-AGBA-2
++
++- roleRunId: TD-AGBA-2
++- dispatchId: dispatch-td-agba-2
++- role: TEST_DESIGNER
++- generation: 0
++- executorType: SUBAGENT
++- startedAt/finishedAt: 2026-08-02T09:14:00Z / 2026-08-02T09:19:00Z
++- executionOutcome: COMPLETED
++- artifactAccepted: true
++- artifactSha256: persisted below; frozen by parent.
++
++## Verdict: CONTRACT_BLOCKED → amended by parent → CONTRACT_FROZEN
++
++The test designer returned 3 blocking amendments (BA-1/BA-2/BA-3) and 1 new required test
++(TEST-AG-07). Full rationale is in the returned artifact. Parent disposition:
++
++- **BA-1 (classification granularity)**: ACCEPTED. Contract pins classification to
++  per-file × per-error-rule using the detector's existing aggregate metrics; all per-method prose struck.
++- **BA-2 (delta contradiction)**: ACCEPTED. Band-crossing `introduced` (rule fires for candidate but not
++  baseline) is delta-independent and always blocks. Delta-based `worsened` uses default delta **20**
++  (covers D2's +11; blocks 105→130). 199→210 is now correctly `pre-existing`/non-blocking; 95→120 is
++  `introduced`/blocking.
++- **BA-3 (errorCount coherence)**: ACCEPTED. In baseline-aware mode `errors[]` contains only blocking
++  (introduced+worsened) errors; `errorCount == errors.length == blockingErrorCount`;
++  `errorCount==0 ⟺ PASS ⟺ exitCode 0`. Pre-existing errors live only in `preExistingErrors[]`.
++  Compatible with the unchanged `check-ai-task-control.mjs` file-validation path.
++- **OQ-1**: resolved by parent — band-crossing introduced + delta(20) worsened (option b+a).
++- **OQ-2**: resolved by parent — TEST-AG-07 is Required (anti-masking honesty guarantee).
++
++## Confirmed selector observability
++
++All 7 selectors are verbatim `test("…")` first arguments observable by `node --test` and matched as
++substrings by `scripts/run-ai-evidence-command.mjs`. Each is unique against the existing test names in
++`scripts/tests/ai-governance.test.mjs`.
++
++## Frozen test inventory (7 tests)
++
++| test_id | AC | selector |
++|---|---|---|
++| TEST-AG-01 | AC-01 | baseline-aware gate does not block unchanged pre-existing React method debt |
++| TEST-AG-02 | AC-02 | baseline-aware gate blocks a newly introduced over-threshold method |
++| TEST-AG-03 | AC-03 | baseline-aware gate blocks a worsened pre-existing method beyond the allowed delta |
++| TEST-AG-04 | AC-04 | baseline-aware gate still blocks over-long Java methods |
++| TEST-AG-05 | AC-05 | architecture gate keeps strict behavior when no baseline is supplied |
++| TEST-AG-06 | AC-06 | architecture report binds candidate and baseline identity and the full governance suite passes |
++| TEST-AG-07 | AC-01,AC-02 | baseline-aware gate treats a missing baseline file as introduced not silently dropped |
++
++## Non-blocking recommendations folded into the test matrix
++
++- DEFECT-5: TEST-AG-03 includes the delta==default boundary case (non-blocking).
++- DEFECT-6: AC-05 splits STATIC (existing tests unchanged) from AUTOMATION (no baseline fields emitted).
++- DEFECT-7: AC-06 asserts both identity binding and `spawnSync(run-ai-governance-gates.mjs).status === 0`
++  inside one test body; lane AC count stays at 6 (≤ 8).
+diff --git a/scripts/check-ai-architecture.mjs b/scripts/check-ai-architecture.mjs
+index 2fac656..001c9f3 100644
+--- a/scripts/check-ai-architecture.mjs
++++ b/scripts/check-ai-architecture.mjs
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env node
+ 
+ import { createHash } from "node:crypto";
++import fs from "node:fs";
+ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+ import { execFileSync } from "node:child_process";
+ import path from "node:path";
+@@ -147,6 +148,68 @@ export function analyzeSource(file, content) {
+   };
+ }
+ 
++const ALLOWED_WORSEN_DELTA = 20;
++
++function errorRuleKind(message) {
++  if (message.startsWith("longest method ")) return "longest-method";
++  if (message.startsWith("class/module ")) return "class-module";
++  if (message === "controller crosses transaction/persistence boundary") return "controller-cross";
++  if (message === "service combines file/protocol parsing with persistence") return "service-file-persist";
++  if (message === "SQL appears outside mapper/persistence boundary") return "sql-outside-mapper";
++  return null;
++}
++
++function errorMetricForKind(message) {
++  if (message.startsWith("longest method ")) {
++    const match = message.match(/^longest method (\d+) lines/);
++    return match ? Number.parseInt(match[1], 10) : null;
++  }
++  if (message.startsWith("class/module ")) {
++    const match = message.match(/^class\/module (\d+) lines/);
++    return match ? Number.parseInt(match[1], 10) : null;
++  }
++  return null;
++}
++
++function classifyError(message, baselineReport) {
++  const kind = errorRuleKind(message);
++  const candidateMetric = errorMetricForKind(message);
++  if (!baselineReport) {
++    return { classification: "introduced", candidateMetric, baselineMetric: null, delta: null };
++  }
++  const baselineMatch = baselineReport.errors.find((entry) => errorRuleKind(entry) === kind);
++  if (!baselineMatch) {
++    return { classification: "introduced", candidateMetric, baselineMetric: null, delta: null };
++  }
++  const baselineMetric = errorMetricForKind(baselineMatch);
++  if (candidateMetric !== null && baselineMetric !== null) {
++    const delta = candidateMetric - baselineMetric;
++    if (delta > ALLOWED_WORSEN_DELTA) {
++      return { classification: "worsened", candidateMetric, baselineMetric, delta };
++    }
++    return { classification: "pre-existing", candidateMetric, baselineMetric, delta };
++  }
++  return { classification: "pre-existing", candidateMetric: null, baselineMetric: null, delta: null };
++}
++
++async function baselineReportFor(file, baselineDir) {
++  let relativeFile = file;
++  if (path.isAbsolute(file)) {
++    const candidateRoot = fs.realpathSync(process.cwd());
++    const resolvedFile = fs.realpathSync(file);
++    const fromResolved = path.relative(candidateRoot, resolvedFile);
++    relativeFile = fromResolved && !fromResolved.startsWith("..") ? fromResolved : path.relative(process.cwd(), file);
++  }
++  const baselinePath = path.join(baselineDir, relativeFile);
++  try {
++    const content = await readFile(baselinePath, "utf8");
++    return analyzeSource(file, content);
++  } catch (error) {
++    if (error.code === "ENOENT") return null;
++    throw error;
++  }
++}
++
+ function gitOutput(args, options = {}) {
+   return execFileSync("git", args, { encoding: "utf8", ...options });
+ }
+@@ -215,10 +278,12 @@ async function main() {
+   const reviewCountIndex = process.argv.indexOf("--architecture-review-count");
+   const candidateIdentityIndex = process.argv.indexOf("--candidate-identity");
+   const jsonOutputIndex = process.argv.indexOf("--json-output");
++  const baselineIndex = process.argv.indexOf("--baseline");
+   const architectureReviewCount = reviewCountIndex >= 0 ? Number.parseInt(process.argv[reviewCountIndex + 1], 10) || 0 : 0;
+   const base = baseIndex >= 0 ? process.argv[baseIndex + 1] : "";
+   const candidateIdentity = candidateIdentityIndex >= 0 ? process.argv[candidateIdentityIndex + 1] : "";
+   const jsonOutput = jsonOutputIndex >= 0 ? process.argv[jsonOutputIndex + 1] : "";
++  const baselineDir = baselineIndex >= 0 ? path.resolve(process.argv[baselineIndex + 1]) : "";
+   let files = [];
+   let additions = 0;
+   const candidateErrors = [];
+@@ -268,17 +333,70 @@ async function main() {
+   for (const error of candidateErrors) console.log(`CANDIDATE ERROR ${error}`);
+ 
+   const warningDetails = [];
++  const introducedErrors = [];
++  const worsenedErrors = [];
++  const preExistingErrors = [];
++  if (baselineDir) {
++    for (const report of reports) {
++      const baselineReport = await baselineReportFor(report.file, baselineDir);
++      for (const message of report.errors) {
++        const verdict = classifyError(message, baselineReport);
++        const detail = {
++          file: report.file,
++          message,
++          classification: verdict.classification,
++          candidateMetric: verdict.candidateMetric,
++          baselineMetric: verdict.baselineMetric,
++          delta: verdict.delta
++        };
++        if (verdict.classification === "introduced") {
++          introducedErrors.push(detail);
++          console.log(`BASELINE-INTRODUCED ${report.file}: ${message}`);
++        } else if (verdict.classification === "worsened") {
++          worsenedErrors.push(detail);
++          console.log(`BASELINE-WORSENED ${report.file}: ${message} (candidate ${verdict.candidateMetric}, baseline ${verdict.baselineMetric}, delta ${verdict.delta})`);
++        } else {
++          preExistingErrors.push(detail);
++          console.log(`BASELINE-PRE-EXISTING ${report.file}: ${message}`);
++        }
++      }
++    }
++  }
+   const errorDetails = [];
+   for (const report of reports) {
+     for (const message of report.warnings) warningDetails.push({ file: report.file, message });
+-    for (const message of report.errors) errorDetails.push({ file: report.file, message });
++    if (!baselineDir) {
++      for (const message of report.errors) errorDetails.push({ file: report.file, message });
++    }
+   }
+   for (const message of candidateWarnings) warningDetails.push({ file: "<candidate>", message });
+   for (const message of candidateErrors) errorDetails.push({ file: "<candidate>", message });
+   const warnings = warningDetails.map((item, index) => ({ id: `ARCH-W-${String(index + 1).padStart(3, "0")}`, ...item }));
+-  const errors = errorDetails.map((item, index) => ({ id: `ARCH-E-${String(index + 1).padStart(3, "0")}`, ...item }));
+   const warningCount = warnings.length;
+-  const errorCount = reports.reduce((sum, report) => sum + report.errors.length, 0) + candidateErrors.length;
++  let errors;
++  let errorCount;
++  let blockingErrorCount = null;
++  let introducedDetailed = [];
++  let worsenedDetailed = [];
++  let preExistingDetailed = [];
++  if (baselineDir) {
++    let idCounter = 0;
++    const nextId = () => `ARCH-E-${String(idCounter += 1).padStart(3, "0")}`;
++    introducedDetailed = introducedErrors.map((item) => ({ id: nextId(), ...item }));
++    worsenedDetailed = worsenedErrors.map((item) => ({ id: nextId(), ...item }));
++    const candidateErrorDetailed = candidateErrors.map((message) => ({
++      id: nextId(), file: "<candidate>", message, classification: "candidate",
++      candidateMetric: null, baselineMetric: null, delta: null
++    }));
++    preExistingDetailed = preExistingErrors.map((item) => ({ id: nextId(), ...item }));
++    errors = [...introducedDetailed, ...worsenedDetailed, ...candidateErrorDetailed];
++    blockingErrorCount = errors.length;
++    errorCount = blockingErrorCount;
++    console.log(`Architecture gate (baseline-aware): introduced=${introducedDetailed.length} worsened=${worsenedDetailed.length} pre-existing=${preExistingDetailed.length} blocking=${blockingErrorCount}`);
++  } else {
++    errors = errorDetails.map((item, index) => ({ id: `ARCH-E-${String(index + 1).padStart(3, "0")}`, ...item }));
++    errorCount = errors.length;
++  }
+   console.log(`Architecture gate: files=${reports.length}, additions=${additions}, warnings=${warningCount}, errors=${errorCount}`);
+   if (jsonOutput) {
+     if (!candidateIdentity) {
+@@ -298,10 +416,18 @@ async function main() {
+       files: reports,
+       additions,
+       warnings,
++      errorCount,
+       errors,
+       status: errorCount === 0 ? "PASS" : "FAIL",
+       exitCode: errorCount === 0 ? 0 : 1
+     };
++    if (baselineDir) {
++      payload.baselineIdentity = process.argv[baselineIndex + 1];
++      payload.blockingErrorCount = blockingErrorCount;
++      payload.introducedErrors = introducedDetailed;
++      payload.worsenedErrors = worsenedDetailed;
++      payload.preExistingErrors = preExistingDetailed;
++    }
+     await mkdir(path.dirname(output), { recursive: true });
+     await writeFile(temporary, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+     await rename(temporary, output);
+diff --git a/scripts/tests/ai-governance.test.mjs b/scripts/tests/ai-governance.test.mjs
+index b06ab43..b94af28 100644
+--- a/scripts/tests/ai-governance.test.mjs
++++ b/scripts/tests/ai-governance.test.mjs
+@@ -856,3 +856,322 @@ test("ZCode Stop Hook blocks premature qta-run completion and releases BLOCKED t
+     await rm(directory, { recursive: true, force: true });
+   }
+ });
++
++function methodBodyFixture(lineCount) {
++  const lines = ["export function Comp() {"];
++  for (let index = 0; index < lineCount; index += 1) lines.push(`  const a${index} = 0;`);
++  lines.push("}");
++  return `${lines.join("\n")}\n`;
++}
++
++function securitySelectorIntegrationFixture(baselineBodyLines) {
++  const lines = ["export function Comp() {"];
++  for (let index = 0; index < baselineBodyLines; index += 1) lines.push(`  const a${index} = 0;`);
++  lines.push("  const permissions = useSecuritySelector((state) => state.permissions);");
++  lines.push("  const identity = useSecuritySelector((state) => state.identity);");
++  lines.push("  const profile = useSecuritySelector((state) => state.profile);");
++  lines.push("  const entitlements = useSecuritySelector((state) => state.entitlements);");
++  lines.push("  const session = useSecuritySelector((state) => state.session);");
++  lines.push("  return null;");
++  lines.push("}");
++  return `${lines.join("\n")}\n`;
++}
++
++async function runBaselineAwareGate({ candidateDir, baselineDir, candidateFile, reportPath }) {
++  const script = path.resolve("scripts/check-ai-architecture.mjs");
++  const baselineAbs = path.resolve(baselineDir);
++  const candidateAbs = path.resolve(candidateDir, candidateFile);
++  return spawnSync(process.execPath, [script,
++    "--files", candidateAbs,
++    "--baseline", baselineAbs,
++    "--candidate-identity", "candidate-baseline-aware",
++    "--json-output", reportPath
++  ], { cwd: candidateDir, encoding: "utf8" });
++}
++
++test("baseline-aware gate does not block unchanged pre-existing React method debt", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-preexisting-cand-"));
++  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-preexisting-base-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    const baselineBodyLines = 148;
++    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await writeFile(path.join(baselineDir, relativeFile), methodBodyFixture(baselineBodyLines));
++    await writeFile(path.join(candidateDir, relativeFile),
++      securitySelectorIntegrationFixture(baselineBodyLines));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const result = await runBaselineAwareGate({
++      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
++    });
++    assert.equal(result.status, 0, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.status, "PASS");
++    assert.equal(report.exitCode, 0);
++    assert.equal(report.blockingErrorCount, 0);
++    assert.equal(report.errors.length, 0);
++    assert.equal(report.baselineIdentity, path.resolve(baselineDir));
++    const longestMethodErrors = [
++      ...report.introducedErrors, ...report.worsenedErrors, ...report.preExistingErrors
++    ].filter((entry) => entry.message.includes("longest method"));
++    assert.ok(longestMethodErrors.length >= 1);
++    assert.deepEqual(report.introducedErrors, []);
++    assert.deepEqual(report.worsenedErrors, []);
++    for (const entry of report.preExistingErrors) {
++      assert.equal(entry.classification, "pre-existing");
++      assert.equal(typeof entry.candidateMetric, "number");
++      assert.equal(typeof entry.baselineMetric, "number");
++      assert.equal(typeof entry.delta, "number");
++    }
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++    await rm(baselineDir, { recursive: true, force: true });
++  }
++});
++
++test("baseline-aware gate blocks a newly introduced over-threshold method", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-introduced-cand-"));
++  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-introduced-base-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await writeFile(path.join(baselineDir, relativeFile), methodBodyFixture(93));
++    await writeFile(path.join(candidateDir, relativeFile), methodBodyFixture(118));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const result = await runBaselineAwareGate({
++      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
++    });
++    assert.equal(result.status, 1, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.status, "FAIL");
++    assert.equal(report.exitCode, 1);
++    assert.ok(report.blockingErrorCount >= 1);
++    assert.equal(report.errors.length, report.blockingErrorCount);
++    const introduced = report.introducedErrors.filter((entry) => entry.message.includes("longest method"));
++    assert.ok(introduced.length >= 1);
++    for (const entry of introduced) {
++      assert.equal(entry.classification, "introduced");
++      assert.equal(entry.baselineMetric, null);
++      assert.equal(entry.delta, null);
++      assert.equal(typeof entry.candidateMetric, "number");
++    }
++    assert.ok(report.errors.some((entry) => introduced.some((match) => match.id === entry.id)));
++    assert.deepEqual(report.worsenedErrors, []);
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++    await rm(baselineDir, { recursive: true, force: true });
++  }
++});
++
++test("baseline-aware gate blocks a worsened pre-existing method beyond the allowed delta", async () => {
++  const worsenedCandidate = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-worsened-cand-"));
++  const worsenedBaseline = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-worsened-base-"));
++  const boundaryCandidate = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-boundary-cand-"));
++  const boundaryBaseline = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-boundary-base-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    for (const directory of [worsenedCandidate, worsenedBaseline, boundaryCandidate, boundaryBaseline]) {
++      await mkdir(path.join(directory, path.dirname(relativeFile)), { recursive: true });
++    }
++    await writeFile(path.join(worsenedBaseline, relativeFile), methodBodyFixture(103));
++    await writeFile(path.join(worsenedCandidate, relativeFile), methodBodyFixture(128));
++    await writeFile(path.join(boundaryBaseline, relativeFile), methodBodyFixture(108));
++    await writeFile(path.join(boundaryCandidate, relativeFile), methodBodyFixture(128));
++
++    const worsenedReportPath = path.join(worsenedCandidate, "architecture-report.json");
++    const worsened = await runBaselineAwareGate({
++      candidateDir: worsenedCandidate, baselineDir: worsenedBaseline,
++      candidateFile: relativeFile, reportPath: worsenedReportPath
++    });
++    assert.equal(worsened.status, 1, worsened.stdout);
++    const worsenedReport = JSON.parse(await readFile(worsenedReportPath, "utf8"));
++    assert.equal(worsenedReport.status, "FAIL");
++    assert.equal(worsenedReport.exitCode, 1);
++    assert.ok(worsenedReport.blockingErrorCount >= 1);
++    const worsenedEntries = worsenedReport.worsenedErrors
++      .filter((entry) => entry.message.includes("longest method"));
++    assert.ok(worsenedEntries.length >= 1);
++    for (const entry of worsenedEntries) {
++      assert.equal(entry.classification, "worsened");
++      assert.equal(entry.delta, 25);
++      assert.equal(entry.candidateMetric, 130);
++      assert.equal(entry.baselineMetric, 105);
++    }
++    assert.ok(worsenedReport.errors.some((entry) => worsenedEntries.some((match) => match.id === entry.id)));
++
++    const boundaryReportPath = path.join(boundaryCandidate, "architecture-report.json");
++    const boundary = await runBaselineAwareGate({
++      candidateDir: boundaryCandidate, baselineDir: boundaryBaseline,
++      candidateFile: relativeFile, reportPath: boundaryReportPath
++    });
++    assert.equal(boundary.status, 0, boundary.stdout);
++    const boundaryReport = JSON.parse(await readFile(boundaryReportPath, "utf8"));
++    assert.equal(boundaryReport.status, "PASS");
++    assert.equal(boundaryReport.exitCode, 0);
++    assert.equal(boundaryReport.blockingErrorCount, 0);
++    assert.deepEqual(boundaryReport.introducedErrors, []);
++    assert.deepEqual(boundaryReport.worsenedErrors, []);
++    const boundaryPreExisting = boundaryReport.preExistingErrors
++      .filter((entry) => entry.message.includes("longest method"));
++    assert.ok(boundaryPreExisting.length >= 1);
++    for (const entry of boundaryPreExisting) {
++      assert.equal(entry.classification, "pre-existing");
++      assert.equal(entry.delta, 20);
++      assert.equal(entry.candidateMetric, 130);
++      assert.equal(entry.baselineMetric, 110);
++    }
++  } finally {
++    await rm(worsenedCandidate, { recursive: true, force: true });
++    await rm(worsenedBaseline, { recursive: true, force: true });
++    await rm(boundaryCandidate, { recursive: true, force: true });
++    await rm(boundaryBaseline, { recursive: true, force: true });
++  }
++});
++
++function javaMethodBodyFixture(lineCount) {
++  const lines = ["class LongMethod {", "  public void calculate(int input) {"];
++  for (let index = 0; index < lineCount; index += 1) lines.push(`    int value${index} = ${index};`);
++  lines.push("    return;");
++  lines.push("  }");
++  lines.push("}");
++  return `${lines.join("\n")}\n`;
++}
++
++test("baseline-aware gate still blocks over-long Java methods", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-java-cand-"));
++  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-java-base-"));
++  try {
++    const relativeFile = "src/main/java/demo/LongMethod.java";
++    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await writeFile(path.join(baselineDir, relativeFile), javaMethodBodyFixture(95));
++    await writeFile(path.join(candidateDir, relativeFile), javaMethodBodyFixture(120));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const result = await runBaselineAwareGate({
++      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
++    });
++    assert.equal(result.status, 1, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.status, "FAIL");
++    assert.ok(report.blockingErrorCount >= 1);
++    const introduced = report.introducedErrors
++      .filter((entry) => entry.message.includes("longest method"));
++    assert.ok(introduced.length >= 1);
++    for (const entry of introduced) {
++      assert.equal(entry.classification, "introduced");
++      assert.equal(entry.baselineMetric, null);
++      assert.equal(entry.delta, null);
++      assert.equal(typeof entry.candidateMetric, "number");
++      assert.ok(entry.candidateMetric > 100);
++    }
++    assert.ok(report.errors.some((entry) => introduced.some((match) => match.id === entry.id)));
++    assert.deepEqual(report.worsenedErrors, []);
++    assert.equal(report.candidateIdentity, "candidate-baseline-aware");
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++    await rm(baselineDir, { recursive: true, force: true });
++  }
++});
++
++test("architecture gate keeps strict behavior when no baseline is supplied", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-strict-no-baseline-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await writeFile(path.join(candidateDir, relativeFile), methodBodyFixture(118));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const script = path.resolve("scripts/check-ai-architecture.mjs");
++    const result = spawnSync(process.execPath, [script,
++      "--files", path.resolve(candidateDir, relativeFile),
++      "--candidate-identity", "strict-candidate",
++      "--json-output", reportPath
++    ], { cwd: candidateDir, encoding: "utf8" });
++    assert.equal(result.status, 1, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.status, "FAIL");
++    assert.equal(report.errors.length, report.errorCount);
++    assert.ok(report.errors.length >= 1);
++    assert.ok(report.errors.some((entry) => entry.message.includes("longest method")));
++    assert.equal(report.baselineIdentity, undefined);
++    assert.equal(report.blockingErrorCount, undefined);
++    assert.equal(report.introducedErrors, undefined);
++    assert.equal(report.worsenedErrors, undefined);
++    assert.equal(report.preExistingErrors, undefined);
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++  }
++});
++
++test("architecture report binds candidate and baseline identity and the full governance suite passes", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-identity-bind-cand-"));
++  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-identity-bind-base-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    await mkdir(path.join(baselineDir, path.dirname(relativeFile)), { recursive: true });
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await writeFile(path.join(baselineDir, relativeFile), methodBodyFixture(148));
++    await writeFile(path.join(candidateDir, relativeFile),
++      securitySelectorIntegrationFixture(148));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const script = path.resolve("scripts/check-ai-architecture.mjs");
++    const baselineAbs = path.resolve(baselineDir);
++    const candidateAbs = path.resolve(candidateDir, relativeFile);
++    const result = spawnSync(process.execPath, [script,
++      "--files", candidateAbs,
++      "--baseline", baselineAbs,
++      "--candidate-identity", "cand-X",
++      "--json-output", reportPath
++    ], { cwd: candidateDir, encoding: "utf8" });
++    assert.equal(result.status, 0, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.candidateIdentity, "cand-X");
++    assert.equal(report.baselineIdentity, baselineAbs);
++    assert.equal(report.errorCount, 0);
++    assert.equal(report.status, "PASS");
++    assert.equal(report.exitCode, 0);
++
++    const suiteScript = path.resolve("scripts/run-ai-governance-gates.mjs");
++    const suite = spawnSync(process.execPath, [suiteScript],
++      { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" });
++    assert.equal(suite.status, 0, suite.stderr);
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++    await rm(baselineDir, { recursive: true, force: true });
++  }
++});
++
++test("baseline-aware gate treats a missing baseline file as introduced not silently dropped", async () => {
++  const candidateDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-missing-cand-"));
++  const baselineDir = await mkdtemp(path.join(os.tmpdir(), "qta-baseline-missing-base-"));
++  try {
++    const relativeFile = "src/pages/Example.tsx";
++    await mkdir(path.join(candidateDir, path.dirname(relativeFile)), { recursive: true });
++    await mkdir(path.join(baselineDir, "src", "unrelated"), { recursive: true });
++    await writeFile(path.join(candidateDir, relativeFile), methodBodyFixture(118));
++    await writeFile(path.join(baselineDir, "src/unrelated/Other.tsx"), methodBodyFixture(10));
++    const reportPath = path.join(candidateDir, "architecture-report.json");
++    const result = await runBaselineAwareGate({
++      candidateDir, baselineDir, candidateFile: relativeFile, reportPath
++    });
++    assert.equal(result.status, 1, result.stdout);
++    const report = JSON.parse(await readFile(reportPath, "utf8"));
++    assert.equal(report.status, "FAIL");
++    assert.ok(report.blockingErrorCount >= 1);
++    const introduced = report.introducedErrors
++      .filter((entry) => entry.message.includes("longest method"));
++    assert.ok(introduced.length >= 1);
++    for (const entry of introduced) {
++      assert.equal(entry.classification, "introduced");
++      assert.equal(entry.baselineMetric, null);
++      assert.equal(entry.delta, null);
++      assert.equal(typeof entry.candidateMetric, "number");
++    }
++    assert.ok(report.errors.some((entry) => introduced.some((match) => match.id === entry.id)));
++    assert.deepEqual(report.worsenedErrors, []);
++    assert.deepEqual(report.preExistingErrors, []);
++  } finally {
++    await rm(candidateDir, { recursive: true, force: true });
++    await rm(baselineDir, { recursive: true, force: true });
++  }
++});
