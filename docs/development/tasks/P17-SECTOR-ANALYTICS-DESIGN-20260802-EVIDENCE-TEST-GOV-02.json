@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "P17-SECTOR-ANALYTICS-DESIGN-20260802",
+  "roleRunId": "FV-RUN-1",
+  "sessionId": "FV-RUN-1",
+  "testId": "TEST-GOV-02",
+  "candidateMode": "SNAPSHOT",
+  "candidateIdentity": "3fdb49ddf4339bf3cc7f3077c0457a4abbfb7f883873c972656ed5907378a92b",
+  "command": [
+    "node",
+    "scripts/run-ai-governance-gates.mjs"
+  ],
+  "startedAt": "2026-08-02T15:23:54.877Z",
+  "finishedAt": "2026-08-02T15:24:02.571Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "fab433fbf405774e3b69d24d786ec64a9b6b71a95a5c7cab0251701ab3c9062e",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "QTA AI governance gates passed"
+  ],
+  "observedSelectors": [
+    "QTA AI governance gates passed"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "54c809ed1286b27c7adc9e3712bfa9671a9d7a88",
+    "tree": "9b892ced170be30fa1ccec6603d507781085d7d8",
+    "statusSha256": "baec90e5087c160d2fb9eecd1ad021f9c1de0e8c46ad964c39927d714db1b13f",
+    "diffSha256": "53d842ba2f168a0d0763667cbc77ab17523cff03f7e71773cbca6f4f98111aec"
+  },
+  "candidateAfter": {
+    "head": "54c809ed1286b27c7adc9e3712bfa9671a9d7a88",
+    "tree": "9b892ced170be30fa1ccec6603d507781085d7d8",
+    "statusSha256": "baec90e5087c160d2fb9eecd1ad021f9c1de0e8c46ad964c39927d714db1b13f",
+    "diffSha256": "53d842ba2f168a0d0763667cbc77ab17523cff03f7e71773cbca6f4f98111aec"
+  },
+  "candidateUnchanged": true
+}

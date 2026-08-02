@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/check-ai-architecture.mjs",
+  "generatedAt": "2026-08-02T15:23:11.590Z",
+  "candidateIdentity": "c8341df03ca656732cc85c42dcd779f066b835a5/7b4b016529915cfcc0031346b5e6855b276b776f",
+  "base": "563e84a573426800b3f6aa8e4e0525bc5314b3a8",
+  "manifestPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CANDIDATE.json",
+  "architectureReviewCount": 0,
+  "files": [],
+  "additions": 0,
+  "warnings": [],
+  "errorCount": 0,
+  "errors": [],
+  "status": "PASS",
+  "exitCode": 0
+}

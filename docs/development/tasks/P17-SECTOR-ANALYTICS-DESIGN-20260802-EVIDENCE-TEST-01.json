@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "P17-SECTOR-ANALYTICS-DESIGN-20260802",
+  "roleRunId": "FV-RUN-1",
+  "sessionId": "FV-RUN-1",
+  "testId": "TEST-01",
+  "candidateMode": "SNAPSHOT",
+  "candidateIdentity": "3fdb49ddf4339bf3cc7f3077c0457a4abbfb7f883873c972656ed5907378a92b",
+  "command": [
+    "node",
+    "scripts/tests/p17-sector-analytics-design-structure.test.mjs"
+  ],
+  "startedAt": "2026-08-02T15:22:23.469Z",
+  "finishedAt": "2026-08-02T15:22:23.576Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "83f2653d5eec6be3a047d83606a7226260e7af550cc287a5a7d7c9634b83b441",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "P17-SECTOR-ANALYTICS-AC01",
+    "P17-SECTOR-ANALYTICS-AC02",
+    "P17-SECTOR-ANALYTICS-AC03"
+  ],
+  "observedSelectors": [
+    "P17-SECTOR-ANALYTICS-AC01",
+    "P17-SECTOR-ANALYTICS-AC02",
+    "P17-SECTOR-ANALYTICS-AC03"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "54c809ed1286b27c7adc9e3712bfa9671a9d7a88",
+    "tree": "9b892ced170be30fa1ccec6603d507781085d7d8",
+    "statusSha256": "7156023249f4a0abef08dec683bad0beea966ece33ac4038366589d4bb05206d",
+    "diffSha256": "53d842ba2f168a0d0763667cbc77ab17523cff03f7e71773cbca6f4f98111aec"
+  },
+  "candidateAfter": {
+    "head": "54c809ed1286b27c7adc9e3712bfa9671a9d7a88",
+    "tree": "9b892ced170be30fa1ccec6603d507781085d7d8",
+    "statusSha256": "7156023249f4a0abef08dec683bad0beea966ece33ac4038366589d4bb05206d",
+    "diffSha256": "53d842ba2f168a0d0763667cbc77ab17523cff03f7e71773cbca6f4f98111aec"
+  },
+  "candidateUnchanged": true
+}
