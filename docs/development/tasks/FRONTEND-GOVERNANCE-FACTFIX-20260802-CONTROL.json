@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 3,
+  "taskId": "FRONTEND-GOVERNANCE-FACTFIX-20260802",
+  "controlPath": "docs/development/tasks/FRONTEND-GOVERNANCE-FACTFIX-20260802-CONTROL.json",
+  "startedAt": "2026-08-02T16:35:00Z",
+  "lane": "L0",
+  "lifecycleState": "CONTRACT_FROZEN",
+  "contract": {
+    "path": "docs/development/tasks/FRONTEND-GOVERNANCE-FACTFIX-20260802-CONTRACT.md",
+    "version": "1",
+    "sha256": "91c0e3953b29fc3a9603c40a5685dbe1b12780defcb4d361cdd4793d6d0a1489",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["STATIC"]}
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "7 fact docs D-status alignment (delivered on candidate 46df0de)",
+        "acIds": ["AC-01"],
+        "allowedWritePaths": ["docs/AI_HANDOFF.md"],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      }
+    ],
+    "testInventory": [
+      {"testId": "TEST-01", "acIds": ["AC-01"], "kind": "STATIC", "required": true, "sourcePath": "docs/AI_HANDOFF.md", "selector": "已进入 main"}
+    ],
+    "blockingAmendments": []
+  },
+  "git": {
+    "automation": "DELIVERY_PUSH",
+    "branch": "codex/frontend-governance-bootstrap-20260802",
+    "baselineCommit": "563e84a573426800b3f6aa8e4e0525bc5314b3a8",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {"sequence": 1, "from": "CONTEXT_READY", "to": "CONTRACT_DRAFTED", "at": "2026-08-02T16:35:00Z", "actor": "zcode-parent-FRONTEND-GOVERNANCE-FACTFIX-20260802"},
+    {"sequence": 2, "from": "CONTRACT_DRAFTED", "to": "CONTRACT_FROZEN", "at": "2026-08-02T16:36:00Z", "actor": "zcode-parent-FRONTEND-GOVERNANCE-FACTFIX-20260802"}
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "46df0deff963fb34d4371d8e044a24f9d3f25d74",
+    "commit": "46df0deff963fb34d4371d8e044a24f9d3f25d74",
+    "treeHash": "cc23c599e5c3c636300fe5d026e675d1d8ae825e",
+    "patchSha256": "da8247ee7d9eb757e5c8e98016db0cbd590b3fbc5c02ebe019058e4a73c1ea18",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "docs/development/tasks/FRONTEND-GOVERNANCE-FACTFIX-20260802-candidate-diff.patch",
+    "diffArtifactSha256": "da8247ee7d9eb757e5c8e98016db0cbd590b3fbc5c02ebe019058e4a73c1ea18"
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [],
+  "review": {
+    "omitted": true,
+    "omissionReason": "L0 contract-lite: docs-only fact alignment already shipped on candidate; verify+finalize only",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_REQUIRED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "architectureGate": {
+    "required": false,
+    "candidateIdentity": "",
+    "status": "NOT_REQUIRED",
+    "exitCode": 0,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_REQUIRED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": false, "status": "NOT_REQUIRED"},
+      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
