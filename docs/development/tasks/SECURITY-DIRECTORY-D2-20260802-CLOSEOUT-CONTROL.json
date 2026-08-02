@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CLOSEOUT-CONTROL.json",
   "startedAt": "2026-08-02T12:05:00Z",
   "lane": "L0",
-  "lifecycleState": "SELF_CHECKED",
+  "lifecycleState": "CANDIDATE_FROZEN",
   "contract": {
     "path": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CLOSEOUT-CONTRACT.md",
     "version": "1",
@@ -154,20 +154,28 @@
       "at": "2026-08-02T12:12:00Z",
       "actor": "codex-parent-d2-closeout-1",
       "note": "IMP-D2CO-1 SELF_CHECKED: repaired arch gate PASS (9 pre-existing, 0 blocking); patch SHA 479d6bf4 matches RESLICE freeze; governance 50/50."
+    },
+    {
+      "sequence": 5,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-02T12:14:00Z",
+      "actor": "codex-parent-d2-closeout-1",
+      "note": "Candidate commit d253b25 frozen; strict arch report PASS (scripts-only)."
     }
   ],
   "candidate": {
     "mode": "COMMIT",
     "generation": 1,
-    "identity": "",
-    "commit": "",
-    "treeHash": "",
-    "patchSha256": "",
+    "identity": "d253b25f6b0a7bc24d0abe98597a629c90ee2162",
+    "commit": "d253b25f6b0a7bc24d0abe98597a629c90ee2162",
+    "treeHash": "ce1770ecf6628a0d456b6741af99f26e9313e5f3",
+    "patchSha256": "14637c3e6c7d943ceb5d182a054d9bbc690f7effe1642cf509ffc12040f2a075",
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
-    "diffArtifactPath": "",
-    "diffArtifactSha256": ""
+    "diffArtifactPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CLOSEOUT-BASELINE-CANDIDATE.patch",
+    "diffArtifactSha256": "14637c3e6c7d943ceb5d182a054d9bbc690f7effe1642cf509ffc12040f2a075"
   },
   "crossRepoCandidateRecord": {
     "frontendRepo": "/Users/joker/code/quant-trading-assistant-web",
@@ -232,14 +240,14 @@
   "testDesignerOmissionReason": "L0 contract-lite; RESLICE already froze the D2 ACs and test inventory (contract sha 9170e2a1...); user instruction forbids re-dispatching a test designer.",
   "architectureGate": {
     "required": true,
-    "candidateIdentity": "",
-    "status": "NOT_RUN",
+    "candidateIdentity": "d253b25f6b0a7bc24d0abe98597a629c90ee2162",
+    "status": "PASS",
     "exitCode": 0,
     "errorCount": 0,
     "warningCount": 0,
     "warningDispositions": [],
-    "reportPath": "",
-    "reportSha256": "",
+    "reportPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-CLOSEOUT-ARCH-REPORT.json",
+    "reportSha256": "7482d121f1a1dbd871839b102152a15dd0deaca5fcd93fd616605a1a86b30497",
     "generatedBy": "scripts/check-ai-architecture.mjs"
   },
   "verification": {
