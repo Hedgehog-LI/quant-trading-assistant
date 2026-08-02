@@ -544,3 +544,51 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 10. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。
+
+## 板块分析规划表（P1.7，规划 V19+）
+
+> 状态：**规划 V19+**，未实现。本块为板块分析层（相对强弱 / 轮动持续性 / 龙头贡献 / 量价确认 / 异动提醒）的衍生指标表设计，绑定更高 Flyway 版本 V19+，不复用 V1-V18 既有版本号。所有衍生表均为独立新表，**只读原始事实表，不写回**（衍生读服务只读 `market_sector_*`/`market_sector_ranking_*`/`stock_*` 原始事实表，禁止 UPDATE/写回/回写/覆盖）。本规划区域不表述任何已落库事实，全部为规划。详细公式与口径见 `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`。
+
+### 板块分析 V19+ 衍生表（规划）
+
+#### sector_relative_strength_snapshot（规划 V19+）
+
+状态：规划 V19+，未实现。用途：板块相对强弱（Mansfield-style RS + RS-rank 百分位）衍生快照。只读 `market_sector_ranking_batch`（CLOSE）/`market_sector_snapshot`/`stock_daily_bar` 原始事实表，不写回。
+
+核心字段：`id`（主键，bigint auto_increment）、`sector_identity`（varchar(96)）、`market_code`（varchar(8)，CN/HK/US）、`as_of_date`（date）、`window`（smallint，20/50/120）、`benchmark_type`（varchar(32)，`TRACKING_SYMBOL`/`SECTOR_EQUAL_WEIGHT`）、`benchmark_symbol`（varchar(32)，可空）、`rs_value`（decimal(20,6)）、`rs_rank_percentile`（decimal(20,6)，0~100）、`quality_status`（varchar(32)，`OK`/`INSUFFICIENT_SAMPLE`/`STALE`/`ORIGIN_CHANGED`）、`valid_sample_size`（int）、`created_at`/`updated_at`（datetime）。
+
+幂等键：unique `uk_sector_rs(sector_identity, as_of_date, window)`；索引 `idx_sector_rs_market_date(market_code, as_of_date)`。
+
+#### sector_rotation_persistence_snapshot（规划 V19+）
+
+状态：规划 V19+，未实现。用途：板块轮动持续性（相邻交易日排名 Spearman 均值 + 连续领涨/领跌天数）。只读 `market_sector_ranking_batch`/`market_sector_ranking_item` 原始事实表，不写回。
+
+核心字段：`id`、`sector_identity`、`market_code`、`as_of_date`、`window`（5/10/20）、`rank_spearman_mean`（decimal(20,6)）、`consecutive_leading_days`（int）、`consecutive_lagging_days`（int）、`quality_status`、`valid_sample_size`、`created_at`/`updated_at`。
+
+幂等键：unique `uk_sector_rotation(sector_identity, as_of_date, window)`；索引 `idx_sector_rotation_market_date(market_code, as_of_date)`。
+
+#### sector_leader_contribution_snapshot（规划 V19+）
+
+状态：规划 V19+，未实现。用途：板块龙头贡献度（成交额加权为主、净流入加权为辅）。只读 `market_sector_member_snapshot`/`market_sector_snapshot` 原始事实表，不写回。
+
+核心字段：`id`、`sector_identity`、`market_code`、`trade_date`（date）、`window`（1/5）、`leader_turnover_share`（decimal(20,6)）、`leader_net_inflow_share`（decimal(20,6)，可空）、`top_k`（int）、`top_leaders_json`（text）、`excluded_member_count`（int）、`valid_member_count`（int）、`quality_status`、`created_at`/`updated_at`。
+
+幂等键：unique `uk_sector_leader(sector_identity, trade_date, window)`；索引 `idx_sector_leader_market_date(market_code, trade_date)`。
+
+#### sector_volume_confirmation_snapshot（规划 V19+）
+
+状态：规划 V19+，未实现。用途：板块量价确认（量价同向/背离 + 量比）。只读 `market_sector_snapshot` 原始事实表，不写回。
+
+核心字段：`id`、`sector_identity`、`market_code`、`trade_date`、`change_rate`（decimal(20,6)）、`turnover_amount`（decimal(20,6)）、`volume_ratio`（decimal(20,6)）、`confirmation_status`（varchar(16)，`CONFIRMED`/`DIVERGENCE`/`INSUFFICIENT`）、`quality_status`、`created_at`/`updated_at`。
+
+幂等键：unique `uk_sector_volume(sector_identity, trade_date)`；索引 `idx_sector_volume_market_date(market_code, trade_date)`。
+
+#### market_data_alert 复用（不新增告警表，规划 V19+）
+
+异动提醒复用 V7 版本的 `market_data_alert` 表（该表本身已在 V7 落库），新增 `alert_type=SECTOR_*`（`SECTOR_RS_REVERSAL`、`SECTOR_VOLUME_DIVERGENCE`、`SECTOR_LEADER_CONCENTRATION`、`SECTOR_RANK_JUMP` 等），`severity` 取 `INFO/WARN/HIGH`，`trigger_value_json` 存派生指标上下文。不新建第二套告警表。规划 V19+ 仅在应用层新增枚举值与写入逻辑，不新建表结构（若需索引调整由 ST-3 评估）。
+
+#### MyBatis / Flyway 边界（规划 V19+）
+
+- 新表走更高 Flyway 版本 V19+（V19、V20...），SQL 放在 `src/main/resources/db/migration/V19__*.sql` 等。
+- MyBatis XML 放在 `src/main/resources/mapper/`，主键 `id bigint auto_increment`，金额/价格 `decimal(20,6)`，时间 `created_at`/`updated_at`。
+- 衍生读服务只读原始事实表，不反向 UPDATE 原始表；衍生结果只存新表，可重算、可下线。

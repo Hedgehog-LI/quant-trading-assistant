@@ -471,3 +471,165 @@ LongPort SDK 4.3.3 分钟粒度使用原生 `Min_1/Min_5/Min_15/Min_30/Min_60`�
 - 后端不得在错误响应中返回密钥、完整原始响应或 OAuth 凭据。
 - 未配置 provider 时返回业务状态，不影响应用启动。
 - 真实外联前必须确认官方 SDK jar/native libs 已安装到后端运行时 classpath（`runtime-libs/`，vendor jar 被 gitignore）；不要提交密钥或 vendor 大体积 native 包到 Git。部署必须配置 `LONGPORT_HTTP_URL` / `LONGPORT_QUOTE_WEBSOCKET_URL` 域名覆盖（见 §2）。
+
+## 5. 板块分析接口设计（P1.7，规划，未实现）
+
+> 状态：**规划/未实现**。本节为板块分析层（相对强弱 / 轮动持续性 / 龙头贡献 / 量价确认 / 异动提醒）的接口设计，尚未实现。所有端点均只读已落库的板块原始事实表并产出 V19+ 衍生指标快照；不写回原始事实表，不调用 provider 外联，不生成买卖指令，不构成投资建议。详细公式与口径见 `../features/MARKET_SECTOR_ANALYTICS_DESIGN.md`。
+
+统一前缀（规划）：`/api/v1/market-data/sector-analytics/*`，统一响应 `ApiResponse<T>`。市场仅支持 `CN/HK/US`，严格按各自 `ZoneId` 对齐交易日，禁止跨市场混算。`window` 取值：相对强弱 `20/50/120`、轮动持续性 `5/10/20`、龙头贡献 `1/5`、量价确认当日 + 近 5 日均值。`quality_status` 为 `OK/INSUFFICIENT_SAMPLE/STALE/ORIGIN_CHANGED`，非 `OK` 时前端降级展示且不产 HIGH 提醒。
+
+### 5.1 板块相对强弱（规划，未实现）
+
+| 方法 | 路径（规划） | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/sector-analytics/relative-strength?market=&window=&asOfDate=&limit=` | 按市场/窗口查询 RS-rank 排行（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/relative-strength/{sectorIdentity}?window=&asOfDate=` | 单板块 RS 值与 RS-rank 百分位详情（未实现） |
+
+请求示例：
+
+```
+GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&asOfDate=2026-07-31&limit=20
+```
+
+响应示例（`ApiResponse<T>`）：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "data": {
+    "market": "CN",
+    "window": 20,
+    "asOfDate": "2026-07-31",
+    "benchmarkType": "SECTOR_EQUAL_WEIGHT",
+    "items": [
+      {
+        "sectorIdentity": "BK/SH/IN40159",
+        "sectorName": "半导体",
+        "rsValue": "1.234567",
+        "rsRankPercentile": "92.500000",
+        "qualityStatus": "OK",
+        "validSampleSize": 20
+      }
+    ]
+  },
+  "timestamp": "2026-07-31T16:00:00"
+}
+```
+
+### 5.2 板块轮动持续性（规划，未实现）
+
+| 方法 | 路径（规划） | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/sector-analytics/rotation-persistence?market=&window=&asOfDate=&limit=` | 按市场/窗口查询持续性排行（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/rotation-persistence/{sectorIdentity}?window=&asOfDate=` | 单板块 Spearman 均值与连续领涨/领跌天数（未实现） |
+
+响应示例（节选）：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "data": {
+    "market": "CN",
+    "window": 10,
+    "asOfDate": "2026-07-31",
+    "items": [
+      {
+        "sectorIdentity": "BK/SH/IN40159",
+        "rankSpearmanMean": "0.812000",
+        "consecutiveLeadingDays": 4,
+        "consecutiveLaggingDays": 0,
+        "qualityStatus": "OK"
+      }
+    ]
+  },
+  "timestamp": "2026-07-31T16:00:00"
+}
+```
+
+### 5.3 板块龙头贡献（规划，未实现）
+
+| 方法 | 路径（规划） | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/sector-analytics/leader-contribution?market=&tradeDate=&window=&limit=` | 按市场查询龙头贡献排行（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/leader-contribution/{sectorIdentity}?tradeDate=&window=` | 单板块龙头成分明细（未实现） |
+
+响应示例（节选，`topLeaders` 为龙头成分明细）：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "data": {
+    "market": "CN",
+    "tradeDate": "2026-07-31",
+    "window": 1,
+    "items": [
+      {
+        "sectorIdentity": "BK/SH/IN40159",
+        "leaderTurnoverShare": "0.382000",
+        "leaderNetInflowShare": "0.410000",
+        "topK": 3,
+        "excludedMemberCount": 2,
+        "validMemberCount": 24,
+        "qualityStatus": "OK",
+        "topLeaders": [
+          { "canonicalSymbol": "SH.600519", "changeRate": "0.052000", "turnoverAmount": "1200000.000000", "netInflow": "300000.000000", "share": "0.180000" }
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-07-31T16:00:00"
+}
+```
+
+### 5.4 板块量价确认（规划，未实现）
+
+| 方法 | 路径（规划） | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/sector-analytics/volume-confirmation?market=&tradeDate=&limit=` | 按市场查询量价确认状态（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/volume-confirmation/{sectorIdentity}?tradeDate=` | 单板块量价确认详情（未实现） |
+
+响应示例（节选，`confirmationStatus` 为 `CONFIRMED/DIVERGENCE/INSUFFICIENT`）：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "data": {
+    "market": "CN",
+    "tradeDate": "2026-07-31",
+    "items": [
+      {
+        "sectorIdentity": "BK/SH/IN40159",
+        "changeRate": "0.031000",
+        "turnoverAmount": "50000000.000000",
+        "volumeRatio": "1.650000",
+        "confirmationStatus": "CONFIRMED",
+        "qualityStatus": "OK"
+      }
+    ]
+  },
+  "timestamp": "2026-07-31T16:00:00"
+}
+```
+
+### 5.5 板块异动提醒（规划，未实现，复用 /alerts）
+
+板块异动提醒复用现有 `/api/v1/market-data/alerts`，按 `alertType=SECTOR_*` 过滤查询（如 `SECTOR_RS_REVERSAL`、`SECTOR_VOLUME_DIVERGENCE`、`SECTOR_LEADER_CONCENTRATION`、`SECTOR_RANK_JUMP`）；`severity` 取 `INFO/WARN/HIGH`，`triggerValueJson` 存派生指标上下文。
+
+```
+GET /api/v1/market-data/alerts?severity=&resolved=&canonicalSymbol=&alertType=SECTOR_*&page=&size=
+```
+
+异动提醒仅为观察提示，不构成投资建议，不产生交易动作。
+
+### 5.6 错误码（规划，复用）
+
+板块分析层不直接外联 provider；当其依赖的原始事实不可用或陈旧时，复用现有错误码语义：
+
+- `MARKET_SECTOR_PROVIDER_UNAVAILABLE`：原始板块事实缺失或陈旧（如最近 CLOSE 快照不可用、`quality_status=STALE`）。
+- `MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED`：语义对齐，仅当上游原始事实采集链路因鉴权失败导致分析输入不可用时透传；分析层自身不做外联。
+
+样本不足（`quality_status=INSUFFICIENT_SAMPLE`）不返回错误码，而是返回正常 200 响应并在字段中降级标注，由前端降级展示。

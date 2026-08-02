@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json",
   "startedAt": "2026-08-02T00:00:00Z",
   "lane": "L0",
-  "lifecycleState": "CONTRACT_FROZEN",
+  "lifecycleState": "IMPLEMENTING",
   "contract": {
     "path": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md",
     "version": "1.1",
@@ -104,6 +104,13 @@
       "from": "TEST_DESIGN_READY",
       "to": "CONTRACT_FROZEN",
       "at": "2026-08-02T00:10:00Z",
+      "actor": "codex-parent-p17-sector-design-1"
+    },
+    {
+      "sequence": 4,
+      "from": "CONTRACT_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-02T00:12:00Z",
       "actor": "codex-parent-p17-sector-design-1"
     }
   ],
