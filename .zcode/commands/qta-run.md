@@ -11,6 +11,10 @@ Task input:
 
 $ARGUMENTS
 
+To replace an unavailable parent session, invoke
+`/qta-run --resume <TASK-ID> <objective-or-control-path>`. Resume only the exact active Task ID; do not start a
+new task, delete the active lock, or fabricate dispatch receipts.
+
 Do not pass the full conversation to child roles. Select one lane, persist the task packet and state, enforce
 ordered role gates, and stop on the Skill's repair or evidence conditions.
 
@@ -21,6 +25,18 @@ verification uses a fresh role/session and ends after one artifact. Use one long
 follow-up (two waits total); never perform status polling. Require both functional and architecture gates on
 the frozen candidate before finalization.
 
+Every fixed-role Agent/Task prompt starts with the exact canonical prefix below, copied from the TaskPacket
+template. Do not paraphrase it or place the dispatch ID elsewhere:
+
+```text
+# Task Packet: <TASK-ID> / <ROLE> / <ROLE-RUN-ID>
+- Dispatch ID: <DISPATCH-ID>
+```
+
+If the Hook rejects this prefix, fix that same packet and retry once. Never run the Hook manually and never
+submit a synthetic packet to manufacture a receipt. The Hook records dispatch as `PENDING` before the Agent
+call and writes a separate `SUCCEEDED` or `FAILED` terminal outcome after it returns.
+
 The parent coordinator must never implement, review, or verify when a specialist times out or returns only a
 plan. Record every failed dispatch. Two timeouts for one slice require `BLOCKED` and reslicing. The final
 verifier must be execution-capable and create machine receipts with `scripts/run-ai-evidence-command.mjs`.
@@ -30,6 +46,14 @@ Continue through the state machine until `DELIVERY_READY`, `BLOCKED`, or the use
 `FINALIZED`, a plan, or one subagent response is not completion. Goal success is forbidden until
 `node scripts/check-ai-delivery-ready.mjs <TASK_CONTROL>` exits `0`; do not ask a model-only completion judge
 to override that command.
+
+`L0` may omit test designer and code reviewer only; it must still dispatch a bounded implementer and a clean
+final verifier. Closeout work resumes the original task instead of inventing a second lifecycle. A legacy
+implementation slice without valid implementer evidence requires an evidence-only implementer run before
+candidate freeze.
+
+Create or switch to the frozen task branch before the first file write. While a governed task is active, do
+not modify, stage, commit, merge, cherry-pick, revert, or tag on `main`/`master`.
 
 `/qta-run` is unattended. Never call `AskUserQuestion` while it is active. For a reversible engineering
 choice, select the documented or clearly recommended option and record the decision. If unresolved

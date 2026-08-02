@@ -1,4 +1,5 @@
 # Task Packet: <TASK-ID> / <ROLE> / <ROLE-RUN-ID>
+- Dispatch ID: <DISPATCH-ID>
 
 ## Identity
 
@@ -7,7 +8,6 @@
 - Role instance policy: `FRESH_ONLY`
 - Executor type: `SUBAGENT` (parent substitution is a policy violation)
 - Agent definition:
-- Dispatch ID:
 - Expected dispatch receipt path: `.git/qta-governance/dispatches/<task-hash>/<dispatch-hash>.json`
 - Role session ID:
 - Role started-at timestamp:

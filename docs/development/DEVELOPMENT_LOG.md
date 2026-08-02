@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-08-02 — AI 治理收口与无人值守规则加固
+
+- **目标**：修复 ZCode 多轮空跑后暴露的 TaskPacket 格式漂移、伪造 Hook 回执、默认分支写入、活动锁卡死和 L0/收口角色省略问题；不改业务代码。
+- **实现**：固定 TaskPacket 首两行；Agent 派发改为 `PENDING -> SUCCEEDED/FAILED` 两阶段审计并绑定 `tool_use_id`；active `main/master` 使用 Git 只读白名单；新增精确 `/qta-run --resume <TASK-ID>` 会话接管；终态锁自动释放；Skill、命令和治理文档统一实施者/核验者要求。
+- **独立审查**：前两代 reviewer 分别发现 3 项派发/推送缺陷和 1 项 Git 黑名单绕过，修复后第三代返回 `REVIEW_CLEAR`；随后全新 verifier 返回 `ACCEPTED`。
+- **验证**：治理套件 **58/58**、Skill 触发 **28/28**、10 skills / 4 agents 结构校验及 `git diff --check` 全部通过。
+- **边界**：未运行 Maven、Docker、前端或部署测试；未 commit/push。详见 `tasks/AI-GOVERNANCE-CLOSEOUT-HARDENING-20260802-*.md`。
+
 ## 2026-08-02 — P1.4b-D3 证券目录同步基础后端
 
 - **目标**：定义 `SecurityDirectoryProvider` 与 CSV 快照目录 provider，安全、幂等、可恢复地更新本地证券目录，为后续自动目录同步准备稳定边界；不接真实外部网络、不碰交易/账户/订单。

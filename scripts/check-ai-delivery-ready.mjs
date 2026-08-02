@@ -66,14 +66,15 @@ function isTracked(root, relative) {
   }
 }
 
-function dispatchAuditErrors(control, root) {
+export function dispatchAuditErrors(control, root) {
   const errors = [];
   const taskHash = createHash("sha256").update(control.taskId ?? "").digest("hex");
   const relative = gitOutput(root, ["rev-parse", "--git-path", `qta-governance/dispatches/${taskHash}`]).trim();
   const directory = path.resolve(root, relative);
   let receipts = [];
   try {
-    receipts = readdirSync(directory).filter((name) => name.endsWith(".json"))
+    receipts = readdirSync(directory)
+      .filter((name) => name.endsWith(".json") && !name.endsWith(".outcome.json"))
       .map((name) => JSON.parse(readFileSync(path.join(directory, name), "utf8")));
   } catch (error) {
     errors.push(`dispatch audit directory is unavailable (${error.code ?? error.message})`);
@@ -84,6 +85,21 @@ function dispatchAuditErrors(control, root) {
   for (const receipt of receipts) {
     if (receipt.taskId !== control.taskId) errors.push(`dispatch audit contains another task: ${receipt.dispatchId}`);
     if (!recorded.has(receipt.dispatchId)) errors.push(`dispatched attempt is omitted from roleRuns: ${receipt.dispatchId}`);
+    if (receipt.version === 2) {
+      const outcomePath = path.join(directory,
+        `${createHash("sha256").update(receipt.dispatchId ?? "").digest("hex")}.outcome.json`);
+      try {
+        const outcome = JSON.parse(readFileSync(outcomePath, "utf8"));
+        if (!new Set(["SUCCEEDED", "FAILED"]).has(outcome.status)
+            || outcome.taskId !== receipt.taskId || outcome.dispatchId !== receipt.dispatchId
+            || outcome.roleRunId !== receipt.roleRunId || outcome.parentSessionId !== receipt.parentSessionId
+            || outcome.promptSha256 !== receipt.promptSha256 || outcome.toolUseId !== receipt.toolUseId) {
+          errors.push(`dispatch outcome does not match pending receipt: ${receipt.dispatchId}`);
+        }
+      } catch (error) {
+        errors.push(`dispatch remains PENDING without a terminal outcome: ${receipt.dispatchId} (${error.code ?? error.message})`);
+      }
+    }
   }
   for (const dispatchId of recorded) {
     if (!audited.has(dispatchId)) errors.push(`roleRuns contains a dispatch without Hook audit: ${dispatchId}`);

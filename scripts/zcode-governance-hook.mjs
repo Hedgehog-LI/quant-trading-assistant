@@ -3,7 +3,7 @@
 import process from "node:process";
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,7 +19,7 @@ const QTA_AGENT_ROLES = Object.freeze({
   "qta-final-verifier": "FINAL_VERIFIER"
 });
 
-function qtaDispatchMetadata(input) {
+export function qtaDispatchMetadata(input) {
   const tool = input?.tool_name ?? input?.toolName ?? "";
   if (!/^(?:Agent|Task)$/.test(tool)) return null;
   const toolInput = input?.tool_input ?? input?.toolInput ?? {};
@@ -27,17 +27,16 @@ function qtaDispatchMetadata(input) {
   const role = QTA_AGENT_ROLES[agentName];
   if (!role) return null;
   const prompt = firstString(toolInput, ["prompt", "input", "task", "description"]);
-  const header = prompt.match(/^# Task Packet:\s*([^/\n]+?)\s*\/\s*([^/\n]+?)\s*\/\s*([^\n]+?)\s*$/m);
-  const dispatch = prompt.match(/^- Dispatch ID:\s*(\S+)\s*$/m);
+  const prefix = prompt.match(/^# Task Packet:\s*([^/\r\n]+?)\s*\/\s*([^/\r\n]+?)\s*\/\s*([^\r\n]+?)\s*\r?\n- Dispatch ID:\s*(\S+)\s*(?:\r?\n|$)/);
   return {
     agentName,
     agentDefinition: `.zcode/agents/${agentName}.md`,
     expectedRole: role,
     prompt,
-    taskId: header?.[1]?.trim() ?? "",
-    declaredRole: header?.[2]?.trim() ?? "",
-    roleRunId: header?.[3]?.trim() ?? "",
-    dispatchId: dispatch?.[1]?.trim() ?? ""
+    taskId: prefix?.[1]?.trim() ?? "",
+    declaredRole: prefix?.[2]?.trim() ?? "",
+    roleRunId: prefix?.[3]?.trim() ?? "",
+    dispatchId: prefix?.[4]?.trim() ?? ""
   };
 }
 
@@ -137,7 +136,11 @@ function evaluateSegment(tokens, reasons, depth = 0) {
     if (subcommand === "push") {
       if (args.some((arg) => arg === "-f" || arg.startsWith("--force"))) reasons.push("force push is prohibited");
       const refs = args.filter((arg) => !arg.startsWith("-")).slice(1);
-      if (refs.some((ref) => /^(?:refs\/heads\/)?(?:main|master)(?::|$)/.test(ref))) {
+      if (refs.some((ref) => {
+        const normalized = ref.replace(/^\+/, "");
+        return /^(?:refs\/heads\/)?(?:main|master)(?::|$)/.test(normalized)
+          || /:(?:refs\/heads\/)?(?:main|master)$/.test(normalized);
+      })) {
         reasons.push("direct default-branch push is prohibited");
       }
     }
@@ -156,6 +159,9 @@ function evaluateSegment(tokens, reasons, depth = 0) {
   }
 
   const command = path.basename(tokens[0] ?? "");
+  if (tokens.some((token) => token.replaceAll("\\", "/").endsWith("scripts/zcode-governance-hook.mjs"))) {
+    reasons.push("do not execute the governance Hook manually; correct the blocked tool input and retry it once");
+  }
   const commonFileMutators = new Set([
     "sed", "perl", "tee", "cp", "mv", "truncate", "touch", "install", "patch", "apply_patch"
   ]);
@@ -179,7 +185,7 @@ export function evaluateHook(input) {
   const dispatch = qtaDispatchMetadata(input);
 
   if (dispatch && (!dispatch.taskId || !dispatch.roleRunId || !dispatch.dispatchId)) {
-    reasons.push("QTA specialist dispatch requires a complete Task Packet header and Dispatch ID");
+    reasons.push("QTA specialist dispatch must start with exactly '# Task Packet: <TASK-ID> / <ROLE> / <ROLE-RUN-ID>' followed by '- Dispatch ID: <DISPATCH-ID>' on its own line; correct the Agent prompt once and do not invoke the Hook manually");
   }
   if (dispatch && dispatch.declaredRole !== dispatch.expectedRole) {
     reasons.push("QTA specialist dispatch role does not match its fixed Agent definition");
@@ -226,11 +232,125 @@ async function gitMetadataDirectory(projectRoot) {
   }
 }
 
+function hookEvent(input) {
+  return input?.hook_event_name ?? input?.hookEventName ?? input?.event ?? "";
+}
+
+function inputSessionId(input) {
+  return input?.session_id ?? input?.sessionId ?? process.env.CLAUDE_SESSION_ID;
+}
+
+function inputProjectRoot(input) {
+  return process.env.ZCODE_PROJECT_DIR ?? process.env.CLAUDE_PROJECT_DIR
+    ?? input?.cwd ?? process.cwd();
+}
+
+function requestedResumeTask(prompt) {
+  return prompt.match(/(?:^|\s)\/qta-run\s+--resume\s+([A-Za-z0-9._-]+)(?:\s|$)/)?.[1] ?? "";
+}
+
+async function governanceActiveDirectory(projectRoot) {
+  return path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "active");
+}
+
+async function activeEntries(projectRoot) {
+  const directory = await governanceActiveDirectory(projectRoot);
+  let names = [];
+  try {
+    names = await readdir(directory);
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+  const entries = [];
+  for (const name of names.filter((item) => item.endsWith(".json"))) {
+    const file = path.join(directory, name);
+    try {
+      entries.push({ file, value: JSON.parse(await readFile(file, "utf8")) });
+    } catch {
+      // Preserve malformed evidence for explicit diagnosis.
+    }
+  }
+  return entries;
+}
+
+async function reconcileTerminalActiveLocks(projectRoot) {
+  for (const entry of await activeEntries(projectRoot)) {
+    const active = entry.value;
+    if (!active?.taskId || !active?.controlPath) continue;
+    let control;
+    try {
+      control = JSON.parse(await readFile(path.resolve(projectRoot, active.controlPath), "utf8"));
+    } catch {
+      continue;
+    }
+    if (control.taskId !== active.taskId) continue;
+    if (control.lifecycleState === "BLOCKED") {
+      await unlink(entry.file);
+      continue;
+    }
+    if (control.lifecycleState === "DELIVERY_READY") {
+      const gate = spawnSync(process.execPath, [path.join(projectRoot, "scripts", "check-ai-delivery-ready.mjs"),
+        active.controlPath], { cwd: projectRoot, encoding: "utf8", timeout: 30_000 });
+      if (gate.status === 0) await unlink(entry.file);
+    }
+  }
+}
+
+function currentBranch(projectRoot) {
+  const result = spawnSync("git", ["branch", "--show-current"], {
+    cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]
+  });
+  return result.status === 0 ? result.stdout.trim() : "";
+}
+
+function mutatesDefaultBranch(input) {
+  const tool = input?.tool_name ?? input?.toolName ?? "";
+  const toolInput = input?.tool_input ?? input?.toolInput ?? {};
+  if (/^(?:Write|Edit|ApplyPatch)$/.test(tool)) return true;
+  if (tool !== "Bash") return false;
+  const commandText = firstString(toolInput, ["command", "cmd"]);
+  const fileMutators = new Set([
+    "sed", "perl", "tee", "cp", "mv", "truncate", "touch", "install", "patch", "apply_patch", "rm"
+  ]);
+  for (const segment of commandSegments(shellTokens(commandText))) {
+    if (fileMutators.has(path.basename(segment[0] ?? ""))) return true;
+    if (segment.some((token) => /^(?:[12]?)>{1,2}/.test(token))) return true;
+    const git = segment.findIndex((token) => path.basename(token) === "git");
+    if (git < 0) continue;
+    const args = gitCommandArgs(segment, git);
+    const subcommand = args[0] ?? "";
+    const readOnly = new Set([
+      "status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "cat-file", "grep",
+      "describe", "merge-base", "name-rev", "shortlog", "blame"
+    ]).has(subcommand)
+      || (subcommand === "branch" && (args.length === 1
+        || args.slice(1).every((arg) => /^(?:--show-current|--list|-a|--all|-r|--remotes|-v|--verbose)$/.test(arg))))
+      || (subcommand === "remote" && (args.length === 1
+        || args.slice(1).every((arg) => /^(?:-v|--verbose)$/.test(arg))));
+    const switchTarget = args.filter((arg) => !arg.startsWith("-")).at(-1) ?? "";
+    const taskBranchEscape = subcommand === "switch" && /^codex\//.test(switchTarget)
+      && !args.some((arg) => ["--discard-changes", "-C", "--force-create", "--force", "-f"].includes(arg));
+    if (!readOnly && !taskBranchEscape) return true;
+  }
+  return false;
+}
+
+async function enforceGovernedBranchPolicy(input) {
+  if (hookEvent(input) !== "PreToolUse") return;
+  const projectRoot = inputProjectRoot(input);
+  const projectHash = sha256(path.resolve(projectRoot));
+  const governed = (await activeEntries(projectRoot))
+    .some((entry) => entry.value?.projectRootSha256 === projectHash);
+  if (!governed || !/^(?:main|master)$/.test(currentBranch(projectRoot)) || !mutatesDefaultBranch(input)) return;
+  console.error("QTA governance blocked a write on the protected default branch; create or switch to the frozen codex/* task branch before editing, staging, committing, or merging");
+  process.exit(2);
+}
+
 async function recordRuntimeReceipt(input) {
   if (process.env.QTA_GOVERNANCE_AUDIT === "off") return;
-  const sessionId = input?.session_id ?? input?.sessionId ?? process.env.CLAUDE_SESSION_ID;
-  const projectRoot = process.env.ZCODE_PROJECT_DIR ?? process.env.CLAUDE_PROJECT_DIR
-    ?? input?.cwd ?? process.cwd();
+  const sessionId = inputSessionId(input);
+  const projectRoot = inputProjectRoot(input);
   if (!sessionId || !projectRoot) return;
   const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "sessions");
   await mkdir(directory, { recursive: true });
@@ -255,34 +375,12 @@ async function recordRuntimeReceipt(input) {
 
 async function recordDispatchReceipt(input) {
   if (process.env.QTA_GOVERNANCE_AUDIT === "off") return;
+  if (hookEvent(input) !== "PreToolUse") return;
   const dispatch = qtaDispatchMetadata(input);
   if (!dispatch) return;
-  const parentSessionId = input?.session_id ?? input?.sessionId ?? process.env.CLAUDE_SESSION_ID;
-  const projectRoot = process.env.ZCODE_PROJECT_DIR ?? process.env.CLAUDE_PROJECT_DIR
-    ?? input?.cwd ?? process.cwd();
+  const parentSessionId = inputSessionId(input);
+  const projectRoot = inputProjectRoot(input);
   if (!parentSessionId || !projectRoot) throw new Error("QTA dispatch audit requires parent session and project root");
-  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
-    sha256(dispatch.taskId));
-  await mkdir(directory, { recursive: true });
-  const receiptPath = path.join(directory, `${sha256(dispatch.dispatchId)}.json`);
-  const handle = await open(receiptPath, "wx", 0o600);
-  try {
-    await handle.writeFile(`${JSON.stringify({
-      version: 1,
-      taskId: dispatch.taskId,
-      dispatchId: dispatch.dispatchId,
-      roleRunId: dispatch.roleRunId,
-      role: dispatch.expectedRole,
-      agentDefinition: dispatch.agentDefinition,
-      parentSessionId,
-      observedAt: new Date().toISOString(),
-      projectRootSha256: sha256(path.resolve(projectRoot)),
-      promptSha256: sha256(dispatch.prompt),
-      nonce: randomUUID()
-    }, null, 2)}\n`);
-  } finally {
-    await handle.close();
-  }
   const activeDirectory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "active");
   const activePath = path.join(activeDirectory, `${sha256(parentSessionId)}.json`);
   await mkdir(activeDirectory, { recursive: true });
@@ -294,6 +392,30 @@ async function recordDispatchReceipt(input) {
   }
   if (active?.taskId && active.taskId !== dispatch.taskId) {
     throw new Error(`parent session already owns active governed task ${active.taskId}`);
+  }
+  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
+    sha256(dispatch.taskId));
+  await mkdir(directory, { recursive: true });
+  const receiptPath = path.join(directory, `${sha256(dispatch.dispatchId)}.json`);
+  const handle = await open(receiptPath, "wx", 0o600);
+  try {
+    await handle.writeFile(`${JSON.stringify({
+      version: 2,
+      taskId: dispatch.taskId,
+      dispatchId: dispatch.dispatchId,
+      roleRunId: dispatch.roleRunId,
+      role: dispatch.expectedRole,
+      agentDefinition: dispatch.agentDefinition,
+      parentSessionId,
+      observedAt: new Date().toISOString(),
+      projectRootSha256: sha256(path.resolve(projectRoot)),
+      promptSha256: sha256(dispatch.prompt),
+      toolUseId: input?.tool_use_id ?? input?.toolUseId ?? null,
+      status: "PENDING",
+      nonce: randomUUID()
+    }, null, 2)}\n`);
+  } finally {
+    await handle.close();
   }
   const temporary = `${activePath}.tmp-${process.pid}`;
   await writeFile(temporary, `${JSON.stringify({
@@ -308,16 +430,89 @@ async function recordDispatchReceipt(input) {
   await rename(temporary, activePath);
 }
 
+async function recordDispatchOutcome(input) {
+  if (process.env.QTA_GOVERNANCE_AUDIT === "off") return;
+  const event = hookEvent(input);
+  if (!new Set(["PostToolUse", "PostToolUseFailure"]).has(event)) return;
+  const dispatch = qtaDispatchMetadata(input);
+  if (!dispatch) return;
+  const parentSessionId = inputSessionId(input);
+  const projectRoot = inputProjectRoot(input);
+  if (!parentSessionId || !projectRoot) throw new Error("QTA dispatch outcome requires parent session and project root");
+  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
+    sha256(dispatch.taskId));
+  const dispatchHash = sha256(dispatch.dispatchId);
+  const receipt = JSON.parse(await readFile(path.join(directory, `${dispatchHash}.json`), "utf8"));
+  const toolUseId = input?.tool_use_id ?? input?.toolUseId ?? null;
+  if (receipt.parentSessionId !== parentSessionId || receipt.promptSha256 !== sha256(dispatch.prompt)
+      || receipt.toolUseId !== toolUseId) {
+    throw new Error("QTA dispatch outcome does not match its pending receipt");
+  }
+  const outcomePath = path.join(directory, `${dispatchHash}.outcome.json`);
+  const handle = await open(outcomePath, "wx", 0o600);
+  try {
+    await handle.writeFile(`${JSON.stringify({
+      version: 1,
+      taskId: dispatch.taskId,
+      dispatchId: dispatch.dispatchId,
+      roleRunId: dispatch.roleRunId,
+      parentSessionId,
+      projectRootSha256: sha256(path.resolve(projectRoot)),
+      promptSha256: receipt.promptSha256,
+      toolUseId,
+      status: event === "PostToolUse" ? "SUCCEEDED" : "FAILED",
+      observedAt: new Date().toISOString(),
+      nonce: randomUUID()
+    }, null, 2)}\n`);
+  } finally {
+    await handle.close();
+  }
+}
+
 async function activateRunPrompt(input) {
   if (process.env.QTA_GOVERNANCE_AUDIT === "off") return;
-  const event = input?.hook_event_name ?? input?.hookEventName ?? input?.event ?? "";
+  const event = hookEvent(input);
   if (event !== "UserPromptSubmit") return;
   const prompt = firstString(input, ["prompt", "user_prompt", "userPrompt"]);
   if (!/(?:^|\s)\/qta-run(?:\s|$)/.test(prompt)) return;
-  const parentSessionId = input?.session_id ?? input?.sessionId ?? process.env.CLAUDE_SESSION_ID;
-  const projectRoot = process.env.ZCODE_PROJECT_DIR ?? process.env.CLAUDE_PROJECT_DIR
-    ?? input?.cwd ?? process.cwd();
+  const parentSessionId = inputSessionId(input);
+  const projectRoot = inputProjectRoot(input);
   if (!parentSessionId || !projectRoot) throw new Error("/qta-run activation requires session and project root");
+  await reconcileTerminalActiveLocks(projectRoot);
+  const projectHash = sha256(path.resolve(projectRoot));
+  const resumeTaskId = requestedResumeTask(prompt);
+  const anotherActiveTask = (await activeEntries(projectRoot)).find((entry) =>
+    entry.value?.projectRootSha256 === projectHash && entry.value?.parentSessionId !== parentSessionId);
+  if (anotherActiveTask) {
+    const active = anotherActiveTask.value;
+    if (!resumeTaskId || resumeTaskId !== active.taskId || !active.controlPath) {
+      throw new Error(`project already has active governed task ${active.taskId || "BOOTSTRAPPING"}; continue its parent session or explicitly run '/qta-run --resume ${active.taskId || "<TASK-ID>"} <objective-or-control-path>' from the replacement session`);
+    }
+    let control;
+    try {
+      control = JSON.parse(await readFile(path.resolve(projectRoot, active.controlPath), "utf8"));
+    } catch (error) {
+      throw new Error(`cannot resume ${resumeTaskId}: active control is unavailable (${error.code ?? error.message})`);
+    }
+    if (control.taskId !== resumeTaskId || new Set(["BLOCKED", "DELIVERY_READY"]).has(control.lifecycleState)) {
+      throw new Error(`cannot resume ${resumeTaskId}: control identity or lifecycle state is not resumable`);
+    }
+    const activeDirectory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "active");
+    const replacementPath = path.join(activeDirectory, `${sha256(parentSessionId)}.json`);
+    const temporary = `${replacementPath}.tmp-${process.pid}`;
+    await writeFile(temporary, `${JSON.stringify({
+      ...active,
+      version: 1,
+      parentSessionId,
+      projectRootSha256: projectHash,
+      resumedFromSessionSha256: sha256(active.parentSessionId ?? ""),
+      updatedAt: new Date().toISOString()
+    }, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporary, replacementPath);
+    await unlink(anotherActiveTask.file);
+    return;
+  }
+  if (resumeTaskId) throw new Error(`cannot resume ${resumeTaskId}: no matching active governed task exists`);
   const activeDirectory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "active");
   const activePath = path.join(activeDirectory, `${sha256(parentSessionId)}.json`);
   await mkdir(activeDirectory, { recursive: true });
@@ -427,13 +622,17 @@ async function main() {
   if (await enforceStopGate(input)) return;
   await activateRunPrompt(input);
   await enforceUnattendedQuestionPolicy(input);
-  const result = evaluateHook(input);
-  if (!result.allowed) {
-    console.error(`QTA governance blocked this action: ${result.reasons.join("; ")}`);
-    process.exit(2);
+  await enforceGovernedBranchPolicy(input);
+  if (hookEvent(input) === "PreToolUse" || !hookEvent(input)) {
+    const result = evaluateHook(input);
+    if (!result.allowed) {
+      console.error(`QTA governance blocked this action: ${result.reasons.join("; ")}`);
+      process.exit(2);
+    }
   }
   await recordRuntimeReceipt(input);
   await recordDispatchReceipt(input);
+  await recordDispatchOutcome(input);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

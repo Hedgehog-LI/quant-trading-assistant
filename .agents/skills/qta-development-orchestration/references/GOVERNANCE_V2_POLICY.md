@@ -7,7 +7,7 @@ architecture-gate decision.
 
 | Lane | Typical scope | AC cap | Blocking amendments | Required gates |
 |---|---|---:|---:|---|
-| L0 | Documentation or mechanical edit | 3 | 0 | diff/static |
+| L0 | Documentation or mechanical edit | 3 | 0 | bounded implementer, diff/static, clean verifier |
 | L1 | Bounded single-module behavior | 5 | 1 | static, focused test, full test, review |
 | L2 | Migration, transaction, compatibility, concurrency, provider, scheduler, performance | 8 | 3 | L1 plus package and final verifier |
 | L3 | Funds, authorization, cross-repository contract, irreversible runtime/data, deployment-critical | 10 | 5 | L2 plus required runtime/deployment |
@@ -56,11 +56,24 @@ and policy violation. The parent cannot substitute for a specialist role. Initia
 into one fresh implementer per coherent slice; one slice has at most three ACs, eight expected files, and 500
 production-line additions. Two timeouts on one slice require `BLOCKED` and reslicing.
 
+L0 may omit only test design and code review. It never omits the bounded implementer or clean final verifier.
+Closeout normally resumes the original task and role history; legacy implementation slices without valid
+implementer evidence require one evidence-only implementer before candidate freeze.
+
+Every Agent/Task dispatch starts with the exact two-line TaskPacket prefix from the template. A rejected
+prefix is corrected and retried once; the Hook is never invoked manually and synthetic receipts are invalid.
+Dispatch audit is two-phase: immutable `PENDING` receipt on `PreToolUse`, then immutable `SUCCEEDED` or
+`FAILED` outcome. Delivery rejects pending-only dispatches.
+
 Implementer and final-verifier profiles use `bypassPermissions` only to remove interactive Bash approvals.
 Tool allowlists, prohibited actions, allowed paths, Hook denials, candidate identity, and evidence rules still
 apply unchanged. An active `/qta-run` never calls `AskUserQuestion`: reversible choices use the recommended
 option, while a genuine product, destructive, credential, or external-input blocker is persisted as
 `BLOCKED` instead of waiting for a human response.
+
+An unavailable parent session is replaced only through
+`/qta-run --resume <TASK-ID> <objective-or-control-path>`. The Hook transfers a matching same-project,
+non-terminal active lock and preserves the original task/control identity; implicit task stealing is blocked.
 
 ## Context And Control Budget
 

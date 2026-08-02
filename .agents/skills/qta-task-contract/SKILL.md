@@ -101,7 +101,10 @@ artifact to the parent coordinator, which owns persistence and contract freezing
 - Final verifier executes required gates and decides the verdict.
 
 `L1`, `L2`, and `L3` use all four roles. `L0` may omit test design and code review only when the contract-lite
-record explains why; it still requires a clean final verifier.
+record explains why; it still requires a bounded implementer and a clean final verifier. A closeout normally
+resumes the original task and role history. If a legacy task contains an implementation slice but lacks valid
+implementer evidence, its recovery contract must assign an evidence-only implementer before candidate freeze;
+parent-authored checks do not satisfy that requirement.
 
 ## Stop Conditions
 

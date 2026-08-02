@@ -116,9 +116,12 @@ verifier 的 Bash 审批，不扩大工具白名单、写路径、Git 权限或�
 权限边界才能解决。在此之前严禁把本地证据写成 `ENFORCED`。
 
 `L0` 通过显式 omission record 省略 test designer/code reviewer，并从 `CANDIDATE_FROZEN` 直接进入
-干净 verifier；L1-L3 不允许省略。每个 repair generation 都必须有新的 implementer，L1-L3 每个
-candidate generation 都必须有新的 reviewer。repair/failure history 和 blocking amendment history
-跨上下文保留，不能只维护一个可被覆盖的计数器。
+干净 verifier；它不能省略 bounded implementer 或 final verifier。收口任务默认恢复原 Task ID 和
+role history，不另建一套生命周期；遗留任务已有 implementation slice 却缺少有效 implementer 证据时，
+必须先派发 evidence-only implementer，父协调者自己执行检查不能替代该角色。L1-L3 不允许省略角色。
+每个 repair generation 都必须有新的 implementer，L1-L3 每个 candidate generation 都必须有新的
+reviewer。repair/failure history 和 blocking amendment history 跨上下文保留，不能只维护一个可被
+覆盖的计数器。
 
 ## 5. 父协调状态机
 
@@ -126,7 +129,7 @@ candidate generation 都必须有新的 reviewer。repair/failure history 和 bl
 
 | Lane | 范围 | AC 上限 | 强制门禁 |
 |---|---|---:|---|
-| `L0` | 文档/机械低风险改动 | 3 | static + clean verifier |
+| `L0` | 文档/机械低风险改动 | 3 | bounded implementer + static + clean verifier |
 | `L1` | 单模块、无 migration | 5 | 四角色 + focused/full test |
 | `L2` | migration/事务/兼容/并发/provider/scheduler/性能 | 8 | L1 + package + independent verifier |
 | `L3` | 资金/鉴权/跨仓/不可逆运行与部署 | 10 | L2 + required runtime/deployment |
@@ -151,12 +154,30 @@ repair history 必须绑定发现问题的 reviewer/verifier role run 与下一�
 计划、单个角色返回或一次 repair 都不算完成。冻结契约内的可逆选择由父协调者采用推荐方案自行决定，仅产品/金融语义冲突、破坏性/密钥
 授权或真实外部阻塞可以询问用户。当前任务结束后不得为了消耗 Token 自动开启第二个产品任务。
 
+原父会话不可用但控制文件仍为非终态时，新会话使用
+`/qta-run --resume <TASK-ID> <objective-or-control-path>` 显式接管。Hook 只转移同项目、Task ID 精确
+匹配且控制文件身份有效的 active lock；禁止静默抢占其他任务或让模型手工删除审计文件。
+
 初始实现必须在契约中拆成 bounded slice：每个 slice 最多 3 个 AC、8 个预期文件、500 行生产代码
 增量，一个干净 implementer 只做一个 slice。父协调器只组装状态和 Git，不写业务实现。
 
 ## 6. Git、Commit 和 Push
 
 父协调者是唯一 Git owner，子角色不得 stage、commit、rebase、merge 或 push。
+
+所有固定角色派发的 TaskPacket 必须以两行机器契约开头：
+
+```text
+# Task Packet: <TASK-ID> / <ROLE> / <ROLE-RUN-ID>
+- Dispatch ID: <DISPATCH-ID>
+```
+
+Hook 拒绝格式时只修正同一 TaskPacket 并重试一次，禁止手工执行 Hook 或用伪造输入制造回执。派发回执
+采用两阶段记录：`PreToolUse` 写不可变 `PENDING`，Agent 返回后由 `PostToolUse` 或
+`PostToolUseFailure` 写独立的 `SUCCEEDED`/`FAILED` outcome；缺少终态 outcome 不能交付。
+
+父协调者必须在第一次写文件前创建或切换到冻结的任务分支。治理任务 active 时，禁止在
+`main`/`master` 上编辑文件，或执行 stage、commit、merge、cherry-pick、revert、tag。
 
 任务契约必须根据用户明确授权冻结 `git_automation`：
 

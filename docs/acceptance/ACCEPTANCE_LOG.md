@@ -4,6 +4,13 @@
 
 ---
 
+## 2026-08-02 — AI 治理收口规则加固（通过）
+
+- **范围**：Hook、派发/交付审计、活动锁、默认分支保护、TaskPacket 模板、Skill/命令/治理文档；无业务代码。
+- **审查**：两代独立 reviewer 的阻断 finding 均已修复，最终新 reviewer 为 `REVIEW_CLEAR`。
+- **最终核验**：全新只读 verifier 在 `codex/ai-governance-closeout-hardening-20260802` 上执行固定门禁并返回 `ACCEPTED`：治理测试 **58/58**、触发评估 **28/28**、`git diff --check` 通过。
+- **结论**：允许本地提交该治理候选；未 push、未部署，不宣称业务运行时验收。
+
 ## 2026-08-02 — P1.4b-D3 证券目录同步基础（条件通过，允许本地交付）
 
 - **冻结身份**：任务 `SECURITY-DIRECTORY-D3-20260802`；contract SHA-256 `afc854bd205b3c152cc96c25546eac978dd882229edf3136c3987b3748b9e95a`；候选 commit `ff393bc69279a85eddf0d54897df4f0cb67eb4fd`、tree `a91ff7e32d11214d597dee0d29981ab67a5911de`、patch SHA-256 `20baa4c9b523d14320982a1aa1fb71055c7d5601e6f2770677e8168196ec928f`。

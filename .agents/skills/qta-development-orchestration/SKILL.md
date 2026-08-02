@@ -65,6 +65,11 @@ Allowed backward transitions:
 - `L0` may omit test design/review through an explicit omission record and transition directly from
   `CANDIDATE_FROZEN` to clean `VERIFIED`.
 
+`L0` never omits its bounded implementer or clean final verifier. A closeout resumes the original task and
+its role history. When recovering a legacy task that has an implementation slice but no valid implementer
+evidence, dispatch an evidence-only implementer before freezing the candidate; parent-authored gates do not
+substitute for that role run.
+
 Never run code review and final verification in parallel. Never finalize before verification. `VERIFIED`
 requires both `FUNCTIONAL=PASS` and `ARCHITECTURE=PASS` for the same candidate identity.
 
@@ -72,6 +77,11 @@ The parent continues until one terminal state: `DELIVERY_READY`, `BLOCKED`, or a
 `FINALIZED` means finalization records exist; it is not permission to end Goal mode. A plan, one role artifact,
 one repair, or self-reported acceptance is not completion. Do not start a second product task merely to keep
 an overnight run busy.
+
+If the original parent session becomes unavailable while its control remains non-terminal, a replacement
+session must use `/qta-run --resume <TASK-ID> <objective-or-control-path>`. The Hook transfers only a matching
+same-project active lock whose control identity is valid and non-terminal; it never silently steals another
+task or asks the user to delete audit files.
 
 ## Autonomous Decision Policy
 
@@ -83,6 +93,18 @@ impossible, persist an evidence-backed `BLOCKED` checkpoint and stop; do not lea
 human response. The workspace Hook enforces this policy for the active parent session.
 
 ## Task Packet
+
+Every fixed-role Agent/Task prompt must begin with these exact two standalone lines:
+
+```text
+# Task Packet: <TASK-ID> / <ROLE> / <ROLE-RUN-ID>
+- Dispatch ID: <DISPATCH-ID>
+```
+
+`<ROLE>` is one of `TEST_DESIGNER`, `IMPLEMENTER`, `CODE_REVIEWER`, or `FINAL_VERIFIER`. Copy this prefix
+from `assets/TASK_PACKET_TEMPLATE.md`; do not paraphrase it or bury the dispatch ID in prose. If the Hook
+rejects the prefix, correct the same TaskPacket and retry that dispatch once. Never invoke
+`scripts/zcode-governance-hook.mjs` manually or create a synthetic packet to manufacture a receipt.
 
 Give every role only:
 
@@ -197,7 +219,9 @@ The SNAPSHOT manifest must cover every repository path changed from `baselineCom
 pre-existing dirty-path list and explicitly identified task-control/evidence metadata. An omitted changed path
 invalidates the candidate.
 
-Use a dedicated task branch for `L1`, `L2`, and `L3` work. Create traceable commits at these gates:
+Create or switch to the frozen dedicated task branch before the first file write. Governed sessions may not
+edit, stage, commit, merge, cherry-pick, revert, or tag on `main`/`master`. Use a dedicated task branch for
+`L1`, `L2`, and `L3` work, and normally for `L0` recovery/closeout work. Create traceable commits at these gates:
 
 1. `contract`: contract and test design frozen.
 2. `candidate`: implementation is `SELF_CHECKED`.

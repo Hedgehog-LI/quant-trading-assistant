@@ -36,6 +36,38 @@
           ]
         }
       ],
+      "PostToolUse": [
+        {
+          "matcher": "Agent|Task",
+          "hooks": [
+            {
+              "type": "process",
+              "command": "node",
+              "args": [
+                "${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs"
+              ],
+              "timeoutMs": 5000,
+              "statusMessage": "Recording QTA role dispatch outcome"
+            }
+          ]
+        }
+      ],
+      "PostToolUseFailure": [
+        {
+          "matcher": "Agent|Task",
+          "hooks": [
+            {
+              "type": "process",
+              "command": "node",
+              "args": [
+                "${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs"
+              ],
+              "timeoutMs": 5000,
+              "statusMessage": "Recording failed QTA role dispatch"
+            }
+          ]
+        }
+      ],
       "Stop": [
         {
           "hooks": [
