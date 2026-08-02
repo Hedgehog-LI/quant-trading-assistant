@@ -29,9 +29,13 @@ Architecture errors are hard failures and cannot be reinterpreted by prose.
 Continue through the state machine until `DELIVERY_READY`, `BLOCKED`, or the user explicitly stops.
 `FINALIZED`, a plan, or one subagent response is not completion. Goal success is forbidden until
 `node scripts/check-ai-delivery-ready.mjs <TASK_CONTROL>` exits `0`; do not ask a model-only completion judge
-to override that command. For reversible choices inside the frozen contract, select the recommended option
-yourself instead of asking the user. Ask only for unresolved product/financial meaning, destructive or
-credential-bearing authorization, or a genuine external blocker. Do not expand into another product task.
+to override that command.
+
+`/qta-run` is unattended. Never call `AskUserQuestion` while it is active. For a reversible engineering
+choice, select the documented or clearly recommended option and record the decision. If unresolved
+product/financial meaning, destructive or credential-bearing authorization, or an external dependency makes
+all safe paths impossible, persist an evidence-backed `BLOCKED` checkpoint and stop instead of waiting for
+the user. Do not expand into another product task.
 
 The workspace Stop Hook will request continuation up to the ZCode limit while this parent session is active.
 When progress cannot continue within the frozen repair/timeout limits, persist `BLOCKED` with evidence so the

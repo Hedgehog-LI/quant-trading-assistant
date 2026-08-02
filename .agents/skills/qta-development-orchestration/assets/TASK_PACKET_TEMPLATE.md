@@ -37,12 +37,16 @@
 - Allowed write paths:
 - Pre-existing dirty paths:
 - Prohibited actions:
+- Interaction policy: `UNATTENDED` (`AskUserQuestion` prohibited; genuine input dependency -> `BLOCKED`)
 - Runtime tool enforcement: `ADVISORY` (local Hook/receipt/anchor are not a same-user security boundary)
 - Compensating isolation check:
 
 For an implementer packet, assign exactly one frozen slice with at most three ACs, eight expected files, and
 500 production-line additions. A timeout/plan-only/failure/cancellation still returns a terminal dispatch
 record. Two timeouts for the same slice require `BLOCKED`; the parent must not implement it.
+
+Implementer and final-verifier profiles run with `bypassPermissions` for unattended Bash. This never expands
+the packet's write paths, tools, candidate scope, Git policy, or prohibited actions.
 
 ## Authority
 

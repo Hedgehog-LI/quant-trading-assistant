@@ -56,6 +56,12 @@ and policy violation. The parent cannot substitute for a specialist role. Initia
 into one fresh implementer per coherent slice; one slice has at most three ACs, eight expected files, and 500
 production-line additions. Two timeouts on one slice require `BLOCKED` and reslicing.
 
+Implementer and final-verifier profiles use `bypassPermissions` only to remove interactive Bash approvals.
+Tool allowlists, prohibited actions, allowed paths, Hook denials, candidate identity, and evidence rules still
+apply unchanged. An active `/qta-run` never calls `AskUserQuestion`: reversible choices use the recommended
+option, while a genuine product, destructive, credential, or external-input blocker is persisted as
+`BLOCKED` instead of waiting for a human response.
+
 ## Context And Control Budget
 
 - 25% context: persist discoveries and decisions.

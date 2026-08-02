@@ -28,7 +28,7 @@ const expectedAgentPolicies = {
     skills: ["qta-context-bootstrap", "qta-task-contract"]
   },
   "qta-implementer": {
-    permissionMode: "acceptEdits",
+    permissionMode: "bypassPermissions",
     maxTurns: "20",
     tools: ["Read", "Glob", "Grep", "Edit", "Write", "Bash", "Skill"],
     disallowedTools: ["Agent", "Task", "EnterPlanMode", "ExitPlanMode"],
@@ -48,7 +48,7 @@ const expectedAgentPolicies = {
     skills: ["qta-context-bootstrap"]
   },
   "qta-final-verifier": {
-    permissionMode: "acceptEdits",
+    permissionMode: "bypassPermissions",
     maxTurns: "12",
     tools: ["Read", "Glob", "Grep", "Bash", "Skill"],
     disallowedTools: [
@@ -303,8 +303,9 @@ try {
       || !governanceMatchers[0]?.matcher?.includes("Write")
       || !governanceMatchers[0]?.matcher?.includes("Edit")
       || !governanceMatchers[0]?.matcher?.includes("Agent")
-      || !governanceMatchers[0]?.matcher?.includes("Task")) {
-    errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit and Agent/Task dispatches");
+      || !governanceMatchers[0]?.matcher?.includes("Task")
+      || !governanceMatchers[0]?.matcher?.includes("AskUserQuestion")) {
+    errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit, Agent/Task, and AskUserQuestion");
   }
   for (const event of ["UserPromptSubmit", "Stop"]) {
     const groups = hooks?.events?.[event] ?? [];

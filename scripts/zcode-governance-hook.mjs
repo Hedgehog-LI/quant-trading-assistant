@@ -338,6 +338,30 @@ async function activateRunPrompt(input) {
   }, null, 2)}\n`, { mode: 0o600 });
 }
 
+async function enforceUnattendedQuestionPolicy(input) {
+  const tool = input?.tool_name ?? input?.toolName ?? "";
+  if (tool !== "AskUserQuestion") return false;
+  const sessionId = input?.session_id ?? input?.sessionId ?? process.env.CLAUDE_SESSION_ID;
+  const projectRoot = process.env.ZCODE_PROJECT_DIR ?? process.env.CLAUDE_PROJECT_DIR
+    ?? input?.cwd ?? process.cwd();
+  if (!sessionId || !projectRoot) return false;
+  const activePath = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "active",
+    `${sha256(sessionId)}.json`);
+  let active;
+  try {
+    active = JSON.parse(await readFile(activePath, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+  if (active.projectRootSha256 !== sha256(path.resolve(projectRoot))) {
+    console.error("QTA unattended policy: active-task receipt belongs to another project");
+    process.exit(2);
+  }
+  console.error("QTA unattended policy blocked AskUserQuestion: choose the documented/recommended reversible option automatically; if safe progress requires product, destructive, credential, or external input, persist an evidence-backed BLOCKED checkpoint instead of waiting for the user");
+  process.exit(2);
+}
+
 async function enforceStopGate(input) {
   const event = input?.hook_event_name ?? input?.hookEventName ?? input?.event ?? "";
   if (event !== "Stop") return false;
@@ -402,6 +426,7 @@ async function main() {
   const input = await readStdin();
   if (await enforceStopGate(input)) return;
   await activateRunPrompt(input);
+  await enforceUnattendedQuestionPolicy(input);
   const result = evaluateHook(input);
   if (!result.allowed) {
     console.error(`QTA governance blocked this action: ${result.reasons.join("; ")}`);

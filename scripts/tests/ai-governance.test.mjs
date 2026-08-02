@@ -699,6 +699,42 @@ test("ZCode hook process uses the documented exit-code contract", () => {
   assert.equal(allowed.stdout, "");
 });
 
+test("ZCode unattended qta-run blocks AskUserQuestion but ordinary sessions remain interactive", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-unattended-question-"));
+  const script = path.resolve("scripts/zcode-governance-hook.mjs");
+  const environment = { ...process.env, ZCODE_PROJECT_DIR: directory };
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    const ordinary = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: "ordinary-session", cwd: directory,
+        tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Choose?" }] }
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(ordinary.status, 0, ordinary.stderr);
+
+    const sessionId = "unattended-parent";
+    const activation = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "UserPromptSubmit", session_id: sessionId, cwd: directory,
+        prompt: "/qta-run finish one bounded task"
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(activation.status, 0, activation.stderr);
+    const blocked = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory,
+        tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Choose recommended?" }] }
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(blocked.status, 2);
+    assert.match(blocked.stderr, /blocked AskUserQuestion/);
+    assert.match(blocked.stderr, /persist.*BLOCKED/i);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("ZCode Hook receipt binds ADVISORY evidence to an observed runtime session", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "qta-runtime-receipt-"));
   const sessionId = "runtime-session-1";

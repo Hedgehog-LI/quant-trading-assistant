@@ -29,6 +29,9 @@
   `contract_hash`。子角色只接收 TaskPacket。
 - `/qta-run` 会激活父 session 的 Stop Hook；未达到 `DELIVERY_READY` 或持久化 `BLOCKED` 时，父任务
   不允许仅凭一轮输出结束。Stop 回注最多三次，不能替代 repair/timeout 的硬上限。
+- `/qta-run` 是无人值守流程：禁止调用 `AskUserQuestion`。可逆工程选择自动采用文档或明确推荐项；
+  产品/金融含义、破坏性操作、凭据授权或外部依赖确实无法安全继续时，必须持久化 `BLOCKED`，不得
+  挂起等待用户选择。
 - 父协调者创建 `<TASK-ID>-CONTROL.json`，每次角色派发和状态迁移前运行
   `node scripts/check-ai-task-control.mjs <control-file>`。
 - Codex 沙箱若因 `.git/qta-governance` 只读返回 `EPERM/EACCES`，仅为上述控制命令申请受限 `.git`
@@ -45,6 +48,10 @@
   两次同 slice timeout 后记录 `BLOCKED` 并重新切片。
 - **角色实例**：初始实现、每轮 repair、每代 review、最终 verifier 都使用新的 role/session；禁止
   延续旧子会话。
+- **无人值守权限**：implementer 与 final verifier 使用 `bypassPermissions` 运行其冻结范围内的 Bash
+  门禁；该模式不扩大工具、路径、Git 或业务边界。测试设计者与 reviewer 继续保持只读 `plan`。
+- **Shell 节制**：实现者用 Read/Glob/Grep 浏览文件，Bash 只运行必要的聚焦门禁；同一失败不得通过
+  反复更换 `grep/head/tail` 形式重跑完整测试。
 - **测试节奏**：开发/repair 跑聚焦测试；最终候选冻结前跑一次 full/package；独立 verifier 再跑
   一次，不对未变化候选重复跑全量门禁。
 - **架构自检**：候选冻结前运行 `node scripts/check-ai-architecture.mjs --base <baseline>

@@ -75,10 +75,12 @@ an overnight run busy.
 
 ## Autonomous Decision Policy
 
-Inside the frozen contract, choose the recommended reversible implementation option without asking the user.
-Ask only when product/financial meaning is unresolved, a destructive or credential-bearing action requires
-authorization, or external state makes every safe path impossible. Record the decision and evidence in the
-control file; do not create repeated confirmation turns.
+`/qta-run` is an unattended lifecycle. Inside the frozen contract, choose the recommended reversible
+implementation option without asking the user and record the decision and evidence in the control file.
+Never invoke `AskUserQuestion` in an active governed run. If product/financial meaning is unresolved, a
+destructive or credential-bearing action requires authorization, or external state makes every safe path
+impossible, persist an evidence-backed `BLOCKED` checkpoint and stop; do not leave the task waiting for a
+human response. The workspace Hook enforces this policy for the active parent session.
 
 ## Task Packet
 
@@ -149,6 +151,12 @@ those receipts bidirectionally with terminal `roleRuns`, exposing omitted failed
 Append a role-run row only after that role reaches a terminal status. Accepted rows require
 `executorType=SUBAGENT`, the exact `.zcode/agents/` definition, matching capability, and
 `executionOutcome=COMPLETED`. Anchored role rows are immutable events, not mutable RUNNING records.
+
+Implementation and final-verification profiles use ZCode `bypassPermissions` so their bounded Bash gates can
+run unattended. Their explicit tool allowlists, disallowed tools, TaskPacket paths, Hook policy, candidate
+hashes, and role boundaries remain authoritative; bypass mode is not permission to expand scope. Implementers
+use dedicated read/search tools for inspection and must not burn the role window on repeated shell-filtered
+test reruns.
 
 Codex sandbox profiles may expose `.git` as read-only. In that case, request scoped permission only for
 `node scripts/check-ai-task-control.mjs`; never disable the anchor. The validator returns this recovery

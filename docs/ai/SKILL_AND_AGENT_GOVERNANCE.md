@@ -71,9 +71,9 @@ ZCode 真实触发使用 `name + description（约前 250 字符）+ when_to_use
 | Agent | 上下文 | 工具边界 | 输出 |
 |---|---|---|---|
 | `qta-test-designer` | 干净 | 只读、不执行命令 | 可证伪 AC、测试矩阵、契约 amendment artifact |
-| `qta-implementer` | 独立实现上下文 | 可读写、自测，不可 Git/子代理 | 代码、自检、变更清单、候选提交建议 |
+| `qta-implementer` | 独立实现上下文 | `bypassPermissions` 无人值守；可读写、自测，不可 Git/子代理 | 代码、自检、变更清单、候选提交建议 |
 | `qta-code-reviewer` | 干净 | 只读、不执行命令 | 绑定 candidate hash 的 findings 或 `REVIEW_CLEAR` |
-| `qta-final-verifier` | 干净临时 worktree | `acceptEdits` 执行模式；无 Edit/Write，仅 Bash 门禁与脚本回执 | 逐 AC 证据、前后 hash、唯一验收结论 |
+| `qta-final-verifier` | 干净临时 worktree | `bypassPermissions` 无人值守；无 Edit/Write，仅 Bash 门禁与脚本回执 | 逐 AC 证据、前后 hash、唯一验收结论 |
 
 固定 Agent 是不可变模板，不是可反复续聊的实例。初始实现、每轮 repair、每代 review 和最终
 verification 都创建新的 `role_run_id + session_id`，返回 artifact 后立即结束。每个角色只接收
@@ -105,6 +105,11 @@ plan-only 尝试。它仍是同用户下的防误操作证据，不是密码学�
 随后只允许两种结束：控制状态为 `BLOCKED`，或状态为 `DELIVERY_READY` 且 delivery-ready 脚本返回
 0；其他状态会要求继续（客户端最多回注三次）。这能拦住“只跑一轮就自报完成”，但不是无限循环器：
 同因失败达到上限时必须持久化 `BLOCKED`，Stop Hook 即释放任务。
+
+`/qta-run` 同时是无人值守交互边界：PreToolUse Hook 会阻断 active parent 的 `AskUserQuestion`。
+可逆工程选择采用文档或明确推荐项；产品/金融含义、破坏性授权、凭据或外部依赖确实无法安全继续
+时，父协调器必须写入 `BLOCKED`，不能悬挂等待用户。`bypassPermissions` 只移除 implementer 和 final
+verifier 的 Bash 审批，不扩大工具白名单、写路径、Git 权限或任务范围。
 
 威胁模型必须说清：本地 Hook、回执和 `.git` 哈希链用于防误操作、漂移和普通重写，不能抵抗拥有
 同一 macOS 用户任意 Bash 权限的恶意代码。后者只有 ZCode 原生签名证明、受保护远程分支/CI 或更高
