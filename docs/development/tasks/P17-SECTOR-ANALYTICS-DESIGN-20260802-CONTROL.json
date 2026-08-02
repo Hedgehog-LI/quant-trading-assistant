@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json",
   "startedAt": "2026-08-02T00:00:00Z",
   "lane": "L0",
-  "lifecycleState": "IMPLEMENTING",
+  "lifecycleState": "CANDIDATE_FROZEN",
   "contract": {
     "path": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md",
     "version": "1.1",
@@ -112,20 +112,34 @@
       "to": "IMPLEMENTING",
       "at": "2026-08-02T00:12:00Z",
       "actor": "codex-parent-p17-sector-design-1"
+    },
+    {
+      "sequence": 5,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-02T00:30:00Z",
+      "actor": "codex-parent-p17-sector-design-1"
+    },
+    {
+      "sequence": 6,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-02T00:35:00Z",
+      "actor": "codex-parent-p17-sector-design-1"
     }
   ],
   "candidate": {
     "mode": "SNAPSHOT",
-    "generation": 0,
-    "identity": "",
-    "commit": "",
-    "treeHash": "",
-    "patchSha256": "",
-    "manifestPath": "",
-    "manifestSha256": "",
-    "entrySetSha256": "",
-    "diffArtifactPath": "",
-    "diffArtifactSha256": ""
+    "generation": 1,
+    "identity": "c8341df03ca656732cc85c42dcd779f066b835a5/7b4b016529915cfcc0031346b5e6855b276b776f",
+    "commit": "c8341df03ca656732cc85c42dcd779f066b835a5",
+    "treeHash": "7b4b016529915cfcc0031346b5e6855b276b776f",
+    "patchSha256": "80140284a27225f1b0a737e3fbd75ca7a32679cdf4e59dc87efb291abd329610",
+    "manifestPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CANDIDATE.json",
+    "manifestSha256": "3fdb49ddf4339bf3cc7f3077c0457a4abbfb7f883873c972656ed5907378a92b",
+    "entrySetSha256": "001cc8217b8352af50108748bd5e51a4f3d8a00b9b792ea61925e9cb6b55b01f",
+    "diffArtifactPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-BASELINE-CANDIDATE.patch",
+    "diffArtifactSha256": "80140284a27225f1b0a737e3fbd75ca7a32679cdf4e59dc87efb291abd329610"
   },
   "budget": {
     "contextPercent": null,
@@ -159,6 +173,27 @@
       "artifactPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-TEST-DESIGN.md",
       "artifactSha256": "4401fd71055f936977cc9ee9d7350579b5fde5ef730414875e3f2aeb7da32ab2",
       "verdict": "READY_TO_FREEZE",
+      "findingIds": []
+    },
+    {
+      "sequence": 2,
+      "dispatchId": "DISPATCH-IMPL-1",
+      "role": "IMPLEMENTER",
+      "roleRunId": "IMPL-RUN-1",
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "capability": "READ_WRITE",
+      "assignedAcIds": ["AC-01", "AC-02", "AC-03"],
+      "candidateGeneration": 1,
+      "repairRound": 0,
+      "dispatchedAt": "2026-08-02T00:12:00Z",
+      "finishedAt": "2026-08-02T00:30:00Z",
+      "status": "COMPLETED",
+      "executionOutcome": "COMPLETED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md",
+      "artifactSha256": "62afc42315dc72b11432b065982bd798a3459fb4ac4c2618d1fad89c7262a810",
+      "verdict": "SELF_CHECKED",
       "findingIds": []
     }
   ],

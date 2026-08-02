@@ -1,0 +1,1717 @@
+diff --git a/docs/DATABASE_DESIGN.md b/docs/DATABASE_DESIGN.md
+index 9f9061c..1b6ad2b 100644
+--- a/docs/DATABASE_DESIGN.md
++++ b/docs/DATABASE_DESIGN.md
+@@ -544,3 +544,51 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
+ 10. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
+ 
+ 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。
++
++## 板块分析规划表（P1.7，规划 V19+）
++
++> 状态：**规划 V19+**，未实现。本块为板块分析层（相对强弱 / 轮动持续性 / 龙头贡献 / 量价确认 / 异动提醒）的衍生指标表设计，绑定更高 Flyway 版本 V19+，不复用 V1-V18 既有版本号。所有衍生表均为独立新表，**只读原始事实表，不写回**（衍生读服务只读 `market_sector_*`/`market_sector_ranking_*`/`stock_*` 原始事实表，禁止 UPDATE/写回/回写/覆盖）。本规划区域不表述任何已落库事实，全部为规划。详细公式与口径见 `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`。
++
++### 板块分析 V19+ 衍生表（规划）
++
++#### sector_relative_strength_snapshot（规划 V19+）
++
++状态：规划 V19+，未实现。用途：板块相对强弱（Mansfield-style RS + RS-rank 百分位）衍生快照。只读 `market_sector_ranking_batch`（CLOSE）/`market_sector_snapshot`/`stock_daily_bar` 原始事实表，不写回。
++
++核心字段：`id`（主键，bigint auto_increment）、`sector_identity`（varchar(96)）、`market_code`（varchar(8)，CN/HK/US）、`as_of_date`（date）、`window`（smallint，20/50/120）、`benchmark_type`（varchar(32)，`TRACKING_SYMBOL`/`SECTOR_EQUAL_WEIGHT`）、`benchmark_symbol`（varchar(32)，可空）、`rs_value`（decimal(20,6)）、`rs_rank_percentile`（decimal(20,6)，0~100）、`quality_status`（varchar(32)，`OK`/`INSUFFICIENT_SAMPLE`/`STALE`/`ORIGIN_CHANGED`）、`valid_sample_size`（int）、`created_at`/`updated_at`（datetime）。
++
++幂等键：unique `uk_sector_rs(sector_identity, as_of_date, window)`；索引 `idx_sector_rs_market_date(market_code, as_of_date)`。
++
++#### sector_rotation_persistence_snapshot（规划 V19+）
++
++状态：规划 V19+，未实现。用途：板块轮动持续性（相邻交易日排名 Spearman 均值 + 连续领涨/领跌天数）。只读 `market_sector_ranking_batch`/`market_sector_ranking_item` 原始事实表，不写回。
++
++核心字段：`id`、`sector_identity`、`market_code`、`as_of_date`、`window`（5/10/20）、`rank_spearman_mean`（decimal(20,6)）、`consecutive_leading_days`（int）、`consecutive_lagging_days`（int）、`quality_status`、`valid_sample_size`、`created_at`/`updated_at`。
++
++幂等键：unique `uk_sector_rotation(sector_identity, as_of_date, window)`；索引 `idx_sector_rotation_market_date(market_code, as_of_date)`。
++
++#### sector_leader_contribution_snapshot（规划 V19+）
++
++状态：规划 V19+，未实现。用途：板块龙头贡献度（成交额加权为主、净流入加权为辅）。只读 `market_sector_member_snapshot`/`market_sector_snapshot` 原始事实表，不写回。
++
++核心字段：`id`、`sector_identity`、`market_code`、`trade_date`（date）、`window`（1/5）、`leader_turnover_share`（decimal(20,6)）、`leader_net_inflow_share`（decimal(20,6)，可空）、`top_k`（int）、`top_leaders_json`（text）、`excluded_member_count`（int）、`valid_member_count`（int）、`quality_status`、`created_at`/`updated_at`。
++
++幂等键：unique `uk_sector_leader(sector_identity, trade_date, window)`；索引 `idx_sector_leader_market_date(market_code, trade_date)`。
++
++#### sector_volume_confirmation_snapshot（规划 V19+）
++
++状态：规划 V19+，未实现。用途：板块量价确认（量价同向/背离 + 量比）。只读 `market_sector_snapshot` 原始事实表，不写回。
++
++核心字段：`id`、`sector_identity`、`market_code`、`trade_date`、`change_rate`（decimal(20,6)）、`turnover_amount`（decimal(20,6)）、`volume_ratio`（decimal(20,6)）、`confirmation_status`（varchar(16)，`CONFIRMED`/`DIVERGENCE`/`INSUFFICIENT`）、`quality_status`、`created_at`/`updated_at`。
++
++幂等键：unique `uk_sector_volume(sector_identity, trade_date)`；索引 `idx_sector_volume_market_date(market_code, trade_date)`。
++
++#### market_data_alert 复用（不新增告警表，规划 V19+）
++
++异动提醒复用 V7 版本的 `market_data_alert` 表（该表本身已在 V7 落库），新增 `alert_type=SECTOR_*`（`SECTOR_RS_REVERSAL`、`SECTOR_VOLUME_DIVERGENCE`、`SECTOR_LEADER_CONCENTRATION`、`SECTOR_RANK_JUMP` 等），`severity` 取 `INFO/WARN/HIGH`，`trigger_value_json` 存派生指标上下文。不新建第二套告警表。规划 V19+ 仅在应用层新增枚举值与写入逻辑，不新建表结构（若需索引调整由 ST-3 评估）。
++
++#### MyBatis / Flyway 边界（规划 V19+）
++
++- 新表走更高 Flyway 版本 V19+（V19、V20...），SQL 放在 `src/main/resources/db/migration/V19__*.sql` 等。
++- MyBatis XML 放在 `src/main/resources/mapper/`，主键 `id bigint auto_increment`，金额/价格 `decimal(20,6)`，时间 `created_at`/`updated_at`。
++- 衍生读服务只读原始事实表，不反向 UPDATE 原始表；衍生结果只存新表，可重算、可下线。
+diff --git a/docs/api/MARKET_DATA_API.md b/docs/api/MARKET_DATA_API.md
+index 61387c0..c6152db 100644
+--- a/docs/api/MARKET_DATA_API.md
++++ b/docs/api/MARKET_DATA_API.md
+@@ -471,3 +471,165 @@ LongPort SDK 4.3.3 分钟粒度使用原生 `Min_1/Min_5/Min_15/Min_30/Min_60`
+ - 后端不得在错误响应中返回密钥、完整原始响应或 OAuth 凭据。
+ - 未配置 provider 时返回业务状态，不影响应用启动。
+ - 真实外联前必须确认官方 SDK jar/native libs 已安装到后端运行时 classpath（`runtime-libs/`，vendor jar 被 gitignore）；不要提交密钥或 vendor 大体积 native 包到 Git。部署必须配置 `LONGPORT_HTTP_URL` / `LONGPORT_QUOTE_WEBSOCKET_URL` 域名覆盖（见 §2）。
++
++## 5. 板块分析接口设计（P1.7，规划，未实现）
++
++> 状态：**规划/未实现**。本节为板块分析层（相对强弱 / 轮动持续性 / 龙头贡献 / 量价确认 / 异动提醒）的接口设计，尚未实现。所有端点均只读已落库的板块原始事实表并产出 V19+ 衍生指标快照；不写回原始事实表，不调用 provider 外联，不生成买卖指令，不构成投资建议。详细公式与口径见 `../features/MARKET_SECTOR_ANALYTICS_DESIGN.md`。
++
++统一前缀（规划）：`/api/v1/market-data/sector-analytics/*`，统一响应 `ApiResponse<T>`。市场仅支持 `CN/HK/US`，严格按各自 `ZoneId` 对齐交易日，禁止跨市场混算。`window` 取值：相对强弱 `20/50/120`、轮动持续性 `5/10/20`、龙头贡献 `1/5`、量价确认当日 + 近 5 日均值。`quality_status` 为 `OK/INSUFFICIENT_SAMPLE/STALE/ORIGIN_CHANGED`，非 `OK` 时前端降级展示且不产 HIGH 提醒。
++
++### 5.1 板块相对强弱（规划，未实现）
++
++| 方法 | 路径（规划） | 说明 |
++| --- | --- | --- |
++| GET | `/api/v1/market-data/sector-analytics/relative-strength?market=&window=&asOfDate=&limit=` | 按市场/窗口查询 RS-rank 排行（未实现） |
++| GET | `/api/v1/market-data/sector-analytics/relative-strength/{sectorIdentity}?window=&asOfDate=` | 单板块 RS 值与 RS-rank 百分位详情（未实现） |
++
++请求示例：
++
++```
++GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&asOfDate=2026-07-31&limit=20
++```
++
++响应示例（`ApiResponse<T>`）：
++
++```json
++{
++  "success": true,
++  "code": "OK",
++  "data": {
++    "market": "CN",
++    "window": 20,
++    "asOfDate": "2026-07-31",
++    "benchmarkType": "SECTOR_EQUAL_WEIGHT",
++    "items": [
++      {
++        "sectorIdentity": "BK/SH/IN40159",
++        "sectorName": "半导体",
++        "rsValue": "1.234567",
++        "rsRankPercentile": "92.500000",
++        "qualityStatus": "OK",
++        "validSampleSize": 20
++      }
++    ]
++  },
++  "timestamp": "2026-07-31T16:00:00"
++}
++```
++
++### 5.2 板块轮动持续性（规划，未实现）
++
++| 方法 | 路径（规划） | 说明 |
++| --- | --- | --- |
++| GET | `/api/v1/market-data/sector-analytics/rotation-persistence?market=&window=&asOfDate=&limit=` | 按市场/窗口查询持续性排行（未实现） |
++| GET | `/api/v1/market-data/sector-analytics/rotation-persistence/{sectorIdentity}?window=&asOfDate=` | 单板块 Spearman 均值与连续领涨/领跌天数（未实现） |
++
++响应示例（节选）：
++
++```json
++{
++  "success": true,
++  "code": "OK",
++  "data": {
++    "market": "CN",
++    "window": 10,
++    "asOfDate": "2026-07-31",
++    "items": [
++      {
++        "sectorIdentity": "BK/SH/IN40159",
++        "rankSpearmanMean": "0.812000",
++        "consecutiveLeadingDays": 4,
++        "consecutiveLaggingDays": 0,
++        "qualityStatus": "OK"
++      }
++    ]
++  },
++  "timestamp": "2026-07-31T16:00:00"
++}
++```
++
++### 5.3 板块龙头贡献（规划，未实现）
++
++| 方法 | 路径（规划） | 说明 |
++| --- | --- | --- |
++| GET | `/api/v1/market-data/sector-analytics/leader-contribution?market=&tradeDate=&window=&limit=` | 按市场查询龙头贡献排行（未实现） |
++| GET | `/api/v1/market-data/sector-analytics/leader-contribution/{sectorIdentity}?tradeDate=&window=` | 单板块龙头成分明细（未实现） |
++
++响应示例（节选，`topLeaders` 为龙头成分明细）：
++
++```json
++{
++  "success": true,
++  "code": "OK",
++  "data": {
++    "market": "CN",
++    "tradeDate": "2026-07-31",
++    "window": 1,
++    "items": [
++      {
++        "sectorIdentity": "BK/SH/IN40159",
++        "leaderTurnoverShare": "0.382000",
++        "leaderNetInflowShare": "0.410000",
++        "topK": 3,
++        "excludedMemberCount": 2,
++        "validMemberCount": 24,
++        "qualityStatus": "OK",
++        "topLeaders": [
++          { "canonicalSymbol": "SH.600519", "changeRate": "0.052000", "turnoverAmount": "1200000.000000", "netInflow": "300000.000000", "share": "0.180000" }
++        ]
++      }
++    ]
++  },
++  "timestamp": "2026-07-31T16:00:00"
++}
++```
++
++### 5.4 板块量价确认（规划，未实现）
++
++| 方法 | 路径（规划） | 说明 |
++| --- | --- | --- |
++| GET | `/api/v1/market-data/sector-analytics/volume-confirmation?market=&tradeDate=&limit=` | 按市场查询量价确认状态（未实现） |
++| GET | `/api/v1/market-data/sector-analytics/volume-confirmation/{sectorIdentity}?tradeDate=` | 单板块量价确认详情（未实现） |
++
++响应示例（节选，`confirmationStatus` 为 `CONFIRMED/DIVERGENCE/INSUFFICIENT`）：
++
++```json
++{
++  "success": true,
++  "code": "OK",
++  "data": {
++    "market": "CN",
++    "tradeDate": "2026-07-31",
++    "items": [
++      {
++        "sectorIdentity": "BK/SH/IN40159",
++        "changeRate": "0.031000",
++        "turnoverAmount": "50000000.000000",
++        "volumeRatio": "1.650000",
++        "confirmationStatus": "CONFIRMED",
++        "qualityStatus": "OK"
++      }
++    ]
++  },
++  "timestamp": "2026-07-31T16:00:00"
++}
++```
++
++### 5.5 板块异动提醒（规划，未实现，复用 /alerts）
++
++板块异动提醒复用现有 `/api/v1/market-data/alerts`，按 `alertType=SECTOR_*` 过滤查询（如 `SECTOR_RS_REVERSAL`、`SECTOR_VOLUME_DIVERGENCE`、`SECTOR_LEADER_CONCENTRATION`、`SECTOR_RANK_JUMP`）；`severity` 取 `INFO/WARN/HIGH`，`triggerValueJson` 存派生指标上下文。
++
++```
++GET /api/v1/market-data/alerts?severity=&resolved=&canonicalSymbol=&alertType=SECTOR_*&page=&size=
++```
++
++异动提醒仅为观察提示，不构成投资建议，不产生交易动作。
++
++### 5.6 错误码（规划，复用）
++
++板块分析层不直接外联 provider；当其依赖的原始事实不可用或陈旧时，复用现有错误码语义：
++
++- `MARKET_SECTOR_PROVIDER_UNAVAILABLE`：原始板块事实缺失或陈旧（如最近 CLOSE 快照不可用、`quality_status=STALE`）。
++- `MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED`：语义对齐，仅当上游原始事实采集链路因鉴权失败导致分析输入不可用时透传；分析层自身不做外联。
++
++样本不足（`quality_status=INSUFFICIENT_SAMPLE`）不返回错误码，而是返回正常 200 响应并在字段中降级标注，由前端降级展示。
+diff --git a/docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md b/docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md
+new file mode 100644
+index 0000000..2a9758c
+--- /dev/null
++++ b/docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md
+@@ -0,0 +1,99 @@
++# P17 板块分析层实现计划与并行开发顺序
++
++> 关联设计：`docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`（可开发设计，规划/未实现）。
++> 关联契约：`docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md`。
++> 范围：本计划只描述后续实现的子任务拆分、写路径、依赖、AC、测试与合并顺序；本设计任务不实现任何子任务代码。
++
++## 概述
++
++板块分析层（相对强弱 / 轮动持续性 / 龙头贡献 / 量价确认 / 异动提醒）拆为 4 个可并行子任务，遵循独占写路径互不重叠原则。所有子任务只读原始事实表，禁止写回 `market_sector_*`/`market_sector_ranking_*`/`stock_*` 原始事实表；衍生结果写入 V19+ 新表，异动提醒复用 `market_data_alert`。
++
++### 子任务 1（ST-1）：数据模型 + 衍生计算服务 + DTO/Mapper
++
++写路径：
++
++- `src/main/resources/db/migration/V19__sector_analytics_derived_tables.sql`（及后续 V20+ 如需拆分）
++- `src/main/resources/mapper/SectorRelativeStrengthSnapshotMapper.xml`
++- `src/main/resources/mapper/SectorRotationPersistenceSnapshotMapper.xml`
++- `src/main/resources/mapper/SectorLeaderContributionSnapshotMapper.xml`
++- `src/main/resources/mapper/SectorVolumeConfirmationSnapshotMapper.xml`
++- `src/main/java/com/quant/trade/marketdata/analysis/derived/`（四大衍生指标计算服务、读服务、Mapper 接口、model/dto；不进入 `analysis/alert/` 与 `scheduler/`，与 ST-3 写路径不重叠）
++
++依赖：无前置子任务；依赖已落库的 P1.5/P1.6 原始事实表（`market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_batch`、`market_sector_ranking_item`、`stock_daily_bar`）。
++
++AC：实现四大衍生指标的 V19+ 表 Flyway 迁移成功；衍生计算服务按设计公式（输入/窗口/基准/样本/失效）产出幂等快照；只读原始事实表，禁止写回原始事实表；样本不足/停牌/口径变更按 `quality_status` 降级。
++
++测试：`./mvnw test`（含新增 Mapper 与衍生计算单元测试，验证幂等键、`INSUFFICIENT_SAMPLE` 降级、跨市场 ZoneId 对齐）。
++
++合并顺序：第 1 批（串行前置，必须先合并，为 ST-2/ST-3 提供表与服务）。
++
++### 子任务 2（ST-2）：板块分析 REST API + VO
++
++写路径：
++
++- `src/main/java/com/quant/trade/marketdata/controller/SectorAnalyticsController.java`
++- `src/main/java/com/quant/trade/marketdata/vo/SectorRelativeStrengthVO.java`
++- `src/main/java/com/quant/trade/marketdata/vo/SectorRotationPersistenceVO.java`
++- `src/main/java/com/quant/trade/marketdata/vo/SectorLeaderContributionVO.java`
++- `src/main/java/com/quant/trade/marketdata/vo/SectorVolumeConfirmationVO.java`
++- `docs/api/MARKET_DATA_API.md`（§5 由“规划”转“已实现”的接口事实更新）
++
++依赖：ST-1（衍生计算服务与 DTO/Mapper 必须先就位）。
++
++AC：实现 `/api/v1/market-data/sector-analytics/*` 五类端点；统一响应 `ApiResponse<T>`；错误码复用 `MARKET_SECTOR_PROVIDER_UNAVAILABLE`/`MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED`；样本不足返回 200 + 字段降级标注。
++
++测试：`./mvnw test`（含 Controller MockMvc 用例）。
++
++合并顺序：第 2 批（ST-1 之后，可与 ST-3 并行）。
++
++### 子任务 3（ST-3）：异动提醒评估器 + market_data_alert 写入 + Scheduler
++
++写路径：
++
++- `src/main/java/com/quant/trade/marketdata/analysis/alert/SectorAnomalyAlertEvaluator.java`
++- `src/main/java/com/quant/trade/marketdata/analysis/alert/SectorAlertType.java`
++- `src/main/java/com/quant/trade/marketdata/scheduler/SectorAnalyticsScheduler.java`
++- `docs/features/MARKET_ALERT_RULES_DESIGN.md`（追加 `SECTOR_*` 提醒类型说明）
++
++依赖：ST-1（衍生指标快照表与读服务）；不依赖 ST-2（评估器读取衍生表，不依赖 REST）。
++
++AC：异动评估器按阈值 + Z-score 计算异常并写入 `market_data_alert`（`alert_type=SECTOR_*`、`severity=INFO/WARN/HIGH`）；Scheduler 在各市场收盘后（按 ZoneId）触发衍生重算与提醒评估；样本不足时不产 HIGH 提醒。
++
++测试：`./mvnw test`（含评估器单元测试，验证 Z-score、阈值、severity 分级、`trigger_value_json` 内容）。
++
++合并顺序：第 2 批（ST-1 之后，可与 ST-2 并行）。
++
++### 子任务 4（ST-4）：前端页面 + 图表 + mock 契约
++
++写路径：
++
++- `docs/mock/MOCK_REMOTE_CONTRACT.md`（新增 `sector-analytics/*` mock 契约建议）
++- 前端实际代码写在独立前端仓库（不在本仓库；本仓库仅更新 mock 契约建议）
++
++依赖：ST-2（REST API 契约冻结后才能定 mock）；不依赖 ST-3（页面读 API，不直接读提醒写入逻辑，提醒经 `/alerts` 查询）。
++
++AC：前端独立仓库实现“板块分析”页面与五类图表（相对强弱热力/排名条、轮动位次带/桑基、龙头贡献堆叠柱、量价散点、异动流）；mock 契约与后端 VO 对齐；每页标注“不构成投资建议”。
++
++测试：前端独立仓库 `typecheck`/`lint`/`test`/`build`（不在本仓库执行）。
++
++合并顺序：第 3 批（API 冻结后并行；前端独立仓库 PR 独立合并，本仓库仅合并 mock 契约更新）。
++
++## 并行与串行合并顺序（DAG）
++
++```
++ST-1 (数据模型 + 衍生计算服务)
++ |
++ +-- 串行前置 --> ST-2 (REST API + VO)        \
++ |                                              } 第2批，ST-2 与 ST-3 可并行
++ +-- 串行前置 --> ST-3 (异动提醒评估器 + alert) /
++                        |
++                        +-- API 冻结后 --> ST-4 (前端页面 + mock 契约，并行)
++```
++
++并行与串行规则：
++
++- **串行**：ST-1 必须先于 ST-2、ST-3 合并（提供 V19+ 表与衍生服务）；ST-2 必须先于 ST-4（提供冻结的 REST 契约）。
++- **并行**：ST-2 与 ST-3 在 ST-1 之后可并行开发与合并（写路径互不重叠）；ST-4 在 API 冻结后可并行（前端独立仓库）。
++- 合并顺序总结：第 1 批 = ST-1（串行前置）；第 2 批 = ST-2 ∥ ST-3（并行）；第 3 批 = ST-4（前端并行，本仓库仅 mock 契约）。
++
++写路径独占性核查（两两不前缀重叠）：ST-1 占 `db/migration`、`mapper/*.xml`、`marketdata/analysis/`；ST-2 占 `marketdata/controller/`、`marketdata/vo/`、`docs/api/MARKET_DATA_API.md`；ST-3 占 `marketdata/analysis/alert/`、`marketdata/scheduler/`、`docs/features/MARKET_ALERT_RULES_DESIGN.md`；ST-4 占 `docs/mock/MOCK_REMOTE_CONTRACT.md` 与前端独立仓库。各子任务写路径前缀互不重叠。
+diff --git a/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md b/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md
+new file mode 100644
+index 0000000..de11a51
+--- /dev/null
++++ b/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md
+@@ -0,0 +1,174 @@
++# Task Contract: P17-SECTOR-ANALYTICS-DESIGN-20260802 板块相对强弱/轮动持续性/龙头贡献/异动提醒可开发设计
++
++## Contract Identity
++
++- Status: `FROZEN`
++- Contract version: 1.1
++- Frozen at: 2026-08-02T00:00:00Z
++- Frozen by parent run: codex-parent-p17-sector-design-1
++- Test-design: `READY_TO_FREEZE`（TD-RUN-1，0 blocking amendments；AMEND-REC-01/02/03 已采纳，见 `P17-SECTOR-ANALYTICS-DESIGN-20260802-TEST-DESIGN.md`）
++- Lane: `L0`
++
++After freezing the file, the parent computes its SHA-256 and records it in task state and TaskPackets. The
++contract does not contain its own hash.
++
++## Objective
++
++冻结 P1.7 板块分析层的**可开发设计**（不写业务代码）：从产品、量化研究、数据工程和架构四个角度定义板块
++相对强弱、轮动持续性、龙头贡献、成交量确认和异动提醒的可解释公式与口径；明确基准、时间窗口、缺失数据、
++停牌、跨市场时区、样本不足和失效场景；区分原始事实、衍生指标与提醒事件，禁止把分析结果写回原始行情表；
++给出数据模型、MyBatis/Flyway 边界、API、前端页面与图表设计；并把后续实现拆为可并行开发的子任务（每个子
++任务列独占写路径、依赖、AC、测试与合并顺序）。第一版不生成买卖指令、不自动交易、不做不可解释模型评分。
++
++本任务只产出**设计文档与任务拆分 artifact**，不修改任何业务代码、`BUILD_CHECKLIST.md`、`AI_HANDOFF.md` 或
++总日志，这些统一留给后续集成任务。
++
++## Authority
++
++- Product/design: `docs/features/MARKET_SECTOR_CATALOG_DESIGN.md`（P1.5 目录与关注快照基线）、`docs/features/MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`（P1.6 全市场榜单与关注板块自动采集）、`docs/features/MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`（行情资产三层：原始事实/可复用衍生统计/任务质量治理、提醒三层分类）、`docs/features/MARKET_ALERT_RULES_DESIGN.md`（行情提醒规则与 `market_data_alert` 复用边界）。
++- API/data contract: `docs/api/MARKET_DATA_API.md`（`/api/v1/market-data/sector-catalog/*` 现状、`ApiResponse<T>`、错误码语义）、`docs/DATABASE_DESIGN.md`（V14-V18 事实表与命名约定）。
++- Architecture: `docs/CURRENT_ARCHITECTURE_AND_MODULES.md`、`docs/DEVELOPMENT_ROADMAP.md`、`AGENTS.md`（推荐包结构 `factor/indicator`、MyBatis+XML、Flyway、不自动交易原则）。
++- Baseline commit: `563e84a573426800b3f6aa8e4e0525bc5314b3a8`
++- Baseline branch: `codex/p17-sector-analytics-design-20260802`（已在 `main` 之上的干净工作树）
++- Pre-existing dirty paths: 无（工作树干净）
++- Allowed write paths（仅文档/artifact，禁止业务代码）:
++  - `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`（**新建**主设计文档）
++  - `docs/api/MARKET_DATA_API.md`（**只追加** §5 板块分析接口设计章节，标记“规划/未实现”，不改动现有 §1-§4 已实现事实）
++  - `docs/DATABASE_DESIGN.md`（**只追加**板块分析规划表章节，标记“规划 V19+”，不改动 V1-V18 已实现表段落）
++  - `docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md`（**新建**任务拆分与并行开发计划）
++  - `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-*.md`（本任务自身 artifact：TEST-DESIGN/IMPLEMENTER/REVIEW/VERIFICATION/FINALIZATION 等）
++  - `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json`（机器控制文件）
++  - `scripts/tests/p17-sector-analytics-design-structure.test.mjs`（本任务新建的只读静态结构/交叉引用/污染探测校验脚本，非业务代码，与 SLICE-01 一致；TEST-DESIGN AMEND-REC-01 采纳）
++
++> Slice/file/line cap 口径（TEST-DESIGN AMEND-REC-02 采纳）：治理角色 artifact（`*-TEST-DESIGN.md`/`*-IMPLEMENTER.md`/`*-REVIEW.md`/`*-VERIFICATION.md`/`*-FINALIZATION.md`/`*-CONTROL.json`）不计入 file/line cap；文档行数不计入 500 行 cap，仅 `.mjs` 静态脚本的代码行计入。产品文件数 = 5（4 docs + 1 script）≤ 8。
++
++## Facts And Decisions
++
++| Type | Item |
++|---|---|
++| FACT | 现存板块事实表（V14/V15）`market_sector_watch`、`market_sector_snapshot`（含 V15 字段 `snapshot_bucket_time/trigger_type/expected_member_count/valid_member_count/delayed_member_count/unmapped_member_count/quality_status`）、`market_sector_member_snapshot`、`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item` 已落地；最新 migration 为 V18，新分析表规划为 V19+。 |
++| FACT | `market_data_alert`（V7）已定义 `alert_type/severity/canonical_symbol/quote_time/trade_date/message/trigger_value_json/resolved`，severity 取值 `INFO/WARN/HIGH`，现有 alert_type 仅有 `PROVIDER_NOT_CONFIGURED/SYNC_FAILED/EMPTY_DAILY_BARS/STALE_QUOTE`；分析层异动提醒应复用此表并新增 `SECTOR_*` 类型，不新建第二套告警表。 |
++| FACT | 板块 Java 代码位于 `com.quant.trade.marketdata.{controller,service,manager,dao,model,vo,dto,provider,constant}`，无独立 `sector` 子包；14 个 `/sector-catalog/*` 端点已实现于 `MarketSectorCatalogController`；`industryRankings/industryPeers` 是 LongPort HTTPS 透传，非衍生分析。 |
++| FACT | 顶层包为 `agent/common/dashboard/journal/marketdata/portfolio/review/risk/tradeplan/watchlist`；`AGENTS.md` 推荐的 `factor/indicator` 包**尚未创建**。新衍生指标逻辑应在设计中给出归属（推荐 `marketdata` 下分析子包或顶层 `factor/indicator`，本设计需明确推荐并说明）。 |
++| FACT | 前端在**独立仓库**（`docs/FRONTEND_ARCHITECTURE.md`），本仓库无 React 代码；`docs/mock/MOCK_REMOTE_CONTRACT.md` 无板块分析 mock 契约。前端页面与图表设计在本仓库只能给出规格与 mock 约定建议，实际前端实现留作后续独立子任务。 |
++| FACT | P1.5 已声明“后续分析层……派生指标必须记录公式、窗口、样本覆盖和失效场景，不覆盖原始快照”；P1.6 声明“停机恢复后只采最新有效时间桶，不能补写无法还原的历史盘中截面”、A 股集合竞价快照不可等同连续竞价成交事实、板块成交额/量/净流入可能是日内累计值（区间增量需处理跨日重置）。 |
++| FACT | 系统是只读研究工具：不自动交易、不连券商、不存密钥、不承诺收益、分析不生成买卖指令（`AGENTS.md`、P1.5/P1.6 设计、`MARKET_DATA_WORKBENCH` 产品边界一致）。 |
++| DECISION | 采用推荐可逆方案：板块分析层分为**衍生指标快照**（只读派生，新表存储，幂等重算）+ **提醒事件**（复用 `market_data_alert`）；**绝不写回** `market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_*`、`stock_*` 等原始事实表。衍生结果可重算、可丢弃、可下线，原始事实不可变。 |
++| DECISION | 衍生指标全部使用**可解释白盒公式**（Mansfield/RS-rank 类相对强弱、连续排行位次/排名相关性的轮动持续性、龙头贡献度=成分加权和占比、量价确认=板块涨跌方向与板块成交额/成交量变化一致性、异动=阈值+Z-score），不引入黑盒模型评分或机器学习隐式打分。所有公式记录输入字段、窗口、基准、样本最小门槛与失效条件。 |
++| DECISION | 时间窗口与基准：相对强弱与轮动持续性默认使用**收盘快照序列**（`market_sector_ranking_batch` CLOSE + `market_sector_snapshot`）作为主序列，盘中 `INTRADAY` 快照仅用于当日异动与成交量确认的增量计算；基准市场指数/ETF 由用户在关注记录 `tracking_symbol` 配置，缺基准时使用同市场全市场板块等权均值并显式标记 `BENCHMARK_TYPE=SECTOR_EQUAL_WEIGHT`，不静默编造指数。 |
++| DECISION | 缺失/停牌/样本不足：成分停牌按 `trade_status` 与 `is_delayed` 排除并计入 `excluded_member_count`；有效样本数低于门禁（默认 < 板块成分下限，CN≥8、HK/US≥5 或 < 预期成分 50%）时衍生结果标记 `INSUFFICIENT_SAMPLE`，前端降级展示且不产 HIGH 提醒；跨市场时区严格按 P1.6 `ZoneId`（CN `Asia/Shanghai`、HK `Asia/Hong_Kong`、US `America/New_York`）对齐交易日，禁止跨市场混合同一序列。 |
++| DECISION | `MyBatis/Flyway` 边界：新分析表走更高版本 Flyway（V19+），SQL 写在 `src/main/resources/mapper/*.xml`，主键 `id bigint auto_increment`，金额/价格 `decimal(20,6)`，时间 `created_at/updated_at`，幂等键覆盖 `(sector_identity, as_of_date/trade_date, window)`；衍生表与分析读服务只读原始事实表，不反向 UPDATE 原始表。 |
++| DECISION | 把后续实现拆为可并行子任务，每个子任务给出独占写路径、依赖、AC、测试与合并顺序（见 §Implementation Slices 与实现计划文档）；本设计任务不实现任何子任务代码。 |
++| ASSUMPTION | Longbridge 行业分类与 provider 板块 ID 在分析窗口内稳定；若 provider 口径变更，衍生历史序列在变更点断档并标记，不跨口径拼接（沿用 P1.6 失效场景）。 |
++| ASSUMPTION | 第一版只消费**已落库**的板块快照与成分快照，不新增 provider 外联；异动提醒基于阈值，不依赖实时推送通道。 |
++| OPEN_QUESTION | （设计需给出明确推荐，不阻塞）龙头贡献度是否区分“市值加权 vs 成交额加权 vs 净流入加权”——本设计推荐成交额加权为主、净流入加权为辅并给出公式。 |
++
++## Scope
++
++### In Scope
++
++1. 新建主设计 `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`，包含：用户目标与场景、范围与非目标、四视角（产品/量化研究/数据工程/架构）结论、五大可解释公式（相对强弱、轮动持续性、龙头贡献、成交量确认、异动提醒）含输入/窗口/基准/样本门槛/失效场景、原始事实 vs 衍生指标 vs 提醒事件分层、数据模型（规划表 V19+ 字段与索引）、MyBatis/Flyway 边界、API 设计（规划端点）、前端页面与图表设计、mock 约定建议、风险与失效边界（含“不构成投资建议”）。
++2. 追加 `docs/api/MARKET_DATA_API.md` §5“板块分析（规划/未实现）”章节，列出规划端点、请求/响应示例、错误码（复用 `ApiResponse<T>` 与 `MARKET_SECTOR_PROVIDER_UNAVAILABLE` 等），明确标记“规划，未实现”。
++3. 追加 `docs/DATABASE_DESIGN.md` 板块分析规划表段落，列出 V19+ 规划表（如相对强弱快照、轮动持续性快照、龙头贡献快照、量价确认快照、异动提醒来源标记），明确“规划”状态与幂等键，不改 V1-V18 已实现表。
++4. 新建 `docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md`，把后续实现拆为可并行子任务（≥4 个，覆盖：数据模型+计算服务+DTO/Mapper、衍生 API+DTO、异动提醒评估器+`market_data_alert` 写入、前端页面+图表+mock 契约），每个子任务列独占写路径、依赖、AC、测试、合并顺序与并行/串行关系。
++5. 本任务治理 artifact（TEST-DESIGN/IMPLEMENTER/REVIEW/VERIFICATION/FINALIZATION）与 `*-CONTROL.json`。
++
++### Out Of Scope
++
++- 任何业务代码、Flyway migration `.sql`、MyBatis XML、Java/TypeScript/React 实现（均留待后续子任务）。
++- 修改 `BUILD_CHECKLIST.md`、`AI_HANDOFF.md`、`docs/development/DEVELOPMENT_LOG.md`、`docs/acceptance/ACCEPTANCE_LOG.md`（统一留给后续集成/交付任务）。
++- 修改现有 `MARKET_DATA_API.md` §1-§4 已实现事实段落、`DATABASE_DESIGN.md` V1-V18 已实现表段落、现有板块设计文档（P1.5/P1.6）。
++- 运行 Maven、npm、Docker 或真实外部调用。
++
++### Prohibited
++
++- 把任何分析/衍生结果写回原始行情/板块事实表（`stock_*`、`market_sector_*` 事实表、`market_sector_ranking_*`）。
++- 生成买卖指令、自动交易逻辑或不可解释黑盒/ML 隐式评分。
++- 引入券商接口或密钥读取。
++- 修改 `main`/`master`，合并、force push，或推送 `codex/p17-sector-analytics-design-20260802` 以外的分支。
++- 创建额外递归专家团 sub-agent（设计内结论由固定四角色产出）。
++- 在文档中把“规划/未实现”表或接口描述为已实现。
++
++## Acceptance Criteria
++
++| AC-ID | Observable behavior | Preconditions/input | Expected result | Evidence | Dimension | Owner | Status |
++|---|---|---|---|---|---|---|---|
++| AC-01 | 主设计文档与 API/DB/实现计划追加章节存在且金融口径自洽可开发。打开 `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`，它包含五大可解释公式（相对强弱、轮动持续性、龙头贡献、成交量确认、异动提醒），每个公式显式列出输入字段、窗口、基准、样本最小门槛与失效场景；并明确分层（原始事实/衍生指标/提醒事件）且声明禁止写回原始事实表。`docs/api/MARKET_DATA_API.md` 追加的板块分析章节与 `docs/DATABASE_DESIGN.md` 追加的规划表段落均标记“规划/未实现”，未把任何规划项表述为已实现。 | 工作树在 baseline `563e84a` 之上，仅含本任务允许写路径。 | 文档存在、章节齐全、五个公式字段齐全、分层与禁止写回明确、规划项均标记未实现，且未改动 V1-V18/§1-§4 已实现事实段落。 | 静态结构与交叉引用校验脚本对设计/接口/DB/实现计划四类 artifact 输出 PASS，并附命中行号证据 | STATIC | TEST_DESIGNER + IMPLEMENTER + FINAL_VERIFIER | NOT_STARTED |
++| AC-02 | 原始事实不被分析结果污染。设计文档与 DB 规划段落中，所有衍生表均为独立新表（V19+），其写路径/读路径声明只读原始事实表，且 `DATABASE_DESIGN.md` V1-V18 已实现表段落与 `market_sector_snapshot/member_snapshot/ranking_*`、`stock_*` 行未出现任何被分析层 UPDATE/写回的描述。 | 同上。 | 校验脚本在所有设计/DB/API/计划 artifact 中未发现“写回/UPDATE 原始事实表”的描述，且衍生表均与新 Flyway 版本绑定，未复用既有版本号。 | 静态污染探测脚本输出 PASS（0 命中禁止模式）+ 人工核验记录 | STATIC | IMPLEMENTER + CODE_REVIEWER + FINAL_VERIFIER | NOT_STARTED |
++| AC-03 | 后续实现可并行且边界清晰。`docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md` 列出 ≥4 个子任务，每个子任务显式给出独占写路径（互不重叠）、依赖关系、AC、测试与合并顺序；并存在一个依赖 DAG/顺序表说明哪些可并行、哪些必须串行。 | 同上。 | 计划文档存在、子任务数 ≥4、每个子任务含独占写路径+依赖+AC+测试+合并顺序、且存在并行/串行顺序表；静态校验输出 PASS。 | 静态结构校验脚本对计划文档输出 PASS | STATIC | TEST_DESIGNER + FINAL_VERIFIER | NOT_STARTED |
++
++## Verification Plan
++
++| Dimension | Required | Command or inspection | Pass rule |
++|---|---|---|---|
++| STATIC | Yes | `node scripts/tests/p17-sector-analytics-design-structure.test.mjs`（本任务新建的只读结构/交叉引用/污染探测静态校验脚本，对设计/API/DB/计划 artifact 做断言；非业务代码，放在 `scripts/tests/` 与本任务 artifact 同批冻结） | exit 0，输出 PASS，附每个 AC 命中行号/路径证据 |
++| AUTOMATION | Yes（治理静态） | `node scripts/validate-ai-governance.mjs` + `node scripts/run-ai-governance-gates.mjs` | exit 0 |
++| RUNTIME | No | 不运行 Maven/npm/Docker/外联（任务明确禁止） | NOT_REQUIRED |
++| DEPLOYMENT | No | 纯设计任务，无部署 | NOT_REQUIRED |
++
++## Implementation Slices
++
++每个初始 slice 至多 3 ACs、8 文件、500 生产行。本任务为设计任务，单 slice 覆盖全部 3 ACs，因 artifact 高度耦合
++（同一组金融口径必须同时在设计/API/DB/计划四类文档中一致）。父上下文负责跨文档一致性组装，实现者负责撰写。
++
++| Slice ID | Coherent boundary | AC IDs | Allowed write paths | Max files | Max production-line delta |
++|---|---|---|---|---:|---:|
++| SLICE-01 | 板块分析层可开发设计文档族（主设计 + API §5 追加 + DB 规划追加 + 实现计划 + 静态结构校验脚本 + 本任务治理 artifact） | AC-01, AC-02, AC-03 | `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`、`docs/api/MARKET_DATA_API.md`、`docs/DATABASE_DESIGN.md`、`docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md`、`scripts/tests/p17-sector-analytics-design-structure.test.mjs`、`docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-*.md` | 8 | 500 |
++
++## Frozen Test Inventory
++
++每个强制证据项有稳定 test ID 与可在机器回执中观察的精确选择器。
++
++| Test ID | AC IDs | Kind | Required | Source path | Exact selector | Receipt path |
++|---|---|---|---|---|---|---|
++| TEST-01 | AC-01 | STATIC | YES | `scripts/tests/p17-sector-analytics-design-structure.test.mjs` | `node scripts/tests/p17-sector-analytics-design-structure.test.mjs`（断言主设计文档存在、五大公式各含输入/窗口/基准/样本门槛/失效场景、分层与禁止写回明确、API §5 与 DB 规划标记未实现、§1-§4 与 V1-V18 未被改动） | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-01.json` |
++| TEST-02 | AC-02 | STATIC | YES | 同上脚本 | 同脚本“污染探测”子断言（所有 artifact 不含“写回/UPDATE 原始事实表”模式，衍生表版本 > V18） | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-02.json` |
++| TEST-03 | AC-03 | STATIC | YES | 同上脚本 | 同脚本“实现计划结构”子断言（≥4 子任务、独占写路径互不重叠、含依赖+AC+测试+合并顺序、存在并行/串行顺序表） | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-03.json` |
++| TEST-GOV-01 | ALL | STATIC | YES | `scripts/validate-ai-governance.mjs` | `node scripts/validate-ai-governance.mjs` | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-GOV-01.json` |
++| TEST-GOV-02 | ALL | STATIC | YES | `scripts/run-ai-governance-gates.mjs` | `node scripts/run-ai-governance-gates.mjs` | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-GOV-02.json` |
++
++## Architecture And Quality Gates
++
++- Required architecture review: `YES`（DELIVERY_PUSH 且需在冻结前确认设计不破坏分层与单事实源；架构门禁 `scripts/check-ai-architecture.mjs` 运行于冻结候选，文档为主，告警需逐条 disposition）
++- Triggered thresholds: 文档任务不触发方法行数/复杂度阈值告警的常规路径；若架构门禁报告 warning，按 report ID 逐条 disposition 并记录。
++- Required layers/boundaries: 衍生指标层只读原始事实层；提醒事件复用 `market_data_alert`；分析层不直连 provider、不写回原始表。
++- Responsibility-map evidence: 主设计文档“分层”章节 + DB/API 规划段落的读/写边界表。
++- ADR exception and expiry: 无。
++
++## Role Assignments
++
++- Test designer: `qta-test-designer`（挑战 AC 与冻结测试清单）
++- Implementer: `qta-implementer`（撰写设计文档族 + 静态校验脚本，并产出自检证据）
++- Code reviewer: `qta-code-reviewer`（审查冻结候选 diff，功能性 + 架构两条线）
++- Final verifier: `qta-final-verifier`（独立干净上下文执行 STATIC/AUTOMATION 门禁，给出唯一验收裁决）
++- Omitted roles and justification: 无（四角色全用，最保守）。
++
++## Candidate And Git Policy
++
++- Git automation: `DELIVERY_PUSH`
++- User authorization evidence: 用户明确授权“git_automation=DELIVERY_PUSH；只允许提交并推送 codex/p17-sector-analytics-design-20260802；禁止合并或推送 main，禁止 force push”。
++- Task branch: `codex/p17-sector-analytics-design-20260802`
++- Contract commit: `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md` + CONTROL（contract 阶段提交）
++- Candidate mode: `SNAPSHOT`（文档候选；先 COMMIT 设计文档族到任务分支作为候选来源，再以 SNAPSHOT 清单覆盖候选路径用于校验/审查/核验；patchSha256 与 COMMIT 模式等价的 diff artifact 一致）
++- Candidate commit: 待实现者 SELF_CHECKED 后冻结
++- Candidate tree hash: 待冻结
++- Patch SHA-256: 待冻结（baseline→候选 diff artifact 的 SHA-256）
++- Candidate manifest path/hash: 由 `scripts/create-candidate-manifest.mjs` 生成并记录
++- Checkpoint push allowed: `NO`（仅 DELIVERY_PUSH，不做 checkpoint push）
++- Delivery push target: `origin/codex/p17-sector-analytics-design-20260802`
++- Protected/default branch direct push: `NO`
++
++## Checkpoint Policy
++
++- Context budget: L0 rawTokenBudget 2,000,000；contextMeasurement=UNAVAILABLE（运行时不暴露可靠遥测，按 turn/wait/poll/repair 限制执行）。
++- Persist discoveries at: 25%
++- Stop opening stages at: 40%
++- Mandatory fresh-context handoff at: 60%
++- Maximum waits per role run: 2
++- Maximum shell polls per command: 3
++- Automatic compaction policy: first compaction forces handoff; second is prohibited
++- Maximum repair rounds for one failure fingerprint: 2
++- Lane AC cap: 3
++- Blocking amendment cap: 0（L0）
++- Blocking amendment history: 无
++- Stop conditions: 金融口径自相矛盾、原始事实被污染、规划项被表述为已实现、或同一失败指纹重复两次 → BLOCKED（证据化记录），不向用户提问。
+diff --git a/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json b/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json
+new file mode 100644
+index 0000000..e96c037
+--- /dev/null
++++ b/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json
+@@ -0,0 +1,215 @@
++{
++  "schemaVersion": 3,
++  "taskId": "P17-SECTOR-ANALYTICS-DESIGN-20260802",
++  "controlPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json",
++  "startedAt": "2026-08-02T00:00:00Z",
++  "lane": "L0",
++  "lifecycleState": "IMPLEMENTING",
++  "contract": {
++    "path": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md",
++    "version": "1.1",
++    "sha256": "d55ef734e49108259f58bfd90e45d3bdbde5163a457f817f0b5f8872bb57a182",
++    "acceptanceCriteria": [
++      {"id": "AC-01", "requiredEvidence": ["STATIC"]},
++      {"id": "AC-02", "requiredEvidence": ["STATIC"]},
++      {"id": "AC-03", "requiredEvidence": ["STATIC"]}
++    ],
++    "implementationSlices": [
++      {
++        "id": "SLICE-01",
++        "description": "板块分析层可开发设计文档族（主设计 + API §5 追加 + DB 规划追加 + 实现计划 + 静态结构校验脚本 + 本任务治理 artifact）",
++        "acIds": ["AC-01", "AC-02", "AC-03"],
++        "allowedWritePaths": [
++          "docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md",
++          "docs/api/MARKET_DATA_API.md",
++          "docs/DATABASE_DESIGN.md",
++          "docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md",
++          "scripts/tests/p17-sector-analytics-design-structure.test.mjs",
++          "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md",
++          "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-01.json",
++          "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-02.json",
++          "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-03.json"
++        ],
++        "maxExpectedFiles": 8,
++        "maxProductionLineDelta": 500
++      }
++    ],
++    "testInventory": [
++      {
++        "testId": "TEST-01",
++        "acIds": ["AC-01"],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "scripts/tests/p17-sector-analytics-design-structure.test.mjs",
++        "selector": "P17-SECTOR-ANALYTICS-AC01"
++      },
++      {
++        "testId": "TEST-02",
++        "acIds": ["AC-02"],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "scripts/tests/p17-sector-analytics-design-structure.test.mjs",
++        "selector": "P17-SECTOR-ANALYTICS-AC02"
++      },
++      {
++        "testId": "TEST-03",
++        "acIds": ["AC-03"],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "scripts/tests/p17-sector-analytics-design-structure.test.mjs",
++        "selector": "P17-SECTOR-ANALYTICS-AC03"
++      },
++      {
++        "testId": "TEST-GOV-01",
++        "acIds": ["AC-01", "AC-02", "AC-03"],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "scripts/validate-ai-governance.mjs",
++        "selector": "node scripts/validate-ai-governance.mjs"
++      },
++      {
++        "testId": "TEST-GOV-02",
++        "acIds": ["AC-01", "AC-02", "AC-03"],
++        "kind": "STATIC",
++        "required": true,
++        "sourcePath": "scripts/run-ai-governance-gates.mjs",
++        "selector": "node scripts/run-ai-governance-gates.mjs"
++      }
++    ],
++    "blockingAmendments": []
++  },
++  "git": {
++    "automation": "DELIVERY_PUSH",
++    "branch": "codex/p17-sector-analytics-design-20260802",
++    "baselineCommit": "563e84a573426800b3f6aa8e4e0525bc5314b3a8",
++    "preExistingDirtyPaths": []
++  },
++  "transitionHistory": [
++    {
++      "sequence": 1,
++      "from": "CONTEXT_READY",
++      "to": "CONTRACT_DRAFTED",
++      "at": "2026-08-02T00:00:00Z",
++      "actor": "codex-parent-p17-sector-design-1"
++    },
++    {
++      "sequence": 2,
++      "from": "CONTRACT_DRAFTED",
++      "to": "TEST_DESIGN_READY",
++      "at": "2026-08-02T00:05:00Z",
++      "actor": "codex-parent-p17-sector-design-1"
++    },
++    {
++      "sequence": 3,
++      "from": "TEST_DESIGN_READY",
++      "to": "CONTRACT_FROZEN",
++      "at": "2026-08-02T00:10:00Z",
++      "actor": "codex-parent-p17-sector-design-1"
++    },
++    {
++      "sequence": 4,
++      "from": "CONTRACT_FROZEN",
++      "to": "IMPLEMENTING",
++      "at": "2026-08-02T00:12:00Z",
++      "actor": "codex-parent-p17-sector-design-1"
++    }
++  ],
++  "candidate": {
++    "mode": "SNAPSHOT",
++    "generation": 0,
++    "identity": "",
++    "commit": "",
++    "treeHash": "",
++    "patchSha256": "",
++    "manifestPath": "",
++    "manifestSha256": "",
++    "entrySetSha256": "",
++    "diffArtifactPath": "",
++    "diffArtifactSha256": ""
++  },
++  "budget": {
++    "contextPercent": null,
++    "contextMeasurement": "UNAVAILABLE",
++    "compactionCount": 0,
++    "repairRound": 0,
++    "maxRepairRounds": 2,
++    "maxWaitCallsPerRole": 2,
++    "maxShellPollsPerCommand": 3,
++    "rawTokens": null,
++    "weeklyAllowancePercent": null
++  },
++  "repairHistory": [],
++  "roleRuns": [
++    {
++      "sequence": 1,
++      "dispatchId": "DISPATCH-TD-1",
++      "role": "TEST_DESIGNER",
++      "roleRunId": "TD-RUN-1",
++      "executorType": "SUBAGENT",
++      "agentDefinition": ".zcode/agents/qta-test-designer.md",
++      "capability": "READ_ONLY",
++      "assignedAcIds": ["AC-01", "AC-02", "AC-03"],
++      "candidateGeneration": 0,
++      "repairRound": 0,
++      "dispatchedAt": "2026-08-02T00:05:00Z",
++      "finishedAt": "2026-08-02T00:08:00Z",
++      "status": "COMPLETED",
++      "executionOutcome": "COMPLETED",
++      "artifactAccepted": true,
++      "artifactPath": "docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-TEST-DESIGN.md",
++      "artifactSha256": "4401fd71055f936977cc9ee9d7350579b5fde5ef730414875e3f2aeb7da32ab2",
++      "verdict": "READY_TO_FREEZE",
++      "findingIds": []
++    }
++  ],
++  "review": {
++    "omitted": false,
++    "omissionReason": "",
++    "generation": 0,
++    "candidateIdentity": "",
++    "functionalVerdict": "NOT_VERIFIED",
++    "architectureVerdict": "NOT_VERIFIED",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "architectureGateSha256": "",
++    "findingIds": []
++  },
++  "architectureGate": {
++    "required": true,
++    "candidateIdentity": "",
++    "status": "NOT_RUN",
++    "exitCode": -1,
++    "errorCount": 0,
++    "warningCount": 0,
++    "warningDispositions": [],
++    "reportPath": "",
++    "reportSha256": "",
++    "generatedBy": "scripts/check-ai-architecture.mjs"
++  },
++  "verification": {
++    "candidateIdentity": "",
++    "verdict": "NOT_VERIFIED",
++    "deliveryPermitted": false,
++    "functionalVerdict": "NOT_VERIFIED",
++    "architectureVerdict": "NOT_VERIFIED",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "architectureGateSha256": "",
++    "dimensions": {
++      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
++      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
++      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
++      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
++    }
++  },
++  "testEvidence": [],
++  "finalization": {
++    "status": "NOT_STARTED",
++    "candidateIdentity": "",
++    "artifactPath": "",
++    "artifactSha256": "",
++    "completedAt": "",
++    "changedPaths": []
++  },
++  "evidence": []
++}
+diff --git a/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md b/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md
+new file mode 100644
+index 0000000..a77e4e3
+--- /dev/null
++++ b/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md
+@@ -0,0 +1,102 @@
++# P17-SECTOR-ANALYTICS-DESIGN-20260802 — Implementer Self-Check
++
++- Task ID: `P17-SECTOR-ANALYTICS-DESIGN-20260802`
++- Lane: `L0`（静态证据 only；RUNTIME/DEPLOYMENT NOT_REQUIRED）
++- Role run: IMPLEMENTER / IMPL-RUN-1 / DISPATCH-IMPL-1
++- Slice: SLICE-01（AC-01, AC-02, AC-03，全部三 AC）
++- Contract hash: `d55ef734e49108259f58bfd90e45d3bdbde5163a457f817f0b5f8872bb57a182`
++- Baseline: `563e84a573426800b3f6aa8e4e0525bc5314b3a8` on `codex/p17-sector-analytics-design-20260802`
++- Status: `SELF_CHECKED`（独立 verifier 尚未裁决；本角色不主张 ACCEPTED/VERIFIED/DEPLOYED）
++
++## Files written（仅 6 个允许写路径，无业务代码）
++
++1. `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`（新建主设计文档，318 行）
++2. `docs/api/MARKET_DATA_API.md`（追加 `## 5.` 板块分析章节，仅 append，未改 §1-§4）
++3. `docs/DATABASE_DESIGN.md`（追加 `## 板块分析规划表` 块，仅 append，未改 V1-V18）
++4. `docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md`（新建任务拆分与并行计划，99 行）
++5. `scripts/tests/p17-sector-analytics-design-structure.test.mjs`（新建只读静态校验脚本，466 行 / 381 非空非注释行，< 500 cap）
++6. `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md`（本自检报告）
++
++## Behavioral summary
++
++- 主设计文档：用户目标/场景、范围与非目标、四视角结论、五大可解释公式（相对强弱、轮动持续性、龙头贡献、成交量确认/量价确认、异动提醒，每节含 输入/窗口/基准/样本/失效 五要素）、原始事实/衍生指标/提醒事件三层（含 `禁止写回` 声明）、V19+ 数据模型（4 张新衍生表 + 复用 `market_data_alert`）、MyBatis/Flyway 边界、API 概述、前端页面与图表规格、风险与失效边界、统一缺失/停牌/跨市场/样本不足处理。
++- API §5：规划/未实现的 5 类端点 + `ApiResponse<T>` 请求/响应示例 + 复用错误码；标记“规划/未实现”，不含 `已实现`。
++- DB 规划块：`## 板块分析规划表` 标注规划 V19+，4 张新表字段/索引/幂等键 + “只读原始事实表，不写回”；不含 `已实现`。
++- 实现计划：4 个子任务（`### 子任务 N`），各含 `写路径`/`依赖`/`AC`/`测试`/`合并顺序`，写路径两两不前缀重叠，附并行/串行 DAG（`## 并行与串行合并顺序（DAG）`）。
++- 静态脚本：`node:test`+`node:assert/strict`+`fs/promises`，无 shell/网络；实现 TEST-DESIGN 全部 A01-*/A02-*/A03-* 断言；使用 TEST-DESIGN 指定的精确正则/锚点（成交量确认 token `(成交量确认|量价确认)`、污染动词表 + 否定排除、V19+ 绑定、`已实现` 禁止出现在规划区域、基线锚点原样保留）。
++
++## Self-check command and result
++
++命令：
++
++```text
++node scripts/tests/p17-sector-analytics-design-structure.test.mjs
++```
++
++结果：`EXIT=0`，19/19 测试通过，stdout 打印全部三个 selector token：
++
++```text
++P17-SECTOR-ANALYTICS-AC01
++P17-SECTOR-ANALYTICS-AC02
++P17-SECTOR-ANALYTICS-AC03
++```
++
++逐 AC 断言证据（脚本内置命中行号/路径诊断，失败即非零退出并定位 file:line）：
++
++- AC-01（A01-01..A01-08 全 PASS）：设计文档存在且非空；≥5 个公式段（标题命中五公式名之一）；每段正文同时含 输入/窗口/基准/样本/失效；含 `原始事实`/`衍生指标`/`提醒事件` 与 `禁止写回` 声明；API `## 5.` 段含 板块分析 + 规划|未实现；API 基线锚点 `## 1.`/`## 2.`/`## 3.`/`## 4.` 原样保留；DB 含 板块分析+规划+V19 块且基线锚点（market_sector_watch/snapshot/member_snapshot、`状态：已实现（V14，V15 扩展）`、ranking_batch/item、security_directory_sync_state、`状态：已实现（V18 migration）`）原样保留；新 `## 5.` 段与 DB 规划块均不含 `已实现`。
++- AC-02（A02-01..A02-03 全 PASS）：四个 artifact 的写回污染探测 0 命中（动词表 `UPDATE/写回/回写/覆盖` × 原始事实表名 `market_sector/stock_/ranking`，扣除含否定标记 `禁止|不得|严禁|不可|勿|不|未|prohibit|never|read-only|只读` 的合规声明）；新分析表块引用 V19+ 且不含 `已实现（V1[0-8]`；含只读原始事实声明。
++- AC-03（A03-01..A03-05 全 PASS）：计划文档存在非空；≥4 个 `### 子任务 N` 块；每块含 `写路径`/`依赖`/`AC`/`测试`/`合并顺序`；各子任务写路径值（`src|docs|scripts` 开头）两两不前缀重叠；含同时含 `并行` 与 `串行`（DAG）的章节。
++
++## Boundary confirmations
++
++- 无业务代码：未写任何 Java/MyBatis XML/Flyway SQL/React/TS 实现（仅设计文档 + 任务计划 + 只读静态 Node 脚本）。
++- 未运行 git / maven / npm / docker / 治理门禁脚本（仅运行本任务自有的静态校验 Node 脚本）。
++- 未改动 V1-V18 表块与 §1-§4 已实现事实段落（git diff 确认：DB 为单一 `@@ -544` append hunk，API 为单一 `@@ -471` append hunk；基线锚点各保留 1 次）。
++- 规划区域（API §5、DB 规划块）不含 `已实现` 字面。
++- 无写回散文：所有衍生表声明只读原始事实表，禁止写回。
++- 未编辑 `BUILD_CHECKLIST.md`、`AI_HANDOFF.md`、`docs/development/DEVELOPMENT_LOG.md`、`docs/acceptance/ACCEPTANCE_LOG.md`、现有 sector 设计文档（P1.5/P1.6）。
++- 未主张 ACCEPTED / VERIFIED / DELIVERY_READY / DEPLOYED。
++
++## Remaining risks / blockers
++
++- 无本角色阻塞项。STATIC 维度 SELF_CHECKED。
++- 未验证维度（按设计任务明确 NOT_REQUIRED）：RUNTIME、DEPLOYMENT；未运行 Maven/npm/Docker（任务禁止）。
++- 待独立 `qta-code-reviewer` 审查冻结候选 diff（功能性 + 架构两条线）后，由 `qta-final-verifier` 在干净上下文执行 STATIC/AUTOMATION 门禁并给出唯一验收裁决。
++- `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTROL.json` 在本角色开始前已被父上下文修改（lifecycle 簿记），非本角色写入；本角色未触碰该文件。
++
++## Changed-path manifest（proposed commit message for parent）
++
++变更路径（6 个允许写路径）：
++
++- `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`（new）
++- `docs/api/MARKET_DATA_API.md`（append §5）
++- `docs/DATABASE_DESIGN.md`（append 板块分析规划表）
++- `docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md`（new）
++- `scripts/tests/p17-sector-analytics-design-structure.test.mjs`（new）
++- `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-IMPLEMENTER.md`（new）
++
++建议提交信息：
++
++```text
++docs(sector-analytics): P1.7 板块分析层可开发设计（设计 only）
++
++冻结板块分析层（相对强弱/轮动持续性/龙头贡献/量价确认/异动提醒）的可开发设计：
++- 新建主设计文档（五大可解释白盒公式含输入/窗口/基准/样本/失效，
++  原始事实/衍生指标/提醒事件三层，禁止写回原始事实表）
++- 追加 API §5（规划/未实现）与 DB 板块分析规划表（V19+，只读原始事实）
++- 新建实现计划（4 个可并行子任务，独占写路径，并行/串行 DAG）
++- 新建只读静态结构/污染探测校验脚本（SELF_CHECKED，3 AC 全 PASS）
++
++不写业务代码；不改动 V1-V18/§1-§4 已实现事实；规划区域不含“已实现”。
++```
++
++## Role/session runtime metadata
++
++- Role run ID: IMPL-RUN-1
++- Dispatch ID: DISPATCH-IMPL-1
++- Session ID:（由父上下文/Hook 记录于 `.git/qta-governance/sessions/`）
++- Start/finish: 2026-08-02（具体 ISO 时间戳由父上下文记录）
++- Runtime receipt path: `.git/qta-governance/sessions/<session-hash>.json`（Hook 生成）
++- Wait calls: 0；Shell polls for the self-check command: 1（单次 `node` 执行即 PASS）
++- Context/compaction: 未压缩（compactionCount=0）；enforcement=ADVISORY
++- Candidate handoff for `qta-code-reviewer`：上述 6 个文件 diff，待审查通过后由 final-verifier 裁决。
+diff --git a/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-TEST-DESIGN.md b/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-TEST-DESIGN.md
+new file mode 100644
+index 0000000..e5e67fd
+--- /dev/null
++++ b/docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-TEST-DESIGN.md
+@@ -0,0 +1,75 @@
++# Test Design: P17-SECTOR-ANALYTICS-DESIGN-20260802
++
++- Task ID: `P17-SECTOR-ANALYTICS-DESIGN-20260802`
++- Lane: `L0`（静态证据 only；RUNTIME/DEPLOYMENT = NOT_REQUIRED）
++- Role: TEST_DESIGNER / TD-RUN-1 / DISPATCH-TD-1
++- Contract hash asserted: `9138c98e5b09a7d3e28bf491a4abfe0c052200c944498d1e492f5dae67810dc6`
++- Verdict: `READY_TO_FREEZE`（0 blocking amendments，在 L0 cap=0 之内）
++- Baseline: `563e84a573426800b3f6aa8e4e0525bc5314b3a8` on `codex/p17-sector-analytics-design-20260802`（干净）
++
++本文件为独立 test-designer 在干净只读上下文返回的 artifact，由父上下文持久化。
++
++## Amendments（父上下文 disposition 记录）
++
++| ID | Type | Disposition |
++|---|---|---|
++| AMEND-REC-01 | RECOMMENDATION | 采纳：将 `scripts/tests/p17-sector-analytics-design-structure.test.mjs` 显式加入契约 §Authority 与 SLICE-01 `allowedWritePaths`（与 SLICE-01 已列一致，消除歧义）。改 §Authority 即需重算 contract_hash。 |
++| AMEND-REC-02 | RECOMMENDATION | 采纳：契约明确说明治理角色 artifact（`*-TEST-DESIGN.md`/`*-IMPLEMENTER.md`/`*-REVIEW.md`/`*-VERIFICATION.md`/`*-FINALIZATION.md`/`*-CONTROL.json`）不计入 file/line cap；文档行数不计入 500 行 cap，仅 `.mjs` 静态脚本的代码行计入。产品文件数=5（4 docs+1 script）。不改变 AC 语义，无需重算 hash。 |
++| AMEND-REC-03 | RECOMMENDATION | 采纳：实现计划文档须使用固定结构词——每个子任务以 `### 子任务 N`（或 `### ST-N`）开头，含字面字段标签 `写路径：`/`依赖：`/`AC：`/`测试：`/`合并顺序：`；并含一个标题同时包含 `并行` 与 `串行`（或 `DAG`）的章节。冻结的测试断言据此实现。不改变 AC 语义，无需重算 hash。 |
++
++## Resolved Ambiguities（保守决策，记入静态断言）
++
++1. 成交量确认公式名：静态检查接受 `成交量确认` 或 `量价确认`（正则 `(成交量确认|量价确认)`）；其余四个公式名固定 `相对强弱`/`轮动持续性`/`龙头贡献`/`异动提醒`。
++2. 每个公式的五要素：设计文档按 `##`/`###` 切分，标题命中公式名之一的 ≥5 段，每段正文须同时含 `输入`/`窗口`/`基准`/`样本`/`失效` 五个关键词。
++3. 新增 `## 5.` API 段与新增 DB 规划表块内**不得**出现 `已实现` 字面子串（只能用 `规划`/`未实现`/`规划 V19+`）；既有事实表对照段落可保留 `已实现`。
++4. 污染探测：候选写回动词 `UPDATE/写回/回写/覆盖` 与原始事实表名 `market_sector_/stock_/ranking` 共现，且**不含**否定标记 `禁止|不得|严禁|不可|勿|不|未|prohibit|never|read-only|只读` 的行即为违规；含否定标记的合规声明不算违规。
++5. §1-§4 / V1-V18 不变：以基线锚点字符串原样保留作为静态断言（非 git diff）。锚点：API `## 1. 当前已实现接口`、`## 2. LongPort 只读行情接口（真实外联已验收）`、`## 3. 行情工作台、采集计划、分钟 K、水位（P1.2）`、`## 4. 安全约束`；DB `### market_sector_watch / market_sector_snapshot / market_sector_member_snapshot`、`状态：已实现（V14，V15 扩展）`、`### market_sector_ranking_batch / market_sector_ranking_item`、`### security_directory_sync_state`、`状态：已实现（V18 migration）`。
++6. 预存在 DB 头部 `当前已发布 V1-V17` 已过期（V18 已实现）：静态检查不依赖该字符串，也不把其修正为 `V1-V18` 当作回归。
++7. V19+ 绑定：新分析表块须引用 `V19`（或 `V19+`/`V2[0-9]`/`V3[0-9]`）且**不含** `已实现（V1[0-8]`。
++
++## Frozen Test Inventory（单 Node 静态脚本）
++
++脚本：`scripts/tests/p17-sector-analytics-design-structure.test.mjs`（`node:test`+`node:assert/strict`+`fs/promises`，无 shell/网络；与 `scripts/tests/ai-governance.test.mjs` 同构）。每 AC 全部断言通过时打印该 AC 的 selector token，否则非零退出并诊断。
++
++| Test ID | AC IDs | Kind | Required | Source path | Exact selector | Receipt path |
++|---|---|---|---|---|---|---|
++| TEST-01 | AC-01 | STATIC | YES | `scripts/tests/p17-sector-analytics-design-structure.test.mjs` | `P17-SECTOR-ANALYTICS-AC01`（脚本在该 AC 全部 A01-* 通过时打印；命令 `node scripts/tests/p17-sector-analytics-design-structure.test.mjs`） | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-01.json` |
++| TEST-02 | AC-02 | STATIC | YES | 同上脚本 | `P17-SECTOR-ANALYTICS-AC02` | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-02.json` |
++| TEST-03 | AC-03 | STATIC | YES | 同上脚本 | `P17-SECTOR-ANALYTICS-AC03` | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-03.json` |
++| TEST-GOV-01 | ALL | STATIC | YES | `scripts/validate-ai-governance.mjs` | `node scripts/validate-ai-governance.mjs`（exit 0） | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-GOV-01.json` |
++| TEST-GOV-02 | ALL | STATIC | YES | `scripts/run-ai-governance-gates.mjs` | `node scripts/run-ai-governance-gates.mjs`（exit 0） | `docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-EVIDENCE-TEST-GOV-02.json` |
++
++### TEST-01（AC-01）断言
++
++- A01-01 `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md` 存在且非空。
++- A01-02 按 `^##`/`^###` 切分，标题命中五公式名之一的段 ≥5。
++- A01-03 上述每段正文同时含 `输入`/`窗口`/`基准`/`样本`/`失效`。
++- A01-04 文档同时含 `原始事实`/`衍生指标`/`提醒事件` 与禁止写回声明（`禁止写回|不得写回|严禁写回|不可写回|不写回|只读.{0,12}原始事实`）。
++- A01-05 API 文档含 `^## 5.` 段，其标题或后 5 行含 `板块分析` 与 `规划|未实现`。
++- A01-06 API 基线锚点 `## 1.`/`## 2.`/`## 3.`/`## 4.` 原样保留。
++- A01-07 DB 含新增 `板块分析`+`规划`+`V19` 块；且基线锚点（market_sector_watch/snapshot/member_snapshot、`V14，V15 扩展`、ranking_batch/item、security_directory_sync_state、`V18 migration`）原样保留。
++- A01-08 新 `## 5.` 段与新增 DB 规划块内不含 `已实现`。
++
++### TEST-02（AC-02）断言
++
++- A02-01 扫描四个 artifact，候选写回行（`(?i)(UPDATE\s+(market_sector|stock_|market_sector_ranking)|(写回|回写|覆盖).{0,40}(market_sector|stock_|ranking)|(market_sector|stock_|ranking).{0,40}(写回|回写|覆盖))`）扣除含否定标记行后 = 0。
++- A02-02 每个新分析表块引用 `V19+` 且不含 `已实现（V1[0-8]`。
++- A02-03 设计或 DB 规划块含只读原始事实声明（`衍生.{0,12}只读|只读.{0,12}(原始事实|market_sector|stock_)|读.{0,8}原始事实`）。
++
++### TEST-03（AC-03）断言
++
++- A03-01 `docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md` 存在且非空。
++- A03-02 含 `^###\s+(子任务|ST-|TASK-)` 块 ≥4。
++- A03-03 每块均含 `写路径`/`依赖`/`AC`/`测试`/`合并顺序`。
++- A03-04 各子任务 `写路径` 后的路径值（匹配 `^(src|docs|scripts)/`）两两不前缀重叠。
++- A03-05 含一个标题/段同时含 `并行` 与 `串行`（或 `DAG`）。
++
++## Falsifiability
++
++AC-01/02/03 各有可在纯静态证据下返回 PASS/FAIL 的二值机器断言；不依赖“测试通过”计数或实现者自述。L0 可证伪门槛满足。
++
++## Escalations
++
++无。0 blocking amendments，在 L0 cap=0 之内。
++
++（独立角色 TD-RUN-1 已终止；未编辑任何文件、未调用 git/shell/npm/maven/docker、未召唤子代理、未压缩。）
+diff --git a/docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md b/docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md
+new file mode 100644
+index 0000000..45f8570
+--- /dev/null
++++ b/docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md
+@@ -0,0 +1,318 @@
++# 板块分析（相对强弱 / 轮动持续性 / 龙头贡献 / 量价确认 / 异动提醒）可开发设计
++
++> 版本：v1.0 · 状态：规划（P1.7，未实现，本文为可开发设计，不落业务代码）
++> 关联：`../../BUILD_CHECKLIST.md`、`../api/MARKET_DATA_API.md` §5（规划）、`../DATABASE_DESIGN.md` 板块分析规划表（V19+）、`../../development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md`、`MARKET_SECTOR_CATALOG_DESIGN.md`、`MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`、`MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`MARKET_ALERT_RULES_DESIGN.md`。
++> 前置事实：板块原始事实表（V14/V15）`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item` 已落地；`market_data_alert`（V7）已存在并可复用；最新 migration V18，本设计规划 V19+。
++
++## 0. 设计状态与定位
++
++本文档是**规划/未实现**的板块分析层（P1.7）可开发设计。它只产出设计文档与实现计划，不写任何业务代码、Flyway SQL、MyBatis XML、Java/TS/React 实现。所有规划表标注为 V19+ 的独立新表，所有规划接口标注为“规划/未实现”，均不被表述为已实现。
++
++本系统是**只读研究工具**：所有派生指标只读原始事实表，**禁止写回** `market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_*` 与 `stock_*` 原始事实表。衍生结果只存新表，可重算、可丢弃、可下线，原始事实不可变。第一版不生成买卖指令、不自动交易、不连接券商、不读取密钥、不引入黑盒 ML 评分。
++
++> **风险声明**：本系统是决策辅助工具，所有指标与提醒仅为观察提示，不构成投资建议，不预测收益，不产生交易动作。
++
++## 1. 用户目标与场景
++
++| 角色 | 目标 | 场景 |
++| --- | --- | --- |
++| 个人投资者 | 决策辅助 | 盘后比较同市场各板块的相对强弱与轮动持续性，识别当前领涨/领跌板块，辅助做“看哪个板块”的研判 |
++| 个人投资者 | 只读研究 | 查看板块涨幅由哪些龙头成分解释、量价是否同向确认，做复盘与归因 |
++| 个人投资者 | 异动观察 | 在板块出现异常涨跌、量能放大、强弱反转时收到 INFO/WARN/HIGH 提醒，作为后续跟进提示 |
++
++系统目标边界：
++
++- **决策辅助、只读研究、不生成买卖指令**。所有指标只读已落库的板块原始事实，做可解释白盒计算并落库为衍生指标快照；提醒事件复用 `market_data_alert`，是观察提醒而非交易信号。
++- 输入只消费**已落库**的板块收盘/成分/榜单快照与基准证券日 K，不新增 provider 外联、不接收实时推送、不在分析窗口内反向调用 provider。
++
++## 2. 范围与非目标
++
++做（第一版）：
++
++1. 五大可解释白盒公式：相对强弱、轮动持续性、龙头贡献、成交量确认（量价确认）、异动提醒。
++2. 衍生指标快照表（V19+ 独立新表）+ 复用 `market_data_alert` 的 `SECTOR_*` 提醒事件。
++3. REST 查询接口（规划，见 §API 设计概要与 `MARKET_DATA_API.md` §5）。
++4. 前端页面与图表规格 + mock 契约建议（实际前端实现留作独立仓库子任务）。
++5. 缺失数据/停牌/跨市场时区/样本不足/口径变更的统一失效处理。
++
++不做（第一版明确非目标）：
++
++- **不自动交易**、不生成买卖指令、不下单、不连券商、不读密钥、不承诺收益。
++- **不做不可解释黑盒 ML 评分**，不引入机器学习隐式打分或因子暗箱；所有公式必须白盒可复算。
++- **不写回原始事实表**（`stock_*`、`market_sector_*` 事实表、`market_sector_ranking_*`）。
++- 不新增 provider 外联通道、不接实时推送。
++- 不替代 P1.5/P1.6 的原始事实采集；分析层只消费其已落库结果。
++- 不在前端仓库做实际实现（本仓库只给规格与 mock 契约建议）。
++
++## 3. 四视角结论
++
++### 3.1 产品经理视角
++
++- 板块分析是 P1.5 目录与 P1.6 全市场榜单之上的“研判层”：用户已有板块涨跌与榜单，还需要回答“谁在持续强、谁只是当日脉冲、涨幅由谁解释、量价是否确认、是否值得跟进提醒”。
++- 必须保持“决策辅助”定位：任何指标与提醒都不得演化为买卖指令；前端必须显式标注“不构成投资建议”。
++- 异动提醒是对“值得多看一眼”的提示，而非择时信号；提醒强度分级（INFO/WARN/HIGH），并允许用户忽略。
++
++### 3.2 量化研究视角
++
++- 相对强弱采用可解释白盒（Mansfield-style RS + 同市场板块内 RS-rank 百分位），避免黑盒。基准可配置（`tracking_symbol`），缺基准时用同市场板块等权均值并显式标记 `BENCHMARK_TYPE=SECTOR_EQUAL_WEIGHT`，不静默编造指数。
++- 轮动持续性用相邻交易日排名的相关系数（Spearman）与连续领涨/领跌天数刻画稳定性，区分“连续强”与“一日强”。
++- 龙头贡献度推荐成交额加权为主、净流入加权为辅，给出可解释占比公式，并区分市值/成交额/净流入三种口径（OPEN_QUESTION，本设计给出推荐与降级策略）。
++- 所有公式必须显式记录输入字段、时间窗口、基准、样本最小门槛与失效场景，以保证可复盘、可证伪。
++
++### 3.3 数据工程视角
++
++- 严格区分三层：**原始事实**（不可变，P1.5/P1.6 落库）、**衍生指标**（V19+ 新表，幂等可重算）、**提醒事件**（复用 `market_data_alert`）。
++- 衍生计算只读原始事实表；禁止 UPDATE/写回/回写/覆盖原始事实表。衍生表用更高 Flyway 版本（V19+），主键 `id bigint auto_increment`，金额 `decimal(20,6)`，幂等键覆盖 `(sector_identity, as_of_date/trade_date, window)`。
++- 时序以收盘快照序列为主轴（`market_sector_ranking_batch` CLOSE + `market_sector_snapshot`）；盘中 `INTRADAY` 快照仅用于当日异动与成交量确认的区间增量计算，且必须处理日内累计值跨日重置。
++- 样本不足/停牌/缺失/口径变更统一标 `INSUFFICIENT_SAMPLE` 或 `STALE`/`ORIGIN_CHANGED` 并降级，不静默编造。
++
++### 3.4 架构视角
++
++- 分析层归属推荐为 `com.quant.trade.marketdata.analysis` 子包（与现有 sector 代码同模块、同事务边界、不直连 provider），其中衍生指标计算落在 `analysis/derived/`，异动提醒评估器落在 `analysis/alert/`，调度器落在 `marketdata/scheduler/`（与现有分钟线 scheduler 同包），逻辑稳定后再评估是否上移到顶层 `factor/indicator`（`AGENTS.md` 推荐包，当前未创建）。本设计采用 marketdata.analysis 子包，避免跨模块依赖与过早抽象。
++- 读服务只读原始事实表 + 写衍生表 + 复用 `market_data_alert`；不写原始表。Scheduler 仅做衍生重算与提醒评估，不调用 provider。
++- 与 `MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md` 的“行情资产三层（原始事实/可复用衍生统计/任务质量治理）”一致：本层属于“可复用衍生统计”，质量治理复用 `market_data_alert`。
++
++## 4. 原始事实 / 衍生指标 / 提醒事件 三层模型
++
++| 层 | 存储 | 读写边界 | 可变性 |
++| --- | --- | --- | --- |
++| 原始事实 | `market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_batch`、`market_sector_ranking_item`、`market_sector_watch`、`market_sector_ranking_config`、`stock_daily_bar`、`stock_quote_snapshot` | 分析层**只读**这些原始事实表 | 不可变（P1.5/P1.6 已保证） |
++| 衍生指标 | V19+ 新表：`sector_relative_strength_snapshot`、`sector_rotation_persistence_snapshot`、`sector_leader_contribution_snapshot`、`sector_volume_confirmation_snapshot` | 衍生读服务读取原始事实表 → 计算 → 写入新衍生表（幂等可重算） | 可重算、可丢弃、可下线 |
++| 提醒事件 | 复用 `market_data_alert`（V7），新增 `alert_type=SECTOR_*` | 提醒评估器读取衍生指标 + 原始快照 → 写 `market_data_alert` | INFO/WARN/HIGH，可 resolve |
++
++> **禁止写回声明（强制边界）**：禁止写回 `market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_batch`、`market_sector_ranking_item`、`market_sector_watch`、`market_sector_ranking_config`、`stock_daily_bar`、`stock_quote_snapshot` 等原始事实表；衍生读服务只读原始事实表，不得写回、回写或覆盖原始事实，衍生结果只存新表。原始事实不可变，衍生结果可重算可下线。下线某衍生公式只需停掉对应计算与查询，不回滚也不污染原始事实。
++
++字面 token 要求：本设计显式包含 `原始事实`、`衍生指标`、`提醒事件` 三类，并以“禁止写回/不得写回原始事实表”作为强约束。
++
++## 5. 五大可解释公式
++
++每个公式均给出五要素：输入（输入字段来源）、窗口（计算时间窗口）、基准（比较基准与配置）、样本（样本最小门槛）、失效（失效场景与降级）。所有公式为白盒可解释，不引入黑盒/ML 隐式评分。
++
++### 5.1 相对强弱（Relative Strength / RS-rank）
++
++- **输入**：板块收盘快照序列（`market_sector_ranking_batch` 中 `snapshot_type=CLOSE` 的 `rank_no` 与 `market_sector_snapshot` 的 `change_rate` / `year_to_date_change_rate` / `total_turnover_amount`）以及基准 `tracking_symbol` 的日 K（`stock_daily_bar` 的 `close`）或同市场板块等权均值。输入字段仅来自原始事实表，只读。
++- **窗口**：默认窗口 20 / 50 / 120 个交易日（`window` 维度，对应短期/中期/长期）。每个窗口独立产出一份 RS 值与 RS-rank 百分位。
++- **基准**：基准可由用户在 `market_sector_watch.tracking_symbol` 配置（推荐宽基指数/行业 ETF 的统一证券代码）；缺基准时使用同市场全板块等权均值，并显式标记 `benchmark_type=SECTOR_EQUAL_WEIGHT`，不静默编造指数。
++- **样本**：连续收盘快照数 ≥ 窗口长度（如 20 日窗口需 ≥ 20 个连续交易日 CLOSE 快照），且同市场当日有效板块数 ≥ 阈值（默认 ≥ 5）。低于门槛时标记 `quality_status=INSUFFICIENT_SAMPLE` 并降级展示，不产 HIGH 提醒。
++- **失效**：provider 口径变更（行业分类或 provider 板块 ID 在窗口内变更）→ 在变更点断档并标 `ORIGIN_CHANGED`，不跨口径拼接；样本不足；成分大面积停牌；跨市场混算（必须按 CN/HK/US 各自 ZoneId 对齐交易日，禁止混入同一序列）。
++
++公式要点（白盒）：
++
++- Mansfield-style RS：`RS_normalized = ((P_sector / P_baseline) ^ (260/N) ... )`，N 取窗口长度；具体实现采用标准化比率并对历史序列做标准化（减均值除标准差）以得到可比较的相对强弱分。
++- RS-rank：在同市场当日所有有效板块 RS 值集合内计算百分位（0~100），100 表示最强。
++- 同一板块同窗口每日收盘后产出一份衍生快照，幂等键 `(sector_identity, as_of_date, window)`。
++
++### 5.2 轮动持续性（Rotation Persistence）
++
++- **输入**：`market_sector_ranking_batch`（CLOSE）的 `rank_no` 序列与 `market_sector_ranking_item` 的排名明细，按交易日排序。输入只读原始事实表。
++- **窗口**：默认 5 / 10 / 20 个交易日（短/中/长）。每个窗口独立计算持续性。
++- **基准**：基准为同市场全板块当日排名集合（rank 在该集合内的相对位次变化），不引入外部指数。
++- **样本**：连续收盘交易日数 ≥ 窗口长度，且窗口内无大缺口（缺失交易日占比 < 阈值，默认 < 30%）。低于门槛标 `INSUFFICIENT_SAMPLE` 并降级。
++- **失效**：provider 口径变更 → 断档标记 `ORIGIN_CHANGED`；窗口内快照缺失超过阈值；A 股集合竞价 `INTRADAY` 快照被误当作连续竞价 CLOSE 序列（必须只用 `snapshot_type=CLOSE`，集合竞价不计入连续位次）。
++
++公式要点（白盒）：
++
++- 相邻交易日排名相关系数（Spearman）：对窗口内每日全板块 rank 序列做两两 Spearman 相关，取均值作为持续性分（越接近 1 表示位次越稳定）。
++- 连续领涨/领跌天数：板块 rank 连续处于头部（如前 N%）或尾部（后 N%）的连续交易日数。
++- 幂等键 `(sector_identity, as_of_date, window)`。
++
++### 5.3 龙头贡献（Leader Contribution）
++
++- **输入**：`market_sector_member_snapshot` 的 `change_rate` / `turnover_amount` / `net_inflow`（成分个股资金字段）与 `market_sector_snapshot` 的聚合值 `total_turnover_amount` / `total_net_inflow` / `change_rate`（板块聚合基准）。输入只读原始事实表。
++- **窗口**：默认单快照当日（当日一份成分快照即可计算贡献度）+ 可选 N 日均值（默认 N=5，平滑贡献度排名）。
++- **基准**：基准为板块自身聚合值（板块总成交额/总净流入/板块涨跌幅），贡献度 = 个成分值 / 板块聚合值，加和应≈1。
++- **样本**：有效成分数门槛：CN ≥ 8、HK/US ≥ 5，或 ≥ 预期成分数 50%（取 `expected_member_count`）。低于门槛标 `INSUFFICIENT_SAMPLE` 并降级，不产 HIGH 提醒。
++- **失效**：成分停牌（按 `trade_status` 与 `is_delayed` 排除并计 `excluded_member_count`）；延迟行情（`is_delayed=true`）导致净流入/成交额口径不一致；累计值跨日重置未处理（成交额/净流入若为日内累计，跨日比较必须先用相邻快照差分或仅用 CLOSE 快照对齐）。
++
++公式要点（白盒）：
++
++- 成交额加权为主：`leader_share = sum(top_k 成分 turnover_amount) / 板块 total_turnover_amount`，top_k 默认取前 3/5。
++- 净流入加权为辅：`net_inflow_share = sum(top_k 成分 net_inflow) / 板块 total_net_inflow`，仅当净流入口径可靠（非全延迟、累计值已差分对齐）时计算，否则置空并标记。
++- OPEN_QUESTION（推荐）：是否区分市值/成交额/净流入加权——本设计推荐**成交额加权为主、净流入加权为辅**，市值加权作为可选（成分市值需额外维护，第一版不强制）。
++- 幂等键 `(sector_identity, trade_date, window)`。
++
++### 5.4 成交量确认（量价确认）
++
++- **输入**：`market_sector_snapshot` 的 `change_rate`（板块涨跌方向）与 `total_turnover_amount` / `total_volume`（板块成交额/成交量），区间增量须处理日内累计跨日重置（用相邻快照差分或仅取 CLOSE 快照对齐）。输入只读原始事实表。
++- **窗口**：当日（量价是否同向）+ 5 日均量（判断是否放量/缩量）。默认窗口为当日 + 近 5 日均值。
++- **基准**：基准为板块自身近期均量（近 5 日 `total_turnover_amount` 均值），判断当日成交相对历史是放量还是缩量。
++- **样本**：有可用成交数据且非全停牌；近 5 日成交快照数 ≥ 3。低于门槛标 `INSUFFICIENT_SAMPLE` 并降级。
++- **失效**：累计值（成交额/成交量）跨日重置未处理；延迟行情（`is_delayed`）导致成交失真；小盘低成交板块（成交额绝对值过低）易产生虚假背离信号 → 降级展示，不产 HIGH 提醒。
++
++公式要点（白盒）：
++
++- 量价同向 = 确认：板块 `change_rate` 与成交额/成交量变化方向一致（涨且放量 / 跌且放量）记为 `CONFIRMED`；方向背离（涨且缩量 / 跌且缩量）记为 `DIVERGENCE`（警示）。
++- 量比：`volume_ratio = 当日 total_turnover_amount / 近5日均值`，>1 放量、<1 缩量。
++- 幂等键 `(sector_identity, trade_date)`。
++
++### 5.5 异动提醒（Anomaly Alert）
++
++- **输入**：上述派生指标（相对强弱 RS/RS-rank、轮动持续性、龙头贡献、量价确认）与原始快照（`market_sector_snapshot` 的 `change_rate` / `total_turnover_amount` / `total_net_inflow`）。输入只读原始事实表与衍生表。
++- **窗口**：当日 vs 近 N 日均值/标准差（默认 N=20）。窗口内做 Z-score。
++- **基准**：基准为板块自身历史分布（近 N 日该板块某指标的均值与标准差），不引入外部阈值集合。
++- **样本**：历史样本 ≥ 阈值（默认 ≥ 20 个有效交易日）才能算 Z-score；否则仅阈值判断（如涨跌幅超过固定阈值），并在提醒中标注 `EVIDENCE=THRESHOLD_ONLY`。
++- **失效**：样本不足（< 20）只能阈值判断；数据陈旧（最新快照 `quote_time` 超过阈值）→ 降级或不产提醒；延迟行情导致指标失真。
++
++公式要点（白盒，阈值 + Z-score）：
++
++- Z-score：`z = (当日值 - 近N日均值) / 近N日标准差`，`|z|` 超过阈值（默认 2.0）记为异常。
++- 阈值：涨跌幅绝对值超过固定阈值（如 |change_rate| > 3%）、量比超过阈值（如 > 2.0）。
++- 复用 `market_data_alert`（V7），新增 `alert_type=SECTOR_RS_REVERSAL` / `SECTOR_VOLUME_DIVERGENCE` / `SECTOR_LEADER_CONCENTRATION` / `SECTOR_RANK_JUMP` 等；`severity` 取 `INFO/WARN/HIGH`；`trigger_value_json` 存派生指标快照与上下文。
++
++> **强制声明**：异动提醒是观察提醒，**不是买卖指令、不是投资建议**，不预测收益、不产生交易动作。前端必须在每条提醒旁标注“仅供参考，不构成投资建议”。
++
++## 6. 数据模型（规划 V19+，独立新表，只读原始事实）
++
++> 状态：**规划 V19+**，未实现。以下表为独立新表，绑定 Flyway V19+（V19、V20、...，具体由实现计划 ST-1 拆分），不复用 V1-V18 既有版本号。所有衍生表只读原始事实表，不写回原始事实表。规划区域不含“已实现”描述。
++
++### 6.1 sector_relative_strength_snapshot（规划 V19+）
++
++用途：板块相对强弱（Mansfield-style RS + RS-rank 百分位）衍生快照，只读 `market_sector_ranking_batch`/`market_sector_snapshot`/`stock_daily_bar`。
++
++核心字段：
++
++- `id` bigint 主键 auto_increment
++- `sector_identity` varchar(96) — 板块稳定身份（provider_code + provider_sector_id 或 watch_id 派生）
++- `market_code` varchar(8) — CN/HK/US
++- `as_of_date` date — 基准交易日
++- `window` smallint — 窗口长度（20/50/120）
++- `benchmark_type` varchar(32) — `TRACKING_SYMBOL` / `SECTOR_EQUAL_WEIGHT`
++- `benchmark_symbol` varchar(32) — 实际使用的基准统一证券代码（可空）
++- `rs_value` decimal(20,6)
++- `rs_rank_percentile` decimal(20,6) — 0~100
++- `quality_status` varchar(32) — `OK` / `INSUFFICIENT_SAMPLE` / `STALE` / `ORIGIN_CHANGED`
++- `valid_sample_size` int
++- `created_at` / `updated_at` datetime
++
++索引/幂等：
++
++- unique `uk_sector_rs(sector_identity, as_of_date, window)`
++- index `idx_sector_rs_market_date(market_code, as_of_date)`
++
++### 6.2 sector_rotation_persistence_snapshot（规划 V19+）
++
++用途：板块轮动持续性（相邻交易日排名 Spearman 相关 + 连续领涨/领跌天数），只读 `market_sector_ranking_batch`/`market_sector_ranking_item`。
++
++核心字段：
++
++- `id` / `sector_identity` / `market_code` / `as_of_date` / `window`(5/10/20)
++- `rank_spearman_mean` decimal(20,6)
++- `consecutive_leading_days` int
++- `consecutive_lagging_days` int
++- `quality_status` / `valid_sample_size` / `created_at` / `updated_at`
++
++索引/幂等：
++
++- unique `uk_sector_rotation(sector_identity, as_of_date, window)`
++- index `idx_sector_rotation_market_date(market_code, as_of_date)`
++
++### 6.3 sector_leader_contribution_snapshot（规划 V19+）
++
++用途：板块龙头贡献度（成交额加权为主、净流入加权为辅），只读 `market_sector_member_snapshot`/`market_sector_snapshot`。
++
++核心字段：
++
++- `id` / `sector_identity` / `market_code` / `trade_date` / `window`(1/5)
++- `leader_turnover_share` decimal(20,6) — 成交额加权龙头占比
++- `leader_net_inflow_share` decimal(20,6) — 净流入加权龙头占比（可空）
++- `top_k` int — 默认 3/5
++- `top_leaders_json` text — 龙头成分明细（canonical_symbol、change_rate、turnover_amount、net_inflow、share）
++- `excluded_member_count` int — 停牌/延迟排除计数
++- `valid_member_count` int
++- `quality_status` / `created_at` / `updated_at`
++
++索引/幂等：
++
++- unique `uk_sector_leader(sector_identity, trade_date, window)`
++- index `idx_sector_leader_market_date(market_code, trade_date)`
++
++### 6.4 sector_volume_confirmation_snapshot（规划 V19+）
++
++用途：板块量价确认（量价同向/背离 + 量比），只读 `market_sector_snapshot`。
++
++核心字段：
++
++- `id` / `sector_identity` / `market_code` / `trade_date`
++- `change_rate` decimal(20,6)
++- `turnover_amount` decimal(20,6) — 当日板块成交额（已处理累计跨日重置）
++- `volume_ratio` decimal(20,6) — 当日 / 近5日均值
++- `confirmation_status` varchar(16) — `CONFIRMED` / `DIVERGENCE` / `INSUFFICIENT`
++- `quality_status` / `created_at` / `updated_at`
++
++索引/幂等：
++
++- unique `uk_sector_volume(sector_identity, trade_date)`
++- index `idx_sector_volume_market_date(market_code, trade_date)`
++
++### 6.5 复用 market_data_alert（不新建告警表）
++
++异动提醒复用 V7 已实现的 `market_data_alert`，新增 `alert_type=SECTOR_*`（`SECTOR_RS_REVERSAL`、`SECTOR_VOLUME_DIVERGENCE`、`SECTOR_LEADER_CONCENTRATION`、`SECTOR_RANK_JUMP` 等）。`severity` 取 `INFO/WARN/HIGH`；`trigger_value_json` 存派生指标上下文。**不新建第二套告警表**。读服务只读原始事实与衍生表，写 `market_data_alert`。
++
++### 6.6 MyBatis / Flyway 边界
++
++- 新表走更高 Flyway 版本 V19+（V19、V20...），SQL 放在 `src/main/resources/db/migration/V19__*.sql`（具体由 ST-1 决定）。
++- MyBatis XML 放在 `src/main/resources/mapper/`（如 `SectorRelativeStrengthSnapshotMapper.xml`）。
++- 主键统一 `id bigint auto_increment`；金额/价格 `decimal(20,6)`；时间 `created_at`/`updated_at`。
++- 衍生读服务只读原始事实表，禁止 UPDATE/写回/回写/覆盖原始事实表。
++
++## 7. API 设计（规划，未实现 — 详见 MARKET_DATA_API.md §5）
++
++本节为概述；详细端点、请求/响应示例与错误码见 `docs/api/MARKET_DATA_API.md` §5（规划/未实现）。
++
++- GET 板块相对强弱（按市场/窗口查询排行与单板块详情）
++- GET 板块轮动持续性（按市场/窗口查询排行与单板块详情）
++- GET 板块龙头贡献（按市场查询排行与单板块龙头明细）
++- GET 板块量价确认（按市场查询排行与单板块量价状态）
++- GET 板块异动提醒：复用现有 `/api/v1/market-data/alerts?alertType=SECTOR_*` 查询
++
++统一前缀 `/api/v1/market-data/sector-analytics/*`（规划），统一响应 `ApiResponse<T>`。错误码复用 `MARKET_SECTOR_PROVIDER_UNAVAILABLE`（原始事实缺失时）、`MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED`（语义对齐，分析层不直接外联，仅在依赖原始事实不可用时透传）。所有端点标注“规划/未实现”。
++
++## 8. 前端页面与图表设计（规格 + mock 契约建议）
++
++> 前端在**独立仓库**（`docs/FRONTEND_ARCHITECTURE.md`）。本仓库只给规格与 mock 契约建议，实际前端实现留作 ST-4 子任务。
++
++页面结构（建议）：
++
++- “板块分析”一级页面，含四个子标签：相对强弱 / 轮动持续性 / 龙头贡献 / 量价确认；右上角“异动提醒”入口（铃铛 + 列表）。
++- 每个子标签顶部显示市场切换（CN/HK/US）、窗口切换（20/50/120 等）、基准说明（`BENCHMARK_TYPE` 标签）。
++
++图表建议：
++
++- 相对强弱：板块 RS 热力图（市场 × 板块，颜色编码 RS-rank 百分位）+ 板块 RS 排名条形图（带窗口切换）。
++- 轮动持续性：板块位次带图（ridgeline/位次随时间漂移）+ 轮动桑基图（领涨→领跌流向）。
++- 龙头贡献：堆叠柱状图（板块总成交额/净流入 = 各龙头成分贡献堆叠）+ 龙头明细表。
++- 量价确认：散点图（x=change_rate, y=volume_ratio，颜色=CONFIRMED/DIVERGENCE）。
++- 异动提醒：提醒流（按 severity 分色，INFO/WARN/HIGH），每条提醒含派生指标上下文与“不构成投资建议”标注。
++
++mock 契约建议：
++
++- 在前端仓库的 `docs/mock/MOCK_REMOTE_CONTRACT.md`（当前无板块分析 mock 契约）新增 `sector-analytics/*` 一组 mock 响应，字段与后端 VO 对齐；本仓库（后端）只在 ST-4 更新该 mock 契约建议文本，不写 React 代码。
++
++降级展示：
++
++- 当 `quality_status=INSUFFICIENT_SAMPLE` / `STALE` / `ORIGIN_CHANGED` 时，前端以灰显 + 文案提示，不产 HIGH 提醒。
++- 每个指标卡片需标注“不构成投资建议，仅作观察提示”。
++
++## 9. 风险与失效边界
++
++- **本系统是决策辅助，不构成投资建议**：所有指标与提醒仅为观察提示，不预测收益、不产生交易动作。前端必须在页面与每条提醒显式标注。
++- 跨市场时区：严格按 P1.6 `ZoneId`（CN `Asia/Shanghai`、HK `Asia/Hong_Kong`、US `America/New_York`）对齐交易日，禁止跨市场混入同一序列。
++- 停牌与延迟：成分按 `trade_status` 与 `is_delayed` 排除并计 `excluded_member_count`；延迟行情导致净流入/成交额口径不一致时降级。
++- 缺失与样本不足：低于门槛标 `INSUFFICIENT_SAMPLE` 并降级展示，不产 HIGH 提醒。
++- 口径变更：provider 行业分类/板块 ID 在窗口内变更 → 在变更点断档标 `ORIGIN_CHANGED`，不跨口径拼接。
++- 累计值跨日重置：成交额/成交量/净流入若为日内累计，跨日比较必须先差分或仅用 CLOSE 快照对齐，避免虚假信号。
++
++## 10. 统一缺失数据 / 停牌 / 跨市场时区 / 样本不足 / 失效处理
++
++- 停牌：按 `trade_status` 与 `is_delayed` 排除停牌/延迟成分，并计入 `excluded_member_count`；不参与聚合。
++- 样本不足：有效样本数低于门禁（CN≥8、HK/US≥5，或 < 预期成分 50%）时衍生结果标 `INSUFFICIENT_SAMPLE`，前端降级展示，且不产 HIGH 提醒（最多 INFO）。
++- 跨市场时区：严格按 CN/HK/US 各自 ZoneId 对齐交易日，不混算同一序列；基准与窗口在同市场内成立。
++- 数据陈旧：最新快照 `quote_time` 超过阈值（如 CN 收盘后超过 30 分钟仍未落 CLOSE）→ 标 `STALE` 并降级。
++- 口径变更：provider 口径变更 → 断档标 `ORIGIN_CHANGED`，历史序列在变更点不跨口径拼接。
++
++## 11. 验收边界（规划，由后续实现任务满足）
++
++- 五大公式均含输入/窗口/基准/样本/失效五要素并落库为 V19+ 衍生表。
++- 原始事实零污染：所有衍生表只读原始事实表，禁止写回。
++- 实现计划含 ≥4 个可并行子任务，独占写路径互不重叠。
++- 静态结构/污染探测脚本对设计/API/DB/计划四类 artifact 输出 PASS。
+diff --git a/scripts/tests/p17-sector-analytics-design-structure.test.mjs b/scripts/tests/p17-sector-analytics-design-structure.test.mjs
+new file mode 100644
+index 0000000..0abfa5e
+--- /dev/null
++++ b/scripts/tests/p17-sector-analytics-design-structure.test.mjs
+@@ -0,0 +1,466 @@
++// Static structure / cross-reference / pollution-probe check for
++// P17-SECTOR-ANALYTICS-DESIGN-20260802 (SLICE-01, AC-01/AC-02/AC-03).
++//
++// Read-only: node:test + node:assert/strict + fs/promises. No shell, no network.
++// Mirrors the style of scripts/tests/ai-governance.test.mjs.
++//
++// On success prints exactly these selector tokens to stdout (one per AC):
++//   P17-SECTOR-ANALYTICS-AC01
++//   P17-SECTOR-ANALYTICS-AC02
++//   P17-SECTOR-ANALYTICS-AC03
++// On any failure exits non-zero with a diagnostic naming the failing assertion
++// and the offending file (and line where applicable).
++
++import assert from "node:assert/strict";
++import { readFile } from "node:fs/promises";
++import test from "node:test";
++
++const REPO = process.cwd();
++
++const FILES = {
++  design: "docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md",
++  api: "docs/api/MARKET_DATA_API.md",
++  db: "docs/DATABASE_DESIGN.md",
++  plan: "docs/development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md"
++};
++
++async function readRel(rel) {
++  const text = await readFile(`${REPO}/${rel}`, "utf8");
++  return text;
++}
++
++// Split a markdown document into sections by ## / ### headings. Each section
++// is { heading, title, body, startLine }.
++function splitSections(doc) {
++  const lines = doc.split(/\r?\n/);
++  const sections = [];
++  let current = { heading: null, title: "", body: [], startLine: 1 };
++  for (let index = 0; index < lines.length; index += 1) {
++    const line = lines[index];
++    const match = /^(#{2,3})\s+(.*)$/.exec(line);
++    if (match) {
++      if (current.heading !== null || current.body.length > 0) {
++        sections.push({ ...current, body: current.body.join("\n") });
++      }
++      current = { heading: match[1], title: match[2], body: [], startLine: index + 1 };
++    } else {
++      current.body.push(line);
++    }
++  }
++  sections.push({ ...current, body: current.body.join("\n") });
++  return sections;
++}
++
++const FORMULA_NAMES = ["相对强弱", "轮动持续性", "龙头贡献", "成交量确认|量价确认", "异动提醒"];
++const FIVE_ELEMENTS = ["输入", "窗口", "基准", "样本", "失效"];
++
++// ---------------------------------------------------------------------------
++// TEST-01 (AC-01): main design doc + API §5 + DB planned block structure
++// ---------------------------------------------------------------------------
++
++test("A01-01 design doc exists and is non-empty", async () => {
++  const doc = await readRel(FILES.design);
++  assert.ok(doc.trim().length > 0, `${FILES.design} is empty`);
++});
++
++test("A01-02 at least 5 sections whose heading matches one of the five formula names", async () => {
++  const doc = await readRel(FILES.design);
++  const sections = splitSections(doc);
++  const matched = sections.filter((section) =>
++    FORMULA_NAMES.some((name) => new RegExp(name).test(section.title)));
++  assert.ok(matched.length >= 5,
++    `expected >=5 formula sections, found ${matched.length}: ${matched.map((m) => m.title).join(" | ")}`);
++});
++
++test("A01-03 each formula section body contains all five elements (输入/窗口/基准/样本/失效)", async () => {
++  const doc = await readRel(FILES.design);
++  const sections = splitSections(doc);
++  const matched = sections.filter((section) =>
++    FORMULA_NAMES.some((name) => new RegExp(name).test(section.title)));
++  assert.ok(matched.length >= 5, "need >=5 formula sections first");
++  for (const section of matched.slice(0, 5)) {
++    for (const element of FIVE_ELEMENTS) {
++      assert.ok(section.body.includes(element),
++        `formula section "${section.title}" (line ${section.startLine}) missing element "${element}"`);
++    }
++  }
++});
++
++test("A01-04 design doc has three-layer tokens + no-write-back declaration", async () => {
++  const doc = await readRel(FILES.design);
++  for (const token of ["原始事实", "衍生指标", "提醒事件"]) {
++    assert.ok(doc.includes(token), `${FILES.design} missing token "${token}"`);
++  }
++  assert.match(doc, /禁止写回|不得写回|严禁写回|不可写回|不写回|只读.{0,12}原始事实/,
++    `${FILES.design} missing no-write-back declaration`);
++});
++
++test("A01-05 API doc has a `## 5.` section mentioning 板块分析 and 规划|未实现", async () => {
++  const doc = await readRel(FILES.api);
++  const sections = doc.split(/\r?\n/);
++  let found = false;
++  for (let index = 0; index < sections.length; index += 1) {
++    if (/^## 5\./.test(sections[index])) {
++      const head = sections.slice(index, index + 6).join("\n");
++      if (/板块分析/.test(head) && /(规划|未实现)/.test(head)) {
++        found = true;
++        break;
++      }
++    }
++  }
++  assert.ok(found, `${FILES.api} missing \`## 5.\` section with 板块分析 + 规划|未实现`);
++});
++
++test("A01-06 API baseline anchors (## 1. / ## 2. / ## 3. / ## 4.) preserved", async () => {
++  const doc = await readRel(FILES.api);
++  const anchors = [
++    "## 1. 当前已实现接口",
++    "## 2. LongPort 只读行情接口（真实外联已验收）",
++    "## 3. 行情工作台、采集计划、分钟 K、水位（P1.2）",
++    "## 4. 安全约束"
++  ];
++  for (const anchor of anchors) {
++    assert.ok(doc.includes(anchor), `${FILES.api} missing baseline anchor "${anchor}"`);
++  }
++});
++
++test("A01-07 DB has a new 板块分析 + 规划 + V19 block AND baseline anchors preserved", async () => {
++  const doc = await readRel(FILES.db);
++  assert.match(doc, /板块分析[\s\S]*?规划[\s\S]*?V19|规划[\s\S]*?板块分析[\s\S]*?V19/,
++    `${FILES.db} missing 板块分析 + 规划 + V19 block`);
++  const anchors = [
++    "### market_sector_watch / market_sector_snapshot / market_sector_member_snapshot",
++    "状态：已实现（V14，V15 扩展）",
++    "### market_sector_ranking_batch / market_sector_ranking_item",
++    "### security_directory_sync_state",
++    "状态：已实现（V18 migration）"
++  ];
++  for (const anchor of anchors) {
++    assert.ok(doc.includes(anchor), `${FILES.db} missing baseline anchor "${anchor}"`);
++  }
++});
++
++test("A01-08 new `## 5.` API section and new DB planned block do NOT contain 已实现", async () => {
++  const apiDoc = await readRel(FILES.api);
++  const apiLines = apiDoc.split(/\r?\n/);
++  let apiSectionStart = -1;
++  for (let index = 0; index < apiLines.length; index += 1) {
++    if (/^## 5\./.test(apiLines[index])) { apiSectionStart = index; break; }
++  }
++  assert.notEqual(apiSectionStart, -1, `${FILES.api} has no \`## 5.\` section`);
++  const apiSection = apiLines.slice(apiSectionStart).join("\n");
++  assert.ok(!apiSection.includes("已实现"),
++    `${FILES.api} \`## 5.\` section must NOT contain 已实现`);
++
++  const dbDoc = await readRel(FILES.db);
++  const plannedStart = dbDoc.indexOf("## 板块分析规划表");
++  assert.notEqual(plannedStart, -1, `${FILES.db} has no planned 板块分析 block`);
++  const plannedSection = dbDoc.slice(plannedStart);
++  assert.ok(!plannedSection.includes("已实现"),
++    `${FILES.db} planned 板块分析 block must NOT contain 已实现`);
++});
++
++// ---------------------------------------------------------------------------
++// TEST-02 (AC-02): original facts are not polluted by analysis results
++// ---------------------------------------------------------------------------
++
++// Candidate write-back verb patterns. A line is a violation only if it matches
++// a write-back verb + a raw-fact table pattern AND does NOT contain a negation
++// marker (compliant declarations are allowed).
++const WRITEBACK_VERBS = [
++  /UPDATE\s+(market_sector|stock_|market_sector_ranking)/i,
++  /(写回|回写|覆盖)[\s\S]{0,40}?(market_sector|stock_|ranking)/,
++  /(market_sector|stock_|ranking)[\s\S]{0,40}?(写回|回写|覆盖)/
++];
++const NEGATION = /(禁止|不得|严禁|不可|勿|不|未|prohibit|never|read-only|只读)/;
++
++function findPollution(text, source) {
++  const lines = text.split(/\r?\n/);
++  const hits = [];
++  lines.forEach((line, index) => {
++    if (!line) return;
++    const matchesVerb = WRITEBACK_VERBS.some((pattern) => pattern.test(line));
++    if (matchesVerb && !NEGATION.test(line)) {
++      hits.push({ source, line: index + 1, text: line.trim() });
++    }
++  });
++  return hits;
++}
++
++test("A02-01 no write-back-to-original-fact violations across all four artifacts", async () => {
++  const all = [];
++  for (const [name, rel] of Object.entries(FILES)) {
++    const doc = await readRel(rel);
++    all.push(...findPollution(doc, rel));
++  }
++  assert.equal(all.length, 0,
++    `write-back violations found (must be 0):\n${all.map((h) => `  ${h.source}:${h.line} ${h.text}`).join("\n")}`);
++});
++
++test("A02-02 each new analysis table block references V19+ and not 已实现（V1[0-8]", async () => {
++  const dbDoc = await readRel(FILES.db);
++  const plannedStart = dbDoc.indexOf("## 板块分析规划表");
++  assert.notEqual(plannedStart, -1, `${FILES.db} has no planned block`);
++  const planned = dbDoc.slice(plannedStart);
++  assert.match(planned, /V19\+|V19|V2[0-9]|V3[0-9]/, "planned block must reference V19+");
++  assert.doesNotMatch(planned, /已实现（V1[0-8]/, "planned block must not contain 已实现（V1[0-8]");
++
++  const designDoc = await readRel(FILES.design);
++  assert.match(designDoc, /V19\+|V19|V2[0-9]|V3[0-9]/, "design doc must reference V19+");
++});
++
++test("A02-03 design or DB planned block contains read-only-original-fact declaration", async () => {
++  const designDoc = await readRel(FILES.design);
++  const dbDoc = await readRel(FILES.db);
++  const combined = `${designDoc}\n${dbDoc}`;
++  assert.match(combined, /衍生.{0,12}只读|只读.{0,12}(原始事实|market_sector|stock_)|读.{0,8}原始事实/,
++    "missing read-only-original-fact declaration");
++});
++
++// ---------------------------------------------------------------------------
++// TEST-03 (AC-03): implementation plan structure
++// ---------------------------------------------------------------------------
++
++test("A03-01 implementation plan exists and is non-empty", async () => {
++  const doc = await readRel(FILES.plan);
++  assert.ok(doc.trim().length > 0, `${FILES.plan} is empty`);
++});
++
++test("A03-02 plan has >=4 sub-task blocks headed `### 子任务 N` / `### ST-N` / `### TASK-N`", async () => {
++  const doc = await readRel(FILES.plan);
++  const matches = doc.split(/\r?\n/).filter((line) => /^###\s+(子任务|ST-|TASK-)/.test(line));
++  assert.ok(matches.length >= 4, `expected >=4 sub-task blocks, found ${matches.length}`);
++});
++
++test("A03-03 each sub-task block contains 写路径/依赖/AC/测试/合并顺序", async () => {
++  const doc = await readRel(FILES.plan);
++  const lines = doc.split(/\r?\n/);
++  // Slice into blocks starting at each sub-task heading until the next heading.
++  const blocks = [];
++  let current = null;
++  for (const line of lines) {
++    if (/^###\s+(子任务|ST-|TASK-)/.test(line)) {
++      if (current) blocks.push(current);
++      current = { heading: line, body: [] };
++    } else if (current) {
++      // stop a block at the next ## or ### heading that is NOT another sub-task
++      if (/^(#{2,3})\s/.test(line) && !/^###\s+(子任务|ST-|TASK-)/.test(line)) {
++        blocks.push(current);
++        current = null;
++      } else {
++        current.body.push(line);
++      }
++    }
++  }
++  if (current) blocks.push(current);
++  const subtaskBlocks = blocks.filter((b) => /^###\s+(子任务|ST-|TASK-)/.test(b.heading));
++  assert.ok(subtaskBlocks.length >= 4, `expected >=4 sub-task blocks, found ${subtaskBlocks.length}`);
++  for (const block of subtaskBlocks) {
++    const body = block.body.join("\n");
++    for (const label of ["写路径", "依赖", "AC", "测试", "合并顺序"]) {
++      assert.ok(body.includes(label),
++        `sub-task "${block.heading}" missing field label "${label}"`);
++    }
++  }
++});
++
++test("A03-04 sub-task write-paths do not pairwise prefix-overlap", async () => {
++  const doc = await readRel(FILES.plan);
++  const lines = doc.split(/\r?\n/);
++  // Re-derive sub-task blocks (same logic as A03-03).
++  const blocks = [];
++  let current = null;
++  for (const line of lines) {
++    if (/^###\s+(子任务|ST-|TASK-)/.test(line)) {
++      if (current) blocks.push(current);
++      current = { heading: line, body: [] };
++    } else if (current) {
++      if (/^(#{2,3})\s/.test(line) && !/^###\s+(子任务|ST-|TASK-)/.test(line)) {
++        blocks.push(current);
++        current = null;
++      } else {
++        current.body.push(line);
++      }
++    }
++  }
++  if (current) blocks.push(current);
++  const subtaskBlocks = blocks.filter((b) => /^###\s+(子任务|ST-|TASK-)/.test(b.heading));
++
++  // Collect, per sub-task, the path tokens that look like src/.../docs/.../scripts/...
++  const perTask = subtaskBlocks.map((block) => {
++    const paths = [];
++    for (const bodyLine of block.body) {
++      // Only consider the write-path field area: match leading repo-relative paths.
++      const pathRegex = /(^|\s|`|；|;|，|,|\()((src|docs|scripts)\/[^\s`，,；;）)]+)/g;
++      let pathMatch;
++      while ((pathMatch = pathRegex.exec(bodyLine)) !== null) {
++        paths.push(pathMatch[2]);
++      }
++    }
++    return { heading: block.heading, paths };
++  });
++
++  // Verify pairwise no-prefix-overlap across sub-tasks.
++  for (let i = 0; i < perTask.length; i += 1) {
++    for (let j = i + 1; j < perTask.length; j += 1) {
++      for (const a of perTask[i].paths) {
++        for (const b of perTask[j].paths) {
++          const overlap = a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`) ||
++            a.startsWith(b) || b.startsWith(a);
++          assert.equal(overlap, false,
++            `write-path overlap between "${perTask[i].heading}" and "${perTask[j].heading}": "${a}" vs "${b}"`);
++        }
++      }
++    }
++  }
++});
++
++test("A03-05 plan has a heading/section containing BOTH 并行 and 串行 (or DAG)", async () => {
++  const doc = await readRel(FILES.plan);
++  const sections = splitSections(doc);
++  const ok = sections.some((section) =>
++    /并行/.test(section.title) && /(串行|DAG)/.test(section.title));
++  assert.ok(ok, "missing a heading containing both 并行 and 串行|DAG");
++});
++
++// ---------------------------------------------------------------------------
++// Aggregate: print selector tokens if all assertions for an AC pass.
++// ---------------------------------------------------------------------------
++
++test("AC-01 all assertions pass -> print P17-SECTOR-ANALYTICS-AC01", async () => {
++  // Re-run AC-01 checks inline (idempotent) so the token only prints when green.
++  const design = await readRel(FILES.design);
++  const api = await readRel(FILES.api);
++  const db = await readRel(FILES.db);
++
++  assert.ok(design.trim().length > 0);
++  const sections = splitSections(design);
++  const matched = sections.filter((s) => FORMULA_NAMES.some((n) => new RegExp(n).test(s.title)));
++  assert.ok(matched.length >= 5);
++  for (const section of matched.slice(0, 5)) {
++    for (const element of FIVE_ELEMENTS) {
++      assert.ok(section.body.includes(element), `section "${section.title}" missing ${element}`);
++    }
++  }
++  for (const token of ["原始事实", "衍生指标", "提醒事件"]) {
++    assert.ok(design.includes(token), `missing token ${token}`);
++  }
++  assert.match(design, /禁止写回|不得写回|严禁写回|不可写回|不写回|只读.{0,12}原始事实/);
++
++  const apiLines = api.split(/\r?\n/);
++  let apiFive = false;
++  for (let i = 0; i < apiLines.length; i += 1) {
++    if (/^## 5\./.test(apiLines[i])) {
++      const head = apiLines.slice(i, i + 6).join("\n");
++      if (/板块分析/.test(head) && /(规划|未实现)/.test(head)) { apiFive = true; break; }
++    }
++  }
++  assert.ok(apiFive);
++  for (const anchor of ["## 1. 当前已实现接口",
++    "## 2. LongPort 只读行情接口（真实外联已验收）",
++    "## 3. 行情工作台、采集计划、分钟 K、水位（P1.2）",
++    "## 4. 安全约束"]) {
++    assert.ok(api.includes(anchor), `missing api anchor ${anchor}`);
++  }
++  assert.match(db, /板块分析[\s\S]*?规划[\s\S]*?V19|规划[\s\S]*?板块分析[\s\S]*?V19/);
++  for (const anchor of [
++    "### market_sector_watch / market_sector_snapshot / market_sector_member_snapshot",
++    "状态：已实现（V14，V15 扩展）",
++    "### market_sector_ranking_batch / market_sector_ranking_item",
++    "### security_directory_sync_state",
++    "状态：已实现（V18 migration）"]) {
++    assert.ok(db.includes(anchor), `missing db anchor ${anchor}`);
++  }
++
++  // A01-08: planned regions must not contain 已实现
++  const apiSectionStart = apiLines.findIndex((l) => /^## 5\./.test(l));
++  assert.ok(!apiLines.slice(apiSectionStart).join("\n").includes("已实现"));
++  const dbPlanned = db.slice(db.indexOf("## 板块分析规划表"));
++  assert.ok(!dbPlanned.includes("已实现"));
++
++  console.log("P17-SECTOR-ANALYTICS-AC01");
++});
++
++test("AC-02 all assertions pass -> print P17-SECTOR-ANALYTICS-AC02", async () => {
++  let violations = 0;
++  for (const rel of Object.values(FILES)) {
++    const doc = await readRel(rel);
++    violations += findPollution(doc, rel).length;
++  }
++  assert.equal(violations, 0, `write-back violations: ${violations}`);
++
++  const db = await readRel(FILES.db);
++  const dbPlanned = db.slice(db.indexOf("## 板块分析规划表"));
++  assert.match(dbPlanned, /V19\+|V19|V2[0-9]|V3[0-9]/);
++  assert.doesNotMatch(dbPlanned, /已实现（V1[0-8]/);
++  const design = await readRel(FILES.design);
++  assert.match(design, /V19\+|V19|V2[0-9]|V3[0-9]/);
++
++  assert.match(`${design}\n${db}`,
++    /衍生.{0,12}只读|只读.{0,12}(原始事实|market_sector|stock_)|读.{0,8}原始事实/);
++
++  console.log("P17-SECTOR-ANALYTICS-AC02");
++});
++
++test("AC-03 all assertions pass -> print P17-SECTOR-ANALYTICS-AC03", async () => {
++  const plan = await readRel(FILES.plan);
++  assert.ok(plan.trim().length > 0);
++  const lines = plan.split(/\r?\n/);
++  const subHeadings = lines.filter((l) => /^###\s+(子任务|ST-|TASK-)/.test(l));
++  assert.ok(subHeadings.length >= 4, `sub-tasks: ${subHeadings.length}`);
++
++  const blocks = [];
++  let current = null;
++  for (const line of lines) {
++    if (/^###\s+(子任务|ST-|TASK-)/.test(line)) {
++      if (current) blocks.push(current);
++      current = { heading: line, body: [] };
++    } else if (current) {
++      if (/^(#{2,3})\s/.test(line) && !/^###\s+(子任务|ST-|TASK-)/.test(line)) {
++        blocks.push(current);
++        current = null;
++      } else {
++        current.body.push(line);
++      }
++    }
++  }
++  if (current) blocks.push(current);
++  const subtaskBlocks = blocks.filter((b) => /^###\s+(子任务|ST-|TASK-)/.test(b.heading));
++  for (const block of subtaskBlocks) {
++    const body = block.body.join("\n");
++    for (const label of ["写路径", "依赖", "AC", "测试", "合并顺序"]) {
++      assert.ok(body.includes(label), `"${block.heading}" missing ${label}`);
++    }
++  }
++
++  // A03-04 re-check no pairwise prefix overlap
++  const perTask = subtaskBlocks.map((block) => {
++    const paths = [];
++    for (const bodyLine of block.body) {
++      const pathRegex = /(^|\s|`|；|;|，|,|\()((src|docs|scripts)\/[^\s`，,；;）)]+)/g;
++      let pathMatch;
++      while ((pathMatch = pathRegex.exec(bodyLine)) !== null) {
++        paths.push(pathMatch[2]);
++      }
++    }
++    return { heading: block.heading, paths };
++  });
++  for (let i = 0; i < perTask.length; i += 1) {
++    for (let j = i + 1; j < perTask.length; j += 1) {
++      for (const a of perTask[i].paths) {
++        for (const b of perTask[j].paths) {
++          const overlap = a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`) ||
++            a.startsWith(b) || b.startsWith(a);
++          assert.equal(overlap, false, `overlap "${a}" vs "${b}"`);
++        }
++      }
++    }
++  }
++
++  // A03-05 parallel/serial heading
++  const sections = splitSections(plan);
++  assert.ok(sections.some((s) => /并行/.test(s.title) && /(串行|DAG)/.test(s.title)),
++    "missing 并行 + 串行|DAG heading");
++
++  console.log("P17-SECTOR-ANALYTICS-AC03");
++});
