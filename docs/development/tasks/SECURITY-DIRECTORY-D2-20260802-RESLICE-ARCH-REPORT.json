@@ -1,49 +1,103 @@
 {
   "schemaVersion": 1,
   "generatedBy": "scripts/check-ai-architecture.mjs",
-  "generatedAt": "2026-08-02T07:55:16.912Z",
-  "candidateIdentity": "00820f1e2d3f81e50c055eb29a5ec4d2838fe2b2",
+  "generatedAt": "2026-08-02T12:00:15.323Z",
+  "candidateIdentity": "0cf382fec889bbecb567fd27064040b3901b9c27",
   "base": "",
   "manifestPath": "",
   "architectureReviewCount": 0,
   "files": [
     {
-      "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/components/SecuritySelector.tsx",
-      "lines": 285,
-      "methods": 6,
-      "longestMethod": 22,
-      "dependencies": 0,
-      "responsibilities": [],
-      "warnings": [],
-      "errors": []
-    },
-    {
-      "file": "/Users/joker/code/quant-trading-assistant-web/src/features/market-data/api/securityDirectoryApi.ts",
-      "lines": 141,
-      "methods": 7,
-      "longestMethod": 8,
-      "dependencies": 0,
-      "responsibilities": [
-        "search-scoring"
-      ],
-      "warnings": [],
-      "errors": []
-    },
-    {
-      "file": "/Users/joker/code/quant-trading-assistant-web/src/features/market-data/utils/syncPlanForm.ts",
-      "lines": 92,
-      "methods": 3,
-      "longestMethod": 39,
-      "dependencies": 0,
-      "responsibilities": [],
-      "warnings": [],
-      "errors": []
-    },
-    {
       "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
       "lines": 625,
       "methods": 21,
       "longestMethod": 115,
+      "methodLengths": [
+        {
+          "name": "providerStatusTitle",
+          "lines": 7
+        },
+        {
+          "name": "providerStatusAlertType",
+          "lines": 5
+        },
+        {
+          "name": "ensureLongPortReady",
+          "lines": 10
+        },
+        {
+          "name": "MarketDataPage",
+          "lines": 19
+        },
+        {
+          "name": "QuoteSnapshotsTab",
+          "lines": 102
+        },
+        {
+          "name": "run",
+          "lines": 5
+        },
+        {
+          "name": "handleFetchLatest",
+          "lines": 23
+        },
+        {
+          "name": "ProviderStatusTab",
+          "lines": 50
+        },
+        {
+          "name": "run",
+          "lines": 5
+        },
+        {
+          "name": "handleHealthCheck",
+          "lines": 6
+        },
+        {
+          "name": "StocksTab",
+          "lines": 107
+        },
+        {
+          "name": "run",
+          "lines": 10
+        },
+        {
+          "name": "handleDelete",
+          "lines": 9
+        },
+        {
+          "name": "BarsTab",
+          "lines": 115
+        },
+        {
+          "name": "handleImport",
+          "lines": 15
+        },
+        {
+          "name": "SyncTasksTab",
+          "lines": 102
+        },
+        {
+          "name": "run",
+          "lines": 5
+        },
+        {
+          "name": "handleCreate",
+          "lines": 28
+        },
+        {
+          "name": "AlertsTab",
+          "lines": 68
+        },
+        {
+          "name": "run",
+          "lines": 5
+        },
+        {
+          "name": "handleResolve",
+          "lines": 9
+        }
+      ],
       "dependencies": 0,
       "responsibilities": [
         "file-protocol",
@@ -63,6 +117,68 @@
       "lines": 567,
       "methods": 15,
       "longestMethod": 210,
+      "methodLengths": [
+        {
+          "name": "MarketWorkspacePage",
+          "lines": 17
+        },
+        {
+          "name": "OverviewTab",
+          "lines": 90
+        },
+        {
+          "name": "run",
+          "lines": 11
+        },
+        {
+          "name": "PlansTab",
+          "lines": 210
+        },
+        {
+          "name": "run",
+          "lines": 11
+        },
+        {
+          "name": "openCreate",
+          "lines": 6
+        },
+        {
+          "name": "openEdit",
+          "lines": 5
+        },
+        {
+          "name": "handleSave",
+          "lines": 19
+        },
+        {
+          "name": "handleToggle",
+          "lines": 5
+        },
+        {
+          "name": "handleRun",
+          "lines": 18
+        },
+        {
+          "name": "handleReconcile",
+          "lines": 14
+        },
+        {
+          "name": "MinuteBarTab",
+          "lines": 72
+        },
+        {
+          "name": "run",
+          "lines": 11
+        },
+        {
+          "name": "WatermarkTab",
+          "lines": 64
+        },
+        {
+          "name": "run",
+          "lines": 11
+        }
+      ],
       "dependencies": 0,
       "responsibilities": [
         "file-protocol",
@@ -81,6 +197,104 @@
       "lines": 624,
       "methods": 24,
       "longestMethod": 148,
+      "methodLengths": [
+        {
+          "name": "MarketSegmentsPage",
+          "lines": 17
+        },
+        {
+          "name": "MarketSectorCollectionTab",
+          "lines": 124
+        },
+        {
+          "name": "run",
+          "lines": 12
+        },
+        {
+          "name": "save",
+          "lines": 13
+        },
+        {
+          "name": "run",
+          "lines": 6
+        },
+        {
+          "name": "openBatch",
+          "lines": 5
+        },
+        {
+          "name": "state",
+          "lines": 5
+        },
+        {
+          "name": "MarketSectorTab",
+          "lines": 116
+        },
+        {
+          "name": "run",
+          "lines": 10
+        },
+        {
+          "name": "openPeer",
+          "lines": 6
+        },
+        {
+          "name": "follow",
+          "lines": 11
+        },
+        {
+          "name": "MarketSectorWatchTab",
+          "lines": 148
+        },
+        {
+          "name": "run",
+          "lines": 10
+        },
+        {
+          "name": "refresh",
+          "lines": 6
+        },
+        {
+          "name": "toggle",
+          "lines": 6
+        },
+        {
+          "name": "remove",
+          "lines": 6
+        },
+        {
+          "name": "openDetail",
+          "lines": 9
+        },
+        {
+          "name": "SegmentListTab",
+          "lines": 117
+        },
+        {
+          "name": "run",
+          "lines": 12
+        },
+        {
+          "name": "handleCreate",
+          "lines": 16
+        },
+        {
+          "name": "handleDelete",
+          "lines": 19
+        },
+        {
+          "name": "run",
+          "lines": 13
+        },
+        {
+          "name": "handleAdd",
+          "lines": 14
+        },
+        {
+          "name": "handleRemove",
+          "lines": 12
+        }
+      ],
       "dependencies": 0,
       "responsibilities": [
         "search-scoring"
@@ -95,10 +309,35 @@
       ]
     },
     {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/features/market-data/utils/syncPlanForm.ts",
+      "lines": 92,
+      "methods": 3,
+      "longestMethod": 39,
+      "methodLengths": [
+        {
+          "name": "buildPlanInput",
+          "lines": 39
+        },
+        {
+          "name": "planToDraft",
+          "lines": 28
+        },
+        {
+          "name": "fallbackConfigurationErrors",
+          "lines": 9
+        }
+      ],
+      "dependencies": 0,
+      "responsibilities": [],
+      "warnings": [],
+      "errors": []
+    },
+    {
       "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/types/domain.ts",
       "lines": 598,
       "methods": 0,
       "longestMethod": 0,
+      "methodLengths": [],
       "dependencies": 0,
       "responsibilities": [
         "search-scoring"
@@ -106,6 +345,84 @@
       "warnings": [
         "significant lines 598 > 400"
       ],
+      "errors": []
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/features/market-data/api/securityDirectoryApi.ts",
+      "lines": 141,
+      "methods": 7,
+      "longestMethod": 8,
+      "methodLengths": [
+        {
+          "name": "meetsThreshold",
+          "lines": 6
+        },
+        {
+          "name": "rankItem",
+          "lines": 1
+        },
+        {
+          "name": "marketIndex",
+          "lines": 5
+        },
+        {
+          "name": "toSummary",
+          "lines": 8
+        },
+        {
+          "name": "pick",
+          "lines": 3
+        },
+        {
+          "name": "searchSecurities",
+          "lines": 3
+        },
+        {
+          "name": "getSecurity",
+          "lines": 3
+        }
+      ],
+      "dependencies": 0,
+      "responsibilities": [
+        "search-scoring"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/components/SecuritySelector.tsx",
+      "lines": 285,
+      "methods": 6,
+      "longestMethod": 22,
+      "methodLengths": [
+        {
+          "name": "marketLabel",
+          "lines": 3
+        },
+        {
+          "name": "typeLabel",
+          "lines": 3
+        },
+        {
+          "name": "handleQueryChange",
+          "lines": 8
+        },
+        {
+          "name": "handleRetry",
+          "lines": 3
+        },
+        {
+          "name": "confirmItem",
+          "lines": 6
+        },
+        {
+          "name": "handleKeyDown",
+          "lines": 22
+        }
+      ],
+      "dependencies": 0,
+      "responsibilities": [],
+      "warnings": [],
       "errors": []
     }
   ],
@@ -157,23 +474,98 @@
       "message": "significant lines 598 > 400"
     }
   ],
-  "errors": [
+  "errorCount": 0,
+  "errors": [],
+  "status": "PASS",
+  "exitCode": 0,
+  "baselineIdentity": "/var/folders/nk/4ygsbnd96mb20x5c93clvpmh0000gn/T/d2-repair-baseline-c64dVM",
+  "baselineCommit": "80c38324f58ba58cf6f96884184e16c86b967f96",
+  "baselineFileContentsSha256": "0cf81353b5e3096b4889758b46f55b36ba71d77db3ae31ddec35e3665ea9bdd0",
+  "allowedWorsenDelta": 20,
+  "blockingErrorCount": 0,
+  "introducedErrors": [],
+  "worsenedErrors": [],
+  "preExistingErrors": [
     {
       "id": "ARCH-E-001",
       "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
-      "message": "longest method 115 lines > 100"
+      "message": "longest method 115 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 102,
+      "baselineMetric": 101,
+      "delta": 1
     },
     {
       "id": "ARCH-E-002",
-      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-workspace.tsx",
-      "message": "longest method 210 lines > 100"
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
+      "message": "longest method 115 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 107,
+      "baselineMetric": 107,
+      "delta": 0
     },
     {
       "id": "ARCH-E-003",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
+      "message": "longest method 115 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 115,
+      "baselineMetric": 115,
+      "delta": 0
+    },
+    {
+      "id": "ARCH-E-004",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
+      "message": "longest method 115 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 102,
+      "baselineMetric": 101,
+      "delta": 1
+    },
+    {
+      "id": "ARCH-E-005",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-workspace.tsx",
+      "message": "longest method 210 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 210,
+      "baselineMetric": 199,
+      "delta": 11
+    },
+    {
+      "id": "ARCH-E-006",
       "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
-      "message": "longest method 148 lines > 100"
+      "message": "longest method 148 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 124,
+      "baselineMetric": 124,
+      "delta": 0
+    },
+    {
+      "id": "ARCH-E-007",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
+      "message": "longest method 148 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 116,
+      "baselineMetric": 116,
+      "delta": 0
+    },
+    {
+      "id": "ARCH-E-008",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
+      "message": "longest method 148 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 148,
+      "baselineMetric": 148,
+      "delta": 0
+    },
+    {
+      "id": "ARCH-E-009",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
+      "message": "longest method 148 lines > 100",
+      "classification": "pre-existing",
+      "candidateMetric": 117,
+      "baselineMetric": 117,
+      "delta": 0
     }
-  ],
-  "status": "FAIL",
-  "exitCode": 1
+  ]
 }
