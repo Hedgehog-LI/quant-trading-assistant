@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/check-ai-architecture.mjs",
+  "generatedAt": "2026-08-02T07:55:16.912Z",
+  "candidateIdentity": "00820f1e2d3f81e50c055eb29a5ec4d2838fe2b2",
+  "base": "",
+  "manifestPath": "",
+  "architectureReviewCount": 0,
+  "files": [
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/components/SecuritySelector.tsx",
+      "lines": 285,
+      "methods": 6,
+      "longestMethod": 22,
+      "dependencies": 0,
+      "responsibilities": [],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/features/market-data/api/securityDirectoryApi.ts",
+      "lines": 141,
+      "methods": 7,
+      "longestMethod": 8,
+      "dependencies": 0,
+      "responsibilities": [
+        "search-scoring"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/features/market-data/utils/syncPlanForm.ts",
+      "lines": 92,
+      "methods": 3,
+      "longestMethod": 39,
+      "dependencies": 0,
+      "responsibilities": [],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
+      "lines": 625,
+      "methods": 21,
+      "longestMethod": 115,
+      "dependencies": 0,
+      "responsibilities": [
+        "file-protocol",
+        "provider"
+      ],
+      "warnings": [
+        "significant lines 625 > 400",
+        "methods 21 > 20",
+        "longest method 115 lines > 60"
+      ],
+      "errors": [
+        "longest method 115 lines > 100"
+      ]
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-workspace.tsx",
+      "lines": 567,
+      "methods": 15,
+      "longestMethod": 210,
+      "dependencies": 0,
+      "responsibilities": [
+        "file-protocol",
+        "provider"
+      ],
+      "warnings": [
+        "significant lines 567 > 400",
+        "longest method 210 lines > 60"
+      ],
+      "errors": [
+        "longest method 210 lines > 100"
+      ]
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
+      "lines": 624,
+      "methods": 24,
+      "longestMethod": 148,
+      "dependencies": 0,
+      "responsibilities": [
+        "search-scoring"
+      ],
+      "warnings": [
+        "significant lines 624 > 400",
+        "methods 24 > 20",
+        "longest method 148 lines > 60"
+      ],
+      "errors": [
+        "longest method 148 lines > 100"
+      ]
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/types/domain.ts",
+      "lines": 598,
+      "methods": 0,
+      "longestMethod": 0,
+      "dependencies": 0,
+      "responsibilities": [
+        "search-scoring"
+      ],
+      "warnings": [
+        "significant lines 598 > 400"
+      ],
+      "errors": []
+    }
+  ],
+  "additions": 0,
+  "warnings": [
+    {
+      "id": "ARCH-W-001",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
+      "message": "significant lines 625 > 400"
+    },
+    {
+      "id": "ARCH-W-002",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
+      "message": "methods 21 > 20"
+    },
+    {
+      "id": "ARCH-W-003",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
+      "message": "longest method 115 lines > 60"
+    },
+    {
+      "id": "ARCH-W-004",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-workspace.tsx",
+      "message": "significant lines 567 > 400"
+    },
+    {
+      "id": "ARCH-W-005",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-workspace.tsx",
+      "message": "longest method 210 lines > 60"
+    },
+    {
+      "id": "ARCH-W-006",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
+      "message": "significant lines 624 > 400"
+    },
+    {
+      "id": "ARCH-W-007",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
+      "message": "methods 24 > 20"
+    },
+    {
+      "id": "ARCH-W-008",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
+      "message": "longest method 148 lines > 60"
+    },
+    {
+      "id": "ARCH-W-009",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/types/domain.ts",
+      "message": "significant lines 598 > 400"
+    }
+  ],
+  "errors": [
+    {
+      "id": "ARCH-E-001",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-data.tsx",
+      "message": "longest method 115 lines > 100"
+    },
+    {
+      "id": "ARCH-E-002",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-workspace.tsx",
+      "message": "longest method 210 lines > 100"
+    },
+    {
+      "id": "ARCH-E-003",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/pages/market-segments.tsx",
+      "message": "longest method 148 lines > 100"
+    }
+  ],
+  "status": "FAIL",
+  "exitCode": 1
+}

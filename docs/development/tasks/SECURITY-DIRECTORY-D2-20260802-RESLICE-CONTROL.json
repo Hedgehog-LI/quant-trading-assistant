@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTROL.json",
   "startedAt": "2026-08-02T05:47:00Z",
   "lane": "L2",
-  "lifecycleState": "CANDIDATE_FROZEN",
+  "lifecycleState": "BLOCKED",
   "contract": {
     "path": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-CONTRACT.md",
     "version": "1",
@@ -490,6 +490,14 @@
       "at": "2026-08-02T07:50:00Z",
       "actor": "codex-parent-d2-reslice-recovery",
       "note": "Full frontend gate green (typecheck/lint 0-0/test 303-303/build); candidate commit 00820f1e2d3f81e50c055eb29a5ec4d2838fe2b2 with frozen frontend diff patch artifact 479d6bf4..."
+    },
+    {
+      "sequence": 7,
+      "from": "CANDIDATE_FROZEN",
+      "to": "BLOCKED",
+      "at": "2026-08-02T08:00:00Z",
+      "actor": "codex-parent-d2-reslice-recovery",
+      "note": "Architecture gate hard-fail on mandated full --files list: 3 errors (longest method >100 lines) in pre-existing page files market-data.tsx/market-workspace.tsx/market-segments.tsx (React render methods, baseline 671/604/669 lines, not D2-introduced). D2-owned files report errors=0. Cannot be waived (GOVERNANCE_V2_POLICY) and cannot be safely resolved in D2 scope (large refactor of untested multi-tab pages / detector fix is a separate governed task). See RESLICE-CHECKPOINT-BLOCKED.md."
     }
   ],
   "candidate": {
@@ -741,15 +749,16 @@
   },
   "architectureGate": {
     "required": true,
-    "candidateIdentity": "",
-    "status": "NOT_RUN",
-    "exitCode": -1,
-    "errorCount": 0,
-    "warningCount": 0,
+    "candidateIdentity": "00820f1e2d3f81e50c055eb29a5ec4d2838fe2b2",
+    "status": "FAIL",
+    "exitCode": 1,
+    "errorCount": 3,
+    "warningCount": 9,
     "warningDispositions": [],
-    "reportPath": "",
-    "reportSha256": "",
-    "generatedBy": "scripts/check-ai-architecture.mjs"
+    "reportPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-ARCH-REPORT.json",
+    "reportSha256": "a46cc5c961519ecd1309884647bc4326cf6adb2d89a6487811fd80ec8d2bf194",
+    "generatedBy": "scripts/check-ai-architecture.mjs",
+    "blockingReason": "3 ERROR 'longest method > 100 lines' in pre-existing page files (market-data.tsx 115, market-workspace.tsx 210, market-segments.tsx 148). These are React function-component render methods that existed at frontend baseline (671/604/669 lines); D2 added only 3-13 lines of SecuritySelector integration per file and did not introduce them. D2-owned files (SecuritySelector/securityDirectoryApi/syncPlanForm/domain.ts) report errors=0 (RESLICE-ARCH-REPORT-D2OWNED.json, be6031e4...). Cannot be waived (GOVERNANCE_V2_POLICY); resolving requires a separate governed refactor of untested multi-tab pages or a detector fix. Task BLOCKED."
   },
   "verification": {
     "candidateIdentity": "",

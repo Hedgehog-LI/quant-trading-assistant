@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/check-ai-architecture.mjs",
+  "generatedAt": "2026-08-02T07:56:51.957Z",
+  "candidateIdentity": "00820f1e2d3f81e50c055eb29a5ec4d2838fe2b2",
+  "base": "",
+  "manifestPath": "",
+  "architectureReviewCount": 0,
+  "files": [
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/components/SecuritySelector.tsx",
+      "lines": 285,
+      "methods": 6,
+      "longestMethod": 22,
+      "dependencies": 0,
+      "responsibilities": [],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/features/market-data/api/securityDirectoryApi.ts",
+      "lines": 141,
+      "methods": 7,
+      "longestMethod": 8,
+      "dependencies": 0,
+      "responsibilities": [
+        "search-scoring"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/features/market-data/utils/syncPlanForm.ts",
+      "lines": 92,
+      "methods": 3,
+      "longestMethod": 39,
+      "dependencies": 0,
+      "responsibilities": [],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/types/domain.ts",
+      "lines": 598,
+      "methods": 0,
+      "longestMethod": 0,
+      "dependencies": 0,
+      "responsibilities": [
+        "search-scoring"
+      ],
+      "warnings": [
+        "significant lines 598 > 400"
+      ],
+      "errors": []
+    }
+  ],
+  "additions": 0,
+  "warnings": [
+    {
+      "id": "ARCH-W-001",
+      "file": "/Users/joker/code/quant-trading-assistant-web/src/shared/types/domain.ts",
+      "message": "significant lines 598 > 400"
+    }
+  ],
+  "errors": [],
+  "status": "PASS",
+  "exitCode": 0
+}
