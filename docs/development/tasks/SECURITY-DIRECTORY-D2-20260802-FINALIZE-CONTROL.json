@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 3,
+  "taskId": "SECURITY-DIRECTORY-D2-20260802-FINALIZE",
+  "controlPath": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-FINALIZE-CONTROL.json",
+  "startedAt": "2026-08-02T12:15:00Z",
+  "lane": "L0",
+  "lifecycleState": "CONTRACT_FROZEN",
+  "contract": {
+    "path": "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-FINALIZE-CONTRACT.md",
+    "version": "1",
+    "sha256": "1a86e3423acae2db0c9276c397d3916cfa2321441c15c3fcd715274a8cd919f5",
+    "acceptanceCriteria": [
+      {
+        "id": "AC-01",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      }
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-CLOSEOUT",
+        "description": "Parent-run close-out: regenerate D2 arch report with repaired gate from both cwds; record cross-repo commit identities; run frontend+backend gates; no source edits.",
+        "acIds": [
+          "AC-01",
+          "AC-02",
+          "AC-03"
+        ],
+        "allowedWritePaths": [
+          "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-FINALIZE-CONTRACT.md",
+          "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-FINALIZE-CONTROL.json",
+          "docs/development/tasks/SECURITY-DIRECTORY-D2-20260802-RESLICE-ARCH-REPORT.json"
+        ],
+        "maxExpectedFiles": 3,
+        "maxProductionLineDelta": 50
+      }
+    ],
+    "testInventory": [
+      {
+        "testId": "TEST-D2CO-01",
+        "acIds": [
+          "AC-01"
+        ],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "scripts/tests/ai-governance.test.mjs",
+        "selector": "candidate-root makes baseline-aware classification cwd-independent"
+      },
+      {
+        "testId": "TEST-D2CO-02",
+        "acIds": [
+          "AC-02"
+        ],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "package.json",
+        "selector": "npm run test"
+      },
+      {
+        "testId": "TEST-D2CO-STATIC",
+        "acIds": [
+          "AC-03"
+        ],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "scripts/tests/ai-governance.test.mjs",
+        "selector": "baseline-aware repair keeps the full governance suite and strict no-baseline behavior green"
+      }
+    ],
+    "blockingAmendments": []
+  },
+  "git": {
+    "automation": "COMMIT",
+    "branch": "codex/security-directory-d2-20260802",
+    "baselineCommit": "d9cb052bcde9e69a03bcee787ecb806d4783c2ac",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-02T12:15:00Z",
+      "actor": "codex-parent-d2-finalize-1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-02T12:16:00Z",
+      "actor": "codex-parent-d2-finalize-1",
+      "note": "L0 contract-lite (renamed from CLOSEOUT after a baseline-hash typo). Re-uses RESLICE-frozen D2 ACs/test inventory."
+    }
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "",
+    "diffArtifactSha256": ""
+  },
+  "crossRepoCandidateRecord": {
+    "frontendRepo": "/Users/joker/code/quant-trading-assistant-web",
+    "frontendBaselineCommit": "80c38324f58ba58cf6f96884184e16c86b967f96",
+    "frontendCandidateCommit": "0cf382fec889bbecb567fd27064040b3901b9c27",
+    "frontendCandidateTree": "32c1dd3a8ef68e55711ca215e9f1a08f8d1b99f2",
+    "frontendBaselineToCandidatePatchSha256": "479d6bf4b9f2fdce39d90fa49bb6cb251bae55202e0b98027fa21c3674164b06",
+    "note": "Real frontend candidate commit (not a patch substitute). baseline->candidate patch SHA equals the RESLICE-frozen frontend diff patch SHA (479d6bf4...)."
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [],
+  "review": {
+    "omitted": true,
+    "omissionReason": "L0 contract-lite; fresh independent qta-code-reviewer is dispatched and recorded in roleRuns.",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "testDesignerOmissionReason": "L0 contract-lite; RESLICE froze D2 ACs/test inventory; user forbids re-dispatching a test designer.",
+  "architectureGate": {
+    "required": true,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": 0,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {
+        "required": true,
+        "status": "NOT_VERIFIED"
+      },
+      "AUTOMATION": {
+        "required": true,
+        "status": "NOT_VERIFIED"
+      },
+      "RUNTIME": {
+        "required": false,
+        "status": "NOT_REQUIRED"
+      },
+      "DEPLOYMENT": {
+        "required": false,
+        "status": "NOT_REQUIRED"
+      }
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
