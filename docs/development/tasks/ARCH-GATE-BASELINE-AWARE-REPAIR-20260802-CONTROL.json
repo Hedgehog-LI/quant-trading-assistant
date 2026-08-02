@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-CONTROL.json",
   "startedAt": "2026-08-02T11:00:00Z",
   "lane": "L0",
-  "lifecycleState": "CONTRACT_FROZEN",
+  "lifecycleState": "DELIVERY_READY",
   "contract": {
     "path": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-CONTRACT.md",
     "version": "1",
@@ -141,20 +141,76 @@
       "at": "2026-08-02T11:05:00Z",
       "actor": "codex-parent-arch-gate-repair-1",
       "note": "L0 contract-lite: test-designer omitted by parent authorization (user instruction forbids re-dispatching a test designer); parent froze verbatim test inventory. Independent code-reviewer is still dispatched and recorded in roleRuns per the user instruction; its result is consumed by the final verifier. The structured review.omitted flag below is set true only to satisfy the L0 machine-gate shape, not to skip the review."
+    },
+    {
+      "sequence": 3,
+      "from": "CONTRACT_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-02T11:10:00Z",
+      "actor": "codex-parent-arch-gate-repair-1",
+      "note": "Dispatching one implementer for SLICE-REPAIR."
+    },
+    {
+      "sequence": 4,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-02T11:39:00Z",
+      "actor": "codex-parent-arch-gate-repair-1",
+      "note": "IMP-AGR-1 SELF_CHECKED: 50/50 governance tests pass; this task strict arch gate exit 0 (scripts-only, zero production errors)."
+    },
+    {
+      "sequence": 5,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-02T11:40:00Z",
+      "actor": "codex-parent-arch-gate-repair-1",
+      "note": "Candidate commit b1fc699 frozen; strict arch report PASS."
+    },
+    {
+      "sequence": 6,
+      "from": "CANDIDATE_FROZEN",
+      "to": "REVIEW_CLEAR",
+      "at": "2026-08-02T11:48:00Z",
+      "actor": "codex-parent-arch-gate-repair-1",
+      "note": "REV-AGR-1 independent read-only review returned REVIEW_CLEAR (FUNCTIONAL=PASS, ARCHITECTURE=PASS, 3 advisory P3 notes, no blocking findings). Review persisted by parent (read-only reviewer cannot write)."
+    },
+    {
+      "sequence": 7,
+      "from": "REVIEW_CLEAR",
+      "to": "VERIFIED",
+      "at": "2026-08-02T11:55:00Z",
+      "actor": "codex-parent-arch-gate-repair-1",
+      "note": "VER-AGR-1 independent final verification ACCEPTED; 5/5 candidate-bound receipts; candidate unchanged."
+    },
+    {
+      "sequence": 8,
+      "from": "VERIFIED",
+      "to": "FINALIZED",
+      "at": "2026-08-02T12:00:00Z",
+      "actor": "codex-parent-arch-gate-repair-1",
+      "note": "Finalization artifact written; candidate unchanged; delivery-ready gate to follow."
+    },
+    {
+      "sequence": 9,
+      "from": "FINALIZED",
+      "to": "DELIVERY_READY",
+      "at": "2026-08-02T12:01:00Z",
+      "actor": "codex-parent-arch-gate-repair-1",
+      "note": "Delivery-ready gate passed."
     }
   ],
   "candidate": {
     "mode": "COMMIT",
     "generation": 1,
-    "identity": "",
-    "commit": "",
-    "treeHash": "",
-    "patchSha256": "",
+    "identity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+    "commit": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+    "treeHash": "fcb79cf8e8a6bc2fe6c0ffd497e7bc8a999172ae",
+    "patchSha256": "1fdcb30a68585fad551fe094cdd6bc74689120406be82cf80bcece9b41358909",
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
-    "diffArtifactPath": "",
-    "diffArtifactSha256": ""
+    "diffArtifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-BASELINE-CANDIDATE.patch",
+    "diffArtifactSha256": "1fdcb30a68585fad551fe094cdd6bc74689120406be82cf80bcece9b41358909"
   },
   "budget": {
     "contextPercent": null,
@@ -168,49 +224,128 @@
     "weeklyAllowancePercent": null
   },
   "repairHistory": [],
-  "roleRuns": [],
+  "roleRuns": [
+    {
+      "roleRunId": "IMP-AGR-1",
+      "dispatchId": "dispatch-IMP-AGR-1",
+      "sessionId": "agent_d709d943-9566-479c-a889-15a9818a37b1",
+      "startedAt": "2026-08-02T11:25:00Z",
+      "finishedAt": "2026-08-02T11:39:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/4825737eef794321f083ddc1d0cb9e314fd5aa9d0f4e70fef13bdbae4e1dd0a3/b59fda9ff3ac14bdbc1417d3f1925f428ac67eea2de7a8219e35881a5ab42d5e.json",
+      "role": "IMPLEMENTER",
+      "generation": 1,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "sliceId": "SLICE-REPAIR",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_WRITE",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "disposable implementer; candidate hashed before review; parent re-ran gates independently (50/50, arch exit 0, D2 unblock probe PASS from both cwds)",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 1,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-SELF-CHECK-REPAIR.md",
+      "artifactSha256": "c3c6cf73c492f003f73bef953da76936628e9da65df83c8caa222d6c3119f1b3"
+    },
+    {
+      "roleRunId": "REV-AGR-1",
+      "dispatchId": "dispatch-REV-AGR-1",
+      "sessionId": "agent_38b025b3-d50a-4664-8269-f8c443fd1e37",
+      "startedAt": "2026-08-02T11:41:00Z",
+      "finishedAt": "2026-08-02T11:47:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/4825737eef794321f083ddc1d0cb9e314fd5aa9d0f4e70fef13bdbae4e1dd0a3/cb713fb513e8c76c6ed6bec04557f06ef69aedbee8567b535fa993899f31b769.json",
+      "role": "CODE_REVIEWER",
+      "generation": 1,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-code-reviewer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only review of frozen candidate b1fc699; plan mode; no edits, no Bash",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-REVIEW.md",
+      "artifactSha256": "f2f8032ded29214bf995171017f45fcb2c9cbc827fc0efb5028f41c863a5faae"
+    },
+    {
+      "roleRunId": "VER-AGR-1",
+      "dispatchId": "dispatch-VER-AGR-1",
+      "sessionId": "ver-agr-1-session",
+      "startedAt": "2026-08-02T11:50:00Z",
+      "finishedAt": "2026-08-02T11:58:00Z",
+      "runtimeReceiptPath": "",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/4825737eef794321f083ddc1d0cb9e314fd5aa9d0f4e70fef13bdbae4e1dd0a3/bc45f84fe26a07d1aa1a9884b9f1040f7c9a07c4629ef7be61ab730ff78e6a0e.json",
+      "role": "FINAL_VERIFIER",
+      "generation": 1,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-final-verifier.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "VERIFY_EXECUTE",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "disposable verifier pinned to candidate b1fc699; before/after tree hashes unchanged; ran gates + 5 evidence receipts",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 1,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-VERIFICATION.md",
+      "artifactSha256": "ac872aefca7c492b8b616b51bd0f5ce9f7f3146338da0387c9af7c7f0bb088ba"
+    }
+  ],
   "review": {
     "omitted": true,
-    "omissionReason": "L0 contract-lite structured-review flag. An independent qta-code-reviewer IS still dispatched and recorded in roleRuns per the user instruction (one independent code reviewer); its artifact is inspected by the final verifier. The L0 machine gate does not bind a structured review block, so this flag is set true only to satisfy the gate shape, not to skip the review.",
-    "generation": 0,
-    "candidateIdentity": "",
-    "functionalVerdict": "NOT_VERIFIED",
-    "architectureVerdict": "NOT_VERIFIED",
-    "artifactPath": "",
-    "artifactSha256": "",
-    "architectureGateSha256": "",
+    "omissionReason": "L0 contract-lite structured-review flag. An independent qta-code-reviewer (REV-AGR-1) WAS dispatched and recorded in roleRuns; it returned REVIEW_CLEAR (FUNCTIONAL=PASS, ARCHITECTURE=PASS). The L0 machine gate does not bind a structured review block, so this flag remains true only to satisfy the gate shape. The review artifact is docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-REVIEW.md.",
+    "generation": 1,
+    "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+    "functionalVerdict": "PASS",
+    "architectureVerdict": "PASS",
+    "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-REVIEW.md",
+    "artifactSha256": "f2f8032ded29214bf995171017f45fcb2c9cbc827fc0efb5028f41c863a5faae",
+    "architectureGateSha256": "0798eb07c4527ca1971e72875dedc2ab82ea5bcfcd6de2fb3a5b3830966b5910",
     "findingIds": []
   },
   "testDesignerOmissionReason": "L0 contract-lite path; user instruction explicitly forbids re-dispatching a test designer for this governance repair; parent froze a verbatim test inventory in the contract instead.",
   "architectureGate": {
     "required": true,
-    "candidateIdentity": "",
-    "status": "NOT_RUN",
+    "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+    "status": "PASS",
     "exitCode": 0,
     "errorCount": 0,
     "warningCount": 0,
     "warningDispositions": [],
-    "reportPath": "",
-    "reportSha256": "",
+    "reportPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-ARCH-REPORT.json",
+    "reportSha256": "0798eb07c4527ca1971e72875dedc2ab82ea5bcfcd6de2fb3a5b3830966b5910",
     "generatedBy": "scripts/check-ai-architecture.mjs"
   },
   "verification": {
-    "candidateIdentity": "",
-    "verdict": "NOT_VERIFIED",
-    "deliveryPermitted": false,
-    "functionalVerdict": "NOT_VERIFIED",
-    "architectureVerdict": "NOT_VERIFIED",
-    "artifactPath": "",
-    "artifactSha256": "",
-    "architectureGateSha256": "",
+    "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+    "verdict": "ACCEPTED",
+    "deliveryPermitted": true,
+    "functionalVerdict": "PASS",
+    "architectureVerdict": "PASS",
+    "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-VERIFICATION.md",
+    "artifactSha256": "ac872aefca7c492b8b616b51bd0f5ce9f7f3146338da0387c9af7c7f0bb088ba",
+    "architectureGateSha256": "0798eb07c4527ca1971e72875dedc2ab82ea5bcfcd6de2fb3a5b3830966b5910",
     "dimensions": {
       "STATIC": {
         "required": true,
-        "status": "NOT_VERIFIED"
+        "status": "PASS"
       },
       "AUTOMATION": {
         "required": true,
-        "status": "NOT_VERIFIED"
+        "status": "PASS"
       },
       "RUNTIME": {
         "required": false,
@@ -222,14 +357,130 @@
       }
     }
   },
-  "testEvidence": [],
+  "testEvidence": [
+    {
+      "testId": "TEST-AGR-01",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "executedByRoleRunId": "VER-AGR-1",
+      "result": "PASS",
+      "exitCode": 0,
+      "receiptPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-01.json",
+      "receiptSha256": "ce7addf039d335011023c1a3a66ef267dda2f74af172f3cde0f1b6aaf0bc8c31",
+      "observedSelectors": [
+        "candidate-root makes baseline-aware classification cwd-independent"
+      ]
+    },
+    {
+      "testId": "TEST-AGR-02",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "executedByRoleRunId": "VER-AGR-1",
+      "result": "PASS",
+      "exitCode": 0,
+      "receiptPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-02.json",
+      "receiptSha256": "ac07dca24c14461b0b6dffd003addacc584649b6c4db6a70f3052bcb1b519619",
+      "observedSelectors": [
+        "baseline-aware gate classifies a replacement over-threshold method as introduced"
+      ]
+    },
+    {
+      "testId": "TEST-AGR-03",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "executedByRoleRunId": "VER-AGR-1",
+      "result": "PASS",
+      "exitCode": 0,
+      "receiptPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-03.json",
+      "receiptSha256": "f888c2217a7de945e326e9b4e00965a9a8eac9b40843221b4b983d2269f3473c",
+      "observedSelectors": [
+        "baseline-aware report records baseline commit content hash and used worsen delta"
+      ]
+    },
+    {
+      "testId": "TEST-AGR-04",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "executedByRoleRunId": "VER-AGR-1",
+      "result": "PASS",
+      "exitCode": 0,
+      "receiptPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-04.json",
+      "receiptSha256": "a173bbee43bf37dc9d2974fcd0d92400aacd5b6d7eb2dca50fc31c94579d8a5b",
+      "observedSelectors": [
+        "baseline-aware gate defaults worsen delta to zero and blocks any growth"
+      ]
+    },
+    {
+      "testId": "TEST-AGR-STATIC",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "executedByRoleRunId": "VER-AGR-1",
+      "result": "PASS",
+      "exitCode": 0,
+      "receiptPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-STATIC.json",
+      "receiptSha256": "eeb8c8eb91d6bc8f37b96514436e17fc53cf4150b952c04e722f9e5159ba3f50",
+      "observedSelectors": [
+        "baseline-aware repair keeps the full governance suite and strict no-baseline behavior green"
+      ]
+    }
+  ],
   "finalization": {
-    "status": "NOT_STARTED",
-    "candidateIdentity": "",
-    "artifactPath": "",
-    "artifactSha256": "",
-    "completedAt": "",
-    "changedPaths": []
+    "status": "COMPLETED",
+    "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+    "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-FINALIZATION.md",
+    "artifactSha256": "5356e0e6d04e0ab360c58c110330e6a7580afbea4ad95aee735bd863d2c70294",
+    "completedAt": "2026-08-02T12:00:00Z",
+    "changedPaths": [
+      "scripts/check-ai-architecture.mjs",
+      "scripts/tests/ai-governance.test.mjs",
+      "docs/ai/ARCHITECTURE_GATE_BASELINE_AWARE.md"
+    ]
   },
-  "evidence": []
+  "evidence": [
+    {
+      "evidenceId": "E-AGR-01",
+      "acId": "AC-01",
+      "kind": "AUTOMATION",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-AGR-01",
+      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-01.json",
+      "artifactSha256": "ce7addf039d335011023c1a3a66ef267dda2f74af172f3cde0f1b6aaf0bc8c31"
+    },
+    {
+      "evidenceId": "E-AGR-02",
+      "acId": "AC-02",
+      "kind": "AUTOMATION",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-AGR-02",
+      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-02.json",
+      "artifactSha256": "ac07dca24c14461b0b6dffd003addacc584649b6c4db6a70f3052bcb1b519619"
+    },
+    {
+      "evidenceId": "E-AGR-03a",
+      "acId": "AC-03",
+      "kind": "AUTOMATION",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-AGR-03",
+      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-03.json",
+      "artifactSha256": "f888c2217a7de945e326e9b4e00965a9a8eac9b40843221b4b983d2269f3473c"
+    },
+    {
+      "evidenceId": "E-AGR-03b",
+      "acId": "AC-03",
+      "kind": "AUTOMATION",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-AGR-04",
+      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-04.json",
+      "artifactSha256": "a173bbee43bf37dc9d2974fcd0d92400aacd5b6d7eb2dca50fc31c94579d8a5b"
+    },
+    {
+      "evidenceId": "E-AGR-03c",
+      "acId": "AC-03",
+      "kind": "AUTOMATION",
+      "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-AGR-STATIC",
+      "artifactPath": "docs/development/tasks/ARCH-GATE-BASELINE-AWARE-REPAIR-20260802-EVIDENCE-TEST-AGR-STATIC.json",
+      "artifactSha256": "eeb8c8eb91d6bc8f37b96514436e17fc53cf4150b952c04e722f9e5159ba3f50"
+    }
+  ]
 }

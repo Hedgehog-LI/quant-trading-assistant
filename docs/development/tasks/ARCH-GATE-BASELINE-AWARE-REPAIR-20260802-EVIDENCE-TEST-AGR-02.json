@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "ARCH-GATE-BASELINE-AWARE-REPAIR-20260802",
+  "roleRunId": "VER-AGR-1",
+  "sessionId": "ver-agr-1-session",
+  "testId": "TEST-AGR-02",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+  "command": [
+    "/opt/homebrew/Cellar/node/26.0.0/bin/node",
+    "--test",
+    "scripts/tests/ai-governance.test.mjs"
+  ],
+  "startedAt": "2026-08-02T11:55:24.481Z",
+  "finishedAt": "2026-08-02T11:55:27.809Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "6e1352d3255bde9a7365d35dec55ae00ec05116d8081e94505cb27ac48a1f4a9",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "baseline-aware gate classifies a replacement over-threshold method as introduced"
+  ],
+  "observedSelectors": [
+    "baseline-aware gate classifies a replacement over-threshold method as introduced"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+    "tree": "fcb79cf8e8a6bc2fe6c0ffd497e7bc8a999172ae",
+    "statusSha256": "c7d6d9450878cde66abaee4f5d4c25e3643fdffdcd63f8861b2b3dc69af580a3",
+    "diffSha256": "17e7d9b62e001f32dcf09a7c37766d713632b4c504a932817c89bd0697a2254c"
+  },
+  "candidateAfter": {
+    "head": "b1fc6993073b4541029e2a7837b2473b6c054caf",
+    "tree": "fcb79cf8e8a6bc2fe6c0ffd497e7bc8a999172ae",
+    "statusSha256": "c7d6d9450878cde66abaee4f5d4c25e3643fdffdcd63f8861b2b3dc69af580a3",
+    "diffSha256": "17e7d9b62e001f32dcf09a7c37766d713632b4c504a932817c89bd0697a2254c"
+  },
+  "candidateUnchanged": true
+}
