@@ -2,17 +2,17 @@
   "schemaVersion": 1,
   "generatedBy": "scripts/run-ai-evidence-command.mjs",
   "taskId": "P17-SECTOR-ANALYTICS-DESIGN-20260802",
-  "roleRunId": "FV-RUN-1",
-  "sessionId": "FV-RUN-1",
+  "roleRunId": "FV-RUN-5",
+  "sessionId": "FV-RUN-5",
   "testId": "TEST-GOV-01",
   "candidateMode": "SNAPSHOT",
-  "candidateIdentity": "3fdb49ddf4339bf3cc7f3077c0457a4abbfb7f883873c972656ed5907378a92b",
+  "candidateIdentity": "fed46e05d2fdb19a150bf83ce8be9f6876b3768ff3dc3e7a787767f5d2ffd574",
   "command": [
     "node",
     "scripts/validate-ai-governance.mjs"
   ],
-  "startedAt": "2026-08-02T15:23:37.122Z",
-  "finishedAt": "2026-08-02T15:23:37.405Z",
+  "startedAt": "2026-08-02T15:45:23.917Z",
+  "finishedAt": "2026-08-02T15:45:24.084Z",
   "exitCode": 0,
   "result": "PASS",
   "timedOut": false,
@@ -27,16 +27,16 @@
   ],
   "selectorError": "",
   "candidateBefore": {
-    "head": "54c809ed1286b27c7adc9e3712bfa9671a9d7a88",
-    "tree": "9b892ced170be30fa1ccec6603d507781085d7d8",
-    "statusSha256": "baec90e5087c160d2fb9eecd1ad021f9c1de0e8c46ad964c39927d714db1b13f",
-    "diffSha256": "53d842ba2f168a0d0763667cbc77ab17523cff03f7e71773cbca6f4f98111aec"
+    "head": "a31128dcc690b18000d129a57c109401f22bc17a",
+    "tree": "8c85e0ce6b792de162fe403b3d340cbaa85e1eb7",
+    "statusSha256": "0505493a31fd1dc5f155f6cd5a2dc0b1cf1b096774c2eaa3a4f10b0d411434f1",
+    "diffSha256": "298c62159abb81a473b42b8ac1c85976dc2bd80b4e2c3af449644b7d1af60f9d"
   },
   "candidateAfter": {
-    "head": "54c809ed1286b27c7adc9e3712bfa9671a9d7a88",
-    "tree": "9b892ced170be30fa1ccec6603d507781085d7d8",
-    "statusSha256": "baec90e5087c160d2fb9eecd1ad021f9c1de0e8c46ad964c39927d714db1b13f",
-    "diffSha256": "53d842ba2f168a0d0763667cbc77ab17523cff03f7e71773cbca6f4f98111aec"
+    "head": "a31128dcc690b18000d129a57c109401f22bc17a",
+    "tree": "8c85e0ce6b792de162fe403b3d340cbaa85e1eb7",
+    "statusSha256": "0505493a31fd1dc5f155f6cd5a2dc0b1cf1b096774c2eaa3a4f10b0d411434f1",
+    "diffSha256": "298c62159abb81a473b42b8ac1c85976dc2bd80b4e2c3af449644b7d1af60f9d"
   },
   "candidateUnchanged": true
 }

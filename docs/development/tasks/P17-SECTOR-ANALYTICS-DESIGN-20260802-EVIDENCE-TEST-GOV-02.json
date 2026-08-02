@@ -2,21 +2,21 @@
   "schemaVersion": 1,
   "generatedBy": "scripts/run-ai-evidence-command.mjs",
   "taskId": "P17-SECTOR-ANALYTICS-DESIGN-20260802",
-  "roleRunId": "FV-RUN-1",
-  "sessionId": "FV-RUN-1",
+  "roleRunId": "FV-RUN-5",
+  "sessionId": "FV-RUN-5",
   "testId": "TEST-GOV-02",
   "candidateMode": "SNAPSHOT",
-  "candidateIdentity": "3fdb49ddf4339bf3cc7f3077c0457a4abbfb7f883873c972656ed5907378a92b",
+  "candidateIdentity": "fed46e05d2fdb19a150bf83ce8be9f6876b3768ff3dc3e7a787767f5d2ffd574",
   "command": [
     "node",
     "scripts/run-ai-governance-gates.mjs"
   ],
-  "startedAt": "2026-08-02T15:23:54.877Z",
-  "finishedAt": "2026-08-02T15:24:02.571Z",
+  "startedAt": "2026-08-02T15:45:24.244Z",
+  "finishedAt": "2026-08-02T15:45:29.897Z",
   "exitCode": 0,
   "result": "PASS",
   "timedOut": false,
-  "stdoutSha256": "fab433fbf405774e3b69d24d786ec64a9b6b71a95a5c7cab0251701ab3c9062e",
+  "stdoutSha256": "a44ee15b124e0f0a7e96a28beae03e7793072a62aa8f8b21db4673e95171691c",
   "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "reportFiles": [],
   "expectedSelectors": [
@@ -27,16 +27,16 @@
   ],
   "selectorError": "",
   "candidateBefore": {
-    "head": "54c809ed1286b27c7adc9e3712bfa9671a9d7a88",
-    "tree": "9b892ced170be30fa1ccec6603d507781085d7d8",
-    "statusSha256": "baec90e5087c160d2fb9eecd1ad021f9c1de0e8c46ad964c39927d714db1b13f",
-    "diffSha256": "53d842ba2f168a0d0763667cbc77ab17523cff03f7e71773cbca6f4f98111aec"
+    "head": "a31128dcc690b18000d129a57c109401f22bc17a",
+    "tree": "8c85e0ce6b792de162fe403b3d340cbaa85e1eb7",
+    "statusSha256": "43a18f749bb62129533a1333b79b766af69c03fecbf074ff48666f5ef488a651",
+    "diffSha256": "6d8a55589fac3b86ef6ea5d072f77f325d5e7d7c6454a7e8b6ab748a69dcb226"
   },
   "candidateAfter": {
-    "head": "54c809ed1286b27c7adc9e3712bfa9671a9d7a88",
-    "tree": "9b892ced170be30fa1ccec6603d507781085d7d8",
-    "statusSha256": "baec90e5087c160d2fb9eecd1ad021f9c1de0e8c46ad964c39927d714db1b13f",
-    "diffSha256": "53d842ba2f168a0d0763667cbc77ab17523cff03f7e71773cbca6f4f98111aec"
+    "head": "a31128dcc690b18000d129a57c109401f22bc17a",
+    "tree": "8c85e0ce6b792de162fe403b3d340cbaa85e1eb7",
+    "statusSha256": "43a18f749bb62129533a1333b79b766af69c03fecbf074ff48666f5ef488a651",
+    "diffSha256": "6d8a55589fac3b86ef6ea5d072f77f325d5e7d7c6454a7e8b6ab748a69dcb226"
   },
   "candidateUnchanged": true
 }

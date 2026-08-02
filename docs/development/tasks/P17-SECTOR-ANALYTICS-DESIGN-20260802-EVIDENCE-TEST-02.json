@@ -4,39 +4,39 @@
   "taskId": "P17-SECTOR-ANALYTICS-DESIGN-20260802",
   "roleRunId": "FV-RUN-5",
   "sessionId": "FV-RUN-5",
-  "testId": "TEST-01",
+  "testId": "TEST-02",
   "candidateMode": "SNAPSHOT",
   "candidateIdentity": "fed46e05d2fdb19a150bf83ce8be9f6876b3768ff3dc3e7a787767f5d2ffd574",
   "command": [
     "node",
     "scripts/tests/p17-sector-analytics-design-structure.test.mjs"
   ],
-  "startedAt": "2026-08-02T15:45:23.109Z",
-  "finishedAt": "2026-08-02T15:45:23.220Z",
+  "startedAt": "2026-08-02T15:45:23.396Z",
+  "finishedAt": "2026-08-02T15:45:23.492Z",
   "exitCode": 0,
   "result": "PASS",
   "timedOut": false,
-  "stdoutSha256": "d3589f537fb610e61c60a67a4a546bfc58aead02e9f03861177d3fe84f8465c8",
+  "stdoutSha256": "9f1d683044c1f586aa9fe5703c659649fd769324fde814fc0e122d1732d1a59d",
   "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "reportFiles": [],
   "expectedSelectors": [
-    "P17-SECTOR-ANALYTICS-AC01"
+    "P17-SECTOR-ANALYTICS-AC02"
   ],
   "observedSelectors": [
-    "P17-SECTOR-ANALYTICS-AC01"
+    "P17-SECTOR-ANALYTICS-AC02"
   ],
   "selectorError": "",
   "candidateBefore": {
     "head": "a31128dcc690b18000d129a57c109401f22bc17a",
     "tree": "8c85e0ce6b792de162fe403b3d340cbaa85e1eb7",
-    "statusSha256": "f5dd135d302d5219a490e7d15f1d680bfcb53a2249ff643b553f459928a73068",
-    "diffSha256": "3cda06dc115219062147e240e28d7ab1201b2029b2a5abd6d6d0aa3c6e5cbbf5"
+    "statusSha256": "be38d19c61e557cfac01564ecc9fd3b32c6046e1e468f47d1a4aa30a5ecc7595",
+    "diffSha256": "298c62159abb81a473b42b8ac1c85976dc2bd80b4e2c3af449644b7d1af60f9d"
   },
   "candidateAfter": {
     "head": "a31128dcc690b18000d129a57c109401f22bc17a",
     "tree": "8c85e0ce6b792de162fe403b3d340cbaa85e1eb7",
-    "statusSha256": "f5dd135d302d5219a490e7d15f1d680bfcb53a2249ff643b553f459928a73068",
-    "diffSha256": "3cda06dc115219062147e240e28d7ab1201b2029b2a5abd6d6d0aa3c6e5cbbf5"
+    "statusSha256": "be38d19c61e557cfac01564ecc9fd3b32c6046e1e468f47d1a4aa30a5ecc7595",
+    "diffSha256": "298c62159abb81a473b42b8ac1c85976dc2bd80b4e2c3af449644b7d1af60f9d"
   },
   "candidateUnchanged": true
 }
