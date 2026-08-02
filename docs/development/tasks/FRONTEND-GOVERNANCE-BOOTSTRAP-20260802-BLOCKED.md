@@ -14,6 +14,24 @@ The completion verifier directed: split into per-repo ledgers; rewrite testInven
 
 Net: both repos remain BLOCKED at the dispatch-audit / anchor-chain / selector-in-source gates after executing the verifier's directive in full. The deliverables are complete and independently verified green; the remaining gap is purely the single-repo governance-tooling model.
 
+## Update (third attempt — control-repo fresh-taskId AC-06 ledger + deterministic anchor-chain block)
+Per the verifier's third directive, created a NEW control-repo task `FRONTEND-GOVERNANCE-FACTFIX-20260802` (fresh taskId → no anchor history) scoped to AC-06 only, lane L0, COMMIT candidate. Validated at CONTRACT_DRAFTED (passed) and advanced to CONTRACT_FROZEN with candidate `46df0de`, which created the first anchor.
+
+Then hit a cascade of deterministic blocks, each confirmed by direct gate execution:
+1. **ENOBUFS**: the control candidate diff (`563e84a..HEAD`) grew to 1.54MB after the BLOCKED/ledger artifacts were committed, exceeding `execFileSync`'s default 1MB buffer in `check-ai-task-control.mjs:762` (`git diff --binary`). The validator has no `maxBuffer` on that call — a validator limitation for >1MB candidates. Switching to SNAPSHOT mode (identity = manifest sha256) avoids the binary-diff check.
+2. **Anchor-chain rigidity (deterministic)**: the first CONTRACT_FROZEN validation anchored a snapshot of the control file. After anchoring, `validateMonotonicControl` (check-ai-task-control.mjs:871-910) forbids changing `baselineCommit`, `preExistingDirtyPaths`, `candidate.identity` (without a generation bump), or any `contract.*` field. Concretely: (a) switching candidate COMMIT→SNAPSHOT required a generation bump (done, gen2); (b) the untracked `.zcode/plans/plan-sess_*.md` is counted as a changed path by `actualChangedPaths` (line 638 includes `git ls-files --others`), so it must be in the SNAPSHOT manifest or `preExistingDirtyPaths` — but adding it to `preExistingDirtyPaths` is blocked by the anchor (line 875, "Git baseline or pre-existing dirty-path manifest changed after anchoring"); (c) there is no valid backward transition out of CONTRACT_FROZEN to re-freeze correctly (line 89 only allows forward ordered transitions or backward-to-IMPLEMENTING).
+3. The anchor chain is specifically designed to prevent post-freeze manipulation, so the ledger cannot be iteratively repaired after an incomplete first freeze — the only way through is a governance-tooling change.
+
+**Control-repo AC-06 deliverable itself is complete and verified** (negative grep clean across the 7 fact docs, ADR/frozen-artifact zero diff, run-ai-governance-gates.mjs green 58/58). The block is purely the ledger's anchor-chain + buffer limitations for this multi-artifact candidate.
+
+## Definitive conclusion + the two user decisions required
+Both repos' `node scripts/check-ai-delivery-ready.mjs` cannot exit 0 with the existing governance-ledger tooling. The deliverables are 100% complete and independently verified green. To reach DELIVERY_READY, one of these **governed governance-tooling changes** (each itself a separate governed task requiring user approval — not inline reinterpretations) is needed:
+
+- **(A) Web repo dispatch store**: either (i) run the web-repo `/qta-run` lifecycle from a ZCode session whose `ZCODE_PROJECT_DIR` is the web repo (so the Hook records dispatch receipts there), or (ii) a governed change to `dispatchAuditErrors` to accept a cross-repo dispatch manifest, or (iii) a governed change to let the Hook record dispatch receipts in every repo whose paths a dispatch touches.
+- **(B) Validator buffer + anchor flexibility**: a governed change to add `maxBuffer` to the `git diff --binary` call (check-ai-task-control.mjs:762) and/or allow `preExistingDirtyPaths`/baseline refinement under a generation bump.
+
+Without one of (A) and (B), the single-repo ledger cannot certify this cross-repo task to DELIVERY_READY. This is recorded as BLOCKED per orchestration policy (same structural failure, no in-contract resolution).
+
 
 
 Per QTA orchestration policy, this records an evidence-backed BLOCKED state because the same structural failure (the single-repo governance ledger cannot certify this cross-repo task to DELIVERY_READY) cannot be resolved within the frozen contract without a governance-tooling change. The deliverables themselves are complete and independently verified by direct gate execution; the BLOCKED is specifically about the `node scripts/check-ai-delivery-ready.mjs <control>` gate, which the explicit hard requirement demands to exit 0 before push.

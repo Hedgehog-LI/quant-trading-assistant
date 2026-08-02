@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "algorithm": "sha256(sorted JSON entries: path,type,sha256)",
+  "root": ".",
+  "entrySetSha256": "14a77912fe0f1fb4ba9d012c112f0d7f069ba71e0311169a1e9bc930bd25140a",
+  "entries": [
+    {
+      "path": "docs/acceptance/ACCEPTANCE_LOG.md",
+      "type": "file",
+      "sha256": "86622c272694141154b6e2b2488a820239ef1764faef6b2565b19282002fcb6a"
+    },
+    {
+      "path": "docs/AI_HANDOFF.md",
+      "type": "file",
+      "sha256": "402618c0b2e91db1bab5509fa4778cc31b23d7297d399f1225f9e1e7d9e33a37"
+    },
+    {
+      "path": "docs/ai/HANDOFF_2026-07-17_security_directory_search.md",
+      "type": "file",
+      "sha256": "d8213a41fa436effded64875ac7029741b8e46844f8aee87fa8b6db9860cfb5c"
+    },
+    {
+      "path": "docs/BUILD_CHECKLIST.md",
+      "type": "file",
+      "sha256": "595701451f33d8fdaefa2b37d37f6f953b585f765eec79f1a5a120f00ee12ec3"
+    },
+    {
+      "path": "docs/CURRENT_ARCHITECTURE_AND_MODULES.md",
+      "type": "file",
+      "sha256": "ac82ac621b4d26495b392c027f1f000faeabdf3a430a44df5c8aa04ae50df109"
+    },
+    {
+      "path": "docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md",
+      "type": "file",
+      "sha256": "9e5735e4ad276f56a84ca66c20cd70d0c550c609e40a39023361a18524bb176b"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-artifact-agents.md",
+      "type": "file",
+      "sha256": "40c06a251fe1db0a48230861012877438fd2702066cf06e0826ad9fb76eda90e"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-artifact-claude.md",
+      "type": "file",
+      "sha256": "30d00f7536a9eefbbad3c0d46a94aa8636ba5357f23ea7faa8c47202006f3df5"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-artifact-governance-source.md",
+      "type": "file",
+      "sha256": "76d626dddc26f8ebf13f55d02990a210ce998c57257eb9e1dc24bef3bccee49b"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-BLOCKED.md",
+      "type": "file",
+      "sha256": "c1a3b43c566592ed24eb3fced8a51ca02ce3869d70574f6dc8b9ccccbe845838"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-CONTRACT.md",
+      "type": "file",
+      "sha256": "31f9794c561e0470c39741d72202a819a08af7552967f976a6be3ea3d0b68cc2"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-control-candidate-diff.patch",
+      "type": "file",
+      "sha256": "e3cf3820c97225477a2c5c719aca38f621f9f505236efb009e452db152568bb7"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-CONTROL.json",
+      "type": "file",
+      "sha256": "b8483341f6afd2439e7ed3a2d75c6a39d03436fbca05926b0ae708171751f48a"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-FINALIZATION.md",
+      "type": "file",
+      "sha256": "f0e957908314065c102a7c801771c54a02d02beb7bc2c6455ab9857699808462"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-REVIEW-G1.md",
+      "type": "file",
+      "sha256": "1ebcd5e92bd6ed438b6d0bff8bb4b27dac90fbe24768aca10560ce7e187cb32f"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-01.receipt.json",
+      "type": "file",
+      "sha256": "dbb841dc4ab2a21e4d11a711f420ff80f4a93058cfab549fca6c637991c4334d"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-02.receipt.json",
+      "type": "file",
+      "sha256": "27e64aa902982c4a8b3b4c9697467eacfe5952765e221d574902a5af6b6ff186"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-03.receipt.json",
+      "type": "file",
+      "sha256": "6f5a6111b037b60589a2b7308359294ddaa6203b258b770c3f3f11be1603d37b"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-04.receipt.json",
+      "type": "file",
+      "sha256": "f843f339cc8c47331954f96122a3b9dbd20006114430263eee7dfe7af8141003"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-05a.receipt.json",
+      "type": "file",
+      "sha256": "22754576d30f2822ce3269f18276389b7258aa33baf83726a9454e017e6cb847"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-06.receipt.json",
+      "type": "file",
+      "sha256": "17de4b3be527e51c9b70eb2c0c5f376ec73726b22a2dbc70304cba10fc59fe64"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-07.receipt.json",
+      "type": "file",
+      "sha256": "2aa8b91629fd9fa8a597e86b014f633082b2cfc08d1814eb6e218513a2203680"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-08a.receipt.json",
+      "type": "file",
+      "sha256": "60a321d4a3e56d74a607b4e204ccc139a0bc60a8eafd2253313cc2d89e3a9b29"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-TEST-08b.receipt.json",
+      "type": "file",
+      "sha256": "4837efd81b8bf82e7978178ab7e26540e7eb877cb76e2cee88df7e2b2bdca538"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-VERIFICATION.md",
+      "type": "file",
+      "sha256": "4a997883cfab18f3b06bb5da0fd7fd2a7cf3a7bd4721ad377dc6f6df4e5dc16e"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-web-arch-report.json",
+      "type": "file",
+      "sha256": "6ba8d10ee0dc30f42310c80453128cdc2cc989451569a8ca9a615be20a24bdcc"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-BOOTSTRAP-20260802-web-candidate-diff.patch",
+      "type": "file",
+      "sha256": "b26a6da24370ba09713bed7a65eb40c9b98ae5731a3e30f2baeb09d67bf96736"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-FACTFIX-20260802-candidate-diff.patch",
+      "type": "file",
+      "sha256": "ec7f8fad780b639f37b492665ff356d95b27c35a1326e5214a552866c2644231"
+    },
+    {
+      "path": "docs/development/tasks/FRONTEND-GOVERNANCE-FACTFIX-20260802-CONTRACT.md",
+      "type": "file",
+      "sha256": "91c0e3953b29fc3a9603c40a5685dbe1b12780defcb4d361cdd4793d6d0a1489"
+    },
+    {
+      "path": "docs/features/SECURITY_DIRECTORY_SEARCH_DESIGN.md",
+      "type": "file",
+      "sha256": "77097144efb26c261ff237c7aa37b8534e7e50ccb8e34050f99b8a0ff3e40ca5"
+    },
+    {
+      "path": "docs/PRODUCT_BLUEPRINT.md",
+      "type": "file",
+      "sha256": "498c21b102415a94db190b01f335659856db8b4c38b43a94424a24bdf76f7cc0"
+    }
+  ]
+}
