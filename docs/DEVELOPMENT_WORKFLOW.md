@@ -91,6 +91,9 @@
 - 更新 `AI_HANDOFF.md`（只保留当前接手事实，历史进 `DEVELOPMENT_LOG`，不无限追加）。
 - 必要时更新 `BUILD_CHECKLIST.md`（**只有实际验收通过才勾选**）。
 - 实测结果追加 `acceptance/ACCEPTANCE_LOG.md`（用 `docs/templates/ACCEPTANCE_TEMPLATE.md`）。
+- 任务改变用户可见能力、完成度、优先级或验证层级时，必须按
+  `features/BUILD_STATUS_BOARD_V2_DESIGN.md §6` 同步建设看板：更新能力节点、追加最近交付、刷新快照时间和
+  可核实的提交/验收证据。只改代码或日志而未同步看板，不算交付收口完成。
 - 长任务 / 中断任务 / 跨模型接力任务：用 `docs/templates/TASK_HANDOFF_TEMPLATE.md` 新增 `docs/ai/HANDOFF_YYYY-MM-DD_<topic>.md`，记录当前 git 状态、变更文件、已跑命令、失败点和下一步提示词。
 - 父协调者创建 `finalization` 提交。可先 checkpoint-push 任务分支备份；只有 accepted revision
   才能 delivery-push，禁止自动直推受保护/default 分支。
@@ -106,7 +109,7 @@
 | API 变化（新增/修改/删除接口） | 是 | `api/API_INDEX.md` + 对应 `api/*.md` + `mock/MOCK_REMOTE_CONTRACT.md` |
 | DB 变化（新表/字段/migration） | 是 | 新增 `src/main/resources/db/migration/V*.sql` + `DATABASE_DESIGN.md` + `CURRENT_ARCHITECTURE_AND_MODULES.md` |
 | Mock 契约变化（key/ID/计算口径） | 是 | `mock/MOCK_REMOTE_CONTRACT.md` |
-| 产品状态/功能完成度/优先级/路线图变化 | 是 | `BUILD_CHECKLIST.md` + `PRODUCT_BLUEPRINT.md` + 前端 `src/features/build-status/api/buildStatusData.ts` + `buildStatusData.test.ts` |
+| 产品状态/功能完成度/优先级/验证层级/路线图变化 | 是 | `BUILD_CHECKLIST.md` + `PRODUCT_BLUEPRINT.md` + `features/BUILD_STATUS_BOARD_V2_DESIGN.md` 规定的前端快照、最近交付与测试 |
 | 重要架构决策 | 是 | 新增 `decisions/ADR-XXXX-*.md` + 更新 `ADR_INDEX.md` |
 | 重要开发记录 | 产品/架构/功能/缺陷/契约/治理有实质变化时 | `development/DEVELOPMENT_LOG.md` 追加一条（用 `DEVELOPMENT_LOG_TEMPLATE.md`）；普通问答/只读检查/错别字不追加 |
 | 验收执行 | 是 | `acceptance/ACCEPTANCE_LOG.md` 追加 |

@@ -28,6 +28,7 @@ Verified candidate entry-set SHA-256:
 | Acceptance log links evidence and verdict | | |
 | AI handoff contains current facts only | | |
 | Capability matrix uses evidence-based status | | |
+| User-visible capability changes update the V2 board node, recent delivery, snapshot date, and verifiable revision evidence | | |
 | Deployment/migration instructions are present when required | | |
 | No secret, local credential, or runtime artifact is tracked | | |
 | Governance validation passes | | |

@@ -40,6 +40,7 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 | 前端开发 | `FRONTEND_ARCHITECTURE.md`、`mock/MOCK_REMOTE_CONTRACT.md`、对应 feature 设计；启用 `qta-frontend-implementation` skill |
 | API 联调 | `api/API_INDEX.md`、对应 `api/*.md`、`mock/MOCK_REMOTE_CONTRACT.md` |
 | Mock 开发 | `mock/MOCK_REMOTE_CONTRACT.md`、对应 `features/*/api/*Api.ts` |
+| 建设看板 / 能力进度 / 最近交付 | `features/BUILD_STATUS_BOARD_V2_DESIGN.md`、`BUILD_CHECKLIST.md`、`development/DEVELOPMENT_LOG.md`、`acceptance/ACCEPTANCE_LOG.md` |
 | 长任务断点 / 上下文压缩 / 跨工具交接 | 当前任务契约、diff、验证证据；启用 `qta-task-checkpoint` skill |
 | 独立测试验收 | 当前任务契约、冻结 diff、实现者自检证据、`acceptance/ACCEPTANCE_LOG.md`；在未参与实现的干净上下文启用 `qta-independent-verification` skill |
 | 交付与文档收口 | 独立验收报告、最终 diff、受影响的唯一事实来源；启用 `qta-delivery-finalization` skill |
@@ -51,7 +52,7 @@ Quant Trading Assistant：本地优先、可服务器部署的交易辅助系统
 | --- | --- |
 | 已实现 API 清单 | `api/API_INDEX.md`（链接到 `api/*.md`、`API_TODAY_MVP.md`，不复制定义） |
 | 当前架构与模块 | `CURRENT_ARCHITECTURE_AND_MODULES.md` |
-| 建设进度 / 勾选 | `BUILD_CHECKLIST.md` |
+| 建设进度 / 勾选 | `BUILD_CHECKLIST.md`；页面模型与状态规则见 `features/BUILD_STATUS_BOARD_V2_DESIGN.md` |
 | Mock / Remote 契约 | `mock/MOCK_REMOTE_CONTRACT.md` |
 | 架构决策 | `decisions/ADR_INDEX.md` + `decisions/ADR-XXXX-*.md` |
 | 开发历史 | `development/DEVELOPMENT_LOG.md` |
