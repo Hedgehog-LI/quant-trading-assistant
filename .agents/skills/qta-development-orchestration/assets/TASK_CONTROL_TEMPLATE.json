@@ -59,7 +59,7 @@
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
-    "diffArtifactPath": "",
+    "diffArtifactPath": ".qta-governance/candidates/<TASK-ID>/generation-1.patch",
     "diffArtifactSha256": ""
   },
   "budget": {

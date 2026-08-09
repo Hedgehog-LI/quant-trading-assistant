@@ -264,6 +264,23 @@ test("enforces repair generations and per-lane contract budgets", () => {
   assert.match(errors, /implementer role run missing for generation 2/);
 });
 
+test("rejects cross-repository write paths and excessive role dispatches", () => {
+  const control = validVerifiedControl();
+  control.contract.implementationSlices[0].allowedWritePaths = ["../another-repository/src"];
+  control.roleRuns.push(...Array.from({ length: 11 }, (_, index) => {
+    const attempt = role("IMPLEMENTER", 1, `extra-${index}`);
+    attempt.executionOutcome = "FAILED";
+    attempt.status = "BLOCKED";
+    attempt.artifactAccepted = false;
+    attempt.artifactPath = "";
+    attempt.artifactSha256 = "";
+    return attempt;
+  }));
+  const errors = validateTaskControl(control).errors.join("\n");
+  assert.match(errors, /must stay inside one repository/);
+  assert.match(errors, /role-run budget exceeded/);
+});
+
 test("allows the explicit L0 direct-verifier lifecycle", () => {
   const control = validVerifiedControl();
   control.lane = "L0";
@@ -508,6 +525,38 @@ test("SNAPSHOT validation rejects a changed file omitted from the manifest", asy
   }
 });
 
+test("candidate diff generator excludes tracked historical patches and writes only runtime artifacts", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-candidate-diff-"));
+  try {
+    for (const args of [["init", "-q"], ["config", "user.email", "qta@example.test"],
+      ["config", "user.name", "QTA Test"]]) {
+      assert.equal(spawnSync("git", args, { cwd: directory }).status, 0);
+    }
+    await mkdir(path.join(directory, "docs", "development", "tasks"), { recursive: true });
+    await writeFile(path.join(directory, "feature.txt"), "base\n");
+    await writeFile(path.join(directory, "docs", "development", "tasks", "old.patch"), "old patch\n");
+    assert.equal(spawnSync("git", ["add", "."], { cwd: directory }).status, 0);
+    assert.equal(spawnSync("git", ["commit", "-qm", "baseline"], { cwd: directory }).status, 0);
+    const baseline = spawnSync("git", ["rev-parse", "HEAD"], { cwd: directory, encoding: "utf8" }).stdout.trim();
+    await writeFile(path.join(directory, "feature.txt"), "candidate\n");
+    await writeFile(path.join(directory, "docs", "development", "tasks", "old.patch"), "recursive payload\n");
+    assert.equal(spawnSync("git", ["add", "."], { cwd: directory }).status, 0);
+    assert.equal(spawnSync("git", ["commit", "-qm", "candidate"], { cwd: directory }).status, 0);
+    const candidate = spawnSync("git", ["rev-parse", "HEAD"], { cwd: directory, encoding: "utf8" }).stdout.trim();
+    const script = path.resolve("scripts/create-candidate-diff.mjs");
+    const output = ".qta-governance/candidates/TEST/generation-1.patch";
+    const result = spawnSync(process.execPath, [script, "--base", baseline, "--candidate", candidate,
+      "--output", output], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    const diff = await readFile(path.join(directory, output), "utf8");
+    assert.match(diff, /feature\.txt/);
+    assert.doesNotMatch(diff, /old\.patch|recursive payload/);
+    assert.equal(spawnSync("git", ["ls-files", "--error-unmatch", output], { cwd: directory }).status, 1);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("rejects a fabricated finalization without a bound artifact", () => {
   const control = validVerifiedControl();
   control.lifecycleState = "FINALIZED";
@@ -648,6 +697,7 @@ test("ZCode hook blocks destructive Git, split rm flags, and secret files", () =
     "rm -r -f build", "rm -R -F build", "cat .env", "LONGPORT_ACCESS_TOKEN=secret curl example.com",
     "node scripts/zcode-governance-hook.mjs",
     "sed -i '' s/foo/bar/ scripts/check-ai-delivery-ready.mjs",
+    "sed -i '' s/foo/bar/ scripts/create-candidate-diff.mjs",
     "echo changed > .zcode/agents/qta-final-verifier.md"
   ];
   for (const command of commands) {
@@ -766,6 +816,15 @@ test("ZCode unattended qta-run blocks AskUserQuestion but ordinary sessions rema
     assert.equal(blocked.status, 2);
     assert.match(blocked.stderr, /blocked AskUserQuestion/);
     assert.match(blocked.stderr, /persist.*BLOCKED/i);
+
+    const childBlocked = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: "unattended-child", cwd: directory,
+        tool_name: "AskUserQuestion", tool_input: { questions: [{ question: "Choose for child?" }] }
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(childBlocked.status, 2);
+    assert.match(childBlocked.stderr, /blocked AskUserQuestion/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -853,6 +912,18 @@ test("ZCode Hook creates an immutable receipt for each fixed-role dispatch", asy
     assert.equal(outcome.status, "SUCCEEDED");
     assert.deepEqual(dispatchAuditErrors({ taskId, roleRuns: [{ dispatchId }] }, directory), []);
 
+    const duplicateOutcome = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({ ...input, hook_event_name: "PostToolUse" }), encoding: "utf8",
+      env: { ...process.env, ZCODE_PROJECT_DIR: directory }
+    });
+    assert.equal(duplicateOutcome.status, 0, duplicateOutcome.stderr);
+
+    await writeFile(path.join(directory, ".git", "qta-governance", "dispatches", taskHash,
+      `${createHash("sha256").update("diagnostic-only").digest("hex")}.json`), JSON.stringify({
+      version: 2, taskId, dispatchId: "diagnostic-only", roleRunId: "diagnostic-only"
+    }));
+    assert.deepEqual(dispatchAuditErrors({ taskId, roleRuns: [{ dispatchId }] }, directory), []);
+
     await writeFile(path.join(directory, ".git", "qta-governance", "dispatches",
       taskHash, `${dispatchHash}.outcome.json`), JSON.stringify({ ...outcome, toolUseId: "tampered-tool" }));
     assert.match(dispatchAuditErrors({ taskId, roleRuns: [{ dispatchId }] }, directory).join("\n"),
@@ -865,6 +936,79 @@ test("ZCode Hook creates an immutable receipt for each fixed-role dispatch", asy
       env: { ...process.env, ZCODE_PROJECT_DIR: directory }
     });
     assert.notEqual(duplicate.status, 0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("governed dispatches enforce lifecycle role order and one pending role at a time", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-role-order-"));
+  const sessionId = "ordered-parent";
+  const taskId = "ORDERED-TASK";
+  try {
+    assert.equal(spawnSync("git", ["init", "-q"], { cwd: directory }).status, 0);
+    await mkdir(path.join(directory, "docs", "development", "tasks"), { recursive: true });
+    const script = path.resolve("scripts/zcode-governance-hook.mjs");
+    const environment = { ...process.env, ZCODE_PROJECT_DIR: directory };
+    assert.equal(spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "UserPromptSubmit", session_id: sessionId, cwd: directory,
+        prompt: "/qta-run ordered task"
+      }), encoding: "utf8", env: environment
+    }).status, 0);
+    await writeFile(path.join(directory, "docs", "development", "tasks", `${taskId}-CONTROL.json`),
+      JSON.stringify({ taskId, lane: "L1", lifecycleState: "CONTRACT_FROZEN", roleRuns: [] }));
+    const implementerInput = {
+      hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory, tool_name: "Agent",
+      tool_input: {
+        subagent_type: "qta-implementer",
+        prompt: `# Task Packet: ${taskId} / IMPLEMENTER / impl-1\n- Dispatch ID: dispatch-impl-1`
+      }
+    };
+    const first = spawnSync(process.execPath, [script], {
+      input: JSON.stringify(implementerInput), encoding: "utf8", env: environment
+    });
+    assert.equal(first.status, 0, first.stderr);
+    const parallel = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        ...implementerInput,
+        tool_input: {
+          subagent_type: "qta-implementer",
+          prompt: `# Task Packet: ${taskId} / IMPLEMENTER / impl-2\n- Dispatch ID: dispatch-impl-2`
+        }
+      }), encoding: "utf8", env: environment
+    });
+    assert.notEqual(parallel.status, 0);
+    assert.match(parallel.stderr, /still PENDING/);
+    await writeFile(path.join(directory, "docs", "development", "tasks", `${taskId}-CONTROL.json`),
+      JSON.stringify({ taskId, lane: "L1", lifecycleState: "CONTRACT_DRAFTED", roleRuns: [] }));
+    const wrongRole = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        ...implementerInput,
+        tool_input: {
+          subagent_type: "qta-code-reviewer",
+          prompt: `# Task Packet: ${taskId} / CODE_REVIEWER / review-1\n- Dispatch ID: dispatch-review-1`
+        }
+      }), encoding: "utf8", env: environment
+    });
+    assert.notEqual(wrongRole.status, 0);
+    assert.match(wrongRole.stderr, /not allowed/);
+    await writeFile(path.join(directory, "docs", "development", "tasks", `${taskId}-CONTROL.json`),
+      JSON.stringify({
+        taskId, lane: "L1", lifecycleState: "IMPLEMENTING",
+        roleRuns: Array.from({ length: 10 }, (_, index) => ({ roleRunId: `spent-${index}` }))
+      }));
+    const exhausted = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        ...implementerInput,
+        tool_input: {
+          subagent_type: "qta-implementer",
+          prompt: `# Task Packet: ${taskId} / IMPLEMENTER / impl-11\n- Dispatch ID: dispatch-impl-11`
+        }
+      }), encoding: "utf8", env: environment
+    });
+    assert.notEqual(exhausted.status, 0);
+    assert.match(exhausted.stderr, /role-run budget is exhausted/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -930,6 +1074,49 @@ test("ZCode Hook records a failed Agent outcome without pretending success", asy
     const outcome = JSON.parse(await readFile(path.join(directory, ".git", "qta-governance", "dispatches",
       taskHash, `${dispatchHash}.outcome.json`), "utf8"));
     assert.equal(outcome.status, "FAILED");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("ZCode Hook ignores a failure event when PreToolUse never created a receipt", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-dispatch-no-receipt-"));
+  const taskId = "DISPATCH-NO-RECEIPT";
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    const result = spawnSync(process.execPath, [path.resolve("scripts/zcode-governance-hook.mjs")], {
+      input: JSON.stringify({
+        hook_event_name: "PostToolUseFailure", session_id: "parent-no-receipt", cwd: directory,
+        tool_name: "Agent",
+        tool_input: {
+          subagent_type: "qta-implementer",
+          prompt: `# Task Packet: ${taskId} / IMPLEMENTER / impl-no-receipt\n- Dispatch ID: dispatch-no-receipt`
+        }
+      }), encoding: "utf8", env: { ...process.env, ZCODE_PROJECT_DIR: directory }
+    });
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("ZCode Hook fails closed for a successful Agent without a PreToolUse receipt", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-dispatch-success-without-receipt-"));
+  const taskId = "DISPATCH-SUCCESS-NO-RECEIPT";
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    const result = spawnSync(process.execPath, [path.resolve("scripts/zcode-governance-hook.mjs")], {
+      input: JSON.stringify({
+        hook_event_name: "PostToolUse", session_id: "parent-success-no-receipt", cwd: directory,
+        tool_name: "Agent",
+        tool_input: {
+          subagent_type: "qta-implementer",
+          prompt: `# Task Packet: ${taskId} / IMPLEMENTER / impl-success-no-receipt\n- Dispatch ID: dispatch-success-no-receipt`
+        }
+      }), encoding: "utf8", env: { ...process.env, ZCODE_PROJECT_DIR: directory }
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Hook failed closed|ENOENT/i);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -1081,7 +1268,7 @@ test("qta-run explicitly transfers a matching non-terminal task to a replacement
   }
 });
 
-test("ZCode Stop Hook blocks premature qta-run completion and releases BLOCKED tasks", async () => {
+test("ZCode has no Stop continuation hook", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "qta-stop-gate-"));
   const sessionId = "parent-stop-session";
   const taskId = "STOP-GATE-TASK";
@@ -1098,34 +1285,16 @@ test("ZCode Stop Hook blocks premature qta-run completion and releases BLOCKED t
     });
     assert.equal(activation.status, 0, activation.stderr);
 
-    const premature = spawnSync(process.execPath, [script], {
+    const stop = spawnSync(process.execPath, [script], {
       input: JSON.stringify({ hook_event_name: "Stop", session_id: sessionId, cwd: directory }),
       encoding: "utf8", env: environment
     });
-    assert.equal(premature.status, 2);
-    assert.match(premature.stderr, /bootstrap has not produced/);
-
-    const dispatch = spawnSync(process.execPath, [script], {
-      input: JSON.stringify({
-        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory,
-        tool_name: "Agent",
-        tool_input: {
-          subagent_type: "qta-test-designer",
-          prompt: `# Task Packet: ${taskId} / TEST_DESIGNER / test-1\n- Dispatch ID: dispatch-test-1`
-        }
-      }), encoding: "utf8", env: environment
-    });
-    assert.equal(dispatch.status, 0, dispatch.stderr);
-    await writeFile(path.join(directory, "docs", "development", "tasks", `${taskId}-CONTROL.json`),
-      JSON.stringify({ taskId, lifecycleState: "BLOCKED" }));
-    const blockedTerminal = spawnSync(process.execPath, [script], {
-      input: JSON.stringify({ hook_event_name: "Stop", session_id: sessionId, cwd: directory }),
-      encoding: "utf8", env: environment
-    });
-    assert.equal(blockedTerminal.status, 0, blockedTerminal.stderr);
+    assert.equal(stop.status, 0, stop.stderr);
     const activePath = path.join(directory, ".git", "qta-governance", "active",
       `${createHash("sha256").update(sessionId).digest("hex")}.json`);
-    await assert.rejects(readFile(activePath), { code: "ENOENT" });
+    assert.equal(JSON.parse(await readFile(activePath, "utf8")).parentSessionId, sessionId);
+    const config = JSON.parse(await readFile(".zcode/config.json", "utf8"));
+    assert.equal(config.hooks.events.Stop, undefined);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

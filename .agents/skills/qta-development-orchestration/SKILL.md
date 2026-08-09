@@ -73,7 +73,9 @@ substitute for that role run.
 Never run code review and final verification in parallel. Never finalize before verification. `VERIFIED`
 requires both `FUNCTIONAL=PASS` and `ARCHITECTURE=PASS` for the same candidate identity.
 
-The parent continues until one terminal state: `DELIVERY_READY`, `BLOCKED`, or an explicit user stop.
+The parent advances deterministically toward one terminal state: `DELIVERY_READY`, `BLOCKED`, or an explicit
+user stop. A client-native Goal controller may request another turn, but this project never uses a Stop Hook
+to force continuation. When a turn ends before a terminal state, persist a checkpoint and one next action.
 `FINALIZED` means finalization records exist; it is not permission to end Goal mode. A plan, one role artifact,
 one repair, or self-reported acceptance is not completion. Do not start a second product task merely to keep
 an overnight run busy.
@@ -90,7 +92,8 @@ implementation option without asking the user and record the decision and eviden
 Never invoke `AskUserQuestion` in an active governed run. If product/financial meaning is unresolved, a
 destructive or credential-bearing action requires authorization, or external state makes every safe path
 impossible, persist an evidence-backed `BLOCKED` checkpoint and stop; do not leave the task waiting for a
-human response. The workspace Hook enforces this policy for the active parent session.
+human response. The workspace Hook enforces this policy for every session while the project has an active
+governed task, including child roles.
 
 ## Task Packet
 
@@ -168,8 +171,9 @@ receipt. Every successful control validation appends a hash-chained anchor under
 are tamper-evident workflow guards, not platform-authenticated security evidence, so current runs must remain
 `ADVISORY` plus compensating isolation.
 For every fixed `qta-*` Agent/Task dispatch, the Hook also requires the TaskPacket header plus unique dispatch
-ID and creates an exclusive receipt under `.git/qta-governance/dispatches/`. Delivery readiness reconciles
-those receipts bidirectionally with terminal `roleRuns`, exposing omitted failed attempts.
+ID and creates an exclusive receipt under `.git/qta-governance/dispatches/`. Delivery readiness validates
+every terminal `roleRuns` entry against its receipt and outcome. Extra runtime receipts remain diagnostic and
+do not mutate the frozen acceptance set or invalidate an already recorded verifier.
 Append a role-run row only after that role reaches a terminal status. Accepted rows require
 `executorType=SUBAGENT`, the exact `.zcode/agents/` definition, matching capability, and
 `executionOutcome=COMPLETED`. Anchored role rows are immutable events, not mutable RUNNING records.
@@ -211,13 +215,19 @@ When the value is `NONE`, use `SNAPSHOT` candidate mode. Run
 beside task state, and pass its manifest and entry-set SHA-256 to reviewer and verifier. Regenerate and compare
 the manifest before and after each gate; any mismatch invalidates earlier evidence.
 
-For every candidate mode, the parent persists a baseline-to-candidate diff artifact under the task directory.
+For every candidate mode, the parent generates the baseline-to-candidate diff with
+`scripts/create-candidate-diff.mjs` under `.qta-governance/candidates/<TASK-ID>/`. This runtime artifact is
+Git-ignored, capped at 512 KiB by default, and must never be copied into `docs/development/tasks/` or committed.
 In `COMMIT` mode its SHA-256 must equal `patchSha256`; in `SNAPSHOT` mode the control gate validates the diff
 artifact hash and every current manifest entry. Reviewer input must reference this artifact instead of asking
 the read-only role to execute Git.
 The SNAPSHOT manifest must cover every repository path changed from `baselineCommit`, except the frozen
 pre-existing dirty-path list and explicitly identified task-control/evidence metadata. An omitted changed path
 invalidates the candidate.
+
+One machine control file owns exactly one Git repository. Cross-repository product work must be split into
+one governed child task per repository, followed by a bounded integration verification task; never put `..`
+or absolute paths in `allowedWritePaths`.
 
 Create or switch to the frozen dedicated task branch before the first file write. Governed sessions may not
 edit, stage, commit, merge, cherry-pick, revert, or tag on `main`/`master`. Use a dedicated task branch for
@@ -292,10 +302,11 @@ architecture errors, reused verification/finalization artifacts, untracked evide
 mismatch, and unapproved dirty paths. If it fails, transition to `BLOCKED` or a governed repair; never ask the
 model-only Goal completion judge to reinterpret the failure.
 
-`/qta-run` activates a parent-session Stop Hook. ZCode may request continuation at most three times, so this is
-not a retry budget: move deterministically to the next lifecycle state, or persist an evidence-backed
-`BLOCKED` state when the frozen repair/timeout limit is reached. The Hook releases only `BLOCKED` or a passing
-`DELIVERY_READY` task.
+The project has no Stop Hook and no project-side automatic continuation. ZCode Goal mode, when used, is the
+only continuation controller. `check-ai-delivery-ready.mjs` is an explicit verdict gate, not a scheduler. Move
+deterministically to the next lifecycle state or persist `CHECKPOINTED`/`BLOCKED`; never turn a failed gate
+into another unbounded model call. Hook policy failures exit with a blocking status; a failed dispatch without
+a PreToolUse receipt is ignored as a non-dispatch, while a successful dispatch without one is blocked.
 
 Generate event timestamps from the runtime clock. Transition and role timestamps must be monotonic, inside
 the task window, and not in the future; do not invent convenient ISO values.

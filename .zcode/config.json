@@ -67,21 +67,6 @@
             }
           ]
         }
-      ],
-      "Stop": [
-        {
-          "hooks": [
-            {
-              "type": "process",
-              "command": "node",
-              "args": [
-                "${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs"
-              ],
-              "timeoutMs": 30000,
-              "statusMessage": "Checking QTA Goal completion gate"
-            }
-          ]
-        }
       ]
     }
   }

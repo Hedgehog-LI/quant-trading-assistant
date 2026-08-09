@@ -27,8 +27,11 @@
   required test 必须有稳定 test ID、AC 映射、source path 和 exact selector。
 - 标准/长任务由父上下文启用 `qta-development-orchestration` 或 `/qta-run`，选择 L0-L3 风险 lane 并冻结
   `contract_hash`。子角色只接收 TaskPacket。
-- `/qta-run` 会激活父 session 的 Stop Hook；未达到 `DELIVERY_READY` 或持久化 `BLOCKED` 时，父任务
-  不允许仅凭一轮输出结束。Stop 回注最多三次，不能替代 repair/timeout 的硬上限。
+- `/qta-run` 不安装 Stop Hook。使用 Goal 模式时，ZCode 原生 Goal 是唯一续跑控制器；项目门禁只
+  判定状态，不触发下一轮。中途停止必须写 `CHECKPOINTED` 或 `BLOCKED`；只有显式通过
+  `check-ai-delivery-ready.mjs` 才能宣称交付。
+- Hook 内部异常必须转换为明确阻断；失败派发没有 PreToolUse 回执时不再重复报错，成功派发没有
+  回执则阻断。活动任务内父子角色均不得调用 `AskUserQuestion`。
 - `/qta-run` 是无人值守流程：禁止调用 `AskUserQuestion`。可逆工程选择自动采用文档或明确推荐项；
   产品/金融含义、破坏性操作、凭据授权或外部依赖确实无法安全继续时，必须持久化 `BLOCKED`，不得
   挂起等待用户选择。
@@ -60,6 +63,11 @@
 - **断点**：阶段完成、重复失败、外部阻塞或达到上下文预算时启用 `qta-task-checkpoint`。
 - **候选版本**：自检通过后由父协调者创建 `candidate` 提交，记录 tree hash 和 patch SHA-256；
   该版本尚未独立验收，不能标记可部署。
+- **候选补丁**：统一用 `scripts/create-candidate-diff.mjs` 写入 Git 忽略的
+  `.qta-governance/candidates/<TASK-ID>/`；默认超过 512 KiB 必须拆分，禁止将完整 patch 提交到
+  `docs/development/tasks/`。
+- **跨仓任务**：每个仓库使用独立 control/candidate/gate，再建立只做联调证据的集成任务；一个
+  control 的 `allowedWritePaths` 不能包含绝对路径或 `..`。
 
 ### 1.5 联调
 - 后端 `docker compose up -d --build`；前端 `VITE_DEV_PROXY_TARGET=http://localhost:8080 npm run dev`（不覆盖 `.env.local`）。

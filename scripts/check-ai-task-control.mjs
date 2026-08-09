@@ -8,10 +8,10 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 export const LANE_POLICY = Object.freeze({
-  L0: { maxAcceptanceCriteria: 3, maxBlockingAmendments: 0, rawTokenBudget: 2_000_000 },
-  L1: { maxAcceptanceCriteria: 5, maxBlockingAmendments: 1, rawTokenBudget: 6_000_000 },
-  L2: { maxAcceptanceCriteria: 8, maxBlockingAmendments: 3, rawTokenBudget: 12_000_000 },
-  L3: { maxAcceptanceCriteria: 10, maxBlockingAmendments: 5, rawTokenBudget: 20_000_000 }
+  L0: { maxAcceptanceCriteria: 3, maxBlockingAmendments: 0, rawTokenBudget: 2_000_000, maxRoleRuns: 4 },
+  L1: { maxAcceptanceCriteria: 5, maxBlockingAmendments: 1, rawTokenBudget: 6_000_000, maxRoleRuns: 10 },
+  L2: { maxAcceptanceCriteria: 8, maxBlockingAmendments: 3, rawTokenBudget: 12_000_000, maxRoleRuns: 14 },
+  L3: { maxAcceptanceCriteria: 10, maxBlockingAmendments: 5, rawTokenBudget: 20_000_000, maxRoleRuns: 18 }
 });
 
 const ORDERED_STATES = [
@@ -191,6 +191,14 @@ export function validateTaskControl(control) {
     if (!Array.isArray(slice?.allowedWritePaths) || slice.allowedWritePaths.length === 0
         || slice.allowedWritePaths.length > 8) {
       errors.push(`${prefix}.allowedWritePaths must contain between 1 and 8 paths`);
+    } else {
+      for (const allowedPath of slice.allowedWritePaths) {
+        const normalized = typeof allowedPath === "string" ? allowedPath.replaceAll("\\", "/") : "";
+        if (!normalized || path.isAbsolute(normalized) || normalized === ".." || normalized.startsWith("../")
+            || normalized.includes("/../")) {
+          errors.push(`${prefix}.allowedWritePaths must stay inside one repository: ${allowedPath}`);
+        }
+      }
     }
     if (!Number.isInteger(slice?.maxExpectedFiles) || slice.maxExpectedFiles < 1 || slice.maxExpectedFiles > 8) {
       errors.push(`${prefix}.maxExpectedFiles must be between 1 and 8`);
@@ -297,6 +305,9 @@ export function validateTaskControl(control) {
 
   if (!Array.isArray(control?.roleRuns)) errors.push("roleRuns must be an array");
   const roleRuns = Array.isArray(control?.roleRuns) ? control.roleRuns : [];
+  if (lane && roleRuns.length > lane.maxRoleRuns) {
+    errors.push(`${control.lane} role-run budget exceeded: ${roleRuns.length} > ${lane.maxRoleRuns}`);
+  }
   for (const duplicate of duplicateValues(roleRuns.map((run) => run?.roleRunId))) errors.push(`reused roleRunId: ${duplicate}`);
   for (const duplicate of duplicateValues(roleRuns.map((run) => run?.dispatchId))) errors.push(`reused role dispatchId: ${duplicate}`);
   for (const duplicate of duplicateValues(roleRuns.map((run) => run?.sessionId))) errors.push(`reused role sessionId: ${duplicate}`);
@@ -405,6 +416,9 @@ export function validateTaskControl(control) {
     if (!present(candidate.identity)) errors.push("frozen candidate identity is required");
     if (!present(candidate.diffArtifactPath) || !present(candidate.diffArtifactSha256)) {
       errors.push("frozen candidate diff artifact path/hash is required");
+    } else if (!candidate.diffArtifactPath.replaceAll("\\", "/")
+      .startsWith(".qta-governance/candidates/")) {
+      warnings.push("legacy tracked candidate diff path detected; new candidates must use .qta-governance/candidates/");
     }
     if (candidate.mode === "COMMIT") {
       for (const field of ["commit", "treeHash", "patchSha256"]) {
@@ -759,8 +773,14 @@ export async function validateTaskControlFiles(control, root = process.cwd()) {
         cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
       }).trim();
       if (tree !== control.candidate.treeHash) errors.push("candidate tree hash does not match Git");
-      const patch = execFileSync("git", ["diff", "--binary", control.git.baselineCommit, control.candidate.commit, "--"], {
-        cwd: root, stdio: ["ignore", "pipe", "pipe"]
+      const runtimeDiff = control.candidate?.diffArtifactPath?.replaceAll("\\", "/")
+        .startsWith(".qta-governance/candidates/");
+      const patchArgs = ["diff", "--binary", "--no-ext-diff", control.git.baselineCommit,
+        control.candidate.commit, "--"];
+      if (runtimeDiff) patchArgs.push(".", ":(exclude)docs/development/tasks/*.patch",
+        ":(exclude).qta-governance/**");
+      const patch = execFileSync("git", patchArgs, {
+        cwd: root, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 2 * 1024 * 1024
       });
       if (sha256(patch) !== control.candidate.patchSha256) errors.push("candidate patch SHA-256 does not match Git");
     } catch (error) {

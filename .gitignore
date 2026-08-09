@@ -44,6 +44,9 @@ yarn-debug.log*
 yarn-error.log*
 longbridge.*.log
 
+### Local AI governance runtime artifacts ###
+.qta-governance/
+
 ### Optional runtime vendor SDK jars/native libs ###
 runtime-libs/*
 !runtime-libs/.gitkeep

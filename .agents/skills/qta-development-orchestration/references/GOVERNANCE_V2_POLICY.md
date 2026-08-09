@@ -37,8 +37,10 @@ must not be represented by rewriting an anchored row.
 
 Every repair-history row binds its failure fingerprint and generation edge to the accepted finding role run
 (`CODE_REVIEWER` or `FINAL_VERIFIER`) and the fresh implementer role run that produced the next generation.
-Every frozen candidate also has a baseline-to-candidate diff artifact path/hash; read-only reviewers consume
-that artifact and must not execute Git to reconstruct it.
+Every frozen candidate also has a baseline-to-candidate diff artifact path/hash. Generate it under the
+Git-ignored `.qta-governance/candidates/` directory with the bounded generator; read-only reviewers consume
+that artifact and must not execute Git to reconstruct it. A candidate exceeding the configured size cap is
+resliced instead of storing recursive patch files in tracked task documentation.
 
 Current runs record `ADVISORY` even when ZCode applies a fixed template allowlist, because the client does not
 expose a platform-authenticated role/session attestation to the project validator. Compensate with a read-only
@@ -63,17 +65,25 @@ implementer evidence require one evidence-only implementer before candidate free
 Every Agent/Task dispatch starts with the exact two-line TaskPacket prefix from the template. A rejected
 prefix is corrected and retried once; the Hook is never invoked manually and synthetic receipts are invalid.
 Dispatch audit is two-phase: immutable `PENDING` receipt on `PreToolUse`, then immutable `SUCCEEDED` or
-`FAILED` outcome. Delivery rejects pending-only dispatches.
+`FAILED` outcome. Delivery validates each recorded terminal role against its receipt. Extra receipts are
+diagnostic and do not expand the frozen acceptance set during verification.
 
 Implementer and final-verifier profiles use `bypassPermissions` only to remove interactive Bash approvals.
 Tool allowlists, prohibited actions, allowed paths, Hook denials, candidate identity, and evidence rules still
 apply unchanged. An active `/qta-run` never calls `AskUserQuestion`: reversible choices use the recommended
 option, while a genuine product, destructive, credential, or external-input blocker is persisted as
-`BLOCKED` instead of waiting for a human response.
+`BLOCKED` instead of waiting for a human response. The Hook applies this rule to child sessions as well.
+
+Hook policy failures exit with a blocking status. A `PostToolUseFailure` without a matching PreToolUse receipt
+is an already-rejected non-dispatch and is ignored idempotently; a successful event without that receipt is a
+hard integrity failure. A duplicate terminal outcome is accepted only when every binding field matches.
 
 An unavailable parent session is replaced only through
 `/qta-run --resume <TASK-ID> <objective-or-control-path>`. The Hook transfers a matching same-project,
 non-terminal active lock and preserves the original task/control identity; implicit task stealing is blocked.
+
+One control owns one repository. Cross-repository work uses separate repository-local controls and candidates,
+then a bounded integration-verification task. Absolute and parent-relative allowed write paths are invalid.
 
 ## Context And Control Budget
 
@@ -145,5 +155,7 @@ target version, and a deadline no later than 30 days or the next feature in that
 - `REJECTED`: an AC, mandatory gate, candidate identity, or architecture gate fails.
 - `BLOCKED`: required evidence or environment cannot be obtained without an external change.
 
-`FINALIZED` is not a Goal terminal state. Only `DELIVERY_READY`, confirmed by
-`scripts/check-ai-delivery-ready.mjs` on tracked evidence and an approved-clean worktree, may end Goal mode.
+`FINALIZED` is not delivery. Only `DELIVERY_READY`, confirmed explicitly by
+`scripts/check-ai-delivery-ready.mjs` on tracked evidence and an approved-clean worktree, may be reported as
+delivered. The project does not use a Stop Hook; a client-native Goal controller is the sole continuation
+authority when Goal mode is enabled.

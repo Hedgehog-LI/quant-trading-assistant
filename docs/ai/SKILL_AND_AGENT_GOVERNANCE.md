@@ -1,7 +1,7 @@
 # Skill And Agent Governance
 
 > 本文是项目级 Skill、固定 Agent、父协调流程、证据身份、成本预算和 Git 阶段门禁的唯一事实来源。
-> Skill 定流程，Agent 模板定角色，父协调器定顺序，Hook/脚本定强制约束，机器控制文件负责跨对话记忆。
+> Skill 定流程，Agent 模板定角色，父协调器定顺序，Hook 只做前置安全约束，脚本做显式门禁，机器控制文件负责跨对话记忆。
 > 当前控制协议为 schema v3；本地仍是 `ADVISORY` 防误操作边界，不冒充平台级安全隔离。
 
 ## 1. 三阶段路线与原十项映射
@@ -40,7 +40,8 @@
 - `scripts/check-ai-task-control.mjs`：任务状态、角色实例、候选身份和 verdict 不变量校验。
 - `scripts/check-ai-architecture.mjs`：变更文件规模、职责和分层风险门禁。
 - `scripts/run-ai-evidence-command.mjs`：低噪声执行冻结验证命令并生成角色/session/候选绑定回执。
-- `scripts/check-ai-delivery-ready.mjs`：Goal 唯一完成门禁，检查角色来源、机器证据、Git 跟踪和脏路径。
+- `scripts/create-candidate-diff.mjs`：生成有大小上限、Git 忽略的候选补丁，避免补丁递归入库。
+- `scripts/check-ai-delivery-ready.mjs`：显式完成门禁，检查角色来源、机器证据、Git 跟踪和脏路径。
 - `scripts/zcode-governance-hook.mjs`：ZCode 通用危险操作前置拦截。
 - `.git/qta-governance/`：Hook 生成的 session 首见回执、固定角色 dispatch 回执与控制文件哈希链；
   不入库、禁止角色直接访问。
@@ -97,16 +98,21 @@ Hook 自动生成 session 首见回执，回执中的观测 session、项目哈�
 用量不得回退或改写。
 
 父协调器调用固定 `qta-*` Agent/Task 时，PreToolUse Hook 要求完整 TaskPacket header 和唯一
-dispatch ID，并在 `.git/qta-governance/dispatches/` 生成不可覆盖回执。交付门禁双向核对：每个回执
-必须有 roleRuns 终态行，每个 roleRuns dispatch 也必须有 Hook 回执，从而发现被省略的 timeout 或
-plan-only 尝试。它仍是同用户下的防误操作证据，不是密码学签名。
+dispatch ID，并在 `.git/qta-governance/dispatches/` 生成不可覆盖回执。交付门禁以冻结的
+`roleRuns` 为验收集合，逐条检查其 Hook 回执和终态 outcome；额外运行时回执只作诊断，不得在核验
+期间扩张验收集合。它仍是同用户下的防误操作证据，不是密码学签名。
 
-输入 `/qta-run` 时，UserPromptSubmit Hook 为父 session 建立 active-task 记录。ZCode 的 Stop Hook
-随后只允许两种结束：控制状态为 `BLOCKED`，或状态为 `DELIVERY_READY` 且 delivery-ready 脚本返回
-0；其他状态会要求继续（客户端最多回注三次）。这能拦住“只跑一轮就自报完成”，但不是无限循环器：
-同因失败达到上限时必须持久化 `BLOCKED`，Stop Hook 即释放任务。
+输入 `/qta-run` 时，UserPromptSubmit Hook 为父 session 建立 active-task 记录。项目不注册 Stop
+Hook，也不自动创建下一轮模型调用；使用 Goal 模式时只有 ZCode 原生 Goal 可以决定续跑。活动任务
+期间，父角色和子角色都禁止 `AskUserQuestion`。任务可以在 `CHECKPOINTED` 或 `BLOCKED` 停止，但
+只有显式 delivery-ready 门禁通过后才能报告交付。
 
-`/qta-run` 同时是无人值守交互边界：PreToolUse Hook 会阻断 active parent 的 `AskUserQuestion`。
+Hook 的失败语义必须清晰：策略拒绝和内部异常统一以阻断码退出；`PostToolUseFailure` 若没有对应的
+PreToolUse 接受回执，只表示该派发从未成立，必须幂等忽略，不能再制造第二个 Hook 错误；成功事件
+没有前置回执则必须阻断。重复的同绑定终态回执允许幂等重放，绑定不一致必须阻断。
+
+`/qta-run` 同时是无人值守交互边界：PreToolUse Hook 会阻断活动任务的父 session 和子 session 的
+`AskUserQuestion`。
 可逆工程选择采用文档或明确推荐项；产品/金融含义、破坏性授权、凭据或外部依赖确实无法安全继续
 时，父协调器必须写入 `BLOCKED`，不能悬挂等待用户。`bypassPermissions` 只移除 implementer 和 final
 verifier 的 Bash 审批，不扩大工具白名单、写路径、Git 权限或任务范围。
@@ -132,7 +138,7 @@ reviewer。repair/failure history 和 blocking amendment history 跨上下文保
 | `L0` | 文档/机械低风险改动 | 3 | bounded implementer + static + clean verifier |
 | `L1` | 单模块、无 migration | 5 | 四角色 + focused/full test |
 | `L2` | migration/事务/兼容/并发/provider/scheduler/性能 | 8 | L1 + package + independent verifier |
-| `L3` | 资金/鉴权/跨仓/不可逆运行与部署 | 10 | L2 + required runtime/deployment |
+| `L3` | 资金/鉴权/跨仓联调/不可逆运行与部署 | 10 | L2 + required runtime/deployment |
 
 状态必须顺序迁移：
 
@@ -147,8 +153,12 @@ manifest/entry-set hash）。无 Git 写授权时使用 SNAPSHOT。Candidate 改
 失效；contract 改变会使 candidate/review/verdict 全部失效。每次迁移前必须运行机器控制文件
 校验。`VERIFIED` 同时要求 `FUNCTIONAL=PASS` 和 `ARCHITECTURE=PASS`。
 同一 failure fingerprint 最多两轮修复，不能通过新开上下文清零次数。
-两种 candidate 都必须生成冻结 diff artifact 及其 SHA-256，供无 Bash 权限的 reviewer 读取；每轮
+两种 candidate 都必须通过 `create-candidate-diff.mjs` 在 `.qta-governance/candidates/` 生成冻结 diff
+及其 SHA-256，供无 Bash 权限的 reviewer 读取；补丁不入 Git，默认超过 512 KiB 就拆任务。每轮
 repair history 必须绑定发现问题的 reviewer/verifier role run 与下一代 implementer role run。
+
+一个 control 只管理一个 Git 仓库。跨仓功能拆成仓库本地子任务，分别冻结和验收后再做集成验证；
+`allowedWritePaths` 只允许仓库内相对路径。
 
 父协调者必须持续到 `DELIVERY_READY`、`BLOCKED` 或用户明确停止；`FINALIZED` 只说明交付文档已整理，
 计划、单个角色返回或一次 repair 都不算完成。冻结契约内的可逆选择由父协调者采用推荐方案自行决定，仅产品/金融语义冲突、破坏性/密钥
@@ -221,7 +231,8 @@ Hook 拒绝格式时只修正同一 TaskPacket 并重试一次，禁止手工执
 - 测试数量、构建成功或 HTTP 200 不能单独证明业务 AC。
 - Reviewer 和 verifier 检查相同 candidate/hash generation。
 - Verifier 只在 disposable worktree 运行命令，前后 tracked tree 必须不变。
-- 两轮同因失败后停止并 checkpoint；不得递归建团或无限重跑。
+- 每个 lane 的角色派发总数有机器上限（L0/L1/L2/L3 分别为 4/10/14/18）；两轮同因失败后停止并
+  checkpoint，不得递归建团、换任务 ID 清零或无限重跑。
 - Reviewer 第一代做完整扫描，后续只审 repair diff 和受影响范围；契约、行为、migration 或候选
   范围变化时才重新完整扫描。
 - 实现/repair 期间跑 focused tests；冻结最终候选前跑一次 full/package；verifier 独立再跑一次。

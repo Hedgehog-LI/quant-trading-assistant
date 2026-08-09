@@ -18,6 +18,7 @@ const QTA_AGENT_ROLES = Object.freeze({
   "qta-code-reviewer": "CODE_REVIEWER",
   "qta-final-verifier": "FINAL_VERIFIER"
 });
+const MAX_ROLE_RUNS_BY_LANE = Object.freeze({ L0: 4, L1: 10, L2: 14, L3: 18 });
 
 export function qtaDispatchMetadata(input) {
   const tool = input?.tool_name ?? input?.toolName ?? "";
@@ -60,6 +61,8 @@ function isProtectedGovernancePath(value) {
     || normalized.endsWith("/scripts/check-ai-task-control.mjs")
     || normalized.endsWith("/scripts/check-ai-delivery-ready.mjs")
     || normalized.endsWith("/scripts/check-ai-architecture.mjs")
+    || normalized.endsWith("/scripts/create-candidate-diff.mjs")
+    || normalized.endsWith("/scripts/create-candidate-manifest.mjs")
     || normalized.endsWith("/scripts/run-ai-evidence-command.mjs")
     || normalized.endsWith("/.agents/schemas/qta-task-control.schema.json")
     || normalized.includes("/.agents/skills/qta-development-orchestration/");
@@ -393,9 +396,48 @@ async function recordDispatchReceipt(input) {
   if (active?.taskId && active.taskId !== dispatch.taskId) {
     throw new Error(`parent session already owns active governed task ${active.taskId}`);
   }
+  const controlPath = active?.controlPath || `docs/development/tasks/${dispatch.taskId}-CONTROL.json`;
+  if (active) {
+    try {
+      const control = JSON.parse(await readFile(path.resolve(projectRoot, controlPath), "utf8"));
+      const allowedByState = {
+        CONTRACT_DRAFTED: new Set(["TEST_DESIGNER"]),
+        CONTRACT_FROZEN: new Set(["IMPLEMENTER"]),
+        IMPLEMENTING: new Set(["IMPLEMENTER"]),
+        CANDIDATE_FROZEN: new Set(control.lane === "L0" ? ["FINAL_VERIFIER"] : ["CODE_REVIEWER"]),
+        REVIEW_CLEAR: new Set(["FINAL_VERIFIER"])
+      };
+      if (!(allowedByState[control.lifecycleState] ?? new Set()).has(dispatch.expectedRole)) {
+        throw new Error(`role ${dispatch.expectedRole} is not allowed while ${dispatch.taskId} is ${control.lifecycleState}`);
+      }
+      const maxRoleRuns = MAX_ROLE_RUNS_BY_LANE[control.lane];
+      if (!Number.isInteger(maxRoleRuns) || !Array.isArray(control.roleRuns)) {
+        throw new Error("task control must declare a valid lane and roleRuns ledger before dispatch");
+      }
+      if (control.roleRuns.length >= maxRoleRuns) {
+        throw new Error(`${control.lane} role-run budget is exhausted; checkpoint BLOCKED instead of dispatching another role`);
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      if (dispatch.expectedRole !== "TEST_DESIGNER") {
+        throw new Error(`task control must exist before dispatching ${dispatch.expectedRole}`);
+      }
+    }
+  }
   const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
     sha256(dispatch.taskId));
   await mkdir(directory, { recursive: true });
+  for (const name of await readdir(directory)) {
+    if (!name.endsWith(".json") || name.endsWith(".outcome.json")) continue;
+    try {
+      await readFile(path.join(directory, name.replace(/\.json$/, ".outcome.json")), "utf8");
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        throw new Error("another fixed-role dispatch is still PENDING; wait for its terminal outcome before dispatching the next role");
+      }
+      throw error;
+    }
+  }
   const receiptPath = path.join(directory, `${sha256(dispatch.dispatchId)}.json`);
   const handle = await open(receiptPath, "wx", 0o600);
   try {
@@ -421,7 +463,7 @@ async function recordDispatchReceipt(input) {
   await writeFile(temporary, `${JSON.stringify({
     version: 1,
     taskId: dispatch.taskId,
-    controlPath: `docs/development/tasks/${dispatch.taskId}-CONTROL.json`,
+    controlPath,
     parentSessionId,
     projectRootSha256: sha256(path.resolve(projectRoot)),
     lastDispatchId: dispatch.dispatchId,
@@ -442,14 +484,35 @@ async function recordDispatchOutcome(input) {
   const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
     sha256(dispatch.taskId));
   const dispatchHash = sha256(dispatch.dispatchId);
-  const receipt = JSON.parse(await readFile(path.join(directory, `${dispatchHash}.json`), "utf8"));
+  let receipt;
+  try {
+    receipt = JSON.parse(await readFile(path.join(directory, `${dispatchHash}.json`), "utf8"));
+  } catch (error) {
+    // A rejected PreToolUse has no pending receipt. Do not turn its failure event into a second Hook failure.
+    if (error.code === "ENOENT" && event === "PostToolUseFailure") return;
+    throw error;
+  }
   const toolUseId = input?.tool_use_id ?? input?.toolUseId ?? null;
   if (receipt.parentSessionId !== parentSessionId || receipt.promptSha256 !== sha256(dispatch.prompt)
       || receipt.toolUseId !== toolUseId) {
     throw new Error("QTA dispatch outcome does not match its pending receipt");
   }
   const outcomePath = path.join(directory, `${dispatchHash}.outcome.json`);
-  const handle = await open(outcomePath, "wx", 0o600);
+  const expectedStatus = event === "PostToolUse" ? "SUCCEEDED" : "FAILED";
+  let handle;
+  try {
+    handle = await open(outcomePath, "wx", 0o600);
+  } catch (error) {
+    if (error.code === "EEXIST") {
+      const existing = JSON.parse(await readFile(outcomePath, "utf8"));
+      if (existing.taskId === dispatch.taskId && existing.dispatchId === dispatch.dispatchId
+          && existing.roleRunId === dispatch.roleRunId && existing.parentSessionId === parentSessionId
+          && existing.promptSha256 === receipt.promptSha256 && existing.toolUseId === toolUseId
+          && existing.status === expectedStatus) return;
+      throw new Error("QTA dispatch outcome already exists with different binding");
+    }
+    throw error;
+  }
   try {
     await handle.writeFile(`${JSON.stringify({
       version: 1,
@@ -460,7 +523,7 @@ async function recordDispatchOutcome(input) {
       projectRootSha256: sha256(path.resolve(projectRoot)),
       promptSha256: receipt.promptSha256,
       toolUseId,
-      status: event === "PostToolUse" ? "SUCCEEDED" : "FAILED",
+      status: expectedStatus,
       observedAt: new Date().toISOString(),
       nonce: randomUUID()
     }, null, 2)}\n`);
@@ -540,75 +603,13 @@ async function enforceUnattendedQuestionPolicy(input) {
   const projectRoot = process.env.ZCODE_PROJECT_DIR ?? process.env.CLAUDE_PROJECT_DIR
     ?? input?.cwd ?? process.cwd();
   if (!sessionId || !projectRoot) return false;
-  const activePath = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "active",
-    `${sha256(sessionId)}.json`);
-  let active;
-  try {
-    active = JSON.parse(await readFile(activePath, "utf8"));
-  } catch (error) {
-    if (error.code === "ENOENT") return false;
-    throw error;
-  }
-  if (active.projectRootSha256 !== sha256(path.resolve(projectRoot))) {
-    console.error("QTA unattended policy: active-task receipt belongs to another project");
-    process.exit(2);
-  }
-  console.error("QTA unattended policy blocked AskUserQuestion: choose the documented/recommended reversible option automatically; if safe progress requires product, destructive, credential, or external input, persist an evidence-backed BLOCKED checkpoint instead of waiting for the user");
+  const projectHash = sha256(path.resolve(projectRoot));
+  const activeEntry = (await activeEntries(projectRoot)).find((entry) =>
+    entry.value?.projectRootSha256 === projectHash);
+  if (!activeEntry) return false;
+  const taskId = activeEntry.value?.taskId || "the active governed task";
+  console.error(`QTA unattended policy blocked AskUserQuestion for ${taskId}: choose the documented/recommended reversible option automatically; if safe progress requires product, destructive, credential, or external input, persist an evidence-backed BLOCKED checkpoint instead of waiting for the user`);
   process.exit(2);
-}
-
-async function enforceStopGate(input) {
-  const event = input?.hook_event_name ?? input?.hookEventName ?? input?.event ?? "";
-  if (event !== "Stop") return false;
-  const sessionId = input?.session_id ?? input?.sessionId ?? process.env.CLAUDE_SESSION_ID;
-  const projectRoot = process.env.ZCODE_PROJECT_DIR ?? process.env.CLAUDE_PROJECT_DIR
-    ?? input?.cwd ?? process.cwd();
-  if (!sessionId || !projectRoot) return true;
-  const activePath = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "active",
-    `${sha256(sessionId)}.json`);
-  let active;
-  try {
-    active = JSON.parse(await readFile(activePath, "utf8"));
-  } catch (error) {
-    if (error.code === "ENOENT") return true;
-    throw error;
-  }
-  if (active.projectRootSha256 !== sha256(path.resolve(projectRoot))) {
-    console.error("QTA Stop gate: active-task receipt belongs to another project");
-    process.exit(2);
-  }
-  if (!active.taskId || !active.controlPath) {
-    console.error("QTA Stop gate: /qta-run bootstrap has not produced a governed task/control yet. Continue with context, contract, and test-design dispatch or explicitly cancel outside Goal mode.");
-    process.exit(2);
-  }
-  let control;
-  try {
-    control = JSON.parse(await readFile(path.resolve(projectRoot, active.controlPath), "utf8"));
-  } catch (error) {
-    console.error(`QTA Stop gate: active control is unavailable (${error.code ?? error.message}); checkpoint BLOCKED or restore the control file`);
-    process.exit(2);
-  }
-  if (control.taskId !== active.taskId) {
-    console.error("QTA Stop gate: active task/control identity mismatch");
-    process.exit(2);
-  }
-  if (control.lifecycleState === "BLOCKED") {
-    await unlink(activePath);
-    return true;
-  }
-  if (control.lifecycleState !== "DELIVERY_READY") {
-    console.error(`QTA Stop gate: ${active.taskId} is ${control.lifecycleState}, not DELIVERY_READY or BLOCKED. Continue the frozen lifecycle; do not declare completion.`);
-    process.exit(2);
-  }
-  const gate = spawnSync(process.execPath, [path.join(projectRoot, "scripts", "check-ai-delivery-ready.mjs"),
-    active.controlPath], { cwd: projectRoot, encoding: "utf8", timeout: 30_000 });
-  if (gate.status !== 0) {
-    const detail = (gate.stderr || gate.stdout || "delivery-ready gate failed").trim();
-    console.error(`QTA Stop gate: delivery readiness failed. Continue with repair or checkpoint BLOCKED.\n${detail.slice(-4000)}`);
-    process.exit(2);
-  }
-  await unlink(activePath);
-  return true;
 }
 
 async function readStdin() {
@@ -619,7 +620,6 @@ async function readStdin() {
 
 async function main() {
   const input = await readStdin();
-  if (await enforceStopGate(input)) return;
   await activateRunPrompt(input);
   await enforceUnattendedQuestionPolicy(input);
   await enforceGovernedBranchPolicy(input);
@@ -635,4 +635,9 @@ async function main() {
   await recordDispatchOutcome(input);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(`QTA governance Hook failed closed: ${error?.message ?? error}`);
+    process.exitCode = 2;
+  });
+}

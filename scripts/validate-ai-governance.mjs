@@ -256,6 +256,7 @@ const requiredGovernanceFiles = [
   ".zcode/config.json",
   "scripts/check-ai-task-control.mjs",
   "scripts/check-ai-delivery-ready.mjs",
+  "scripts/create-candidate-diff.mjs",
   "scripts/check-ai-architecture.mjs",
   "scripts/run-ai-evidence-command.mjs",
   "scripts/zcode-governance-hook.mjs",
@@ -307,11 +308,14 @@ try {
       || !governanceMatchers[0]?.matcher?.includes("AskUserQuestion")) {
     errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit, Agent/Task, and AskUserQuestion");
   }
-  for (const event of ["UserPromptSubmit", "Stop"]) {
+  for (const event of ["UserPromptSubmit"]) {
     const groups = hooks?.events?.[event] ?? [];
     const configured = groups.some((group) => (group.hooks ?? []).some((hook) => hook.type === "process"
       && hook.command === "node" && hook.args?.includes("${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs")));
     if (!configured) errors.push(`ZCode ${event} must invoke zcode-governance-hook.mjs`);
+  }
+  if (hooks?.events?.Stop !== undefined) {
+    errors.push("ZCode Stop hook must remain disabled; client-native Goal is the sole continuation controller");
   }
   if (!(hooks?.events?.UserPromptSubmit ?? []).some((group) => group.matcher?.includes("/qta-run"))) {
     errors.push("ZCode UserPromptSubmit hook must activate /qta-run sessions");

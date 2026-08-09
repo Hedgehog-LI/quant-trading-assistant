@@ -28,7 +28,6 @@ function requiredArtifactPaths(control) {
     control.controlPath,
     control.contract?.path,
     control.candidate?.manifestPath,
-    control.candidate?.diffArtifactPath,
     control.review?.omitted ? "" : control.review?.artifactPath,
     control.architectureGate?.required ? control.architectureGate?.reportPath : "",
     control.verification?.artifactPath,
@@ -80,11 +79,15 @@ export function dispatchAuditErrors(control, root) {
     errors.push(`dispatch audit directory is unavailable (${error.code ?? error.message})`);
     return errors;
   }
-  const audited = new Set(receipts.map((receipt) => receipt.dispatchId));
+  const receiptByDispatch = new Map(receipts.map((receipt) => [receipt.dispatchId, receipt]));
   const recorded = new Set((control.roleRuns ?? []).map((run) => run.dispatchId).filter(present));
-  for (const receipt of receipts) {
+  for (const dispatchId of recorded) {
+    const receipt = receiptByDispatch.get(dispatchId);
+    if (!receipt) {
+      errors.push(`roleRuns contains a dispatch without Hook audit: ${dispatchId}`);
+      continue;
+    }
     if (receipt.taskId !== control.taskId) errors.push(`dispatch audit contains another task: ${receipt.dispatchId}`);
-    if (!recorded.has(receipt.dispatchId)) errors.push(`dispatched attempt is omitted from roleRuns: ${receipt.dispatchId}`);
     if (receipt.version === 2) {
       const outcomePath = path.join(directory,
         `${createHash("sha256").update(receipt.dispatchId ?? "").digest("hex")}.outcome.json`);
@@ -100,9 +103,6 @@ export function dispatchAuditErrors(control, root) {
         errors.push(`dispatch remains PENDING without a terminal outcome: ${receipt.dispatchId} (${error.code ?? error.message})`);
       }
     }
-  }
-  for (const dispatchId of recorded) {
-    if (!audited.has(dispatchId)) errors.push(`roleRuns contains a dispatch without Hook audit: ${dispatchId}`);
   }
   return errors;
 }
