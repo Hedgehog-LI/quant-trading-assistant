@@ -7,6 +7,9 @@ import com.quant.trade.marketdata.provider.LongPortMarketSectorProvider;
 import com.quant.trade.marketdata.provider.MarketSectorProvider;
 import com.quant.trade.marketdata.provider.SecurityDirectoryProvider;
 import com.quant.trade.marketdata.provider.DisabledSecurityDirectoryProvider;
+import com.quant.trade.marketdata.provider.SecurityMetadataEnricher;
+import com.quant.trade.marketdata.provider.DisabledSecurityMetadataEnricher;
+import com.quant.trade.marketdata.provider.longport.LongPortSecurityMetadataEnricher;
 import com.quant.trade.marketdata.provider.csv.CsvSnapshotSecurityDirectoryProvider;
 import com.quant.trade.marketdata.provider.csv.SecurityDirectoryCsvParser;
 import com.quant.trade.marketdata.provider.longport.LongPortQuoteClient;
@@ -88,6 +91,27 @@ public class MarketDataConfig {
     public MarketSectorProvider longPortMarketSectorProvider(LongPortProperties properties,
                                                               LongPortSectorClient sectorClient) {
         return new LongPortMarketSectorProvider(properties, sectorClient);
+    }
+
+    /**
+     * LongPort 元数据补全 enricher（D3-03）。沿用既有 longport 装配条件：enabled 时注入；
+     * provider 未配置凭据时 {@code isEnabled()} 返回 false，但 bean 仍存在，便于调用方区分
+     * 「未启用」与「未配置」。禁用时不装配本 bean，由 disabled 兜底接管。
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "qta.market-data.longport", name = "enabled", havingValue = "true")
+    public SecurityMetadataEnricher longPortSecurityMetadataEnricher(MarketDataProvider provider) {
+        return new LongPortSecurityMetadataEnricher(provider);
+    }
+
+    /**
+     * 元数据补全 disabled 兜底 bean（D3-03）。longport 未启用时保证应用可启动、D1 搜索/导入
+     * 不受影响；调用 enrich 端点时经 GlobalExceptionHandler 呈现为 400 BUSINESS_RULE_VIOLATION。
+     */
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(SecurityMetadataEnricher.class)
+    public SecurityMetadataEnricher disabledSecurityMetadataEnricher() {
+        return new DisabledSecurityMetadataEnricher();
     }
 
     /** 证券目录 CSV 解析器（D3 路径 P2，复用 D1 冻结口径）。 */

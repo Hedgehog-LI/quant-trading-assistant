@@ -112,6 +112,82 @@ canonical_symbol,name,market,exchange,currency,security_type,list_status,data_so
 
 同一 CSV 重复导入不会重复证券或别名；正式名称发生变化时，旧正式名称会写入 `FORMER_NAME` alias。导入与搜索都只访问本地 `stock_basic/stock_alias`，不会调用报价、K 线、LongPort，也不会创建采集任务。目录为空时返回 `catalogStatus=EMPTY`；非空目录以最大 `sourceUpdatedAt` 表示更新时间，超过 48 小时才标记 `stale=true`。D3 可替换这一临时新鲜度口径。
 
+### 证券元数据按需补全（P1.4b-D3-03）
+
+| 方法 | 路径 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/market-data/security-directory/enrich` | 已实现 | 对本地目录已存在的精确 canonical symbol，按需调用 LongPort Static Info 补全元数据；可选部分持久化 |
+
+请求体示例：
+
+```json
+{
+  "canonicalSymbol": "SH.600519",
+  "persist": false
+}
+```
+
+- `canonicalSymbol` 必填，必须是精确 canonical symbol（`SH.600519` / `HK.02498` / `US.AAPL`），经 `CanonicalSymbolUtils.normalize` 规范化，长度上限 32（`@Size`，超限返回 `VALIDATION_ERROR`）；不做名称模糊搜索/联想。
+- `persist` 可选，默认 `false`。`false` 时只查询/展示，不落库；`true` 时只补全 `stock_basic` 中为空的元数据。
+
+响应示例（`persist=false`）：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "data": {
+    "canonicalSymbol": "SH.600519",
+    "enriched": true,
+    "providerCode": "LONGPORT",
+    "fields": {
+      "nameCn": "贵州茅台",
+      "nameHk": "貴州茅台",
+      "nameEn": "Kweichow Moutai",
+      "exchange": "SSE",
+      "currency": "CNY"
+    },
+    "lotSize": 100,
+    "persisted": false,
+    "reason": "OK"
+  },
+  "timestamp": "2026-08-02T15:00:00"
+}
+```
+
+字段说明：
+
+- `enriched`：是否成功从 provider 拿到静态信息（`false`=provider 未找到该证券，非异常）。
+- `providerCode`：provider 标识（`LONGPORT`，或 disabled 兜底的 `DISABLED`）。
+- `fields`：可补全字段集合 `{nameCn, nameHk, nameEn, exchange, currency}`，均可空。
+- `lotSize`：**顶层字段**（不在 `fields` 内），每手股数。**只返回，不持久化**：`stock_basic` 无 `lot_size` 列，不扩表、不新增 migration。
+- `persisted`：是否实际写入了 `stock_basic` 行。
+- `reason`：结果原因枚举：`OK`（provider 返回数据；persist=false 展示，或 persist=true 实际写入）/ `NO_CHANGE`（`persist=true` 但没有任何字段被写入）/ `PROVIDER_NOT_FOUND`（provider 返回 null，未找到该证券的静态信息，不落库）。
+
+持久化规则（`persist=true`）：
+
+- 由 Mapper 的**原子条件更新**保证：只在数据库当前字段仍为 null/空字符串/纯空白时写入，**本地已有非空字段无论 LongPort 返回值是否不同都保留本地值**（数据库层保证，不依赖调用前读取结果）。
+- 可补字段仅限 `name_cn / name_hk / name_en / exchange / currency`。
+- **不修改 `source_updated_at` / `data_source` / `source_hash`**：`source_updated_at` 是证券目录新鲜度依据，不能被 LongPort 补全更新时间污染；本轮不新增 Flyway migration、不新增来源追踪表。
+- `lotSize` 不持久化。
+- 外部 LongPort 调用在数据库事务外执行；只有最终的单条条件 UPDATE 保持原子性。
+- 更新为 0 时重新查询：行不存在 → 404 `STOCK_NOT_FOUND`；行存在但无可补字段 → `persisted=false / reason=NO_CHANGE`。
+- LongPort 返回的字符串统一 trim，null/空字符串/纯空白视为 null，禁止写入数据库。
+- provider 返回证券与请求 `canonicalSymbol` 不一致时拒绝返回与持久化（400 `SECURITY_VERIFICATION_FAILED`），不把其他证券的静态信息写入当前证券。
+
+错误码：
+
+| HTTP | `code` | 触发条件 |
+| --- | --- | --- |
+| 400 | `BUSINESS_RULE_VIOLATION` | LongPort provider 未启用（disabled enricher 直接抛异常，经 `GlobalExceptionHandler`；不创建任务、不回显凭据） |
+| 400 | `INVALID_CANONICAL_SYMBOL` | `canonicalSymbol` 格式不合法（normalize 失败） |
+| 400 | `VALIDATION_ERROR` | 请求体未通过 Bean Validation（如 `canonicalSymbol` 为空、长度超过 32） |
+| 400 | `SECURITY_VERIFICATION_FAILED` | provider 返回证券与请求不一致 |
+| 400 | `MARKET_DATA_PROVIDER_AUTHENTICATION_FAILED` | LongPort Static Info 鉴权失败（provider 透传具体码）；同类还有 `MARKET_DATA_PROVIDER_TIMEOUT`/`PERMISSION_DENIED`/`RATE_LIMITED` 等 `MARKET_DATA_PROVIDER_*` 码 |
+| 404 | `STOCK_NOT_FOUND` | 本地目录无该 canonical symbol，或补全期间该行被删除（service 抛 `SecurityDirectoryNotFoundException`，复用 controller 既有 404 handler） |
+
+所有错误响应均不含凭据/密钥/完整 token 字面量。默认 `qta.market-data.longport.enabled=false` 时装配 `DisabledSecurityMetadataEnricher`，应用正常启动、D1 搜索/导入/详情不受影响。本端点不接报价、K 线、交易、账户、订单或调度器。
+
 ### 精确证券代码验证
 
 | 方法 | 路径 | 状态 | 说明 |

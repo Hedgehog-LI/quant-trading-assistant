@@ -195,4 +195,47 @@
     <delete id="deleteByCanonicalSymbol">
         DELETE FROM stock_basic WHERE canonical_symbol = #{canonicalSymbol}
     </delete>
+
+    <!--
+        D3-03 enricher 原子条件更新。
+        仅在数据库当前字段仍为 null/空字符串/纯空白时写入（CASE WHEN 逐列判断），
+        目录同步在 LongPort 调用期间写入的非空值会被保留——数据库层保证本地非空字段永不被覆盖。
+        WHERE 子句要求至少一个目标字段当前为空，从而区分「0 行受影响 = 无可补字段或行已不存在」。
+        严禁修改 source_updated_at / data_source / source_hash（不污染目录新鲜度）。
+    -->
+    <update id="updateEmptyMetadataByCanonicalSymbol">
+        UPDATE stock_basic
+        <set>
+            <if test="nameCn != null">
+                name_cn = CASE WHEN name_cn IS NULL OR TRIM(name_cn) = ''
+                               THEN #{nameCn} ELSE name_cn END,
+            </if>
+            <if test="nameHk != null">
+                name_hk = CASE WHEN name_hk IS NULL OR TRIM(name_hk) = ''
+                               THEN #{nameHk} ELSE name_hk END,
+            </if>
+            <if test="nameEn != null">
+                name_en = CASE WHEN name_en IS NULL OR TRIM(name_en) = ''
+                               THEN #{nameEn} ELSE name_en END,
+            </if>
+            <if test="exchange != null">
+                exchange = CASE WHEN exchange IS NULL OR TRIM(exchange) = ''
+                                THEN #{exchange} ELSE exchange END,
+            </if>
+            <if test="currency != null">
+                currency = CASE WHEN currency IS NULL OR TRIM(currency) = ''
+                                THEN #{currency} ELSE currency END,
+            </if>
+        </set>
+        WHERE canonical_symbol = #{canonicalSymbol}
+          AND (
+            <trim prefixOverrides="OR ">
+                <if test="nameCn != null">OR (name_cn IS NULL OR TRIM(name_cn) = '')</if>
+                <if test="nameHk != null">OR (name_hk IS NULL OR TRIM(name_hk) = '')</if>
+                <if test="nameEn != null">OR (name_en IS NULL OR TRIM(name_en) = '')</if>
+                <if test="exchange != null">OR (exchange IS NULL OR TRIM(exchange) = '')</if>
+                <if test="currency != null">OR (currency IS NULL OR TRIM(currency) = '')</if>
+            </trim>
+          )
+    </update>
 </mapper>

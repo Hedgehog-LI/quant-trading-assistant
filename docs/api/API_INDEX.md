@@ -39,6 +39,7 @@
 | Market Data | POST | `/api/v1/market-data/security-directory/import` | 已实现（P1.4b-D1，本地 CSV 原子幂等导入） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/securities/search` | 已实现（P1.4b-D1，本地确定性代码/名称/别名/拼音检索） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/securities/{canonicalSymbol}` | 已实现（P1.4b-D1，本地证券详情） | `MARKET_DATA_API.md` |
+| Market Data | POST | `/api/v1/market-data/security-directory/enrich` | 已实现（P1.4b-D3-03，LongPort Static Info 按需补全本地目录空字段；可选持久化，不覆盖非空值、不污染来源时间） | `MARKET_DATA_API.md` |
 | Market Data | POST | `/api/v1/market-data/securities/verify` | 已实现（A/H/US 精确代码 + LongPort 静态信息/报价只读验证） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/daily-bars` | 已实现 | `MARKET_DATA_API.md` |
 | Market Data | POST | `/api/v1/market-data/daily-bars/import` | 已实现 | `MARKET_DATA_API.md` |
