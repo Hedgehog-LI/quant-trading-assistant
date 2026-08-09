@@ -80,6 +80,25 @@
 
 通用错误码表见 `../API_TODAY_MVP.md`；v0.1.1 新增：`TRADE_PLAN_NOT_FOUND` / `TRADE_PLAN_NOT_LINKABLE` / `TRADE_PLAN_SYMBOL_MISMATCH` / `JOURNAL_REFERENCED_BY_REVIEW` / `POSITION_SNAPSHOT_COMPARISON_INVALID`。行情错误码见 `MARKET_DATA_API.md` 和实际 `ErrorCodeEnum`。
 
+## 规划接口（未实现，不得当作当前能力调用）
+
+| 模块 | 方法 | 完整路径 | 状态 | 详细文档 |
+| --- | --- | --- | --- | --- |
+| P1.7 就绪 | GET | `/api/v1/market-data/sector-analytics/readiness` | 规划 v1.1 | `MARKET_DATA_API.md` §5.0 |
+| P1.7 总览 | GET | `/api/v1/market-data/sector-analytics/daily-overview` | 规划 v1.1；先薄切片，再发布批次高级总览 | `MARKET_DATA_API.md` §5.0 |
+| P1.7 相对强弱 | GET | `/api/v1/market-data/sector-analytics/relative-strength` | 规划 v1.1 | `MARKET_DATA_API.md` §5.1 |
+| P1.7 相对强弱详情 | GET | `/api/v1/market-data/sector-analytics/relative-strength/{sectorId}` | 规划 v1.1 | `MARKET_DATA_API.md` §5.1 |
+| P1.7 轮动样本 | GET | `/api/v1/market-data/sector-analytics/rotation-market-stability` | 规划 v1.1 | `MARKET_DATA_API.md` §5.2 |
+| P1.7 板块持续性 | GET | `/api/v1/market-data/sector-analytics/rotation-sector-persistence` | 规划 v1.1 | `MARKET_DATA_API.md` §5.2 |
+| P1.7 板块持续性详情 | GET | `/api/v1/market-data/sector-analytics/rotation-sector-persistence/{sectorId}` | 规划 v1.1 | `MARKET_DATA_API.md` §5.2 |
+| P1.7 资金趋势 | GET | `/api/v1/market-data/sector-analytics/capital-flow-trend` | 规划 v1.1 | `MARKET_DATA_API.md` §5.3 |
+| P1.7 资金趋势详情 | GET | `/api/v1/market-data/sector-analytics/capital-flow-trend/{sectorId}` | 规划 v1.1 | `MARKET_DATA_API.md` §5.3 |
+| P1.7 交易集中度 | GET | `/api/v1/market-data/sector-analytics/turnover-concentration` | 规划 v1.1 | `MARKET_DATA_API.md` §5.3 |
+| P1.7 交易集中度详情 | GET | `/api/v1/market-data/sector-analytics/turnover-concentration/{sectorId}` | 规划 v1.1 | `MARKET_DATA_API.md` §5.3 |
+| P1.7 量价确认 | GET | `/api/v1/market-data/sector-analytics/volume-confirmation` | 规划 v1.1 | `MARKET_DATA_API.md` §5.4 |
+| P1.7 量价确认详情 | GET | `/api/v1/market-data/sector-analytics/volume-confirmation/{sectorId}` | 规划 v1.1 | `MARKET_DATA_API.md` §5.4 |
+| P1.7 板块提醒扩展 | GET | `/api/v1/market-data/alerts` | 规划增加 `subjectType=SECTOR&sectorId=&alertTypePrefix=SECTOR_` | `MARKET_DATA_API.md` §5.5 |
+
 ## 维护规则
 
 新增/修改/删除接口时**必须**：① 更新本索引（**完整 `/api/v1/...` 路径**）；② 更新对应详细文档；③ 若影响前端 mock，同步 `../mock/MOCK_REMOTE_CONTRACT.md`。禁止复制多份接口定义。

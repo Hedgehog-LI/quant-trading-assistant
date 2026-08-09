@@ -1,118 +1,135 @@
-# P17 板块分析层实现计划与并行开发顺序
+# P1.7 板块分析实施计划（专家复审修订）
 
-> 关联设计：`docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`（可开发设计，规划/未实现）。
-> 关联契约：`docs/development/tasks/P17-SECTOR-ANALYTICS-DESIGN-20260802-CONTRACT.md`。
-> 范围：本计划只描述后续实现的子任务拆分、写路径、依赖、AC、测试与合并顺序；本设计任务不实现任何子任务代码。
+> 状态：规划/未实现。设计基线：`docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md` v1.1。
+> 原则：先证明数据可用，再计算指标；先做每日决策总览，再做高级归因。P1.7-A 未通过时禁止进入 P1.7-B。
 
-## 概述
+## 1. 冻结范围
 
-板块分析层（相对强弱 / 轮动持续性 / 收益贡献与交易集中度 / 量价确认 / 异动提醒）拆为 4 个子任务，遵循独占写路径两两无前缀重叠原则。所有子任务只读原始事实表，禁止写回 `market_sector_*`/`market_sector_ranking_*`/`stock_*` 原始事实表；衍生结果写入 V19+ 新表（统一含 `formula_code`/`formula_version`/`parameter_hash`/血缘/质量列，幂等键含 `formula_version`），异动提醒复用 `market_data_alert`。
+MVP 包含：数据就绪、每日总览、共同基准相对强弱、轮动持续性、资金趋势、交易集中度、严格滞后的量价确认、板块提醒和前端详情。
 
-### 前缀重叠消除要点（核心修复）
+MVP 不包含：成分收益贡献、自动交易、预测收益、provider 新外联。收益贡献属于 P1.7-C，必须先具备 point-in-time 成分与 `t-1` 权重。
 
-- **ST-1** 独占 `marketdata/analysis/derived/**`（衍生计算）与**共享枚举/模型的唯一所有权** `marketdata/analysis/model/**`；ST-1 不进入 `analysis/alert/**`。
-- **ST-3** 独占 `marketdata/analysis/alert/**`（异动评估）与 `marketdata/scheduler/**`。
-- `analysis/derived/**`、`analysis/model/**` 与 `analysis/alert/**` 是 **package 下的兄弟目录**：`analysis/derived`、`analysis/model`、`analysis/alert` 三者两两互不为前缀（`analysis/derived` 不是 `analysis/alert` 的前缀，反之亦然；`analysis/model` 同理）。
-- ST-1 是 `analysis/model/**`（共享枚举/模型，如 `SectorFormulaVersion`、`RelativeReturnResult`）的**唯一**所有者；ST-2/ST-3 只**消费**（只读引用）ST-1 的模型，不向 `analysis/model/**` 写文件，因此与 ST-1 在该路径上无写重叠。
+## 2. 阶段门禁
 
-### 子任务 1（ST-1）：数据模型 + 衍生计算服务 + 共享模型 + DTO/Mapper
+### P1.7-A 数据就绪门禁
 
-写路径：
+必须全部满足：
 
-- `src/main/resources/db/migration/V19__sector_analytics_derived_tables.sql`（及后续 V20+ 如需拆分）
-- `src/main/resources/mapper/SectorRelativeStrengthSnapshotMapper.xml`
-- `src/main/resources/mapper/SectorRotationMarketStabilityMapper.xml`
-- `src/main/resources/mapper/SectorRotationSectorPersistenceMapper.xml`
-- `src/main/resources/mapper/SectorMemberReturnContributionMapper.xml`
-- `src/main/resources/mapper/SectorTurnoverConcentrationMapper.xml`
-- `src/main/resources/mapper/SectorVolumeConfirmationSnapshotMapper.xml`
-- `src/main/java/com/quant/trade/marketdata/analysis/derived/`（六大衍生指标计算服务、读服务、Mapper 接口、derived 内部 dto；不进入 `analysis/alert/`、`analysis/model/` 之外的兄弟目录、`scheduler/`）
-- `src/main/java/com/quant/trade/marketdata/analysis/model/`（**共享枚举/模型的唯一所有者**：`SectorFormulaCode`、`SectorFormulaVersion`、`LineageColumns`、各衍生结果模型等；ST-2/ST-3 只读消费，不向此目录写文件）
+1. `change_rate` 契约固定为 decimal ratio，真实 fixture `0.0240` 端到端计算为 `0.0240`、显示为 `2.40%`。
+2. 当前 LongPort 无独立总数/分页且上限 100，MVP 固定 `RANKED_UNIVERSE`；不得用返回条数伪造 expected count。`VERIFIED_FULL_MARKET` 仅未来具备权威分母后启用。
+3. `market_sector_identity.id` 为内部/API `sectorId`；使用 identity lock 锚点处理首次并发插入和跨 taxonomy 区间，禁止 watch_id；衍生表使用 FK。
+4. 关注/排行收盘数据具有明确 `trade_date/snapshot_type/provider_quote_time`；AUTO/MANUAL 不能冒充 CLOSE。
+5. `market_calendar` 增加 source/verification；只有 EXCHANGE_FILE/MANUAL_VERIFIED 可进入长窗口，HK/US 缺失时 fail closed。
+6. 金额字段冻结 currency/unit/cumulative-period/reset 语义；延迟和停牌分别建模。
+7. 单公式 calculation run + source manifest + `parameter_hash` + DB claim 可用；跨公式 `publication_batch` 作为高级总览的一致发布单元。
 
-依赖：无前置子任务；依赖已落库的 P1.5/P1.6 原始事实表（`market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_batch`、`market_sector_ranking_item`、`stock_daily_bar`）。
+任一门禁失败：readiness 返回明确状态，分析调度不运行，页面显示阻断原因。
 
-AC：实现六大衍生指标的 V19+ 表 Flyway 迁移成功（相对强弱、市场级稳定性、板块级持续性、收益贡献、交易集中度、量价确认六状态）；衍生计算服务按设计闭式公式产出幂等快照；每张表含统一版本血缘列且幂等键含 `formula_version`；只读原始事实表，禁止写回原始事实表；样本不足/停牌/口径变更/零分母按 `quality_status` 降级。
+### P1.7-B 分析与页面门禁
 
-测试：`./mvnw test`（含新增 Mapper 与衍生计算单元测试，验证幂等键含版本、`INSUFFICIENT_SAMPLE` 降级、零分母不除零、跨市场 ZoneId 对齐、版本升级旧行不覆盖）。
+只有 P1.7-A 独立验收 PASS 后启动。所有指标只消费合格 CLOSE 和已发布 calculation run。
 
-合并顺序：第 1 批（串行前置，必须先合并，为 ST-2/ST-3 提供表、服务与共享模型）。
+## 3. 子任务与独占写路径
 
-### 子任务 2（ST-2）：板块分析 REST API + VO
+### ST-A1：事实契约、身份、范围和薄切片总览
 
 写路径：
 
-- `src/main/java/com/quant/trade/marketdata/controller/SectorAnalyticsController.java`（analytics 控制器）
-- `src/main/java/com/quant/trade/marketdata/vo/SectorRelativeStrengthVO.java`
-- `src/main/java/com/quant/trade/marketdata/vo/SectorRotationMarketStabilityVO.java`
-- `src/main/java/com/quant/trade/marketdata/vo/SectorRotationSectorPersistenceVO.java`
-- `src/main/java/com/quant/trade/marketdata/vo/SectorMemberReturnContributionVO.java`
-- `src/main/java/com/quant/trade/marketdata/vo/SectorTurnoverConcentrationVO.java`
-- `src/main/java/com/quant/trade/marketdata/vo/SectorVolumeConfirmationVO.java`
-- `docs/api/MARKET_DATA_API.md`（§5 由“规划”转“已实现”的接口事实更新）
+- 新 Flyway migration（V19+）
+- `marketdata/analysis/readiness/**`
+- 现有板块 ranking/watch 的 DO、Mapper/XML、service 中与完整性和 CLOSE 语义直接相关的文件
+- provider 字段单位契约测试
 
-依赖：ST-1（衍生计算服务、DTO/Mapper 与 `analysis/model/**` 共享模型必须先就位）。ST-2 只读消费 ST-1 的 `analysis/model/**`，不向其写文件。
+产出：稳定身份与 identity-lock 锚点表（READ COMMITTED 下先建锚点再锁定）；快照回填 sectorId、移除 watch 级联删除并改为归档；排行范围字段；provider 时间、币种、累计语义；字段完整的 readiness；CLOSE 薄切片总览。
 
-AC：实现 `/api/v1/market-data/sector-analytics/*` 端点（相对强弱、市场级稳定性、板块级持续性、收益贡献、交易集中度、量价确认六状态、异动复用 `/alerts`）；统一响应 `ApiResponse<T>` 并携带 `formulaCode`/`formulaVersion`/`qualityStatus`/`qualityReason`；分析 API 不返回 provider 鉴权失败码，错误码按 `VALIDATION_ERROR`/规划 `MARKET_SECTOR_ANALYTICS_FORMULA_VERSION_NOT_FOUND`/`MARKET_SECTOR_ANALYTICS_DATA_UNAVAILABLE` + 200/`quality_status` 区分；样本不足返回 200 + 字段降级标注。
+验收：真实 fixture 单位；rank_limit 固定 `RANKED_UNIVERSE`；首次并发插入/跨 taxonomy 区间无重叠；删除/重建 watch 不改变 sectorId 且不删除快照；AUTO/MANUAL 不命中 CLOSE；readiness 必需 gate 任一阻断即禁止计算。
 
-测试：`./mvnw test`（含 Controller MockMvc 用例，覆盖六状态、拆分贡献/集中度、版本化响应）。
+### ST-A2：计算运行、血缘和原子发布
 
-合并顺序：第 2 批（ST-1 之后，与 ST-3 并行）。
-
-### 子任务 3（ST-3）：异动提醒评估器 + market_data_alert 写入 + Scheduler
+依赖：ST-A1。
 
 写路径：
 
-- `src/main/java/com/quant/trade/marketdata/analysis/alert/SectorAnomalyAlertEvaluator.java`
-- `src/main/java/com/quant/trade/marketdata/analysis/alert/SectorAlertType.java`
-- `src/main/java/com/quant/trade/marketdata/scheduler/SectorAnalyticsScheduler.java`
-- `docs/features/MARKET_ALERT_RULES_DESIGN.md`（追加 `SECTOR_*` 提醒类型说明）
+- calculation run / manifest migration、DO、Mapper/XML
+- `marketdata/analysis/run/**`
+- DB claim 与发布事务测试
 
-依赖：ST-1（衍生指标快照表、读服务与 `analysis/model/**` 共享模型）；不依赖 ST-2（评估器读取衍生表，不依赖 REST）。ST-3 只读消费 ST-1 的 `analysis/model/**`，不向其写文件。
+产出：calculation run、publication batch/member、完整 manifest/hash、候选/READY/发布状态和失败恢复；结果只存 run ID，batch 通过成员表关联并用复合 FK/hash 校验。
 
-AC：异动评估器按阈值 + Z-score 计算异常并写入 `market_data_alert`（`alert_type=SECTOR_*`、`severity=INFO/WARN/HIGH`、`trigger_value_json` 含 `formula_code`/`formula_version`）；Scheduler 在各市场收盘后（按 ZoneId）触发衍生重算与提醒评估；样本不足时不产 HIGH 提醒。
+验收：重复运行幂等；参数变化不覆盖；并发 claim；错误 batch/run 组合受 FK/事务拒绝；group hash 可复算；任一指标失败时 batch 不发布。
 
-测试：`./mvnw test`（含评估器单元测试，验证 Z-score、阈值、severity 分级、`trigger_value_json` 内容、样本不足降级）。
+### ST-B1：MVP 衍生指标
 
-合并顺序：第 2 批（ST-1 之后，与 ST-2 并行）。
-
-### 子任务 4（ST-4）：前端页面 + 图表 + mock 契约
+依赖：P1.7-A 独立 PASS。
 
 写路径：
 
-- `docs/mock/MOCK_REMOTE_CONTRACT.md`（新增 `sector-analytics/*` mock 契约建议）
-- 前端实际代码写在独立前端仓库（不在本仓库；本仓库仅更新 mock 契约建议）
+- 衍生表 migration 与 Mapper/XML
+- `marketdata/analysis/derived/**`
+- `marketdata/analysis/model/**`（共享模型唯一所有者）
 
-依赖：ST-2（REST API 契约冻结后才能定 mock）；不依赖 ST-3（页面读 API，不直接读提醒写入逻辑，提醒经 `/alerts` 查询）。
+产出：相对强弱、市场/板块轮动、资金趋势、交易集中度和量价确认。不得创建收益贡献表。
 
-AC：前端独立仓库实现“板块分析”页面与图表（相对强弱热力/排名、轮动位次带/市场级 Spearman 时序、收益贡献堆叠柱、交易集中度饼/柱、量价六状态散点、异动流）；mock 契约与后端 VO 对齐（含 `formulaCode`/`formulaVersion`）；每页标注“不构成投资建议”。
+强制公式：
 
-测试：前端独立仓库 `typecheck`/`lint`/`test`/`build`（不在本仓库执行）。
+- RS 窗口先冻结每日排行稳定身份交集 cohort；共同基准、板块收益和最终排名都只使用该 cohort。
+- Spearman 按稳定身份连接，在交集内根据 change_rate 重排；零方差无定义。
+- 板块位次使用每日 `n_t` 百分位，缺日中断连续性。
+- 资金趋势冻结 `flowScope=WATCHED_SECTORS`、币种和累计口径；集中度 MVP 固定单个 CLOSE，正/负资金字段只称方向占比。
+- CLOSE 量比使用 `t-5..t-1`；盘中只比较历史同时间桶。
 
-合并顺序：第 3 批（API 冻结后并行；前端独立仓库 PR 独立合并，本仓库仅合并 mock 契约更新）。
+验收：从原始字段到最终指标的端到端单元测试，覆盖单位、截断、错序身份、并列、变化宇宙、缺日、零方差、严格滞后、零分母和参数隔离。
 
-## 并行与串行合并顺序（DAG）
+### ST-B2：查询 API、每日总览和提醒
 
+依赖：ST-B1。
+
+写路径：
+
+- `SectorAnalyticsController`、VO、查询 service
+- `MarketQuoteController`、`MarketDataAlertMapper.java/xml` 及告警迁移
+- `marketdata/analysis/alert/**`、`marketdata/scheduler/SectorAnalyticsScheduler.java`
+- `ErrorCodeEnum` 与 `GlobalExceptionHandler` 的必要映射
+- `docs/api/MARKET_DATA_API.md`
+
+产出：readiness 固定 gate schema；daily-overview 固定 THIN/ADVANCED 选择规则、PageData 和 batch 冲突校验；单公式列表固定 v1/参数哈希、calculationRunId 分页锚点和次级排序；tracking symbol 未复权价格收益对照；提醒绑定 publication batch 并按冻结阈值返回非因果 evidence。
+
+验收：MockMvc 覆盖 400/404/200 降级语义、分页上限、日期范围、公式/参数选择、scope/血缘完整性、板块过滤、跨批次拒绝、告警阈值边界和重复调度。分析接口不得反向调用 provider。
+
+### ST-B3：前端每日总览与详情
+
+依赖：ST-B2 API 契约冻结。
+
+前端独立仓库写路径：feature、API adapter、types、router/navigation、page/component、tests 和 mock contract。不得只写后端仓库的 mock 建议代替前端实现。
+
+产出：今日板块总览、板块详情、数据与计算状态；显式展示 `RANKED_UNIVERSE`、覆盖率、上游阻断、公式版本和“不构成投资建议”。MVP 不显示收益贡献。
+
+验收：typecheck/lint/test/build；关键页面在桌面和移动端验证无溢出；空数据、阻断、降级、加载、错误、正常状态均有测试。
+
+## 4. DAG 与提交
+
+```text
+ST-A1 -> 可部署薄切片总览
+  |
+  +--> ST-A2 -> 独立验证 P1.7-A -> ST-B1 -> ST-B2 -> ST-B3 -> 独立验证 P1.7-B
 ```
-ST-1 (数据模型 + 衍生计算服务 + 共享 model/**)
- |
- +-- 串行前置 --> ST-2 (REST API + VO，消费 ST-1 model)   \
- |                                                          } 第2批，ST-2 与 ST-3 可并行
- +-- 串行前置 --> ST-3 (异动评估器 + alert + scheduler，消费 ST-1 model) /
-                        |
-                        +-- API 冻结后 --> ST-4 (前端页面 + mock 契约，并行)
-```
 
-阻塞条件：
+每个子任务独立 candidate commit。实现者只可 SELF_CHECKED；代码审查和最终验证使用干净角色。P1.7-A 未 PASS 时不得以“先写后补”为理由进入 B。
 
-- **串行**：ST-1 必须先于 ST-2、ST-3 合并（提供 V19+ 表、衍生服务与共享 `analysis/model/**`）；ST-2 必须先于 ST-4（提供冻结的 REST 契约）。
-- **并行**：ST-2 与 ST-3 在 ST-1 之后可并行开发与合并（写路径两两无前缀重叠，且都不向 `analysis/model/**` 写文件）；ST-4 在 API 冻结后可并行（前端独立仓库）。
-- 合并顺序总结：第 1 批 = ST-1（串行前置）；第 2 批 = ST-2 ∥ ST-3（并行）；第 3 批 = ST-4（前端并行，本仓库仅 mock 契约）。
+## 5. 机器验收清单
 
-写路径独占性核查（两两不前缀重叠）：
+- 后端：定向测试 + `./mvnw test` + `./mvnw package`。
+- 前端：typecheck + lint + test + build。
+- DB：Flyway 从空库迁移、旧 V18 数据升级、唯一键/索引/回滚失败场景。
+- 架构：无原始事实写回、无 provider 反向调用、无收益贡献 MVP 文件、无 watch_id 身份。
+- 契约：OpenAPI/接口文档与 Controller/VO/错误映射一致。
+- 数据：真实 fixture 单位、截断、固定 cohort、排名方向、CLOSE、日历、币种、累计、血缘、幂等、单公式 run 与跨公式 batch 发布均有反例测试。
 
-- ST-1 = `db/migration`、`mapper/*.xml`、`marketdata/analysis/derived/**`、`marketdata/analysis/model/**`。
-- ST-2 = `marketdata/controller/**`、`marketdata/vo/**`、`docs/api/MARKET_DATA_API.md`。
-- ST-3 = `marketdata/analysis/alert/**`、`marketdata/scheduler/**`、`docs/features/MARKET_ALERT_RULES_DESIGN.md`。
-- ST-4 = `docs/mock/MOCK_REMOTE_CONTRACT.md` 与前端独立仓库。
+结构关键词测试只能证明文档存在，不能作为功能或设计通过证据。
 
-核查结论：`analysis/derived`、`analysis/model`、`analysis/alert` 是 `marketdata/analysis` 下的兄弟目录，两两互不为前缀；ST-1 唯一拥有 `analysis/model/**`，ST-2/ST-3 只读消费不写入；ST-1 的 `analysis/derived/**` 与 ST-3 的 `analysis/alert/**` 互不为前缀（兄弟目录）。各子任务写路径前缀两两不重叠。
+## 6. 停止条件
+
+- 单位、完整性、CLOSE、身份或交易日历任一未冻结。
+- 需要真实 provider 权限但环境不可用：记录阻塞，不伪造 PASS；其余纯本地任务可继续。
+- 候选越过非目标（自动交易、真实下单、收益贡献 MVP）。
+- 独立 verifier 给出 REJECT：回到对应子任务修复，不更新建设看板为完成。

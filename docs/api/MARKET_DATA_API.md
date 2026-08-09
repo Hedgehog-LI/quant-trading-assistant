@@ -426,6 +426,8 @@ LongPort SDK 4.3.3 分钟粒度使用原生 `Min_1/Min_5/Min_15/Min_30/Min_60`�
 | GET | `/api/v1/market-data/sector-catalog/ranking-history?market=&tradeDate=&snapshotType=&page=&size=` | 分页查询历史榜单批次 |
 | GET | `/api/v1/market-data/sector-catalog/ranking-history/{batchId}/items` | 查询批次内完整板块排名 |
 
+> 当前 DELETE watch 会级联历史快照，这是 P1.7-A 明确阻断项。P1.7-A 必须先回填稳定 `sectorId`、移除级联删除并把 DELETE 改为归档关注关系；迁移验收前不得启用 P1.7 衍生计算。
+
 `market` 仅支持 `CN/HK/US`；排行指标支持 `leading-gainer`、`today-trend`、`popularity`、`market-cap`、`revenue`、`revenue-growth`、`net-profit`、`net-profit-growth`。返回字段包含 provider 板块 ID、涨跌幅、领涨标的和指标值。
 
 关注请求示例：
@@ -474,21 +476,83 @@ LongPort SDK 4.3.3 分钟粒度使用原生 `Min_1/Min_5/Min_15/Min_30/Min_60`�
 
 ## 5. 板块分析接口设计（P1.7，规划，未实现）
 
-> 状态：**规划/未实现**。本节为板块分析层（相对强弱 / 轮动持续性 / 收益贡献与交易集中度 / 量价确认 / 异动提醒）的接口设计，尚未实现。所有端点均只读已落库的板块原始事实表并产出 V19+ 衍生指标快照；不写回原始事实表，不调用 provider 外联，不生成买卖指令，不构成投资建议。详细公式与口径见 `../features/MARKET_SECTOR_ANALYTICS_DESIGN.md`。
+> 状态：**规划/未实现，v1.1 专家复审修订**。P1.7-A 数据就绪门禁先于 P1.7-B 分析 API。MVP 包含每日总览、相对强弱、轮动、资金趋势、交易集中度、量价和提醒；收益贡献后置 P1.7-C。
 
-统一前缀（规划）：`/api/v1/market-data/sector-analytics/*`，统一响应 `ApiResponse<T>`。市场仅支持 `CN/HK/US`，严格按各自 `ZoneId` 对齐交易日，禁止跨市场混算。`window` 取值：相对强弱 `20/50/120`、轮动持续性 `5/10/20`、收益贡献与交易集中度 `1/5`、量价确认当日 + 近 5 日均值。所有响应体携带 `formulaCode`/`formulaVersion`/`qualityStatus`/`qualityReason`。`qualityStatus` 取 `OK/INSUFFICIENT_SAMPLE/INSUFFICIENT/STALE/ORIGIN_CHANGED/NO_DERIVED_DATA/INSUFFICIENT_RAW`，非 `OK` 时前端降级展示且不产 HIGH 提醒。
+统一前缀（规划）：`/api/v1/market-data/sector-analytics/*`，统一响应 `ApiResponse<T>`。列表统一返回 `PageData{page,size,total,sortBy,sortDirection,anchorType,anchorId,items}`：单公式使用 `CALCULATION_RUN`，薄切片使用 `RANKING_BATCH`，高级总览使用 `PUBLICATION_BATCH`。首次请求解析并返回锚点，`page>1` 必须回传对应 `calculationRunId/rankingBatchId/publicationBatchId`，否则 400；防止并发发布导致跨页漂移。衍生接口未显式选 run 时，`formulaVersion/parameterHash` 必须同时传或同时省略；省略时固定采用端点默认 `v1` 并由请求窗口 + 冻结默认阈值计算 parameter hash，不采用“最新版本”。单公式响应携带完整血缘和质量；依赖排行时追加 scope/coverage。跨公式总览返回 `publicationBatchId`，每个模块分别返回自己的 `calculationRunId`。
+
+排序白名单：daily overview 为 `changeRate/rsRankPercentile/rankPercentileChange/flowIntensity/alertCount/sectorId`（THIN 仅允许 `changeRate/sectorId`）；relative strength 为 `relativeReturnN/rsRankPercentile/sectorId`；rotation market 为 `tradeDate/rankSpearmanMean`；rotation sector 为 `meanRankPercentile/rankPercentileChange/sectorId`；flow 为 `flowIntensity/flowIntensityChange/sectorId`；concentration 为 `topKTurnoverShare/absoluteFlowConcentration/sectorId`；volume 为 `turnoverRatio/changeRate/sectorId`。非法字段 400；除时序端点追加 `tradeDate ASC` 外，其余都追加 `sectorId ASC`。
+
+质量状态统一为 `OK/DEGRADED/NO_DERIVED_DATA/INSUFFICIENT_RAW/INSUFFICIENT_SAMPLE/STALE/ORIGIN_CHANGED/BLOCKED_AUTH/BLOCKED_PERMISSION/BACKOFF`。上游阻断作为数据状态返回，不被伪装为“暂无数据”。
+
+### 5.0 每日板块总览与数据就绪（规划，未实现）
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/market-data/sector-analytics/readiness?market=&asOfDate=` | 单位、完整性、CLOSE、日历、来源时间及计算 run 水位 |
+| GET | `/api/v1/market-data/sector-analytics/daily-overview?market=&asOfDate=&viewMode=THIN|ADVANCED&page=&size=&sortBy=&sortDirection=&rankingBatchId=&publicationBatchId=` | 确定性薄切片或同一发布批次的高级聚合 |
+
+`daily-overview` 固定 CLOSE 口径，`viewMode` 默认 `THIN`。THIN 首屏解析 CLOSE `rankingBatchId` 并返回，page>1 必须回传且与 market/asOfDate 匹配；ADVANCED 同理使用 `publicationBatchId`。锚点与模式或范围冲突均 400。未给高级 batch 时按 `published_at DESC,id DESC` 选择该 market/date 最新已发布批次；无批次返回 `NO_DERIVED_DATA`。显式日期无 CLOSE 不回退，两种模式都使用同一 `PageData` 外壳。
+
+总览摘要固定返回 Top/Bottom 各 5 个板块（`leaders`/`laggards`）；完整列表通过同一锚点下的 `pageData` 分页读取。
+
+readiness 响应固定为：`market/requestedAsOfDate/resolvedAsOfDate/ready/overallStatus/gates[]/latestCloseBatchId/latestPublicationBatchId/lastSuccessfulAt`。每个 gate 返回 `code/status(required: PASS|BLOCKED|DEGRADED)/required/evidence/qualityReasonCodes`；必需 gate（UNIT、IDENTITY、WATCH_SNAPSHOT_RETENTION、CLOSE、CALENDAR、CURRENCY、MANIFEST）任一 BLOCKED 则 `ready=false`，不得启动衍生计算。
+
+```json
+{
+  "asOfDate": "2026-07-31",
+  "snapshotType": "CLOSE",
+  "rankingScope": "RANKED_UNIVERSE",
+  "rankingBatchId": 88,
+  "leaders": [{"sectorId": 1001, "sectorName": "半导体", "changeRate": "0.0240"}],
+  "laggards": [{"sectorId": 1009, "sectorName": "煤炭", "changeRate": "-0.0180"}],
+  "flowScope": "WATCHED_SECTORS",
+  "watchedSectorCount": 6,
+  "validFlowSectorCount": 5,
+  "watchedFlows": [{"sectorId": 1001, "netInflow": "1200000", "currencyCode": "CNY", "sourceQuoteTime": "2026-07-31T15:00:00+08:00"}],
+  "pageData": {"page":1,"size":20,"total":1,"sortBy":"changeRate","sortDirection":"DESC","anchorType":"RANKING_BATCH","anchorId":88,"items":[{"sectorId":1001,"changeRate":"0.0240"}]},
+  "publicationBatchId": null,
+  "modules": {
+    "relativeStrength": {"status": "NO_DERIVED_DATA", "calculationRunId": null, "value": null},
+    "rotationPersistence": {"status": "NO_DERIVED_DATA", "calculationRunId": null, "value": null},
+    "capitalFlowTrend": {"status": "NO_DERIVED_DATA", "calculationRunId": null, "value": null},
+    "volumeConfirmation": {"status": "NO_DERIVED_DATA", "calculationRunId": null, "value": null},
+    "alerts": {"status": "NO_DERIVED_DATA", "count": 0, "highestSeverity": null}
+  },
+  "qualityStatus": "DEGRADED",
+  "qualityReasonCodes": ["RANKED_UNIVERSE_NOT_FULL_MARKET", "DERIVED_MODULES_NOT_PUBLISHED"]
+}
+```
+
+高级总览只能选择一个已发布 `publicationBatchId`。每个模块同时返回 `scope/eligibility/status/calculationRunId/formulaVersion/parameterHash/qualityReasonCodes`：排行模块 scope 为 `RANKED_UNIVERSE`，资金/集中度/量价为 `WATCHED_SECTORS`。排行中的未关注板块在 watched 模块固定返回 `eligibility=NOT_WATCHED,value=null,qualityReasonCodes=['NOT_IN_WATCHED_SCOPE']`，不得伪装成计算失败或沿用旧值。
+
+高级总览单行示例（所有模块必须属于 `publicationBatchId=9001`）：
+
+```json
+{
+  "publicationBatchId": 9001,
+  "sectorId": 1001,
+  "rankScope": "RANKED_UNIVERSE",
+  "changeRate": "0.0240",
+  "sourceQuoteTime": "2026-07-31T15:00:00+08:00",
+  "relativeStrength": {"scope":"RANKED_UNIVERSE","eligibility":"ELIGIBLE","status":"DEGRADED","value":"0.925000","calculationRunId":101,"formulaVersion":"v1","parameterHash":"sha256:rs","qualityReasonCodes":["RANKED_UNIVERSE_NOT_FULL_MARKET"]},
+  "rotationPersistence": {"scope":"RANKED_UNIVERSE","eligibility":"ELIGIBLE","status":"DEGRADED","rankPercentileChange":"0.300000","meanRankPercentile":"0.800000","calculationRunId":103,"formulaVersion":"v1","parameterHash":"sha256:rotation","qualityReasonCodes":["RANKED_UNIVERSE_NOT_FULL_MARKET"]},
+  "capitalFlowTrend": {"scope":"WATCHED_SECTORS","eligibility":"ELIGIBLE","status":"OK","flowIntensity":"0.024000","flowIntensityChange":"0.010000","calculationRunId":106,"formulaVersion":"v1","parameterHash":"sha256:flow","qualityReasonCodes":[]},
+  "volumeConfirmation": {"scope":"WATCHED_SECTORS","eligibility":"ELIGIBLE","status":"OK","value":"UP_CONFIRMED","calculationRunId":105,"formulaVersion":"v1","parameterHash":"sha256:volume","qualityReasonCodes":[]},
+  "alerts": {"status":"OK","count":1,"highestSeverity":"WARN","publicationBatchId":9001,"calculationRunIds":[103,105]}
+}
+```
 
 ### 5.1 板块相对强弱（规划，未实现）
 
 | 方法 | 路径（规划） | 说明 |
 | --- | --- | --- |
-| GET | `/api/v1/market-data/sector-analytics/relative-strength?market=&window=&asOfDate=&limit=` | 按市场/窗口查询 RS-rank 排行（未实现） |
-| GET | `/api/v1/market-data/sector-analytics/relative-strength/{sectorIdentity}?window=&asOfDate=` | 单板块 N 日对数相对收益与 RS-rank 百分位详情（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/relative-strength?market=&window=&asOfDate=&page=&size=&sortBy=&sortDirection=&formulaVersion=&parameterHash=&calculationRunId=` | 按市场/窗口查询 RS-rank 排行（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/relative-strength/{sectorId}?window=&asOfDate=&formulaVersion=&parameterHash=&calculationRunId=` | 单板块详情与 tracking symbol 对照（未实现） |
 
 请求示例：
 
 ```
-GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&asOfDate=2026-07-31&limit=20
+GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&asOfDate=2026-07-31&page=1&size=20
 ```
 
 响应示例（`ApiResponse<T>`，含 `formulaCode`/`formulaVersion`/`benchmarkType`）：
@@ -501,53 +565,71 @@ GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&a
     "market": "CN",
     "window": 20,
     "asOfDate": "2026-07-31",
-    "benchmarkType": "SECTOR_EQUAL_WEIGHT",
+    "benchmarkType": "RANK_SET_EQUAL_WEIGHT",
     "benchmarkSymbol": null,
     "formulaCode": "RELATIVE_RETURN_LOG",
     "formulaVersion": "v1",
-    "items": [
+    "parameterHash": "sha256:example",
+    "calculationRunId": 101,
+    "rankScope": "RANKED_UNIVERSE",
+    "coverageRate": null,
+    "isTruncated": true,
+    "pageData": {"page":1,"size":20,"total":1,"sortBy":"rsRankPercentile","sortDirection":"DESC","anchorType":"CALCULATION_RUN","anchorId":101,"items":[
       {
-        "sectorIdentity": "BK/SH/IN40159",
+        "sectorId": 1001,
         "sectorName": "半导体",
         "relativeReturnN": "0.0304731969",
         "rsRankPercentile": "0.925000",
-        "rankScope": "FULL_MARKET",
-        "qualityStatus": "OK",
-        "qualityReason": null,
+        "rankScope": "RANKED_UNIVERSE",
+        "qualityStatus": "DEGRADED",
+        "qualityReasonCodes": ["RANKED_UNIVERSE_NOT_FULL_MARKET"],
         "validSampleSize": 20
       }
-    ]
+    ]}
   },
   "timestamp": "2026-07-31T16:00:00"
 }
 ```
 
-`rankScope` 语义（与设计 `MARKET_SECTOR_ANALYTICS_DESIGN.md` §5.1 一致）：RS-rank 的排名对象与 rank set 都是"各板块实际计算出的 N 日 `relativeReturn_N`"。`FULL_MARKET` = 连续 N 个交易日全市场 CLOSE 榜单历史（`market_sector_ranking_batch`/`market_sector_ranking_item`，`snapshot_type='CLOSE'`，取各板块 `change_rate`）重建各板块合成净值后排名，等权基准同源为全市场等权；`WATCHED_ONLY` = 全市场历史不足时仅对被 watch 板块 CLOSE 快照（`market_sector_snapshot`，`trigger_type='CLOSE'`）重建排名（附 `qualityReason='RANK_SCOPE_WATCHED_ONLY'`，降级展示），此时等权基准同源退化为被关注集合等权，不得声称使用全市场等权；`relativeReturn_N` 无法满足 N 个连续交易日门槛时为 `INSUFFICIENT_SAMPLE`。tracking symbol 基准（`benchmarkType=TRACKING_SYMBOL`）需连续 `N+1` 个 `close_price`（`stock_daily_bar`）才能构造 N 个日收益，不足时降级为与 rank set 同范围的等权基准（`qualityReason='BENCHMARK_TRACKING_SYMBOL_INSUFFICIENT'`）。禁止用单日 `change_rate` 代替 N 日相对收益参与排名。
+当前 LongPort 无独立总数/分页且上限 100，MVP 固定返回 `RANKED_UNIVERSE + DEGRADED + RANKED_UNIVERSE_NOT_FULL_MARKET`。`VERIFIED_FULL_MARKET` 仅为未来预留，禁止用返回条数反填 expected count。公共 RS 统一使用固定 cohort 的共同 rank-set 等权基准：先取窗口内每日排行稳定身份的交集，每日基准和板块收益都只使用该 cohort；中途进入/退出者不补值，cohort 指纹纳入参数与来源哈希。
+
+tracking symbol 详情对照固定读取 `stock_daily_bar(adjustType=NONE)`，仅表达**未复权价格收益**，不代表含分红的总回报或可投资 ETF 业绩。响应必须返回 `trackingSymbol/alignedStartDate/alignedEndDate/sectorPriceReturn/trackingPriceReturn/returnSpread/missingSectorDates/missingTrackingDates/latestBarTime/adjustType/qualityStatus/qualityReasonCodes`。两边按同市场权威交易日取日期交集并用区间首末收盘价计算简单价格收益；任一端点缺失或中间缺日时 `returnSpread=null` 并降级，不前向填补，也不改变公共 RS 基准。
 
 ### 5.2 板块轮动持续性（规划，未实现；市场级与板块级分端点）
 
 | 方法 | 路径（规划） | 说明 |
 | --- | --- | --- |
-| GET | `/api/v1/market-data/sector-analytics/rotation-market-stability?market=&window=&tradeDate=` | 市场级 Spearman ρ 时序（未实现） |
-| GET | `/api/v1/market-data/sector-analytics/rotation-sector-persistence?market=&window=&asOfDate=&limit=` | 按市场/窗口查询板块级持续性排行（未实现） |
-| GET | `/api/v1/market-data/sector-analytics/rotation-sector-persistence/{sectorIdentity}?window=&asOfDate=` | 单板块位次序列指标（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/rotation-market-stability?market=&window=&startDate=&endDate=&page=&size=&sortBy=&sortDirection=&formulaVersion=&parameterHash=&calculationRunId=` | 排行样本级 Spearman ρ 时序（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/rotation-sector-persistence?market=&window=&asOfDate=&page=&size=&sortBy=&sortDirection=&formulaVersion=&parameterHash=&calculationRunId=` | 板块级持续性排行（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/rotation-sector-persistence/{sectorId}?window=&asOfDate=&formulaVersion=&parameterHash=&calculationRunId=` | 单板块位次序列指标（未实现） |
 
-市场级稳定性响应示例（节选，无 `sectorIdentity`，键 `market+tradeDate+window`；`rankSpearmanMean` 按设计 GOLDEN-04 的正确 Pearson 值示例）：
+排行样本稳定性响应示例（节选，不归属单板块；MVP 不得称为全市场）：
 
 ```json
 {
   "success": true,
   "code": "OK",
   "data": {
+    "pageData": {"page":1,"size":20,"total":1,"sortBy":"tradeDate","sortDirection":"ASC","anchorType":"CALCULATION_RUN","anchorId":102,"items":[{
     "market": "CN",
     "window": 10,
     "tradeDate": "2026-07-31",
     "formulaCode": "ROTATION_SPEARMAN",
     "formulaVersion": "v1",
+    "parameterHash": "sha256:rotation-example",
+    "calculationRunId": 102,
+    "rankScope": "RANKED_UNIVERSE",
+    "sourceCoverageRate": null,
+    "isTruncated": true,
     "rankSpearmanMean": "0.948683",
-    "validSampleSize": 28,
-    "qualityStatus": "OK",
-    "qualityReason": null
+    "minPairCoverage": "0.820000",
+    "avgPairCoverage": "0.910000",
+    "validPairCount": 9,
+    "weightedIntersectionCount": 720,
+    "validSampleSize": 9,
+    "qualityStatus": "DEGRADED",
+    "qualityReasonCodes": ["RANKED_UNIVERSE_NOT_FULL_MARKET"]
+    }]}
   },
   "timestamp": "2026-07-31T16:00:00"
 }
@@ -565,65 +647,43 @@ GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&a
     "asOfDate": "2026-07-31",
     "formulaCode": "ROTATION_SECTOR_PERSISTENCE",
     "formulaVersion": "v1",
-    "items": [
+    "parameterHash": "sha256:persistence-example",
+    "calculationRunId": 103,
+    "rankScope": "RANKED_UNIVERSE",
+    "coverageRate": null,
+    "isTruncated": true,
+    "pageData": {"page":1,"size":20,"total":1,"sortBy":"meanRankPercentile","sortDirection":"DESC","anchorType":"CALCULATION_RUN","anchorId":103,"items":[
       {
-        "sectorIdentity": "BK/SH/IN40159",
+        "sectorId": 1001,
         "meanRankPercentile": "0.800000",
         "rankPercentileStdDev": "0.1870828693",
         "topBucketOccupancyRate": "0.400000",
         "consecutiveLeadingDays": 2,
         "consecutiveLaggingDays": 0,
-        "rankChange": -2,
-        "qualityStatus": "OK"
+        "rankPercentileChange": "0.500000",
+        "qualityStatus": "DEGRADED",
+        "qualityReasonCodes": ["RANKED_UNIVERSE_NOT_FULL_MARKET"]
       }
-    ]
+    ]}
   },
   "timestamp": "2026-07-31T16:00:00"
 }
 ```
 
-### 5.3 板块收益贡献与交易集中度（规划，未实现；两类独立端点）
+### 5.3 板块资金趋势与交易集中度（规划，未实现）
 
 | 方法 | 路径（规划） | 说明 |
 | --- | --- | --- |
-| GET | `/api/v1/market-data/sector-analytics/return-contribution?market=&tradeDate=&window=&limit=` | 按市场查询收益贡献排行（未实现） |
-| GET | `/api/v1/market-data/sector-analytics/return-contribution/{sectorIdentity}?tradeDate=&window=` | 单板块成分收益贡献明细（未实现） |
-| GET | `/api/v1/market-data/sector-analytics/turnover-concentration?market=&tradeDate=&window=&limit=` | 按市场查询交易集中度排行（未实现） |
-| GET | `/api/v1/market-data/sector-analytics/turnover-concentration/{sectorIdentity}?tradeDate=&window=` | 单板块成交额/净流入集中度明细（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/capital-flow-trend?market=&tradeDate=&window=&page=&size=&sortBy=&sortDirection=&formulaVersion=&parameterHash=&calculationRunId=` | 关注板块资金趋势（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/capital-flow-trend/{sectorId}?startDate=&endDate=&window=&formulaVersion=&parameterHash=&calculationRunId=` | 单板块资金历史（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/turnover-concentration?market=&tradeDate=&window=1&topK=&page=&size=&sortBy=&sortDirection=&formulaVersion=&parameterHash=&calculationRunId=` | 查询关注板块单 CLOSE 快照交易集中度（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/turnover-concentration/{sectorId}?tradeDate=&window=&topK=&formulaVersion=&parameterHash=&calculationRunId=` | 单板块集中度明细（未实现） |
 
-收益贡献响应示例（节选，`memberContribution = weight · memberReturn`，记录 `sumContribution`/`sectorReturn`/`residual`）：
+收益贡献接口在 P1.7 MVP 中不存在。只有 point-in-time 成分与 `t-1` 权重数据门禁通过后，P1.7-C 才能新增该契约。
 
-```json
-{
-  "success": true,
-  "code": "OK",
-  "data": {
-    "market": "CN",
-    "tradeDate": "2026-07-31",
-    "window": 1,
-    "formulaCode": "MEMBER_RETURN_CONTRIBUTION",
-    "formulaVersion": "v1",
-    "items": [
-      {
-        "sectorIdentity": "BK/SH/IN40159",
-        "weightMethod": "FREEFLOAT_PRICE",
-        "sumContribution": "0.0260000000",
-        "sectorReturn": "0.0500000000",
-        "residual": "0.0240000000",
-        "excludedMemberCount": 2,
-        "validMemberCount": 24,
-        "qualityStatus": "OK",
-        "topContributors": [
-          { "canonicalSymbol": "SH.600519", "weight": "0.180000", "memberReturn": "0.052000", "memberContribution": "0.009360" }
-        ]
-      }
-    ]
-  },
-  "timestamp": "2026-07-31T16:00:00"
-}
-```
+资金趋势响应固定 `flowScope=WATCHED_SECTORS`，并包含 `watchedSectorCount/validFlowSectorCount/netInflow/currencyCode/turnoverAmount/flowIntensity/cumulativeNetInflowN/meanFlowIntensityN/positiveFlowDaysRate/flowIntensityChange` 及统一血缘和质量字段。交易集中度与量价确认同样固定 `dataScope=WATCHED_SECTORS` 并返回 watched/valid sector count，任何列表标题不得写“全市场排行”。
 
-交易集中度响应示例（节选；成交额占比是“集中度”，不是“收益贡献”；净流入集中度以 absSum 为分母，零分母置空 + `INSUFFICIENT`）：
+交易集中度响应示例（节选；MVP 固定 `window=1`；正/负项是资金方向占比，只有 top-K 项是集中度；`absSum=0` 时置空 + `INSUFFICIENT_RAW`）：
 
 ```json
 {
@@ -635,22 +695,27 @@ GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&a
     "window": 1,
     "formulaCode": "TURNOVER_CONCENTRATION",
     "formulaVersion": "v1",
-    "items": [
+    "parameterHash": "sha256:concentration-example",
+    "calculationRunId": 104,
+    "dataScope": "WATCHED_SECTORS",
+    "watchedSectorCount": 6,
+    "validSectorCount": 5,
+    "pageData": {"page":1,"size":20,"total":1,"sortBy":"topKTurnoverShare","sortDirection":"DESC","anchorType":"CALCULATION_RUN","anchorId":104,"items":[
       {
-        "sectorIdentity": "BK/SH/IN40159",
+        "sectorId": 1001,
         "topKTurnoverShare": "0.382000",
-        "positiveFlowConcentration": "0.850000",
-        "negativeFlowConcentration": "0.150000",
+        "positiveFlowShare": "0.850000",
+        "negativeFlowShare": "0.150000",
         "absoluteFlowConcentration": "0.750000",
         "topK": 3,
         "excludedMemberCount": 2,
         "validMemberCount": 24,
         "qualityStatus": "OK",
-        "topConcentrators": [
-          { "canonicalSymbol": "SH.600519", "turnoverAmount": "1200000.000000", "netInflow": "300000.000000", "share": "0.180000" }
-        ]
+        "qualityReasonCodes": [],
+        "topTurnoverMembers": [{"canonicalSymbol":"SH.600519","turnoverAmount":"1200000.000000","turnoverShare":"0.180000"}],
+        "topAbsoluteFlowMembers": [{"canonicalSymbol":"SH.600036","netInflow":"-300000.000000","absoluteFlowShare":"0.220000"}]
       }
-    ]
+    ]}
   },
   "timestamp": "2026-07-31T16:00:00"
 }
@@ -660,8 +725,8 @@ GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&a
 
 | 方法 | 路径（规划） | 说明 |
 | --- | --- | --- |
-| GET | `/api/v1/market-data/sector-analytics/volume-confirmation?market=&tradeDate=&limit=` | 按市场查询量价确认状态（未实现） |
-| GET | `/api/v1/market-data/sector-analytics/volume-confirmation/{sectorIdentity}?tradeDate=` | 单板块量价确认详情（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/volume-confirmation?market=&tradeDate=&page=&size=&sortBy=&sortDirection=&formulaVersion=&parameterHash=&calculationRunId=` | 查询关注板块量价确认状态（未实现） |
+| GET | `/api/v1/market-data/sector-analytics/volume-confirmation/{sectorId}?tradeDate=&formulaVersion=&parameterHash=&calculationRunId=` | 单板块量价确认详情（未实现） |
 
 响应示例（节选，`confirmationStatus` 为六状态 `UP_CONFIRMED/UP_UNCONFIRMED/DOWN_CONFIRMED/DOWN_UNCONFIRMED/NEUTRAL/INSUFFICIENT`；下跌放量是 `DOWN_CONFIRMED` 而非背离）：
 
@@ -674,24 +739,31 @@ GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&a
     "tradeDate": "2026-07-31",
     "formulaCode": "VOLUME_CONFIRMATION",
     "formulaVersion": "v1",
-    "items": [
+    "parameterHash": "sha256:volume-example",
+    "calculationRunId": 105,
+    "dataScope": "WATCHED_SECTORS",
+    "watchedSectorCount": 6,
+    "validSectorCount": 5,
+    "pageData": {"page":1,"size":20,"total":2,"sortBy":"turnoverRatio","sortDirection":"DESC","anchorType":"CALCULATION_RUN","anchorId":105,"items":[
       {
-        "sectorIdentity": "BK/SH/IN40159",
+        "sectorId": 1001,
         "changeRate": "0.031000",
         "turnoverAmount": "50000000.000000",
         "turnoverRatio": "1.650000",
         "confirmationStatus": "UP_CONFIRMED",
-        "qualityStatus": "OK"
+        "qualityStatus": "OK",
+        "qualityReasonCodes": []
       },
       {
-        "sectorIdentity": "BK/SH/IN40160",
+        "sectorId": 1002,
         "changeRate": "-0.020000",
         "turnoverAmount": "42000000.000000",
         "turnoverRatio": "1.300000",
         "confirmationStatus": "DOWN_CONFIRMED",
-        "qualityStatus": "OK"
+        "qualityStatus": "OK",
+        "qualityReasonCodes": []
       }
-    ]
+    ]}
   },
   "timestamp": "2026-07-31T16:00:00"
 }
@@ -699,24 +771,28 @@ GET /api/v1/market-data/sector-analytics/relative-strength?market=CN&window=20&a
 
 ### 5.5 板块异动提醒（规划，未实现，复用 /alerts）
 
-板块异动提醒复用现有 `/api/v1/market-data/alerts`，按 `alertType=SECTOR_*` 过滤查询（如 `SECTOR_RS_REVERSAL`、`SECTOR_VOLUME_CONFIRMATION`、`SECTOR_TURNOVER_CONCENTRATION`、`SECTOR_RANK_JUMP`）；`severity` 取 `INFO/WARN/HIGH`，`triggerValueJson` 存派生指标上下文与 `formulaCode`/`formulaVersion`。
+板块异动提醒复用现有 `/api/v1/market-data/alerts`，但 P1.7-A 必须先扩展表和查询链路：`subjectType=SECTOR`、数值 `sectorId`、`alertType`、`dedupKey`、`calculationRunId`、`publicationBatchId`。板块提醒必须属于所选发布批次；触发 run 非空时必须是该 batch 成员。重复调度返回同一事件而不是重复插入。
+
+每条板块提醒必须返回 `summary/evidenceCodes/evidenceValues/qualityReasonCodes`。证据顺序为指标越界、相对位置变化、关注板块资金趋势、量价确认、数据质量；这是观察证据而非因果解释，P1.7-C 前不得声称某成分“导致”板块涨跌。
+
+固定触发契约：`SECTOR_RANK_JUMP` 为百分位变化绝对值达到 0.30（0.50 且无降级才可 HIGH）；`SECTOR_RS_REVERSAL` 仅指前日 `rsPercentile<=0.2` 到当日 `>=0.8` 的 BULLISH regime，或前日 `rsPercentile>=0.8` 到当日 `<=0.2` 的 BEARISH regime；`SECTOR_VOLUME_CONFIRMATION` 为完整五日基线下量比 ≥2.0 且绝对涨跌 ≥0.03（≥0.05 且无降级才可 HIGH）；`SECTOR_TURNOVER_CONCENTRATION` 为 top-K 成交额占比 ≥0.60（≥0.75 且样本合格才 WARN）。Z-score 仅作 evidence，不触发或升级。阈值纳入 `parameterHash`；`STALE/ORIGIN_CHANGED/BLOCKED_*/BACKOFF` 不产新提醒，其他降级不得产 HIGH。只有量价规则使用其固定阈值，其他规则缺历史即不产提醒。
 
 ```
-GET /api/v1/market-data/alerts?severity=&resolved=&canonicalSymbol=&alertType=SECTOR_*&page=&size=
+GET /api/v1/market-data/alerts?severity=&resolved=&subjectType=SECTOR&sectorId=&publicationBatchId=&alertTypePrefix=SECTOR_&page=&size=
 ```
 
 异动提醒仅为观察提示，不构成投资建议，不产生交易动作。
 
 ### 5.6 错误码（规划）
 
-板块分析 API **不直接外联 provider**，因此**不返回**任何 provider 鉴权失败类错误码（如行情数据源鉴权失败码）；分析层只读已落库衍生与原始事实表，鉴权失败属于上游采集链路（§2/§3）的职责，不透传到分析接口。错误按下列语义区分：
+板块分析 API 不直接外联 provider，但 readiness/overview 必须把上游 `BLOCKED_AUTH/BLOCKED_PERMISSION/BACKOFF` 作为数据状态返回，避免“空数据”误导。错误按下列语义区分：
 
 - 请求参数错误（market/window/date 非法）→ 复用 `VALIDATION_ERROR`（HTTP 400）。
-- 公式版本不存在（请求的 `formulaVersion` 未落库）→ 规划码 `MARKET_SECTOR_ANALYTICS_FORMULA_VERSION_NOT_FOUND`（HTTP 404）。该规划码是通用 `RESOURCE_NOT_FOUND`（"公式版本"这一资源不存在）的分析域特化：所请求资源不存在即返回 404，与"请求参数非法返回 400"严格区分。该规划码待 ST-2 落库为 ErrorCodeEnum 枚举值，本轮不新增枚举值，但 HTTP 语义即为此处声明的 404（不再留待实现时另行决定）。
-- 真正无法查询（衍生表/原始事实不可读且非上述情形）→ 规划码 `MARKET_SECTOR_ANALYTICS_DATA_UNAVAILABLE`（待 ST-2 落库）。
-- 尚无衍生数据 → HTTP 200 + `qualityStatus=NO_DERIVED_DATA` + `qualityReason`。
-- 原始事实不足 → HTTP 200 + `qualityStatus=INSUFFICIENT_RAW` + `qualityReason`。
-- 数据陈旧 → HTTP 200 + `qualityStatus=STALE` + `qualityReason`。
-- 样本不足 → HTTP 200 + `qualityStatus=INSUFFICIENT_SAMPLE`/`INSUFFICIENT` + `qualityReason`，前端降级展示，不产 HIGH 提醒。
+- 公式版本不存在 → `MARKET_SECTOR_ANALYTICS_FORMULA_VERSION_NOT_FOUND`（HTTP 404）；实施任务必须同步修改全局异常映射，不能继续把所有 `BusinessException` 固定返回 400。
+- 真正无法查询（衍生表/原始事实不可读且非上述情形）→ 规划码 `MARKET_SECTOR_ANALYTICS_DATA_UNAVAILABLE`（待 ST-B2 落库）。
+- 尚无衍生数据 → HTTP 200 + `qualityStatus=NO_DERIVED_DATA` + `qualityReasonCodes`。
+- 原始事实不足 → HTTP 200 + `qualityStatus=INSUFFICIENT_RAW` + `qualityReasonCodes`。
+- 数据陈旧 → HTTP 200 + `qualityStatus=STALE` + `qualityReasonCodes`。
+- 样本不足 → HTTP 200 + `qualityStatus=INSUFFICIENT_SAMPLE` + `qualityReasonCodes`，前端降级展示，不产 HIGH 提醒。
 
 200 + `qualityStatus` 非 `OK` 的响应统一在字段层降级标注，由前端灰显处理；不作为错误码返回。规划码遵循 `MARKET_SECTOR_*` 前缀，与现有 `MARKET_SECTOR_PROVIDER_UNAVAILABLE` / `MARKET_DATA_*` 命名一致。

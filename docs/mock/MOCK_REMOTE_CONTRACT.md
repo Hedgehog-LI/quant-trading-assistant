@@ -26,6 +26,7 @@
 | Security Verification（精确代码验证） | ❌ 明确提示切换后端模式，不伪造 LongPort 结果 | ✅ `/market-data/securities/verify` | 验证只读；确认后才进入计划 scope |
 | Security Directory（目录/搜索/详情） | ❌ D2 尚未实现前端 adapter，不伪造目录结果 | ✅ D1 `/security-directory/import` + `/securities/search` + `/securities/{canonicalSymbol}` | 仅本地 DB；不调用 provider、报价或 K 线 |
 | Market Segments（市场板块/自定义分组） | ✅ 市场板块仅演示数据；自定义分组 localStorage | ✅ `/sector-catalog/*` + `/segments/*` | 演示数据必须标 `LOCAL_DEMO`，不得冒充 LongPort |
+| Sector Analytics（P1.7，规划） | ⚠️ 仅 `LOCAL_DEMO` 视觉样例，不伪造计算和资金数据 | 规划 `/sector-analytics/*`，尚未实现 | `RANKED_UNIVERSE` 与 `WATCHED_SECTORS` 必须分开展示 |
 
 ## 3. localStorage 规则
 
@@ -79,3 +80,15 @@
 - 板块 CRUD 与成员管理调用 `/api/v1/market-data/segments/*`（详见 `../api/MARKET_DATA_API.md` §4）。
 - 行情工作台调用 `/api/v1/market-data/workbench/*`（overview 聚合）。
 - remote 由后端强制校验（同板块同 symbol 唯一、级联删除、memberCount 一致等），mock 必须复刻同口径，避免双模式行为分叉。
+
+## 7. P1.7 板块分析规划契约
+
+- mock 不生成 calculationRunId、provider 完整性、资金趋势或板块提醒；页面样例必须显示 `LOCAL_DEMO`。
+- remote 单公式响应携带 `formulaCode/formulaVersion/parameterHash/calculationRunId/qualityStatus/qualityReasonCodes`；高级总览使用 `publicationBatchId` 并为每个模块返回自己的 run，薄切片明确 `DERIVED_MODULES_NOT_PUBLISHED`。
+- 排行范围当前固定 `RANKED_UNIVERSE`；关注板块资金范围固定 `WATCHED_SECTORS`，不得合并成“全市场资金流”。
+- 板块身份 remote 统一使用数值 `sectorId`；不得返回或 mock 旧 `sectorIdentity` 字符串。
+- 每日总览为 CLOSE 口径；显式日期无数据不回退，省略日期才返回最新成功 CLOSE 及实际日期。
+- `viewMode` 默认 `THIN`，不会因存在发布批次自动切换；`ADVANCED` 必须绑定 `publicationBatchId`。分页使用 `anchorType/anchorId`，mock 不伪造 run 或 batch 锚点。
+- P1.7-A remote 删除 watch 只归档关注关系并保留历史快照；mock 的 P1.3 自定义板块级联规则不适用于该行业 watch 生命周期。
+- 资金趋势、交易集中度和量价确认均为 `WATCHED_SECTORS`；板块提醒绑定 publication batch，mock 不伪造成功提醒。
+- 收益贡献属于 P1.7-C，MVP mock 和 remote 均不得提供该字段或页面。

@@ -547,78 +547,90 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 
 ## 板块分析规划表（P1.7，规划 V19+）
 
-> 状态：**规划 V19+**，未实现。本块为板块分析层（相对强弱 / 轮动持续性 / 收益贡献与交易集中度 / 量价确认 / 异动提醒）的衍生指标表设计，绑定更高 Flyway 版本 V19+，不复用 V1-V18 既有版本号。所有衍生表均为独立新表，**只读原始事实表，不写回**（衍生读服务只读 `market_sector_*`/`market_sector_ranking_*`/`stock_*` 原始事实表，禁止 UPDATE/写回/回写/覆盖）。本规划区域不表述任何已落库事实，全部为规划。详细公式与口径见 `docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md`。
+> 状态：**规划 V19+，v1.1 专家复审修订**。先实现 P1.7-A 数据就绪与计算运行，再实现 P1.7-B 衍生指标。MVP 不建立收益贡献表。
+
+### P1.7-A 数据治理表与原始事实扩展（规划）
+
+- `market_sector_identity`：`id bigint` 主键，自然唯一键 `(provider_code, market_code, provider_sector_id, taxonomy_version)`，有效区间左闭右开。新增唯一锚点表 `market_sector_identity_lock(provider_code, market_code, provider_sector_id)`；READ COMMITTED 写事务 `INSERT IGNORE` 后 `SELECT ... FOR UPDATE` 锁锚点，再校验所有 taxonomy version 区间不重叠。
+- 原始快照生命周期迁移：给 snapshot/member snapshot 回填 `sector_identity_id`，移除 watch 级联删除；DELETE watch 仅归档关注关系，历史事实保留。
+- `sector_analytics_publication_batch`：跨公式一致发布单元。run 和 member 都保存 provider/market/as-of-date；member 分别用含这些范围字段的复合 FK 指向 batch 与 run，数据库拒绝跨范围成员。required hash 纳入 formula/version/parameter，group hash再纳入 source manifest/run id；成员集合、范围、READY 状态和 hash 全部在发布事务重算。衍生结果行不保存 batch ID。
+- `sector_analytics_calculation_run`：单个公式的版本、参数哈希、来源 manifest、候选/READY/发布状态、DB claim 和错误；唯一键 `(formula_code, formula_version, parameter_hash, source_manifest_hash)`，通过 publication member 归属批次。
+- 扩展 `market_sector_ranking_batch`：`expected_item_count/actual_item_count/is_truncated/coverage_rate/taxonomy_version`。无法证明完整时仅为 `RANKED_UNIVERSE`。
+- 扩展板块快照事实：provider quote time、currency code、金额单位、累计周期/重置语义、规范化交易状态；P1.7-A 验收前不得计算资金趋势或陈旧状态。
+- 扩展 `market_calendar`：`source_code/verification_status`；长窗口仅接受 `EXCHANGE_FILE/MANUAL_VERIFIED`，HK/US 缺少验证日历时 fail closed，不使用周末推断。
 
 ### 统一版本血缘列（所有板块分析衍生表强制含下列字段）
 
-每张衍生表都强制包含版本与血缘列；公式升级写新 `formula_version` 行，旧行 `is_latest=false` 且填 `superseded_at`，绝不覆盖：
+每张衍生表都强制包含版本与血缘列；单公式结果通过 calculation run 发布，跨公式总览通过 publication batch 原子发布，旧 run/batch 保留且绝不覆盖：
 
-- `formula_code` varchar(64) — 公式标识（`RELATIVE_RETURN_LOG` / `ROTATION_SPEARMAN` / `ROTATION_SECTOR_PERSISTENCE` / `MEMBER_RETURN_CONTRIBUTION` / `TURNOVER_CONCENTRATION` / `VOLUME_CONFIRMATION`）。
+- `formula_code` varchar(64) — 公式标识（`RELATIVE_RETURN_LOG` / `ROTATION_SPEARMAN` / `ROTATION_SECTOR_PERSISTENCE` / `CAPITAL_FLOW_TREND` / `TURNOVER_CONCENTRATION` / `VOLUME_CONFIRMATION`）。
 - `formula_version` varchar(16) — 公式版本，幂等键必含。
-- `parameter_hash` varchar(64) — 输入参数内容哈希。
+- `parameter_hash` varchar(64) — 输入参数内容哈希并纳入唯一键。
+- `calculation_run_id` bigint — 已发布计算运行。
 - `source_provider` varchar(32) — 原始事实 provider。
-- `source_batch_id` bigint 或 `source_snapshot_id` bigint — 来源榜单批次/快照标识。
 - `source_date_range` varchar(64) — 来源日期区间。
+- `source_manifest_hash` varchar(64) — 完整输入 ID 清单哈希。
 - `calculated_at` datetime — 计算时间。
-- `quality_status` varchar(32) — `OK`/`INSUFFICIENT_SAMPLE`/`INSUFFICIENT`/`STALE`/`ORIGIN_CHANGED`。
-- `quality_reason` varchar(128) — 降级原因。
+- `quality_status` varchar(32) — `OK/DEGRADED/NO_DERIVED_DATA/INSUFFICIENT_RAW/INSUFFICIENT_SAMPLE/STALE/ORIGIN_CHANGED/BLOCKED_AUTH/BLOCKED_PERMISSION/BACKOFF`。
+- `quality_reason_codes` text — 结构化原因码 JSON 数组。
 - `valid_sample_size` int — 实际有效样本数。
-- `is_latest` boolean — 是否当前最新版本。
-- `superseded_at` datetime — 被新版本取代时间（可空）。
+- `published_at` datetime — 所属 calculation run 的原子发布时间。
 
 ### 板块分析 V19+ 衍生表（规划）
 
 #### sector_relative_strength_snapshot（规划 V19+）
 
-状态：规划 V19+，未实现。用途：板块相对强弱（N 日对数相对收益 `relativeReturn_N` + RS-rank 百分位）衍生快照。数据来源按 rank_scope 区分（只读原始事实表，不写回）：`FULL_MARKET` 读连续 N 个交易日全市场 CLOSE 榜单历史 `market_sector_ranking_batch`/`market_sector_ranking_item`（`snapshot_type='CLOSE'`，取各板块 `change_rate`）；`WATCHED_ONLY` 读被关注板块 CLOSE 快照 `market_sector_snapshot`（`trigger_type='CLOSE'`，取 `change_rate`）；tracking symbol 基准读 `stock_daily_bar.close_price`（需连续 `N+1` 个收盘价）。
+状态：规划 V19+，未实现。用途：共同 rank-set 等权基准下的相对强弱。`change_rate` 冻结为 decimal ratio；只消费通过完整性门禁的 CLOSE 榜单。范围为 `VERIFIED_FULL_MARKET/RANKED_UNIVERSE`，tracking symbol 只作详情对照。
 
-核心字段：`id`（主键，bigint auto_increment）、`sector_identity`（varchar(96)）、`market_code`（varchar(8)，CN/HK/US）、`as_of_date`（date）、`window`（smallint，20/50/120）、`benchmark_type`（varchar(32)，`TRACKING_SYMBOL`/`SECTOR_EQUAL_WEIGHT`）、`benchmark_symbol`（varchar(32)，可空）、`relative_return_n`（decimal(20,10)）、`rs_rank_percentile`（decimal(20,6)，0~1）、`rank_scope`（varchar(16)，`FULL_MARKET`：连续 N 个交易日全市场 CLOSE 榜单历史（`market_sector_ranking_batch`/`market_sector_ranking_item`）重建各板块 N 日合成净值与 `relativeReturn_N` 后排名，含全市场全部板块，等权基准同源为全市场等权；`WATCHED_ONLY`：全市场历史不足时降级，仅 WATCHED 板块 CLOSE 快照（`market_sector_snapshot`）重建排名，附 `quality_reason='RANK_SCOPE_WATCHED_ONLY'`，等权基准同源退化为被关注集合等权，降级展示）、统一版本血缘列、`created_at`/`updated_at`（datetime）。
+核心字段：`id`、`sector_identity_id` FK、`market_code`、`as_of_date`、`window`、`benchmark_type='RANK_SET_EQUAL_WEIGHT'`、`relative_return_n`、`rs_rank_percentile`、`rank_scope`、`coverage_rate`、统一版本血缘列和时间列。
 
-幂等键：unique `uk_sector_rs(sector_identity, as_of_date, window, formula_version)`（含 `formula_version`）；索引 `idx_sector_rs_market_date(market_code, as_of_date)`。
+幂等键：unique `uk_sector_rs(calculation_run_id, sector_identity_id, as_of_date, window)`。
 
 #### sector_rotation_market_stability（规划 V19+，市场级）
 
-状态：规划 V19+，未实现。用途：**市场级**轮动稳定性（相邻交易日全市场 `rank_no` 向量的 Spearman ρ），键 `(market_code, trade_date, window, formula_version)`，**不含 sector_identity**，不重复存入任何 sector 记录。只读 `market_sector_ranking_batch`/`market_sector_ranking_item`（CLOSE）原始事实表，不写回。
+状态：规划 V19+，未实现。用途：**排行样本级**轮动稳定性（相邻交易日按稳定身份对齐、由 `change_rate` 重算平均秩后的 Spearman ρ），键 `(market_code, trade_date, window, formula_version)`，不含板块身份。MVP 固定 `RANKED_UNIVERSE`，不得称为全市场。
 
-核心字段：`id`、`market_code`、`trade_date`（date）、`window`（5/10/20）、`rank_spearman_mean`（decimal(20,6)）、统一版本血缘列、`created_at`/`updated_at`。
+核心字段：`id`、`market_code`、`trade_date`、`window`、`rank_scope`、`source_coverage_rate`、`is_truncated`、`rank_spearman_mean`（按 intersection count 加权）、`min_pair_coverage/avg_pair_coverage/valid_pair_count/weighted_intersection_count`、统一版本血缘列和时间列。
 
-幂等键：unique `uk_sector_rotation_market(market_code, trade_date, window, formula_version)`（市场级，无 sector_identity）；索引 `idx_sector_rotation_market_date(market_code, trade_date)`。
+幂等键：unique `uk_sector_rotation_market(calculation_run_id, source_provider, market_code, trade_date, window)`。
+
+`sector_rotation_pair_metric` 保存每个相邻日对的 left/right/intersection count、`pair_coverage=min(intersection/left, intersection/right)`、ρ 和原因码；唯一键 `(calculation_run_id, market_code, left_trade_date, right_trade_date)`。
 
 #### sector_rotation_sector_persistence（规划 V19+，板块级）
 
-状态：规划 V19+，未实现。用途：**板块级**位次序列指标（平均位次、位次标准差、头部桶占用率、连续领涨/领跌天数、位次变化）。只读 `market_sector_ranking_item`（CLOSE `rank_no`）原始事实表，不写回。
+状态：规划 V19+，未实现。用途：**板块级**位次序列指标。按 CLOSE `change_rate` 重算平均秩/百分位；持久化 `rank_no` 只作交叉校验，不参与公式。
 
-核心字段：`id`、`sector_identity`、`market_code`、`as_of_date`（date）、`window`（5/10/20）、`mean_rank_percentile`（decimal(20,6)）、`rank_percentile_std_dev`（decimal(20,6)）、`top_bucket_occupancy_rate`（decimal(20,6)）、`consecutive_leading_days`（int）、`consecutive_lagging_days`（int）、`rank_change`（int）、统一版本血缘列、`created_at`/`updated_at`。
+核心字段：`id`、`sector_identity_id` FK、`market_code`、`as_of_date`、`window`、`rank_scope`、`mean_rank_percentile`、`rank_percentile_std_dev`、`top_bucket_occupancy_rate`（百分位 ≥0.8）、`consecutive_leading_days`/`consecutive_lagging_days`（按截面最大/最小 `change_rate`）、`rank_percentile_change`、统一版本血缘列和时间列。
 
-幂等键：unique `uk_sector_rotation_sector(sector_identity, as_of_date, window, formula_version)`（含 `formula_version`）；索引 `idx_sector_rotation_sector_market_date(market_code, as_of_date)`。
+幂等键：unique `uk_sector_rotation_sector(calculation_run_id, sector_identity_id, as_of_date, window)`。
 
-#### sector_member_return_contribution（规划 V19+，收益贡献）
+#### sector_capital_flow_trend（规划 V19+，资金趋势）
 
-状态：规划 V19+，未实现。用途：板块真实收益贡献（`weight · memberReturn`，权重优先前收盘价×流通股本，缺失降级等权）。只读 `market_sector_member_snapshot`/`market_sector_snapshot` 原始事实表，不写回。**不得**与交易集中度混称。
+状态：规划 V19+，未实现。用途：保存**关注板块范围**的净流入方向、持续性和变化速度。核心字段：`sector_identity_id/market_code/trade_date/window/flow_scope='WATCHED_SECTORS'/currency_code/net_inflow/turnover_amount/flow_intensity/cumulative_net_inflow_n/mean_flow_intensity_n/positive_flow_days_rate/flow_intensity_change`、统一版本血缘列和时间列。
 
-核心字段：`id`、`sector_identity`、`market_code`、`trade_date`（date）、`window`（1/5）、`weight_method`（varchar(32)，`FREEFLOAT_PRICE`/`EQUAL_WEIGHT_FALLBACK`）、`sum_contribution`（decimal(20,10)）、`sector_return`（decimal(20,10)）、`residual`（decimal(20,10)）、`top_contributors_json`（text）、`excluded_member_count`（int）、`valid_member_count`（int）、统一版本血缘列、`created_at`/`updated_at`。
+幂等键：unique `uk_sector_flow_trend(calculation_run_id, sector_identity_id, trade_date, window)`。
 
-幂等键：unique `uk_sector_contribution(sector_identity, trade_date, window, formula_version)`（含 `formula_version`）；索引 `idx_sector_contribution_market_date(market_code, trade_date)`。
+`sector_member_return_contribution` 后置到 P1.7-C；在 point-in-time 成分和 `t-1` 权重门禁通过前不得建表。
 
 #### sector_turnover_concentration（规划 V19+，交易集中度）
 
-状态：规划 V19+，未实现。用途：板块交易集中度（top-K 成交额占比 + 正/负/绝对净流入集中度，净流入分母为 absSum 避免除零/负）。只读 `market_sector_member_snapshot`/`market_sector_snapshot` 原始事实表，不写回。**不得**把成交额占比称为“涨幅贡献/收益贡献”。
+状态：规划 V19+，未实现。用途：单个 CLOSE 快照的板块交易集中度（top-K 成交额占比 + 正/负资金方向占比 + top-K 绝对流量集中度）。正/负方向占比之和为 1，不得称为集中度或收益贡献。
 
-核心字段：`id`、`sector_identity`、`market_code`、`trade_date`（date）、`window`（1/5）、`top_k_turnover_share`（decimal(20,6)）、`positive_flow_concentration`（decimal(20,6)，可空）、`negative_flow_concentration`（decimal(20,6)，可空）、`absolute_flow_concentration`（decimal(20,6)，可空）、`top_k`（int）、`top_concentrators_json`（text）、`excluded_member_count`（int）、`valid_member_count`（int）、统一版本血缘列、`created_at`/`updated_at`。
+核心字段：`id`、`sector_identity_id` FK、`market_code`、`trade_date`、`window`（MVP 固定 1）、`data_scope='WATCHED_SECTORS'`、`top_k_turnover_share`、`positive_flow_share`、`negative_flow_share`、`absolute_flow_concentration`、`top_k`、`top_turnover_members_json`、`top_absolute_flow_members_json`、`excluded_member_count`、`valid_member_count`、统一版本血缘列和时间列。`absSum=0` 时相关字段为空且质量为 `INSUFFICIENT_RAW`。
 
-幂等键：unique `uk_sector_concentration(sector_identity, trade_date, window, formula_version)`（含 `formula_version`）；索引 `idx_sector_concentration_market_date(market_code, trade_date)`。
+幂等键：unique `uk_sector_concentration(calculation_run_id, sector_identity_id, trade_date, window, top_k)`。
 
 #### sector_volume_confirmation_snapshot（规划 V19+，六状态）
 
 状态：规划 V19+，未实现。用途：板块量价确认（六状态 + 量比）。只读 `market_sector_snapshot` 原始事实表，不写回。
 
-核心字段：`id`、`sector_identity`、`market_code`、`trade_date`（date）、`change_rate`（decimal(20,8)）、`turnover_amount`（decimal(30,6)）、`turnover_ratio`（decimal(20,6)）、`confirmation_status`（varchar(24)，`UP_CONFIRMED`/`UP_UNCONFIRMED`/`DOWN_CONFIRMED`/`DOWN_UNCONFIRMED`/`NEUTRAL`/`INSUFFICIENT`）、统一版本血缘列、`created_at`/`updated_at`。
+核心字段：`id`、`sector_identity_id` FK、`market_code`、`trade_date`、`data_scope='WATCHED_SECTORS'`、`change_rate`、`turnover_amount`、`turnover_ratio`、`confirmation_status`、统一版本血缘列和时间列。量比必须有完整 `t-5..t-1` 五个 CLOSE。
 
-幂等键：unique `uk_sector_volume(sector_identity, trade_date, formula_version)`（含 `formula_version`）；索引 `idx_sector_volume_market_date(market_code, trade_date)`。
+幂等键：unique `uk_sector_volume(calculation_run_id, sector_identity_id, trade_date)`。
 
-#### market_data_alert 复用（不新增告警表，规划 V19+）
+#### market_data_alert 扩展（复用表，规划 V19+）
 
-异动提醒复用 V7 版本的 `market_data_alert` 表（该表本身已在 V7 落库），新增 `alert_type=SECTOR_*`（`SECTOR_RS_REVERSAL`、`SECTOR_VOLUME_CONFIRMATION`、`SECTOR_TURNOVER_CONCENTRATION`、`SECTOR_RANK_JUMP` 等），`severity` 取 `INFO/WARN/HIGH`，`trigger_value_json` 存派生指标上下文与 `formula_code`/`formula_version`。不新建第二套告警表。规划 V19+ 仅在应用层新增枚举值与写入逻辑，不新建表结构（若需索引调整由 ST-3 评估）。
+复用 V7 表但必须迁移增加 `subject_type`、`sector_identity_id`、`dedup_key`、`calculation_run_id`、`publication_batch_id`；板块提醒必须绑定 batch，非空 run 通过 `(publication_batch_id, calculation_run_id)` 复合 FK 指向 publication member。dedup 覆盖板块、交易日、类型、batch、参数与证据。Controller/Service/Mapper/XML 同步支持主体与批次过滤。
 
 #### MyBatis / Flyway 边界（规划 V19+）
 
