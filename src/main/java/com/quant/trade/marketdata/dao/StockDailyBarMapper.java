@@ -1,5 +1,6 @@
 package com.quant.trade.marketdata.dao;
 
+import com.quant.trade.marketdata.model.StockBarAvailabilityDO;
 import com.quant.trade.marketdata.model.StockDailyBarDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -28,4 +29,7 @@ public interface StockDailyBarMapper {
                        @Param("adjustType") String adjustType,
                        @Param("dataSource") String dataSource);
     long countByCanonicalSymbol(@Param("canonicalSymbol") String canonicalSymbol);
+
+    /** availability：按 data_source + adjust_type 聚合该证券存在的日 K 组合及覆盖概况（只读）。 */
+    List<StockBarAvailabilityDO> selectDailyAvailability(@Param("canonicalSymbol") String canonicalSymbol);
 }

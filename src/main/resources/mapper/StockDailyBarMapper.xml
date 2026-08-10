@@ -87,4 +87,15 @@
     <select id="countByCanonicalSymbol" resultType="long">
         SELECT COUNT(1) FROM stock_daily_bar WHERE canonical_symbol = #{canonicalSymbol}
     </select>
+
+    <select id="selectDailyAvailability" resultType="com.quant.trade.marketdata.model.StockBarAvailabilityDO">
+        SELECT data_source, adjust_type,
+               COUNT(1) AS bar_count,
+               MIN(trade_date) AS first_bar_date, MAX(trade_date) AS last_bar_date,
+               MAX(fetched_at) AS latest_fetched_at
+        FROM stock_daily_bar
+        WHERE canonical_symbol = #{canonicalSymbol}
+        GROUP BY data_source, adjust_type
+        ORDER BY data_source, adjust_type
+    </select>
 </mapper>

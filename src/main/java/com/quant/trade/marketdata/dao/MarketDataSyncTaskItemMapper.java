@@ -24,4 +24,8 @@ public interface MarketDataSyncTaskItemMapper {
     int markFailedIfNonTerminal(@Param("taskId") Long taskId, @Param("errorCode") String errorCode,
                                 @Param("errorMessage") String errorMessage,
                                 @Param("finishedAt") java.time.LocalDateTime finishedAt);
+    /** 查询某证券的采集记录（按开始时间倒序，用于 related-tasks 只读展示）。 */
+    List<MarketDataSyncTaskItemDO> selectBySymbol(@Param("canonicalSymbol") String canonicalSymbol,
+                                                  @Param("limit") int limit, @Param("offset") int offset);
+    long countBySymbol(@Param("canonicalSymbol") String canonicalSymbol);
 }

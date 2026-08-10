@@ -103,4 +103,15 @@
     <select id="countByCanonicalSymbol" resultType="long">
         SELECT COUNT(*) FROM stock_minute_bar WHERE canonical_symbol = #{canonicalSymbol}
     </select>
+
+    <select id="selectMinuteAvailability" resultType="com.quant.trade.marketdata.model.StockBarAvailabilityDO">
+        SELECT interval_type, data_source, adjust_type,
+               COUNT(1) AS bar_count,
+               MIN(bar_start_time) AS first_bar_time, MAX(bar_start_time) AS last_bar_time,
+               MAX(fetched_at) AS latest_fetched_at
+        FROM stock_minute_bar
+        WHERE canonical_symbol = #{canonicalSymbol}
+        GROUP BY interval_type, data_source, adjust_type
+        ORDER BY interval_type, data_source, adjust_type
+    </select>
 </mapper>

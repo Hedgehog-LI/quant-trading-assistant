@@ -88,6 +88,19 @@
         WHERE task_id = #{taskId}
         ORDER BY id ASC
     </select>
+
+    <select id="selectBySymbol" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM market_data_sync_task_item
+        WHERE canonical_symbol = #{canonicalSymbol}
+        ORDER BY started_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countBySymbol" resultType="long">
+        SELECT COUNT(*) FROM market_data_sync_task_item
+        WHERE canonical_symbol = #{canonicalSymbol}
+    </select>
     <update id="markFailedIfNonTerminal">
         UPDATE market_data_sync_task_item SET status='FAILED', error_code=#{errorCode},
             error_message=#{errorMessage}, finished_at=#{finishedAt}
