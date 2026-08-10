@@ -55,7 +55,7 @@
 - [x] 采集计划支持“查询并验证 -> 展示名称/价格/时间 -> 确认加入”。
 - [x] mock 模式明确拒绝伪造外部验证；编辑旧计划仍兼容已有 scope。
 - [x] Docker 真实验证 `SH.603308`、`HK.02498`、`US.NVDA` 均成功。
-- [~] P1.4b 本地证券目录、名称/拼音模糊检索和目录同步：D1 后端已验收；D3 目录同步基础已条件验收；D2/D4 尚未完成。
+- [~] P1.4b 本地证券目录、名称/拼音模糊检索和目录同步：D1 后端已验收；D2 前端共享 SecuritySelector 已合入 main（前端提交 `0cf382f`、自动化验收通过）；D3 目录同步基础已条件验收；D4 尚未完成。
 - [ ] 港美股分钟采集的交易日历、时区和 scheduler；精确验证成功不等于分钟任务已支持。
 
 ## 4. 已完成 P0: 建设看板
@@ -257,7 +257,7 @@
 - [x] 本地目录优先、外部来源补全的架构决策已沉淀：`docs/decisions/ADR-0009-local-first-security-directory.md`。
 - [x] 技术实施分期与接手清单已沉淀：`docs/development/SECURITY_DIRECTORY_SEARCH_IMPLEMENTATION_PLAN.md`。
 - [x] D1：V17 扩展 `stock_basic`、新增 `stock_alias`、CSV 目录原子幂等导入、确定性搜索和详情 API；H2/自动化/性能已验收，Docker MySQL runtime 未验证。
-- [ ] D2：建设共享 `SecuritySelector`，首批接入最新价、历史日 K、采集计划和板块成员。
+- [x] D2：建设共享 `SecuritySelector`，首批接入最新价、历史日 K、采集计划和板块成员；前端提交 `0cf382f`，typecheck/lint/test/build 与独立治理核验通过，已合入 main。
 
 ### P1.5 已完成：市场板块发现与关注快照
 
