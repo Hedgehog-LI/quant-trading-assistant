@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-08-10 — P1.9 行情数据资产中心设计冻结
+
+- **目标**：解决“采集任务有了，但采集后数据分散且难以查看”的产品问题，把现有日 K、分钟 K、最新价、水位和任务转为可解释的只读数据资产视图。
+- **设计**：冻结 P1.9-A 个股行情资产查看器、P1.9-B 板块历史资产视图、P1.9-C 对比与导出三阶段；本轮实施范围只允许 P1.9-A。
+- **架构**：ADR-0012 接受有界只读 read model + Lightweight Charts 5.2.x；后端不调用 provider、不写原始表、不新增 migration，series 用时间范围 + LIMIT 2001 返回最多 2000 bars；前端保留 attribution。
+- **契约**：冻结 availability/series/related-tasks 三个规划 API、日/分钟范围限制、来源/复权隔离、CN 与 HK/US 覆盖率降级语义、页面状态和 12 条验收标准。
+- **边界**：不实现 P1.7、MA/MACD/RSI/BOLL、策略、回测、多证券对比或板块历史图；区间涨跌不等于持仓收益，相关任务不冒充行级血缘。
+- **验证**：本轮仅产品/架构/契约文档，执行文档引用、Skill 治理与 `git diff --check`；未运行 Maven、npm、Docker 或浏览器，不声明代码交付。
+- **关联**：`features/MARKET_DATA_ASSET_CENTER_DESIGN.md`、`development/MARKET_DATA_ASSET_CENTER_IMPLEMENTATION_PLAN.md`、`decisions/ADR-0012-market-data-asset-read-model-and-chart-library.md`、`tasks/MARKET-DATA-ASSET-CENTER-P19A-CONTRACT.md`。
+
 ## 2026-08-02 — AI 治理收口与无人值守规则加固
 
 - **目标**：修复 ZCode 多轮空跑后暴露的 TaskPacket 格式漂移、伪造 Hook 回执、默认分支写入、活动锁卡死和 L0/收口角色省略问题；不改业务代码。

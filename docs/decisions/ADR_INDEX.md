@@ -15,3 +15,4 @@
 | [ADR-0009](ADR-0009-local-first-security-directory.md) | 证券名称检索采用本地目录优先、外部来源补全 | Accepted | 2026-07-17 |
 | [ADR-0010](ADR-0010-sector-ranking-dual-layer-collection.md) | 板块数据采用全市场排行快照 + 关注板块明细双层采集 | Accepted | 2026-07-22 |
 | [ADR-0011](ADR-0011-openclaw-agent-facade-and-tool-boundary.md) | OpenClaw 使用专用 Agent Facade 与固定 Tool Plugin，第一期只读 | Accepted | 2026-07-26 |
+| [ADR-0012](ADR-0012-market-data-asset-read-model-and-chart-library.md) | 行情资产采用有界只读聚合模型与 Lightweight Charts | Accepted | 2026-08-10 |
