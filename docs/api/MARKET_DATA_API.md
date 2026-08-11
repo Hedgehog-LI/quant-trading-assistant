@@ -893,6 +893,7 @@ GET /api/v1/market-data/alerts?severity=&resolved=&subjectType=SECTOR&sectorId=&
 - `expectedBarCount` 沿用 SQL 的包含端点语义（`bar_start_time >= from` 且 `<= to`），只统计满足 `start >= from`、`start <= to`、`start < sessionEnd` 的合法网格起点（处理上午/午休/下午、单日部分区间与跨交易日；`to` 落在会话结束时不含该 bar），不按整天恒定量；HK/US 或日历未就绪时返回 UNKNOWN 且 expected/missing 为 null，不得用实际条数反填。实际条数多于 expected（如非网格数据点）时 `coverageStatus=PARTIAL` 且 `reasonCodes` 含 `UNEXPECTED_BARS`，禁止 `actual=1/expected=0/VERIFIED` 之类的假绿灯。
 - 新鲜度 `quality.freshness` 与每个 `combination.freshness` 为 `FRESH/STALE/UNKNOWN`：依据该组合最新 bar/水位与最近已完成交易时段判定（日 K 按最新交易日、分钟 K 按最新 bar 起点），不按自然日猜测；无权威日历或无法判断时必为 `UNKNOWN` 且 `freshnessDetail` 给出原因（如“缺少权威交易日历，无法判定新鲜度”“HK/US 日历未闭环，无法判定新鲜度”）。
 - 空范围返回 200 + `bars=[]`；非法参数或范围超限返回 400；证券不存在返回 404。
+- 分钟 K 的 `from`/`to` 接受带 offset 的 ISO-8601（按 offset 折算到 Asia/Shanghai）或不带 offset 的本地墙钟时间；折算到 Asia/Shanghai 后必须是整分钟（`second` 与 `nano` 均为 0），非整分钟返回 400 `VALIDATION_ERROR`，禁止静默截断取整。
 - 价格、金额与比率使用 BigDecimal 字符串；分钟时间返回含市场 offset 的 ISO-8601，bars 按时间升序。
 - 本查询只读现有表，不调用 provider、不写 DB、不创建任务、不新增 migration。
 

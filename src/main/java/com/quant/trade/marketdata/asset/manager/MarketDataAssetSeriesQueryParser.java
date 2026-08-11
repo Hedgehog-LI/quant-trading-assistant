@@ -95,22 +95,31 @@ public class MarketDataAssetSeriesQueryParser {
         }
     }
 
-    /** 分钟时间：优先按带 offset 的 ISO-8601 折算到存储时区，否则按存储时区墙钟直接采用。 */
+    /**
+     * 分钟时间：优先按带 offset 的 ISO-8601 折算到存储时区，否则按存储时区墙钟直接采用。
+     * 折算到 Asia/Shanghai 后必须是整分钟（second 与 nano 均为 0），否则 400 VALIDATION_ERROR，禁止静默取整。
+     */
     private LocalDateTime requireMinuteTime(String value, String name) {
         if (value == null || value.isBlank()) {
             throw new BusinessException(ErrorCodeEnum.VALIDATION_ERROR, name + " 不能为空");
         }
         String trimmed = value.trim();
+        LocalDateTime resolved;
         try {
-            return OffsetDateTime.parse(trimmed).atZoneSameInstant(STORAGE_ZONE).toLocalDateTime();
+            resolved = OffsetDateTime.parse(trimmed).atZoneSameInstant(STORAGE_ZONE).toLocalDateTime();
         } catch (DateTimeParseException withOffsetFailed) {
             try {
-                return LocalDateTime.parse(trimmed);
+                resolved = LocalDateTime.parse(trimmed);
             } catch (DateTimeParseException bareFailed) {
                 throw new BusinessException(ErrorCodeEnum.VALIDATION_ERROR,
                         name + " 必须是 ISO-8601 日期时间（如 2026-07-17T09:30:00 或 2026-07-17T09:30:00+08:00）: " + value);
             }
         }
+        if (resolved.getSecond() != 0 || resolved.getNano() != 0) {
+            throw new BusinessException(ErrorCodeEnum.VALIDATION_ERROR,
+                    name + " 折算到 Asia/Shanghai 后必须是整分钟（秒与纳秒为 0）: " + value);
+        }
+        return resolved;
     }
 
     /** 范围上限校验：日 K 按自然日，1M 按权威日历交易日（无日历用周末回退），其余分钟按自然日。 */

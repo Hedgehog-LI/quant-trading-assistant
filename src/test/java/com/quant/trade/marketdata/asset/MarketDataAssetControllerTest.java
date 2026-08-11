@@ -358,6 +358,24 @@ class MarketDataAssetControllerTest {
     }
 
     @Test
+    void seriesWithNonWholeMinuteReturns400() throws Exception {
+        // 分钟 K from 折算到 Asia/Shanghai 后带秒（09:30:30），非整分钟 → 400 VALIDATION_ERROR，禁止静默取整
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market)
+                VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
+                """);
+        mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
+                        .param("interval", "5M")
+                        .param("from", "2026-07-17T09:30:30+08:00")
+                        .param("to", "2026-07-17T11:00:00+08:00")
+                        .param("adjustType", "NONE")
+                        .param("dataSource", "LONGPORT"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     void seriesMissingRequiredParameterReturns400() throws Exception {
         mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series"))
                 .andExpect(status().isBadRequest())
