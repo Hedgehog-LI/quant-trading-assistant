@@ -890,6 +890,8 @@ GET /api/v1/market-data/alerts?severity=&resolved=&subjectType=SECTOR&sectorId=&
 - SQL 使用 symbol + interval/source/adjust + 时间上下界 + `LIMIT 2001`；禁止全表加载后截断。
 - 只返回前 2000 条，第 2001 条仅用于 `truncated=true`。
 - CN 在权威日历/时段可用时计算覆盖；HK/US 日历未闭环时 `coverageStatus=UNKNOWN` 且 expected/missing 为 null。
+- `expectedBarCount` 只统计查询 from/to 与实际连续竞价时段交集内应出现的 bar 起点（处理上午/午休/下午、单日部分区间与跨交易日），不按整天恒定量；HK/US 或日历未就绪时返回 UNKNOWN 且 expected/missing 为 null，不得用实际条数反填。
+- 新鲜度 `quality.freshness` 与每个 `combination.freshness` 为 `FRESH/STALE/UNKNOWN`：依据该组合最新 bar/水位与最近已完成交易时段判定（日 K 按最新交易日、分钟 K 按最新 bar 起点），不按自然日猜测；无权威日历或无法判断时必为 `UNKNOWN` 且 `freshnessDetail` 给出原因（如“缺少权威交易日历，无法判定新鲜度”“HK/US 日历未闭环，无法判定新鲜度”）。
 - 空范围返回 200 + `bars=[]`；非法参数或范围超限返回 400；证券不存在返回 404。
 - 价格、金额与比率使用 BigDecimal 字符串；分钟时间返回含市场 offset 的 ISO-8601，bars 按时间升序。
 - 本查询只读现有表，不调用 provider、不写 DB、不创建任务、不新增 migration。

@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 /**
  * P1.9-A availability 聚焦测试：controller → service → manager → mapper 全链路（H2）。
@@ -139,6 +140,7 @@ class MarketDataAssetControllerTest {
                 .andExpect(jsonPath("$.data.combinations[0].barCount").value(1))
                 .andExpect(jsonPath("$.data.combinations[0].firstBarTime").value("2026-07-14"))
                 .andExpect(jsonPath("$.data.combinations[0].watermarkTime").doesNotExist())
+                .andExpect(jsonPath("$.data.combinations[0].freshness").value("UNKNOWN"))
                 .andExpect(jsonPath("$.data.combinations[1].interval").value("1D"))
                 .andExpect(jsonPath("$.data.combinations[1].dataSource").value("LONGPORT"))
                 .andExpect(jsonPath("$.data.combinations[1].adjustType").value("NONE"))
@@ -146,6 +148,7 @@ class MarketDataAssetControllerTest {
                 .andExpect(jsonPath("$.data.combinations[1].firstBarTime").value("2026-07-15"))
                 .andExpect(jsonPath("$.data.combinations[1].lastBarTime").value("2026-07-16"))
                 .andExpect(jsonPath("$.data.combinations[1].latestFetchedAt").value("2026-07-16T15:02:00+08:00"))
+                .andExpect(jsonPath("$.data.combinations[1].freshness").value("UNKNOWN"))
                 .andExpect(jsonPath("$.data.combinations[2].interval").value("5M"))
                 .andExpect(jsonPath("$.data.combinations[2].dataSource").value("LONGPORT"))
                 .andExpect(jsonPath("$.data.combinations[2].adjustType").value("NONE"))
@@ -153,7 +156,8 @@ class MarketDataAssetControllerTest {
                 .andExpect(jsonPath("$.data.combinations[2].firstBarTime").value("2026-07-17T09:30:00+08:00"))
                 .andExpect(jsonPath("$.data.combinations[2].lastBarTime").value("2026-07-17T09:35:00+08:00"))
                 .andExpect(jsonPath("$.data.combinations[2].latestFetchedAt").value("2026-07-17T09:40:00+08:00"))
-                .andExpect(jsonPath("$.data.combinations[2].watermarkTime").value("2026-07-17T09:40:00+08:00"));
+                .andExpect(jsonPath("$.data.combinations[2].watermarkTime").value("2026-07-17T09:40:00+08:00"))
+                .andExpect(jsonPath("$.data.combinations[2].freshness").value("UNKNOWN"));
     }
 
     @Test
@@ -223,6 +227,8 @@ class MarketDataAssetControllerTest {
                 .andExpect(jsonPath("$.data.quality.suspectBarCount").value(0))
                 .andExpect(jsonPath("$.data.quality.truncated").value(false))
                 .andExpect(jsonPath("$.data.quality.reasonCodes", hasSize(0)))
+                .andExpect(jsonPath("$.data.quality.freshness").value("UNKNOWN"))
+                .andExpect(jsonPath("$.data.quality.freshnessDetail").value("缺少权威交易日历，无法判定新鲜度"))
                 .andExpect(jsonPath("$.data.summary.firstOpen").value("1440"))
                 .andExpect(jsonPath("$.data.summary.lastClose").value("1458"))
                 .andExpect(jsonPath("$.data.summary.absoluteChange").value("18"))
@@ -286,11 +292,13 @@ class MarketDataAssetControllerTest {
                 .andExpect(jsonPath("$.data.availability.watermarkTime").value("2026-07-17T09:40:00+08:00"))
                 .andExpect(jsonPath("$.data.quality.coverageStatus").value("PARTIAL"))
                 .andExpect(jsonPath("$.data.quality.actualBarCount").value(3))
-                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(48))
-                .andExpect(jsonPath("$.data.quality.missingBarCount").value(45))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(24))
+                .andExpect(jsonPath("$.data.quality.missingBarCount").value(21))
                 .andExpect(jsonPath("$.data.quality.suspectBarCount").value(1))
                 .andExpect(jsonPath("$.data.quality.reasonCodes", hasItem("MISSING_BARS")))
                 .andExpect(jsonPath("$.data.quality.reasonCodes", hasItem("SUSPECT_BARS")))
+                .andExpect(jsonPath("$.data.quality.freshness").value("UNKNOWN"))
+                .andExpect(jsonPath("$.data.quality.freshnessDetail").value("缺少权威交易日历，无法判定新鲜度"))
                 .andExpect(jsonPath("$.data.bars", hasSize(3)))
                 .andExpect(jsonPath("$.data.bars[0].time").value("2026-07-17T09:30:00+08:00"))
                 .andExpect(jsonPath("$.data.bars[0].qualityStatus").value("VALID"))
@@ -355,6 +363,153 @@ class MarketDataAssetControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("PARAM_ERROR"));
+    }
+
+    // ==================== 覆盖率：CN 分钟线部分区间（交集口径） ====================
+
+    /** 批量插入 5M 分钟 bar：从 firstStart 起连续 count 根、每根 stepMinutes 分钟（bar 起点 + step 为终点）。 */
+    private void insertMinuteBars(String symbol, LocalTime firstStart, int count, int stepMinutes) {
+        for (int i = 0; i < count; i++) {
+            LocalTime start = firstStart.plusMinutes((long) i * stepMinutes);
+            LocalTime end = start.plusMinutes(stepMinutes);
+            String startText = String.format("2026-07-17 %02d:%02d:00", start.getHour(), start.getMinute());
+            String endText = String.format("2026-07-17 %02d:%02d:00", end.getHour(), end.getMinute());
+            jdbcTemplate.update("""
+                    INSERT INTO stock_minute_bar (canonical_symbol, trade_date, bar_start_time, bar_end_time,
+                        interval_type, session_type, open_price, high_price, low_price, close_price,
+                        volume, amount, adjust_type, data_source, fetched_at, quality_status)
+                    VALUES (?, '2026-07-17', ?, ?, '5M', 'AM', 100.00, 101.00, 99.00, 100.50, 100, 10050.00,
+                        'NONE', 'LONGPORT', ?, 'VALID')
+                    """, symbol, startText, endText, endText);
+        }
+    }
+
+    @Test
+    void seriesMinuteMorningFullWindowIsVerified() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market)
+                VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
+                """);
+        insertCalendar("CN_A", "2026-07-17", "2026-07-17");
+        // 10:00-10:55 共 12 根 5M bar，覆盖 10:00-11:00 完整部分区间
+        insertMinuteBars("SH.600519", LocalTime.of(10, 0), 12, 5);
+
+        mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
+                        .param("interval", "5M")
+                        .param("from", "2026-07-17T10:00:00")
+                        .param("to", "2026-07-17T11:00:00")
+                        .param("adjustType", "NONE")
+                        .param("dataSource", "LONGPORT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.quality.coverageStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data.quality.actualBarCount").value(12))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(12))
+                .andExpect(jsonPath("$.data.quality.missingBarCount").value(0));
+    }
+
+    @Test
+    void seriesMinuteLunchGapOnlyCountsSessionIntersection() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market)
+                VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
+                """);
+        insertCalendar("CN_A", "2026-07-17", "2026-07-17");
+        // 上午 11:00-11:25 6 根 + 下午 13:00-13:25 6 根；午休 11:30-13:00 不产生 bar
+        insertMinuteBars("SH.600519", LocalTime.of(11, 0), 6, 5);
+        insertMinuteBars("SH.600519", LocalTime.of(13, 0), 6, 5);
+
+        mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
+                        .param("interval", "5M")
+                        .param("from", "2026-07-17T11:00:00")
+                        .param("to", "2026-07-17T13:30:00")
+                        .param("adjustType", "NONE")
+                        .param("dataSource", "LONGPORT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.quality.coverageStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data.quality.actualBarCount").value(12))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(12))
+                .andExpect(jsonPath("$.data.quality.missingBarCount").value(0));
+    }
+
+    @Test
+    void seriesMinuteCrossDayCountsPartialSessions() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market)
+                VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
+                """);
+        insertCalendar("CN_A", "2026-07-16", "2026-07-17");
+        // 仅 1 根 07-16 09:30；窗口 07-16 全天（48）+ 07-17 上午（24）= 72
+        jdbcTemplate.update("""
+                INSERT INTO stock_minute_bar (canonical_symbol, trade_date, bar_start_time, bar_end_time,
+                    interval_type, session_type, open_price, high_price, low_price, close_price,
+                    volume, amount, adjust_type, data_source, fetched_at, quality_status)
+                VALUES ('SH.600519', '2026-07-16', '2026-07-16 09:30:00', '2026-07-16 09:35:00',
+                    '5M', 'AM', 1450.00, 1455.00, 1448.00, 1453.00, 1000, 1453000.00,
+                    'NONE', 'LONGPORT', '2026-07-16 09:35:00', 'VALID')
+                """);
+
+        mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
+                        .param("interval", "5M")
+                        .param("from", "2026-07-16T09:30:00")
+                        .param("to", "2026-07-17T11:30:00")
+                        .param("adjustType", "NONE")
+                        .param("dataSource", "LONGPORT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.quality.coverageStatus").value("PARTIAL"))
+                .andExpect(jsonPath("$.data.quality.actualBarCount").value(1))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(72))
+                .andExpect(jsonPath("$.data.quality.missingBarCount").value(71))
+                .andExpect(jsonPath("$.data.quality.reasonCodes", hasItem("MISSING_BARS")));
+    }
+
+    @Test
+    void seriesMinuteZeroWidthRangeAtSessionOpenIsEmpty() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market)
+                VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
+                """);
+        insertCalendar("CN_A", "2026-07-17", "2026-07-17");
+        insertMinuteBars("SH.600519", LocalTime.of(9, 30), 1, 5);
+
+        // from == to == 会话开盘：零宽窗口，预期 0 根（第一根 bar 起点不落入集合）
+        mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
+                        .param("interval", "5M")
+                        .param("from", "2026-07-17T09:30:00")
+                        .param("to", "2026-07-17T09:30:00")
+                        .param("adjustType", "NONE")
+                        .param("dataSource", "LONGPORT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.quality.coverageStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data.quality.actualBarCount").value(1))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(0))
+                .andExpect(jsonPath("$.data.quality.missingBarCount").value(0));
+    }
+
+    @Test
+    void seriesUsMarketReturnsUnknownQualityAndFreshness() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market, currency)
+                VALUES ('US.AAPL', 'AAPL', 'Apple Inc.', 'US', 'USD')
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO stock_daily_bar (canonical_symbol, trade_date, adjust_type, data_source,
+                    open_price, high_price, low_price, close_price, volume, amount, fetched_at)
+                VALUES ('US.AAPL', '2026-07-17', 'NONE', 'LONGPORT',
+                    1450.00, 1455.00, 1448.00, 1453.00, 1000, 1453000.00, '2026-07-17 15:01:03')
+                """);
+
+        mockMvc.perform(get("/api/v1/market-data/assets/US.AAPL/series")
+                        .param("interval", "1D")
+                        .param("from", "2026-07-17")
+                        .param("to", "2026-07-17")
+                        .param("adjustType", "NONE")
+                        .param("dataSource", "LONGPORT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.quality.coverageStatus").value("UNKNOWN"))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").doesNotExist())
+                .andExpect(jsonPath("$.data.quality.missingBarCount").doesNotExist())
+                .andExpect(jsonPath("$.data.quality.freshness").value("UNKNOWN"))
+                .andExpect(jsonPath("$.data.quality.freshnessDetail").value("HK/US 日历未闭环，无法判定新鲜度"));
     }
 
     // ==================== related-tasks ====================

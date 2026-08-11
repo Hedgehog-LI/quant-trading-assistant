@@ -14,5 +14,6 @@ public record MarketDataAssetCombinationVO(
         String firstBarTime,
         String lastBarTime,
         String latestFetchedAt,
-        String watermarkTime) {
+        String watermarkTime,
+        String freshness) {
 }

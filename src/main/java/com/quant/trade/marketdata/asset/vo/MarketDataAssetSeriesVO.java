@@ -27,10 +27,13 @@ public record MarketDataAssetSeriesVO(
     /**
      * 数据质量与覆盖（按本次查询窗口计算）：
      * CN 有权威日历 → VERIFIED / PARTIAL；HK/US 或日历未就绪 → UNKNOWN。
+     * <p>
+     * {@code freshness} 为 FRESH / STALE / UNKNOWN；无权威日历或无法判断时必为 UNKNOWN（禁止猜测）。
+     * {@code freshnessDetail} 在无法判定时给出原因，判定成功时为 null。
      */
     public record Quality(String coverageStatus, Integer actualBarCount, Integer expectedBarCount,
                           Integer missingBarCount, Integer suspectBarCount, boolean truncated,
-                          List<String> reasonCodes) {
+                          List<String> reasonCodes, String freshness, String freshnessDetail) {
     }
 
     /** 区间摘要（按本次返回窗口计算；首根开盘价为 0 时 changeRate 为空）。 */

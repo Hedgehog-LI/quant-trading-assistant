@@ -71,6 +71,22 @@ public class TradingSessionManager {
     }
 
     /**
+     * 获取 [from, to] 范围内的权威交易日列表（升序）。日历无数据时返回空列表，
+     * 由调用方决定是否回退；不做周末猜测。
+     */
+    public List<LocalDate> getTradingDays(String marketCode, LocalDate from, LocalDate to) {
+        List<MarketCalendarDO> rows = calendarMapper.selectByRange(marketCode, from, to, null);
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        return rows.stream()
+                .filter(row -> Boolean.TRUE.equals(row.getIsTradingDay()))
+                .map(MarketCalendarDO::getTradeDate)
+                .sorted()
+                .toList();
+    }
+
+    /**
      * 获取指定日期（含当天）最近的交易日。
      * 优先查日历；无日历则用周末规则回退。
      */
