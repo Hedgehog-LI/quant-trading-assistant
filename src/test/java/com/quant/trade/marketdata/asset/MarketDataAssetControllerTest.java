@@ -391,8 +391,8 @@ class MarketDataAssetControllerTest {
                 VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
                 """);
         insertCalendar("CN_A", "2026-07-17", "2026-07-17");
-        // 10:00-10:55 共 12 根 5M bar，覆盖 10:00-11:00 完整部分区间
-        insertMinuteBars("SH.600519", LocalTime.of(10, 0), 12, 5);
+        // to 为包含端点：10:00-11:00 含 11:00 这根，共 13 根 5M bar 才是完整覆盖
+        insertMinuteBars("SH.600519", LocalTime.of(10, 0), 13, 5);
 
         mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
                         .param("interval", "5M")
@@ -402,8 +402,8 @@ class MarketDataAssetControllerTest {
                         .param("dataSource", "LONGPORT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.quality.coverageStatus").value("VERIFIED"))
-                .andExpect(jsonPath("$.data.quality.actualBarCount").value(12))
-                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(12))
+                .andExpect(jsonPath("$.data.quality.actualBarCount").value(13))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(13))
                 .andExpect(jsonPath("$.data.quality.missingBarCount").value(0));
     }
 
@@ -414,9 +414,9 @@ class MarketDataAssetControllerTest {
                 VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
                 """);
         insertCalendar("CN_A", "2026-07-17", "2026-07-17");
-        // 上午 11:00-11:25 6 根 + 下午 13:00-13:25 6 根；午休 11:30-13:00 不产生 bar
+        // 上午 11:00-11:25 6 根 + 下午 13:00-13:30 7 根（to 包含端点，含 13:30）；午休 11:30-13:00 不产生 bar
         insertMinuteBars("SH.600519", LocalTime.of(11, 0), 6, 5);
-        insertMinuteBars("SH.600519", LocalTime.of(13, 0), 6, 5);
+        insertMinuteBars("SH.600519", LocalTime.of(13, 0), 7, 5);
 
         mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
                         .param("interval", "5M")
@@ -426,8 +426,8 @@ class MarketDataAssetControllerTest {
                         .param("dataSource", "LONGPORT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.quality.coverageStatus").value("VERIFIED"))
-                .andExpect(jsonPath("$.data.quality.actualBarCount").value(12))
-                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(12))
+                .andExpect(jsonPath("$.data.quality.actualBarCount").value(13))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(13))
                 .andExpect(jsonPath("$.data.quality.missingBarCount").value(0));
     }
 
@@ -463,7 +463,7 @@ class MarketDataAssetControllerTest {
     }
 
     @Test
-    void seriesMinuteZeroWidthRangeAtSessionOpenIsEmpty() throws Exception {
+    void seriesMinuteZeroWidthRangeAtSessionOpenCountsOpenBar() throws Exception {
         jdbcTemplate.update("""
                 INSERT INTO stock_basic (canonical_symbol, symbol, name, market)
                 VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
@@ -471,7 +471,7 @@ class MarketDataAssetControllerTest {
         insertCalendar("CN_A", "2026-07-17", "2026-07-17");
         insertMinuteBars("SH.600519", LocalTime.of(9, 30), 1, 5);
 
-        // from == to == 会话开盘：零宽窗口，预期 0 根（第一根 bar 起点不落入集合）
+        // from == to == 09:30（合法网格）：to 为包含端点，09:30 bar 应计入 expected=1
         mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
                         .param("interval", "5M")
                         .param("from", "2026-07-17T09:30:00")
@@ -481,8 +481,65 @@ class MarketDataAssetControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.quality.coverageStatus").value("VERIFIED"))
                 .andExpect(jsonPath("$.data.quality.actualBarCount").value(1))
-                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(0))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(1))
                 .andExpect(jsonPath("$.data.quality.missingBarCount").value(0));
+    }
+
+    @Test
+    void seriesMinuteToAtSessionEndExcludesSessionEndBar() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market)
+                VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
+                """);
+        insertCalendar("CN_A", "2026-07-17", "2026-07-17");
+        // to == 会话结束 11:30：11:30 的 bar 起点不满足 start < sessionEnd，不计入 expected。
+        // 10:00-11:25 共 18 根（10:00..11:25），expected 亦为 18。
+        insertMinuteBars("SH.600519", LocalTime.of(10, 0), 18, 5);
+
+        mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
+                        .param("interval", "5M")
+                        .param("from", "2026-07-17T10:00:00")
+                        .param("to", "2026-07-17T11:30:00")
+                        .param("adjustType", "NONE")
+                        .param("dataSource", "LONGPORT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.quality.coverageStatus").value("VERIFIED"))
+                .andExpect(jsonPath("$.data.quality.actualBarCount").value(18))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(18))
+                .andExpect(jsonPath("$.data.quality.missingBarCount").value(0));
+    }
+
+    @Test
+    void seriesMinuteUnexpectedBarsReturnsPartial() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market)
+                VALUES ('SH.600519', '600519', '贵州茅台', 'SH')
+                """);
+        insertCalendar("CN_A", "2026-07-17", "2026-07-17");
+        // 非网格 from/to：09:32-09:37 内合法网格起点只有 09:35（expected=1）。
+        // 数据里多一根非网格 09:32 bar → actual=2 > expected=1 → PARTIAL + UNEXPECTED_BARS，禁止假绿灯。
+        jdbcTemplate.update("""
+                INSERT INTO stock_minute_bar (canonical_symbol, trade_date, bar_start_time, bar_end_time,
+                    interval_type, session_type, open_price, high_price, low_price, close_price,
+                    volume, amount, adjust_type, data_source, fetched_at, quality_status)
+                VALUES ('SH.600519', '2026-07-17', '2026-07-17 09:32:00', '2026-07-17 09:37:00',
+                    '5M', 'AM', 100.00, 101.00, 99.00, 100.50, 100, 10050.00,
+                    'NONE', 'LONGPORT', '2026-07-17 09:37:00', 'VALID')
+                """);
+        insertMinuteBars("SH.600519", LocalTime.of(9, 35), 1, 5);
+
+        mockMvc.perform(get("/api/v1/market-data/assets/SH.600519/series")
+                        .param("interval", "5M")
+                        .param("from", "2026-07-17T09:32:00")
+                        .param("to", "2026-07-17T09:37:00")
+                        .param("adjustType", "NONE")
+                        .param("dataSource", "LONGPORT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.quality.coverageStatus").value("PARTIAL"))
+                .andExpect(jsonPath("$.data.quality.actualBarCount").value(2))
+                .andExpect(jsonPath("$.data.quality.expectedBarCount").value(1))
+                .andExpect(jsonPath("$.data.quality.missingBarCount").value(0))
+                .andExpect(jsonPath("$.data.quality.reasonCodes", hasItem("UNEXPECTED_BARS")));
     }
 
     @Test

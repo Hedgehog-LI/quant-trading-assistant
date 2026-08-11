@@ -22,9 +22,10 @@ import java.util.List;
 /**
  * P1.9-A series 区间摘要、覆盖与新鲜度计算。
  * <p>
- * expectedBarCount 只统计查询 from/to 与实际连续竞价时段的交集内应出现的 bar 起点
- * （处理上午/午休/下午、单日部分区间与跨交易日），不按整天恒定量；HK/US 或权威日历
- * 未就绪时返回 UNKNOWN 且 expected/missing 为 null。
+ * expectedBarCount 沿用 SQL 包含端点语义（bar_start_time &gt;= from 且 &lt;= to），只统计查询
+ * from/to 与实际连续竞价时段的交集内应出现的 bar 起点（须 start &lt; sessionEnd；处理上午/午休/下午、
+ * 单日部分区间与跨交易日），不按整天恒定量；HK/US 或权威日历未就绪时返回 UNKNOWN 且
+ * expected/missing 为 null。actual &gt; expected 时返回 PARTIAL 且 reasonCodes 含 UNEXPECTED_BARS。
  */
 @Component
 @RequiredArgsConstructor
@@ -156,12 +157,17 @@ public class MarketDataAssetSeriesCoverage {
                 ? tradingDays.size()
                 : countExpectedBarStarts(tradingDays, sessions, query.fromTime(), query.toTime(),
                         intervalMinutes(query.interval()));
+        // 实际条数多于应有网格起点（如非网格数据点）视为 PARTIAL，并给出 UNEXPECTED_BARS，禁止假绿灯。
+        if (actualBarCount > expected) {
+            reasonCodes.add("UNEXPECTED_BARS");
+        }
         long missing = Math.max(0, expected - actualBarCount);
         if (missing > 0) {
             reasonCodes.add("MISSING_BARS");
         }
+        boolean unexpected = actualBarCount > expected;
         return new MarketDataAssetSeriesVO.Quality(
-                missing == 0 ? COVERAGE_VERIFIED : COVERAGE_PARTIAL,
+                (missing > 0 || unexpected) ? COVERAGE_PARTIAL : COVERAGE_VERIFIED,
                 actualBarCount, (int) expected, (int) missing, suspectBarCount, truncated,
                 reasonCodes, freshness, freshnessDetail);
     }
@@ -169,8 +175,9 @@ public class MarketDataAssetSeriesCoverage {
     /**
      * 查询 from/to 与实际连续竞价时段交集内应出现的 bar 起点数。
      * <p>
-     * 对每个交易日与每个连续竞价时段取交集 [max(sessionStart, dayFrom), min(sessionEnd, dayTo))，
-     * 网格起点 = sessionStart + k*minutes（须 < 交集上界）。首末日按查询时刻截取，其余交易日取全天。
+     * 与 SQL 的包含端点语义一致：bar 起点须满足 start &gt;= from 且 start &lt;= to，且 start &lt; sessionEnd。
+     * 对每个交易日与每个连续竞价时段取交集 [max(sessionStart, dayFrom), min(sessionEnd - 1, dayTo)]（两端含），
+     * 网格起点 = sessionStart + k*minutes（须 ≤ 交集上界）。首末日按查询时刻截取，其余交易日取全天。
      */
     public static long countExpectedBarStarts(List<LocalDate> tradingDays, List<int[]> sessionWindows,
                                               LocalDateTime fromTime, LocalDateTime toTime, int minutes) {
@@ -182,14 +189,15 @@ public class MarketDataAssetSeriesCoverage {
                 int start = hhmmToMinutes(session[0]);
                 int end = hhmmToMinutes(session[1]);
                 int lo = Math.max(start, dayFrom);
-                int hi = Math.min(end, dayTo);
-                if (hi <= lo) {
+                // 包含端点：合法的 bar 起点须 start < sessionEnd，故上界取 min(end - 1, dayTo)。
+                int hi = Math.min(end - 1, dayTo);
+                if (hi < lo) {
                     continue;
                 }
                 int offset = Math.max(0, lo - start);
                 int first = start + ((offset + minutes - 1) / minutes) * minutes;
-                if (first < hi) {
-                    expected += (hi - 1 - first) / minutes + 1;
+                if (first <= hi) {
+                    expected += (hi - first) / minutes + 1;
                 }
             }
         }
