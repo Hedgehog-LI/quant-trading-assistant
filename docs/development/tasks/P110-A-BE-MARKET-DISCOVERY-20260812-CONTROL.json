@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 3,
+  "taskId": "P110-A-BE-MARKET-DISCOVERY-20260812",
+  "controlPath": "docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-CONTROL.json",
+  "startedAt": "2026-08-12T10:42:54Z",
+  "lane": "L2",
+  "lifecycleState": "BLOCKED",
+  "contract": {
+    "path": "docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-CONTRACT.md",
+    "version": "2",
+    "sha256": "efe1fc93933660bb669f92b066e8f231162eea6f539b844a86d89e71b54c1133",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-02", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-03", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-04", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-05", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-06", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-07", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-08", "requiredEvidence": ["STATIC", "AUTOMATION"]}
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "V19 identity + readiness gate + change_rate unit contract",
+        "acIds": ["AC-01", "AC-02"],
+        "allowedWritePaths": [
+          "src/main/resources/db/migration/V19__add_sector_analytics_identity_and_readiness.sql",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/MarketSectorIdentityDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/dao/MarketSectorIdentityMapper.java",
+          "src/main/resources/mapper/MarketSectorIdentityMapper.xml",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/SectorIdentityManager.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/readiness/",
+          "src/main/java/com/quant/trade/marketdata/analysis/controller/SectorAnalyticsReadinessController.java",
+          "src/test/java/com/quant/trade/marketdata/analysis/"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-02",
+        "description": "V20 calculation run + publication batch + source manifest hash + atomic publish",
+        "acIds": ["AC-03"],
+        "allowedWritePaths": [
+          "src/main/resources/db/migration/V20__add_sector_analytics_calculation_run.sql",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/CalculationRunDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/PublicationBatchDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/PublicationMemberDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/dao/",
+          "src/main/resources/mapper/CalculationRunMapper.xml",
+          "src/main/resources/mapper/PublicationBatchMapper.xml",
+          "src/main/resources/mapper/PublicationMemberMapper.xml"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-03",
+        "description": "RS fixed-cohort equal-weight percentile + sector rotation persistence metrics",
+        "acIds": ["AC-04", "AC-05"],
+        "allowedWritePaths": [
+          "src/main/resources/db/migration/V21__add_sector_relative_strength_and_rotation.sql",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/SectorRelativeStrengthSnapshotDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/SectorRotationSectorPersistenceDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/dao/SectorRelativeStrengthSnapshotMapper.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/dao/SectorRotationSectorPersistenceMapper.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/derived/",
+          "src/main/resources/mapper/SectorRelativeStrengthSnapshotMapper.xml",
+          "src/main/resources/mapper/SectorRotationSectorPersistenceMapper.xml"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-04",
+        "description": "Market radar read model + rotation quadrant classifier + controller",
+        "acIds": ["AC-06"],
+        "allowedWritePaths": [
+          "src/main/java/com/quant/trade/marketdata/analysis/vo/MarketRadarVO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/MarketRadarReadModelManager.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/RotationStateClassifier.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/service/MarketRadarQueryService.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/controller/MarketRadarController.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/enums/RotationStateEnum.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/enums/FlowMetricNatureEnum.java",
+          "src/test/java/com/quant/trade/marketdata/analysis/"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-05",
+        "description": "Ranking history + sector detail read model + architecture guard tests",
+        "acIds": ["AC-07", "AC-08"],
+        "allowedWritePaths": [
+          "src/main/java/com/quant/trade/marketdata/analysis/vo/SectorRankingHistoryVO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/vo/SectorDetailVO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/SectorRankingHistoryManager.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/SectorDetailReadModelManager.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/service/SectorResearchQueryService.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/controller/SectorResearchController.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/TrackingSymbolBenchmarkGuard.java",
+          "src/test/java/com/quant/trade/marketdata/analysis/"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      }
+    ],
+    "testInventory": [
+      {"testId": "TEST-01", "acIds": ["AC-01"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/readiness/SectorAnalyticsReadinessManagerTest.java",
+        "selector": "class SectorAnalyticsReadinessManagerTest"},
+      {"testId": "TEST-02", "acIds": ["AC-01"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/controller/SectorAnalyticsReadinessControllerTest.java",
+        "selector": "class SectorAnalyticsReadinessControllerTest"},
+      {"testId": "TEST-03", "acIds": ["AC-02"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/manager/SectorIdentityManagerTest.java",
+        "selector": "class SectorIdentityManagerTest"},
+      {"testId": "TEST-04", "acIds": ["AC-03"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/run/CalculationRunManagerTest.java",
+        "selector": "class CalculationRunManagerTest"},
+      {"testId": "TEST-05", "acIds": ["AC-03"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/run/PublicationBatchManagerTest.java",
+        "selector": "class PublicationBatchManagerTest"},
+      {"testId": "TEST-06", "acIds": ["AC-04"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/derived/RelativeStrengthCalculatorTest.java",
+        "selector": "class RelativeStrengthCalculatorTest"},
+      {"testId": "TEST-07", "acIds": ["AC-05"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/derived/SectorRotationPersistenceCalculatorTest.java",
+        "selector": "class SectorRotationPersistenceCalculatorTest"},
+      {"testId": "TEST-08", "acIds": ["AC-06"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/controller/MarketRadarControllerTest.java",
+        "selector": "class MarketRadarControllerTest"},
+      {"testId": "TEST-09", "acIds": ["AC-07"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/controller/SectorRankingHistoryControllerTest.java",
+        "selector": "class SectorRankingHistoryControllerTest"},
+      {"testId": "TEST-10", "acIds": ["AC-07"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/controller/SectorDetailControllerTest.java",
+        "selector": "class SectorDetailControllerTest"},
+      {"testId": "TEST-11", "acIds": ["AC-08"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/SectorAnalyticsArchitectureGuardTest.java",
+        "selector": "class SectorAnalyticsArchitectureGuardTest"},
+      {"testId": "TEST-12", "acIds": ["AC-01", "AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-08"], "kind": "AUTOMATION", "required": true,
+        "sourcePath": "pom.xml",
+        "selector": "./mvnw -q test"},
+      {"testId": "TEST-13", "acIds": ["AC-08"], "kind": "AUTOMATION", "required": true,
+        "sourcePath": "pom.xml",
+        "selector": "./mvnw -q -DskipTests=false package"}
+    ],
+    "blockingAmendments": [
+      {
+        "id": "BLOCKING_AMENDMENT_01",
+        "reason": "watch cascade FK removal exceeds single L2 slice; V19 only adds sector_identity_id without dropping existing FK",
+        "impact": "AC-02 identity independence proven at derived layer, not FK drop"
+      },
+      {
+        "id": "BLOCKING_AMENDMENT_02",
+        "reason": "capital flow / concentration / volume confirmation / anomaly alerts formulas frozen in design but deferred; radar returns NO_DERIVED_DATA/UNAVAILABLE placeholders",
+        "impact": "AC-06 capital/volume columns return explicit degradation"
+      },
+      {
+        "id": "BLOCKING_AMENDMENT_03",
+        "reason": "HK/US authoritative trading calendar is deployment data governance, not code; market_calendar new columns default INFERRED, RS long-window fails closed for HK/US until calendar verified",
+        "impact": "HK/US RS returns INSUFFICIENT_RAW degradation, not fabricated"
+      }
+    ]
+  },
+  "git": {
+    "automation": "COMMIT",
+    "branch": "codex/p110-a-be-market-discovery-20260812",
+    "baselineCommit": "c941309ccac118e6dc52c42b94cd92d654e5269a",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-12T10:42:54Z",
+      "actor": "parent-qta-orchestrator-20260812"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "TEST_DESIGN_READY",
+      "at": "2026-08-12T10:48:00Z",
+      "actor": "parent-qta-orchestrator-20260812"
+    },
+    {
+      "sequence": 3,
+      "from": "TEST_DESIGN_READY",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-12T10:50:56Z",
+      "actor": "parent-qta-orchestrator-20260812"
+    },
+    {
+      "sequence": 4,
+      "from": "CONTRACT_FROZEN",
+      "to": "BLOCKED",
+      "at": "2026-08-12T10:55:00Z",
+      "actor": "parent-qta-orchestrator-20260812",
+      "reason": "QTA governance Hook infrastructure inactive in current ZCode session (ZCODE_PROJECT_DIR/CLAUDE_SESSION_ID unset); dispatch receipts cannot be created, test-designer role run cannot be machine-accepted at CONTRACT_FROZEN. Synthetic receipts and parent substitution are forbidden. Evidence: docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-CHECKPOINT-BLOCKED.md"
+    }
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": ".qta-governance/candidates/P110-A-BE-MARKET-DISCOVERY-20260812/generation-1.patch",
+    "diffArtifactSha256": ""
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "architectureGate": {
+    "required": true,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": -1,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
+      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
