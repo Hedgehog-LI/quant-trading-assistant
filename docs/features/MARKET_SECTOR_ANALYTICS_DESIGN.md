@@ -3,6 +3,7 @@
 > 版本：v1.1 · 状态：专家复审修订（P1.7，未实现；只有 P1.7-A 前置门禁通过后才可开发 P1.7-B）
 > 关联：`../BUILD_CHECKLIST.md`、`../api/MARKET_DATA_API.md` §5（规划）、`../DATABASE_DESIGN.md` 板块分析规划表（V19+）、`../development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md`、`MARKET_SECTOR_CATALOG_DESIGN.md`、`MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`、`MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`MARKET_ALERT_RULES_DESIGN.md`。
 > 前置事实：板块原始事实表（V14/V15）`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item` 已落地；`market_data_alert`（V7）已存在并可复用；最新 migration V18，本设计规划 V19+。
+> 上位产品流程：`MARKET_RESEARCH_DECISION_CENTER_DESIGN.md`。P1.7 是衍生研究引擎，不单独建设与“市场雷达/板块详情”竞争的页面。
 
 ## 0. 设计状态与定位
 
@@ -11,6 +12,14 @@
 本系统是**只读研究工具**：所有派生指标只读原始事实表，**禁止写回** `market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_*` 与 `stock_*` 原始事实表。衍生结果只存新表，可重算、可丢弃、可下线，原始事实不可变。第一版不生成买卖指令、不自动交易、不连接券商、不读取密钥、不引入黑盒 ML 评分。
 
 > **风险声明**：本系统是决策辅助工具，所有指标与提醒仅为观察提示，不构成投资建议，不预测收益，不产生交易动作。
+
+### 0.1 在市场研究流程中的职责（2026-08-12 修订）
+
+- P1.7 负责把合格的板块原始事实计算为可解释、可重算、可审计的研究指标。
+- 面向用户的入口、市场雷达、板块下钻、候选扫描和个股决策流程由 P1.10 统一定义。
+- P1.7 的“今日板块总览”不是独立产品孤岛，而是 P1.10 市场雷达的数据引擎和首屏主体。
+- P1.7 不负责单股候选排序。板块内候选必须在候选 scope、板块成分时点和个股行情质量满足门禁后，由 P1.10-B 单独冻结。
+- P1.7 不负责个人买卖点。真实成交、人工计划和策略候选的边界由 P1.10 个股决策台统一定义。
 
 ## 1. 用户目标与场景
 
@@ -465,6 +474,8 @@ ETF/指数对照只读取 `market_sector_watch.tracking_symbol` 对应的 `stock
 ## 8. 前端页面与图表设计（规格 + mock 契约建议）
 
 > 前端在**独立仓库**（`docs/FRONTEND_ARCHITECTURE.md`）。本仓库只给规格与 mock 契约建议，实际前端实现留作 ST-B3 子任务。
+>
+> 2026-08-12 产品层修订：本节只保留 P1.7 指标在页面中的展示语义。完整导航、市场雷达、板块详情、候选扫描和个股决策线框以 `MARKET_RESEARCH_DECISION_CENTER_DESIGN.md` 为唯一上位来源；不得另外创建五个平级指标页。
 
 页面结构（MVP）：
 

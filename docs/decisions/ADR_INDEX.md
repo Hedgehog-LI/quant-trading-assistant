@@ -16,3 +16,4 @@
 | [ADR-0010](ADR-0010-sector-ranking-dual-layer-collection.md) | 板块数据采用全市场排行快照 + 关注板块明细双层采集 | Accepted | 2026-07-22 |
 | [ADR-0011](ADR-0011-openclaw-agent-facade-and-tool-boundary.md) | OpenClaw 使用专用 Agent Facade 与固定 Tool Plugin，第一期只读 | Accepted | 2026-07-26 |
 | [ADR-0012](ADR-0012-market-data-asset-read-model-and-chart-library.md) | 行情资产采用有界只读聚合模型与 Lightweight Charts | Accepted | 2026-08-10 |
+| [ADR-0013](ADR-0013-research-funnel-and-asset-inspection-boundary.md) | 市场研究采用三级决策漏斗并与数据资产检查分离 | Accepted | 2026-08-12 |

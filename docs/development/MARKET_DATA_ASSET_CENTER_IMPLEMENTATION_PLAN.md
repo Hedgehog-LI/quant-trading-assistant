@@ -1,8 +1,10 @@
-# P1.9-A 行情数据资产中心实施计划
+# P1.9-A 行情数据详情实施计划
 
 > 输入：`../features/MARKET_DATA_ASSET_CENTER_DESIGN.md`
 >
 > 状态：冻结，可交给实施者。只实施 P1.9-A，不实施 P1.9-B/C、P1.7 或 P2 指标。
+>
+> 产品定位受 ADR-0013 修订：本计划只交付数据检查和质量追溯能力，不把 `/market-assets` 建成市场研究首页。P1.9-B/C 分别并入 P1.10 板块详情和候选扫描。
 
 ## 1. 基线与边界
 
@@ -29,17 +31,19 @@
 
 停止条件：任何需求要求写原始表、调用 provider 或增加 migration，立即 BLOCKED 并退回设计。
 
-### A2：前端行情资产主页面
+### A2：前端行情数据详情页
 
 目标：完成选择、查询、K 线、成交量、摘要、质量和表格。
 
 预期范围：
 
-- `market-assets` feature 与 `/market-assets` page/route/menu。
+- `market-assets` feature 与 `/market-assets` page/route；导航名称为“行情数据详情”，归入数据管理。
 - `lightweight-charts` Candlestick + volume pane。
 - remote/mock adapter、URL 状态、TanStack Query、loading/empty/error/partial。
 - availability 驱动粒度/来源/复权选项。
 - 前端聚焦测试，包括 chart adapter、URL、过期请求和空/错状态。
+- mock 使用虚构证券身份、遵守示例交易日历并在图表区持续显示 `LOCAL_DEMO` 水印；不得使用真实证券名称承载合成 K 线。
+- 摘要金额/成交量使用紧凑单位与完整值 tooltip，桌面和窄屏均有防重叠约束。
 
 ### A3：入口串联与验收
 
@@ -87,7 +91,7 @@ flowchart LR
 - 查询切换后旧请求不覆盖新请求。
 - 图表创建/resize/destroy，attribution 未关闭。
 - 摘要、健康、truncated、UNKNOWN 文案。
-- mock LOCAL_DEMO，remote 不回退 mock。
+- mock 使用虚构证券 + 持续 LOCAL_DEMO 水印，remote 不回退 mock。
 - 桌面与窄屏无重叠。
 
 ## 5. 门禁

@@ -2,6 +2,7 @@
 
 > 状态：规划/未实现。设计基线：`docs/features/MARKET_SECTOR_ANALYTICS_DESIGN.md` v1.1。
 > 原则：先证明数据可用，再计算指标；先做每日决策总览，再做高级归因。P1.7-A 未通过时禁止进入 P1.7-B。
+> 产品落点：P1.7 是 `docs/features/MARKET_RESEARCH_DECISION_CENTER_DESIGN.md` 的衍生研究引擎；前端成果必须落入 P1.10-A 市场雷达/板块详情，不创建平行的“板块分析”产品孤岛。
 
 ## 1. 冻结范围
 
@@ -96,13 +97,13 @@ MVP 不包含：成分收益贡献、自动交易、预测收益、provider 新�
 
 验收：MockMvc 覆盖 400/404/200 降级语义、分页上限、日期范围、公式/参数选择、scope/血缘完整性、板块过滤、跨批次拒绝、告警阈值边界和重复调度。分析接口不得反向调用 provider。
 
-### ST-B3：前端每日总览与详情
+### ST-B3：P1.10-A 市场雷达与板块详情前端
 
 依赖：ST-B2 API 契约冻结。
 
 前端独立仓库写路径：feature、API adapter、types、router/navigation、page/component、tests 和 mock contract。不得只写后端仓库的 mock 建议代替前端实现。
 
-产出：今日板块总览、板块详情、数据与计算状态；显式展示 `RANKED_UNIVERSE`、覆盖率、上游阻断、公式版本和“不构成投资建议”。MVP 不显示收益贡献。
+产出：按 P1.10 上位线框实现市场雷达首屏、板块详情和数据与计算状态；显式展示 `RANKED_UNIVERSE`、覆盖率、上游阻断、公式版本和“不构成投资建议”。热力图、轮动矩阵和排行表使用同一发布批次。候选扫描只保留入口/空态，不在本子任务自行发明候选规则；MVP 不显示收益贡献。
 
 验收：typecheck/lint/test/build；关键页面在桌面和移动端验证无溢出；空数据、阻断、降级、加载、错误、正常状态均有测试。
 
