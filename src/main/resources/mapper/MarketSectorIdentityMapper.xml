@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.analysis.dao.MarketSectorIdentityMapper">
+
+    <resultMap id="IdentityResultMap" type="com.quant.trade.marketdata.analysis.model.MarketSectorIdentityDO">
+        <id column="id" property="id"/>
+        <result column="provider_code" property="providerCode"/>
+        <result column="market_code" property="marketCode"/>
+        <result column="provider_sector_id" property="providerSectorId"/>
+        <result column="taxonomy_version" property="taxonomyVersion"/>
+        <result column="sector_name" property="sectorName"/>
+        <result column="valid_from" property="validFrom"/>
+        <result column="valid_to" property="validTo"/>
+        <result column="archived" property="archived"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="IdentityColumns">
+        id, provider_code, market_code, provider_sector_id, taxonomy_version, sector_name,
+        valid_from, valid_to, archived, created_at, updated_at
+    </sql>
+
+    <insert id="insertIgnoreLockAnchor">
+        INSERT IGNORE INTO market_sector_identity_lock (provider_code, market_code, provider_sector_id)
+        VALUES (#{providerCode}, #{marketCode}, #{providerSectorId})
+    </insert>
+
+    <select id="selectLockAnchorForUpdate" resultType="java.lang.Long">
+        SELECT id FROM market_sector_identity_lock
+        WHERE provider_code = #{providerCode}
+          AND market_code = #{marketCode}
+          AND provider_sector_id = #{providerSectorId}
+        FOR UPDATE
+    </select>
+
+    <insert id="insertIdentity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO market_sector_identity (provider_code, market_code, provider_sector_id, taxonomy_version,
+            sector_name, valid_from, valid_to, archived)
+        VALUES (#{providerCode}, #{marketCode}, #{providerSectorId}, #{taxonomyVersion},
+            #{sectorName}, #{validFrom}, #{validTo}, #{archived})
+    </insert>
+
+    <select id="selectByNaturalKey" resultMap="IdentityResultMap">
+        SELECT <include refid="IdentityColumns"/> FROM market_sector_identity
+        WHERE provider_code = #{providerCode}
+          AND market_code = #{marketCode}
+          AND provider_sector_id = #{providerSectorId}
+          AND taxonomy_version = #{taxonomyVersion}
+    </select>
+
+    <select id="selectById" resultMap="IdentityResultMap">
+        SELECT <include refid="IdentityColumns"/> FROM market_sector_identity WHERE id = #{id}
+    </select>
+
+    <!--
+      跨 taxonomy version 区间重叠检查（左闭右开）。
+      validTo 为 NULL 表示至今有效（开放右端，视为 +∞），按半开区间判定重叠：
+      新区间 [validFrom, validTo) 与既有 [existing.valid_from, existing.valid_to) 有交集即冲突。
+      重叠条件：existing.valid_from &lt; COALESCE(newValidTo, '9999-12-31')
+                AND COALESCE(existing.valid_to, '9999-12-31') &gt; newValidFrom
+    -->
+    <select id="countOverlappingIntervals" resultType="int">
+        SELECT COUNT(*) FROM market_sector_identity
+        WHERE provider_code = #{providerCode}
+          AND market_code = #{marketCode}
+          AND provider_sector_id = #{providerSectorId}
+          AND archived = FALSE
+          AND valid_from &lt; COALESCE(#{validTo}, '9999-12-31')
+          AND COALESCE(valid_to, '9999-12-31') &gt; #{validFrom}
+    </select>
+
+    <select id="countByIdentityAnchor" resultType="int">
+        SELECT COUNT(*) FROM market_sector_identity
+        WHERE provider_code = #{providerCode}
+          AND market_code = #{marketCode}
+          AND provider_sector_id = #{providerSectorId}
+    </select>
+
+    <update id="archiveIdentity">
+        UPDATE market_sector_identity SET archived = TRUE WHERE id = #{id}
+    </update>
+
+    <select id="selectActiveByMarket" resultMap="IdentityResultMap">
+        SELECT <include refid="IdentityColumns"/> FROM market_sector_identity
+        WHERE market_code = #{marketCode} AND archived = FALSE
+        ORDER BY provider_sector_id, taxonomy_version
+    </select>
+
+    <!--
+      回填 market_sector_snapshot.sector_identity_id。
+      链路：snapshot.watch_id → market_sector_watch(provider_code, provider_sector_id, market_code)
+            → market_sector_identity(provider_code, market_code, provider_sector_id, taxonomy_version)
+      只回填 sector_identity_id IS NULL 的行；不覆盖既有值，不删除 V14 cascade FK。
+      衍生层只读 sector_identity_id，watch_id 不进入衍生幂等键或 JOIN。
+      使用标量子查询形式（H2/MODE=MySQL 与 MySQL 8.4 均支持 UPDATE ... SET col = (SELECT ...)）。
+    -->
+    <update id="backfillSnapshotIdentity">
+        UPDATE market_sector_snapshot
+        SET sector_identity_id = (
+            SELECT i.id FROM market_sector_identity i
+            INNER JOIN market_sector_watch w
+                ON i.provider_code = w.provider_code
+               AND i.provider_sector_id = w.provider_sector_id
+            WHERE w.id = market_sector_snapshot.watch_id
+              AND i.market_code = #{marketCode}
+              AND i.archived = FALSE
+            LIMIT 1
+        )
+        WHERE sector_identity_id IS NULL
+          AND EXISTS (
+              SELECT 1 FROM market_sector_watch w
+              WHERE w.id = market_sector_snapshot.watch_id
+                AND w.market_code = #{marketCode}
+          )
+    </update>
+
+    <!--
+      回填 market_sector_member_snapshot.sector_identity_id。
+      链路：member.snapshot_id → snapshot.watch_id → watch → identity
+    -->
+    <update id="backfillMemberSnapshotIdentity">
+        UPDATE market_sector_member_snapshot
+        SET sector_identity_id = (
+            SELECT i.id FROM market_sector_identity i
+            INNER JOIN market_sector_watch w
+                ON i.provider_code = w.provider_code
+               AND i.provider_sector_id = w.provider_sector_id
+            INNER JOIN market_sector_snapshot s ON s.watch_id = w.id
+            WHERE s.id = market_sector_member_snapshot.snapshot_id
+              AND i.market_code = #{marketCode}
+              AND i.archived = FALSE
+            LIMIT 1
+        )
+        WHERE sector_identity_id IS NULL
+          AND EXISTS (
+              SELECT 1 FROM market_sector_snapshot s
+              INNER JOIN market_sector_watch w ON s.watch_id = w.id
+              WHERE s.id = market_sector_member_snapshot.snapshot_id
+                AND w.market_code = #{marketCode}
+          )
+    </update>
+</mapper>
