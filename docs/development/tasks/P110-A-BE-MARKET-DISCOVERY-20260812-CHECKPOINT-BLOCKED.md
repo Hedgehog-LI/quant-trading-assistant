@@ -5,6 +5,13 @@
 > 时间：2026-08-12T10:55:00Z
 > 父协调者：parent-qta-orchestrator-20260812
 
+> 2026-08-12 根因勘误：后续检查 ZCode desktop 3.6.5 运行日志确认，客户端并非单纯缺少环境变量，
+> 而是明确记录 `Project hooks were ignored by the security policy`。原 `.zcode/config.json` 因此从未
+> 挂载。治理已迁移为 `~/.zcode/cli/config.json` 用户级 dispatcher + 项目规则脚本，并新增
+> `/qta-doctor` 真实事件链预检。本文保留原始 BLOCKED 事实，但下述“直接 resume 原 Task ID”不再适用。
+> 重启后的真实 ZCode 新任务现已返回 `PASS (user-config + runtime)`；基础设施阻塞已解除，但本终态
+> control 仍不改写，后续通过新的 `-R1` Task ID 重试。
+
 ## 1. 已完成的有效工作（可复用）
 
 1. **CONTEXT_READY**：按渐进式披露加载全部权威设计（P1.10 决策中心、ADR-0013、板块分析设计 v1.1、P17 实施计划、资产中心设计、当前架构）。Lane 分类 L2 正确（migration、事务、identity-lock、并发、计算血缘）。
@@ -39,22 +46,21 @@
 - 不是 test-designer 子角色失败（成功返回完整 artifact）。
 - 不是 BLOCKED 来"停止"任务——是真实的 infrastructure 外部依赖阻断。
 
-## 4. 解除阻塞所需的外部变更
+## 4. 解除阻塞后的正确恢复方式（2026-08-12 勘误）
 
-任一即可（均在本会话能力之外）：
+1. 用户级 Hook 已通过 `scripts/install-zcode-governance-user-hooks.mjs` 安装；重启 ZCode 后必须先在
+   新任务运行 `/qta-doctor`，以真实 `UserPromptSubmit + PreToolUse` 回执确认运行时挂载。
+2. 本 control 已是终态 `BLOCKED`，不得篡改成通过，也不得再用 `--resume` 接管。新建带 `-R1` 后缀
+   的重试 Task ID，引用本轮契约和测试设计作为输入，但由 fresh test designer 重新产生有效机器回执。
+3. 不放宽 receipt 强制，不恢复 Stop Hook，不手工执行项目 Hook，不制造 synthetic evidence。
 
-1. **客户端激活 Hook 传递**：ZCode 客户端在 PreToolUse/PostToolUse/UserPromptSubmit 事件中传递 `session_id` 和项目根，使 `.zcode/config.json` 配置的 hook 能触发并创建 dispatch receipts 和 active lock。
-2. **使用 `--resume` 恢复**：在 Hook 激活的新会话中执行 `/qta-run --resume P110-A-BE-MARKET-DISCOVERY-20260812 docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-CONTROL.json`，接管本任务的已冻结契约和 test-design artifact，继续 IMPLEMENTING 阶段。
-3. **治理框架放宽 receipt 强制**：如果项目决定在 `ADVISORY` 级别允许无 receipt 的 role run（但这属于治理变更，需独立任务，本会话不修改治理脚本）。
+## 5. 下一步动作（新重试任务）
 
-## 5. 下一步动作（resume 时）
-
-1. 验证 active lock 存在（`.git/qta-governance/active/`）。
-2. 将 test-designer role run 记录到 CONTROL（dispatchReceiptPath 指向 hook 创建的真实 receipt）。
-3. 运行 `node scripts/check-ai-task-control.mjs` 确认 CONTRACT_FROZEN 通过。
-4. 按 5 slice 顺序派发 fresh qta-implementer（SLICE-01 → SLICE-05），每个 slice 新实例。
-5. 候选冻结 → 架构门禁 → fresh qta-code-reviewer → fresh qta-final-verifier（disposable worktree）。
-6. 交付收口 → `check-ai-delivery-ready.mjs` exit 0。
+1. `/qta-doctor` 通过后，执行 `/qta-run P110-A-BE-MARKET-DISCOVERY-20260812-R1 ...`。
+2. `/qta-run` 首个工具门禁通过 `qta-governance-doctor --runtime --require-active`。
+3. 新 control 复用冻结产品/架构边界，fresh test designer 重新核对并产生真实 dispatch/runtime receipt。
+4. 按 bounded slice 派发 fresh implementer，随后候选冻结、架构门禁、fresh reviewer 与 fresh verifier。
+5. 只有 `check-ai-delivery-ready.mjs` exit 0 才能交付。
 
 ## 6. 冻结产物清单（供 resume）
 

@@ -830,6 +830,113 @@ test("ZCode unattended qta-run blocks AskUserQuestion but ordinary sessions rema
   }
 });
 
+test("expanded qta-run sentinel activates governance and records real doctor event sequence", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-expanded-run-"));
+  const script = path.resolve("scripts/zcode-governance-hook.mjs");
+  const sessionId = "expanded-run-session";
+  const environment = { ...process.env, ZCODE_PROJECT_DIR: directory };
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    const activation = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "UserPromptSubmit", session_id: sessionId, cwd: directory,
+        prompt: "QTA_GOVERNED_RUN\n\nInvocation arguments:\nfinish one bounded task"
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(activation.status, 0, activation.stderr);
+    const preTool = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory,
+        tool_name: "Bash", tool_input: { command: "git status" }
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(preTool.status, 0, preTool.stderr);
+
+    const sessionHash = createHash("sha256").update(sessionId).digest("hex");
+    const active = JSON.parse(await readFile(
+      path.join(directory, ".git", "qta-governance", "active", `${sessionHash}.json`), "utf8"));
+    const doctor = JSON.parse(await readFile(
+      path.join(directory, ".git", "qta-governance", "doctor", `${sessionHash}.json`), "utf8"));
+    assert.equal(active.parentSessionId, sessionId);
+    assert.equal(doctor.promptKind, "QTA_RUN");
+    assert.ok(doctor.promptObservedAt);
+    assert.ok(doctor.preToolObservedAt);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("user-level ZCode Hook installer preserves config and never registers Stop", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-user-hook-install-"));
+  const installer = path.resolve("scripts/install-zcode-governance-user-hooks.mjs");
+  const environment = { ...process.env, ZCODE_USER_CONFIG_DIR: directory };
+  try {
+    await writeFile(path.join(directory, "config.json"), `${JSON.stringify({
+      theme: "existing",
+      hooks: { events: { SessionStart: [{ matcher: "startup", hooks: [] }] } }
+    }, null, 2)}\n`);
+    const installed = spawnSync(process.execPath, [installer, "--install"], {
+      encoding: "utf8", env: environment
+    });
+    assert.equal(installed.status, 0, installed.stderr);
+    const config = JSON.parse(await readFile(path.join(directory, "config.json"), "utf8"));
+    assert.equal(config.theme, "existing");
+    assert.equal(config.hooks.enabled, true);
+    assert.equal(config.hooks.events.SessionStart.length, 1);
+    assert.equal(config.hooks.events.Stop, undefined);
+    for (const event of ["UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure"]) {
+      assert.equal(config.hooks.events[event].length, 1);
+    }
+
+    const checked = spawnSync(process.execPath, [installer, "--check"], {
+      encoding: "utf8", env: environment
+    });
+    assert.equal(checked.status, 0, checked.stderr);
+    const reinstalled = spawnSync(process.execPath, [installer, "--install"], {
+      encoding: "utf8", env: environment
+    });
+    assert.equal(reinstalled.status, 0, reinstalled.stderr);
+    const idempotent = JSON.parse(await readFile(path.join(directory, "config.json"), "utf8"));
+    assert.equal(idempotent.hooks.events.PreToolUse.length, 1);
+
+    const removed = spawnSync(process.execPath, [installer, "--uninstall"], {
+      encoding: "utf8", env: environment
+    });
+    assert.equal(removed.status, 0, removed.stderr);
+    const afterRemoval = JSON.parse(await readFile(path.join(directory, "config.json"), "utf8"));
+    assert.equal(afterRemoval.theme, "existing");
+    assert.equal(afterRemoval.hooks.events.SessionStart.length, 1);
+    assert.equal(afterRemoval.hooks.events.PreToolUse, undefined);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("user-level dispatcher routes only repositories that contain the QTA project Hook", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-user-hook-dispatch-"));
+  const dispatcher = path.resolve("scripts/zcode-governance-user-dispatcher.mjs");
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    await mkdir(path.join(directory, "scripts"), { recursive: true });
+    const absent = spawnSync(process.execPath, [dispatcher], {
+      input: JSON.stringify({ cwd: directory, tool_name: "Bash", tool_input: { command: "git reset --hard" } }),
+      encoding: "utf8", env: { ...process.env, QTA_GOVERNANCE_AUDIT: "off" }
+    });
+    assert.equal(absent.status, 0, absent.stderr);
+
+    await writeFile(path.join(directory, "scripts", "zcode-governance-hook.mjs"),
+      await readFile("scripts/zcode-governance-hook.mjs", "utf8"));
+    const blocked = spawnSync(process.execPath, [dispatcher], {
+      input: JSON.stringify({ cwd: directory, tool_name: "Bash", tool_input: { command: "git reset --hard" } }),
+      encoding: "utf8", env: { ...process.env, QTA_GOVERNANCE_AUDIT: "off" }
+    });
+    assert.equal(blocked.status, 2);
+    assert.match(blocked.stderr, /QTA governance blocked this action/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("ZCode Hook receipt binds ADVISORY evidence to an observed runtime session", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "qta-runtime-receipt-"));
   const sessionId = "runtime-session-1";
@@ -1293,8 +1400,8 @@ test("ZCode has no Stop continuation hook", async () => {
     const activePath = path.join(directory, ".git", "qta-governance", "active",
       `${createHash("sha256").update(sessionId).digest("hex")}.json`);
     assert.equal(JSON.parse(await readFile(activePath, "utf8")).parentSessionId, sessionId);
-    const config = JSON.parse(await readFile(".zcode/config.json", "utf8"));
-    assert.equal(config.hooks.events.Stop, undefined);
+    const installer = await readFile("scripts/install-zcode-governance-user-hooks.mjs", "utf8");
+    assert.doesNotMatch(installer, /\bStop\s*:/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

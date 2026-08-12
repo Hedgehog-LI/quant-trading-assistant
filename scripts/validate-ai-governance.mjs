@@ -253,13 +253,16 @@ const requiredGovernanceFiles = [
   ".agents/schemas/qta-task-control.schema.json",
   ".agents/skills/qta-development-orchestration/assets/TASK_CONTROL_TEMPLATE.json",
   ".agents/skills/qta-development-orchestration/references/GOVERNANCE_V2_POLICY.md",
-  ".zcode/config.json",
+  ".zcode/commands/qta-doctor.md",
   "scripts/check-ai-task-control.mjs",
   "scripts/check-ai-delivery-ready.mjs",
   "scripts/create-candidate-diff.mjs",
   "scripts/check-ai-architecture.mjs",
   "scripts/run-ai-evidence-command.mjs",
   "scripts/zcode-governance-hook.mjs",
+  "scripts/zcode-governance-user-dispatcher.mjs",
+  "scripts/install-zcode-governance-user-hooks.mjs",
+  "scripts/qta-governance-doctor.mjs",
   "scripts/tests/ai-governance.test.mjs"
 ];
 for (const relative of requiredGovernanceFiles) {
@@ -272,56 +275,40 @@ for (const relative of requiredGovernanceFiles) {
 
 try {
   JSON.parse(await readFile(path.join(root, ".agents", "schemas", "qta-task-control.schema.json"), "utf8"));
-  const zcodeConfig = JSON.parse(await readFile(path.join(root, ".zcode", "config.json"), "utf8"));
-  const hooks = zcodeConfig?.hooks;
-  if (hooks?.enabled !== true) errors.push("ZCode workspace hooks must be enabled");
-  const supportedEvents = new Set([
-    "SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest",
-    "PostToolUse", "PostToolUseFailure", "Stop"
+  const [installer, dispatcher, runCommand, doctorCommand] = await Promise.all([
+    readFile(path.join(root, "scripts", "install-zcode-governance-user-hooks.mjs"), "utf8"),
+    readFile(path.join(root, "scripts", "zcode-governance-user-dispatcher.mjs"), "utf8"),
+    readFile(path.join(root, ".zcode", "commands", "qta-run.md"), "utf8"),
+    readFile(path.join(root, ".zcode", "commands", "qta-doctor.md"), "utf8")
   ]);
-  for (const event of Object.keys(hooks?.events ?? {})) {
-    if (!supportedEvents.has(event)) errors.push(`ZCode hook event is unsupported: ${event}`);
+  for (const event of ["UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure"]) {
+    if (!installer.includes(`${event}:`)) errors.push(`user Hook installer is missing ${event}`);
   }
-  const preToolHooks = hooks?.events?.PreToolUse ?? [];
-  const governanceMatchers = preToolHooks.filter((group) => {
-    try {
-      new RegExp(group.matcher ?? "");
-      return (group.hooks ?? []).some((hook) => hook.type === "process"
-        && hook.command === "node"
-        && Array.isArray(hook.args)
-        && hook.args.includes("${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs")
-        && Number.isInteger(hook.timeoutMs));
-    } catch {
-      errors.push(`ZCode hook matcher is invalid: ${group.matcher}`);
-      return false;
-    }
-  });
-  if (governanceMatchers.length !== 1) {
-    errors.push("ZCode PreToolUse must invoke zcode-governance-hook.mjs");
+  if (!installer.includes("QTA_GOVERNED_RUN") || !installer.includes("QTA_GOVERNANCE_DOCTOR")) {
+    errors.push("user Hook installer must match expanded qta-run and qta-doctor sentinels");
   }
-  if (!governanceMatchers[0]?.matcher?.includes("Bash")
-      || !governanceMatchers[0]?.matcher?.includes("Read")
-      || !governanceMatchers[0]?.matcher?.includes("Write")
-      || !governanceMatchers[0]?.matcher?.includes("Edit")
-      || !governanceMatchers[0]?.matcher?.includes("Agent")
-      || !governanceMatchers[0]?.matcher?.includes("Task")
-      || !governanceMatchers[0]?.matcher?.includes("AskUserQuestion")) {
-    errors.push("ZCode governance hook matcher must cover Bash/Read/Write/Edit, Agent/Task, and AskUserQuestion");
+  if (/\bStop\s*:/.test(installer)) {
+    errors.push("QTA user Hook installer must not register a Stop event");
   }
-  for (const event of ["UserPromptSubmit"]) {
-    const groups = hooks?.events?.[event] ?? [];
-    const configured = groups.some((group) => (group.hooks ?? []).some((hook) => hook.type === "process"
-      && hook.command === "node" && hook.args?.includes("${ZCODE_PROJECT_DIR}/scripts/zcode-governance-hook.mjs")));
-    if (!configured) errors.push(`ZCode ${event} must invoke zcode-governance-hook.mjs`);
+  if (!dispatcher.includes('"scripts", "zcode-governance-hook.mjs"')) {
+    errors.push("user Hook dispatcher must resolve the project governance Hook dynamically");
   }
-  if (hooks?.events?.Stop !== undefined) {
-    errors.push("ZCode Stop hook must remain disabled; client-native Goal is the sole continuation controller");
+  if (!runCommand.includes("QTA_GOVERNED_RUN")
+      || !runCommand.includes("qta-governance-doctor.mjs --runtime --require-active")) {
+    errors.push("qta-run must expose its sentinel and require runtime Hook preflight");
   }
-  if (!(hooks?.events?.UserPromptSubmit ?? []).some((group) => group.matcher?.includes("/qta-run"))) {
-    errors.push("ZCode UserPromptSubmit hook must activate /qta-run sessions");
+  if (!doctorCommand.includes("QTA_GOVERNANCE_DOCTOR")
+      || !doctorCommand.includes("qta-governance-doctor.mjs --runtime")) {
+    errors.push("qta-doctor must expose its sentinel and runtime check");
+  }
+  try {
+    await stat(path.join(root, ".zcode", "config.json"));
+    errors.push("project-level .zcode/config.json must stay absent because ZCode ignores project Hooks");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
   }
 } catch (error) {
-  errors.push(`governance V2 JSON configuration is invalid (${error.message})`);
+  errors.push(`governance V2 configuration is invalid (${error.message})`);
 }
 
 const triggerResult = spawnSync(process.execPath, [path.join(root, "scripts", "evaluate-skill-triggers.mjs")], {

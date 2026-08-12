@@ -13,6 +13,22 @@ child roles to redefine completion, or accepting a candidate that differs from t
 
 This Skill is a controller. It does not implement, review, or verify work itself.
 
+## Runtime Preflight
+
+Before loading task context, writing files, or dispatching a fixed role, `/qta-run` must execute:
+
+```bash
+node scripts/qta-governance-doctor.mjs --runtime --require-active
+```
+
+The gate proves that the current ZCode task reached the user-level `UserPromptSubmit` and `PreToolUse` Hook
+chain and that the governed active lock exists. A static test or direct invocation of the project Hook is not
+a substitute. If preflight fails, dispatch no role, create no synthetic evidence, persist an infrastructure
+`BLOCKED` result, and stop. Install or refresh the user Hook with
+`node scripts/install-zcode-governance-user-hooks.mjs --install`, restart ZCode, and retry from a new task.
+Project-level `.zcode/config.json` Hooks are intentionally absent because supported ZCode desktop builds may
+ignore them by security policy. No install path registers a Stop Hook.
+
 ## Trigger Conditions
 
 Invoke when:
@@ -92,7 +108,7 @@ implementation option without asking the user and record the decision and eviden
 Never invoke `AskUserQuestion` in an active governed run. If product/financial meaning is unresolved, a
 destructive or credential-bearing action requires authorization, or external state makes every safe path
 impossible, persist an evidence-backed `BLOCKED` checkpoint and stop; do not leave the task waiting for a
-human response. The workspace Hook enforces this policy for every session while the project has an active
+human response. The installed user-level dispatcher enforces this policy for every session while the project has an active
 governed task, including child roles.
 
 ## Task Packet

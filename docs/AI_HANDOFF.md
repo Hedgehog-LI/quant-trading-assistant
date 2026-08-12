@@ -15,6 +15,7 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 ## 当前状态（2026-08）
 
+- **ZCode Hook 运行时兼容修复（2026-08-12，已真实验证）**：ZCode desktop 3.6.5 会按安全策略忽略项目级 `.zcode/config.json` Hook，现已迁移为用户级 `~/.zcode/cli/config.json` dispatcher + 仓库版本化规则；新增 `/qta-doctor` 和 `/qta-run` runtime preflight，治理测试 **66/66**、本机安装检查通过，且重启后的真实 ZCode 新任务返回 `PASS (user-config + runtime)`，证明 `UserPromptSubmit -> PreToolUse` 事件链有效，始终无 Stop Hook。原 P110-A control 保持 `BLOCKED`，后续以 `P110-A-BE-MARKET-DISCOVERY-20260812-R1` 新任务重试，不能直接 resume 终态 control。
 - **P1.10 市场研究与个股决策中心设计冻结（2026-08-12，未实现）**：纠正此前“单证券行情查看器承担主研究入口”的产品错位，冻结“市场雷达 → 板块详情 → 候选扫描 → 个股决策台 → 计划/交易/复盘”三级研究漏斗。P1.7 作为板块衍生研究引擎；P1.9 `/market-assets` 重新定位为行情数据详情/质量追溯。设计同时冻结相对强弱、成交活跃度与真实资金流的语义边界，`RANKED_UNIVERSE/WATCHED_SECTORS` 不得冒充全市场；真实成交、人工计划和策略候选点严格分离；mock 必须使用虚构证券并持续显示演示水印。当前只有设计交付，P1.10-A/B/C 均未实现。入口：`docs/features/MARKET_RESEARCH_DECISION_CENTER_DESIGN.md`、ADR-0013。
 
 - **AI 治理规则加固（2026-08-02 已独立验收）**：固定角色 TaskPacket 必须以前两行机器契约开头；派发使用 `PENDING` + `SUCCEEDED/FAILED` 两阶段回执并绑定 `tool_use_id`；active `main/master` 使用 Git 只读白名单，只允许安全切换到 `codex/*`；旧父会话不可用时使用 `/qta-run --resume <TASK-ID> <objective-or-control-path>` 精确接管；L0/收口不能省略 bounded implementer 和 clean verifier。治理测试 **58/58**、触发 **28/28**、最终独立 verifier `ACCEPTED`。入口：`docs/development/tasks/AI-GOVERNANCE-CLOSEOUT-HARDENING-20260802-*.md`。

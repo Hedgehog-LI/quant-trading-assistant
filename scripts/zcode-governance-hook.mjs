@@ -3,6 +3,7 @@
 import process from "node:process";
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { mkdir, open, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,7 +58,11 @@ function isProtectedGovernancePath(value) {
   return normalized.endsWith("/.zcode/config.json")
     || normalized.includes("/.zcode/agents/")
     || normalized.endsWith("/.zcode/commands/qta-run.md")
+    || normalized.endsWith("/.zcode/commands/qta-doctor.md")
     || normalized.endsWith("/scripts/zcode-governance-hook.mjs")
+    || normalized.endsWith("/scripts/zcode-governance-user-dispatcher.mjs")
+    || normalized.endsWith("/scripts/install-zcode-governance-user-hooks.mjs")
+    || normalized.endsWith("/scripts/qta-governance-doctor.mjs")
     || normalized.endsWith("/scripts/check-ai-task-control.mjs")
     || normalized.endsWith("/scripts/check-ai-delivery-ready.mjs")
     || normalized.endsWith("/scripts/check-ai-architecture.mjs")
@@ -249,7 +254,9 @@ function inputProjectRoot(input) {
 }
 
 function requestedResumeTask(prompt) {
-  return prompt.match(/(?:^|\s)\/qta-run\s+--resume\s+([A-Za-z0-9._-]+)(?:\s|$)/)?.[1] ?? "";
+  return prompt.match(/(?:^|\s)\/qta-run\s+--resume\s+([A-Za-z0-9._-]+)(?:\s|$)/)?.[1]
+    ?? prompt.match(/Invocation arguments:\s*--resume\s+([A-Za-z0-9._-]+)(?:\s|$)/)?.[1]
+    ?? "";
 }
 
 async function governanceActiveDirectory(projectRoot) {
@@ -373,6 +380,56 @@ async function recordRuntimeReceipt(input) {
     if (error.code !== "EEXIST") throw error;
   } finally {
     await handle?.close();
+  }
+}
+
+function isGovernedRunPrompt(prompt) {
+  return /(?:^|\s)\/qta-run(?:\s|$)/.test(prompt) || /(?:^|\s)QTA_GOVERNED_RUN(?:\s|$)/.test(prompt);
+}
+
+function isDoctorPrompt(prompt) {
+  return /(?:^|\s)\/qta-doctor(?:\s|$)/.test(prompt)
+    || /(?:^|\s)QTA_GOVERNANCE_DOCTOR(?:\s|$)/.test(prompt);
+}
+
+async function recordDoctorReceipt(input) {
+  if (process.env.QTA_GOVERNANCE_AUDIT === "off") return;
+  const event = hookEvent(input);
+  if (!new Set(["UserPromptSubmit", "PreToolUse"]).has(event)) return;
+  const sessionId = inputSessionId(input);
+  const projectRoot = inputProjectRoot(input);
+  if (!sessionId || !projectRoot) return;
+  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "doctor");
+  const receiptPath = path.join(directory, `${sha256(sessionId)}.json`);
+  await mkdir(directory, { recursive: true });
+
+  if (event === "UserPromptSubmit") {
+    const prompt = firstString(input, ["prompt", "user_prompt", "userPrompt"]);
+    if (!isGovernedRunPrompt(prompt) && !isDoctorPrompt(prompt)) return;
+    const temporary = `${receiptPath}.tmp-${process.pid}`;
+    await writeFile(temporary, `${JSON.stringify({
+      version: 1,
+      sessionId,
+      projectRootSha256: sha256(path.resolve(projectRoot)),
+      promptObservedAt: new Date().toISOString(),
+      preToolObservedAt: null,
+      promptKind: isGovernedRunPrompt(prompt) ? "QTA_RUN" : "QTA_DOCTOR",
+      nonce: randomUUID()
+    }, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporary, receiptPath);
+    return;
+  }
+
+  try {
+    const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    const temporary = `${receiptPath}.tmp-${process.pid}`;
+    await writeFile(temporary, `${JSON.stringify({
+      ...receipt,
+      preToolObservedAt: new Date().toISOString()
+    }, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporary, receiptPath);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
   }
 }
 
@@ -537,7 +594,7 @@ async function activateRunPrompt(input) {
   const event = hookEvent(input);
   if (event !== "UserPromptSubmit") return;
   const prompt = firstString(input, ["prompt", "user_prompt", "userPrompt"]);
-  if (!/(?:^|\s)\/qta-run(?:\s|$)/.test(prompt)) return;
+  if (!isGovernedRunPrompt(prompt)) return;
   const parentSessionId = inputSessionId(input);
   const projectRoot = inputProjectRoot(input);
   if (!parentSessionId || !projectRoot) throw new Error("/qta-run activation requires session and project root");
@@ -630,12 +687,14 @@ async function main() {
       process.exit(2);
     }
   }
+  await recordDoctorReceipt(input);
   await recordRuntimeReceipt(input);
   await recordDispatchReceipt(input);
   await recordDispatchOutcome(input);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1]
+    && realpathSync(path.resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
   main().catch((error) => {
     console.error(`QTA governance Hook failed closed: ${error?.message ?? error}`);
     process.exitCode = 2;

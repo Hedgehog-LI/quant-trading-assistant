@@ -27,6 +27,13 @@
   required test 必须有稳定 test ID、AC 映射、source path 和 exact selector。
 - 标准/长任务由父上下文启用 `qta-development-orchestration` 或 `/qta-run`，选择 L0-L3 风险 lane 并冻结
   `contract_hash`。子角色只接收 TaskPacket。
+- 首次使用、升级治理脚本或更换电脑后，先执行
+  `node scripts/install-zcode-governance-user-hooks.mjs --install`，重启 ZCode，在新任务运行
+  `/qta-doctor`。`/qta-run` 必须在加载上下文或派发角色前通过
+  `node scripts/qta-governance-doctor.mjs --runtime --require-active`；失败立即按基础设施 `BLOCKED`
+  收口，禁止用静态测试或手工 Hook 输入冒充运行时已加载。
+- ZCode 当前会按安全策略忽略项目级 `.zcode/config.json` Hook，因此仓库不再提交该配置；用户级
+  dispatcher 根据当前 Git 根动态调用项目脚本。用户配置只负责挂载，规则仍由仓库版本控制。
 - `/qta-run` 不安装 Stop Hook。使用 Goal 模式时，ZCode 原生 Goal 是唯一续跑控制器；项目门禁只
   判定状态，不触发下一轮。中途停止必须写 `CHECKPOINTED` 或 `BLOCKED`；只有显式通过
   `check-ai-delivery-ready.mjs` 才能宣称交付。

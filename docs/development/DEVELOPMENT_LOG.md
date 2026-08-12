@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-08-12 — ZCode Hook 运行时兼容修复
+
+- **目标**：修复 `/qta-run` 静态治理门禁全绿、但 ZCode 实际未加载项目 Hook，导致固定角色无机器回执并在 P110-A 契约阶段阻塞的问题；不改业务代码/API/DB。
+- **根因**：ZCode desktop 3.6.5 日志明确报告 `Project hooks were ignored by the security policy`；项目级 `.zcode/config.json` 从未挂载。原有静态测试只验证配置与脚本，未验证真实 ZCode 事件链。
+- **改动**：删除误导性的项目 Hook 配置；新增幂等用户级安装器、按 Git 根动态加载项目规则的 dispatcher、`/qta-doctor` 与 `/qta-run` runtime preflight；自定义命令增加稳定 sentinel，兼容 ZCode 在 Hook 前保留或展开命令正文；保留 `Stop Hook` 禁用。
+- **安全边界**：用户配置只负责接线，项目规则仍由仓库版本控制；dispatcher 在非 QTA 仓库无操作；安装器保留其他用户配置、只替换自己的事件组并支持 `--check/--uninstall`。
+- **验证**：`run-ai-governance-gates.mjs` 通过，治理测试 **66/66**；安装器隔离目录的安装/检查/幂等/卸载测试通过；本机用户级安装与 `--check` 通过；重启后的真实 ZCode 新任务运行 `/qta-doctor` 返回 `PASS (user-config + runtime)`，证明 `UserPromptSubmit -> PreToolUse` 事件链有效。
+- **恢复决策**：原 `P110-A-BE-MARKET-DISCOVERY-20260812` 保持 `BLOCKED` 审计事实；doctor 通过后使用新 `-R1` Task ID 重试并重新派发 fresh test designer，不篡改旧 receipt，也不直接 resume 终态 control。
+- **关联**：`docs/ai/SKILL_AND_AGENT_GOVERNANCE.md`、`docs/ai/PORTABLE_AI_GOVERNANCE_INSTALL.md`、`docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-CHECKPOINT-BLOCKED.md`。
+
 ## 2026-08-10 — P1.9 行情数据资产中心设计冻结
 
 - **目标**：解决“采集任务有了，但采集后数据分散且难以查看”的产品问题，把现有日 K、分钟 K、最新价、水位和任务转为可解释的只读数据资产视图。
