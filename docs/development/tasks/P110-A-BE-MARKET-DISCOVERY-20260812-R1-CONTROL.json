@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-R1-CONTROL.json",
   "startedAt": "2026-08-12T14:58:44Z",
   "lane": "L2",
-  "lifecycleState": "CONTRACT_FROZEN",
+  "lifecycleState": "BLOCKED",
   "contract": {
     "path": "docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-R1-CONTRACT.md",
     "version": "3",
@@ -194,20 +194,44 @@
       "at": "2026-08-12T15:03:00Z",
       "actor": "parent-qta-orchestrator-20260812-r1",
       "reason": "NEW-A1 folded into AC-04; contract_hash frozen at 2eec3a037ea90e1d94223fb3e8ce30829c288ec8a9a0625d88ed1b80b429b73d"
+    },
+    {
+      "sequence": 4,
+      "from": "CONTRACT_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-12T15:10:00Z",
+      "actor": "parent-qta-orchestrator-20260812-r1",
+      "reason": "Dispatched fresh IMPLEMENTER rr-p110a-r1-impl-s1-a1b2c3d4 for SLICE-01 (AC-01, AC-02)"
+    },
+    {
+      "sequence": 5,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-12T15:25:00Z",
+      "actor": "parent-qta-orchestrator-20260812-r1",
+      "reason": "SLICE-01 implementer returned SELF_CHECKED/COMPLETED: 16 focused tests green (5 identity + 9 readiness + 2 controller), 11 regression tests green, architecture gate exit 0 (8 files, 358 additions, 0 warnings/errors). Candidate commit aae33c7c."
+    },
+    {
+      "sequence": 6,
+      "from": "SELF_CHECKED",
+      "to": "BLOCKED",
+      "at": "2026-08-12T15:28:00Z",
+      "actor": "parent-qta-orchestrator-20260812-r1",
+      "reason": "Orchestration deadlock: parent prematurely froze SLICE-01 candidate at generation 1 (state SELF_CHECKED, candidate identity aae33c7c) and the control anchor store locked it. The lifecycle state machine forbids SELF_CHECKED->IMPLEMENTING (only CANDIDATE_FROZEN/REVIEW_CLEAR/VERIFIED->IMPLEMENTING), so subsequent SLICE-02..05 IMPLEMENTER dispatches are rejected by the Hook. Candidate identity cannot change without incrementing generation, but the CANDIDATE_FROZEN gate requires all 5 slice implementers at generation 1. Recovery requires a new retry task (R2) implementing all 5 slices under a single IMPLEMENTING window and freezing the candidate exactly once after all slices complete. SLICE-01 work (aae33c7c) is valid and reusable as R2 design input."
     }
   ],
   "candidate": {
     "mode": "COMMIT",
     "generation": 1,
-    "identity": "",
-    "commit": "",
-    "treeHash": "",
-    "patchSha256": "",
+    "identity": "aae33c7c94d436a3591ea2d4027aeafb7d3ed0dc",
+    "commit": "aae33c7c94d436a3591ea2d4027aeafb7d3ed0dc",
+    "treeHash": "4ca0aeed7b834498d18ace53c4687ce131585bb8",
+    "patchSha256": "5770e9e3697dfdd25f5c0dda3293e8ff9a7ab2f9360d8b74ae5e854c0300e35a",
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
     "diffArtifactPath": ".qta-governance/candidates/P110-A-BE-MARKET-DISCOVERY-20260812-R1/generation-1.patch",
-    "diffArtifactSha256": ""
+    "diffArtifactSha256": "5770e9e3697dfdd25f5c0dda3293e8ff9a7ab2f9360d8b74ae5e854c0300e35a"
   },
   "budget": {
     "contextPercent": null,
@@ -249,6 +273,34 @@
       "compactionCount": 0,
       "enforcement": "ADVISORY",
       "compensatingIsolation": "fresh FRESH_ONLY subagent; parent owns all writes; no inherited child history; no Git/recursive-agent/AskUserQuestion allowed"
+    },
+    {
+      "role": "IMPLEMENTER",
+      "roleRunId": "rr-p110a-r1-impl-s1-a1b2c3d4",
+      "dispatchId": "dispatch-p110a-r1-impl-s1-20260812-a1b2c3d4",
+      "sessionId": "agent_2f58cefe-b8f7-4217-bbbb-600dabcfbc87",
+      "parentSessionId": "parent-qta-orchestrator-20260812-r1",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/2ad379ab9318e76680d0a3b2c4d6cd48d9ab5422f149c7ff41ec70e0601e45b7/7a4631c11b33325aefdfdfb87de27742307b479682798eda8a1c9fd422014557.json",
+      "runtimeReceiptPath": "",
+      "startedAt": "2026-08-12T15:10:00Z",
+      "finishedAt": "2026-08-12T15:25:00Z",
+      "status": "CLOSED",
+      "generation": 1,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "capability": "READ_WRITE",
+      "executionOutcome": "COMPLETED",
+      "artifactAccepted": true,
+      "artifactPath": ".qta-governance/candidates/P110-A-BE-MARKET-DISCOVERY-20260812-R1/generation-1.patch",
+      "artifactSha256": "5770e9e3697dfdd25f5c0dda3293e8ff9a7ab2f9360d8b74ae5e854c0300e35a",
+      "verdict": "SELF_CHECKED",
+      "sliceId": "SLICE-01",
+      "contextMode": "FRESH",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 3,
+      "compactionCount": 0,
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "fresh FRESH_ONLY subagent; parent owns Git and all commits; bypassPermissions used only for bounded focused-test Bash; no recursive agents; write-path allowlist enforced"
     }
   ],
   "review": {
