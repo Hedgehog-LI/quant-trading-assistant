@@ -38,6 +38,13 @@ verification uses a fresh role/session and ends after one artifact. Use one long
 follow-up (two waits total); never perform status polling. Require both functional and architecture gates on
 the frozen candidate before finalization.
 
+For generation-1 multi-slice implementation, follow this loop exactly: determine the first frozen slice without
+an accepted implementer role run, dispatch only that slice, append its terminal role run, validate the control,
+and keep `lifecycleState=IMPLEMENTING`. The child verdict `SELF_CHECKED` is slice-local. Do not transition the
+control to global `SELF_CHECKED`, populate any candidate identity/hash field, create the candidate stage commit,
+or dispatch review while another frozen slice remains. After the last initial slice is accepted, transition once
+to global `SELF_CHECKED`, create one cumulative candidate, then transition to `CANDIDATE_FROZEN`.
+
 Every fixed-role Agent/Task prompt starts with the exact canonical prefix below, copied from the TaskPacket
 template. Do not paraphrase it or place the dispatch ID elsewhere:
 

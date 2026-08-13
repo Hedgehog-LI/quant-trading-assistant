@@ -41,6 +41,13 @@ class SectorIdentityManagerTest {
 
     @BeforeEach
     void clean() {
+        jdbcTemplate.update("DELETE FROM sector_analytics_publication_member");
+        jdbcTemplate.update("DELETE FROM sector_analytics_publication_batch");
+        jdbcTemplate.update("DELETE FROM sector_rotation_sector_persistence");
+        jdbcTemplate.update("DELETE FROM sector_relative_strength_snapshot");
+        jdbcTemplate.update("DELETE FROM sector_analytics_calculation_run");
+        jdbcTemplate.update("DELETE FROM market_sector_ranking_item");
+        jdbcTemplate.update("DELETE FROM market_sector_ranking_batch");
         jdbcTemplate.update("DELETE FROM market_sector_member_snapshot");
         jdbcTemplate.update("DELETE FROM market_sector_snapshot");
         jdbcTemplate.update("DELETE FROM market_sector_watch");

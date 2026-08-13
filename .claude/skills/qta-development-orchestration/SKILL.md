@@ -148,14 +148,23 @@ This gate validates the JSON schema, actual contract/candidate/artifact hashes, 
 role generations, ZCode runtime session receipts, hash-chained control anchors, SNAPSHOT changed-path coverage,
 AC evidence, quality verdicts, and finalization identity. A prose status cannot override it.
 
+For multi-slice generation 1, `SELF_CHECKED` is a global barrier. A child implementer's `SELF_CHECKED` verdict
+means only that its assigned slice may be recorded as accepted. It never authorizes a lifecycle transition or
+candidate freeze by itself. If another initial slice remains, dispatch that next slice while the control stays
+`IMPLEMENTING`.
+
 ## Role Dispatch
 
 1. Parent drafts the contract with `$qta-task-contract`.
 2. A fresh `qta-test-designer` instance challenges the draft and returns an artifact payload.
 3. Parent persists accepted amendments and freezes `contract_hash`.
-4. Dispatch one fresh `qta-implementer` per frozen slice. One slice has at most three ACs, eight expected
-   files, and 500 production-line additions. The parent assembles slices but never edits implementation.
-5. Parent freezes candidate identity:
+4. Dispatch one fresh `qta-implementer` per frozen slice, strictly in the frozen slice order. One slice has
+   at most three ACs, eight expected files, and 500 production-line additions. Each accepted implementer
+   artifact is a **slice-local self-check**, not the global lifecycle state. After every non-final slice, append
+   its terminal role run and keep the control at `IMPLEMENTING`; do not populate candidate identity fields and
+   do not transition to global `SELF_CHECKED`. The parent assembles slices but never edits implementation.
+5. Only after every frozen initial slice has exactly one accepted generation-1 implementer role run, transition
+   once from `IMPLEMENTING` to global `SELF_CHECKED`. Then parent freezes one cumulative candidate identity:
    - `COMMIT`: create the candidate commit and record commit/tree/patch hashes.
    - `SNAPSHOT`: create a deterministic allowlisted candidate manifest and record manifest/entry-set hashes.
    - In both modes, persist an exact frozen diff artifact and its SHA-256 for read-only review.

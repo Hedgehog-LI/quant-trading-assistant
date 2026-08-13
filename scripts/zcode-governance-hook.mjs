@@ -30,6 +30,7 @@ export function qtaDispatchMetadata(input) {
   if (!role) return null;
   const prompt = firstString(toolInput, ["prompt", "input", "task", "description"]);
   const prefix = prompt.match(/^# Task Packet:\s*([^/\r\n]+?)\s*\/\s*([^/\r\n]+?)\s*\/\s*([^\r\n]+?)\s*\r?\n- Dispatch ID:\s*(\S+)\s*(?:\r?\n|$)/);
+  const sliceId = prompt.match(/^[-*]\s*Assigned implementation slice ID:\s*(\S+)\s*$/mi)?.[1] ?? "";
   return {
     agentName,
     agentDefinition: `.zcode/agents/${agentName}.md`,
@@ -38,7 +39,8 @@ export function qtaDispatchMetadata(input) {
     taskId: prefix?.[1]?.trim() ?? "",
     declaredRole: prefix?.[2]?.trim() ?? "",
     roleRunId: prefix?.[3]?.trim() ?? "",
-    dispatchId: prefix?.[4]?.trim() ?? ""
+    dispatchId: prefix?.[4]?.trim() ?? "",
+    sliceId
   };
 }
 
@@ -454,9 +456,27 @@ async function recordDispatchReceipt(input) {
     throw new Error(`parent session already owns active governed task ${active.taskId}`);
   }
   const controlPath = active?.controlPath || `docs/development/tasks/${dispatch.taskId}-CONTROL.json`;
+  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
+    sha256(dispatch.taskId));
+  await mkdir(directory, { recursive: true });
   if (active) {
     try {
       const control = JSON.parse(await readFile(path.resolve(projectRoot, controlPath), "utf8"));
+      const recordedDispatchIds = new Set((control.roleRuns ?? []).map((run) => run?.dispatchId));
+      for (const name of await readdir(directory)) {
+        if (!name.endsWith(".json") || name.endsWith(".outcome.json")) continue;
+        const receipt = JSON.parse(await readFile(path.join(directory, name), "utf8"));
+        if (recordedDispatchIds.has(receipt.dispatchId)) continue;
+        try {
+          const outcome = JSON.parse(await readFile(path.join(directory,
+            name.replace(/\.json$/, ".outcome.json")), "utf8"));
+          if (["SUCCEEDED", "FAILED"].includes(outcome.status)) {
+            throw new Error(`terminal dispatch ${receipt.dispatchId} must be appended to roleRuns before another role is dispatched`);
+          }
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
+      }
       const allowedByState = {
         CONTRACT_DRAFTED: new Set(["TEST_DESIGNER"]),
         CONTRACT_FROZEN: new Set(["IMPLEMENTER"]),
@@ -466,6 +486,32 @@ async function recordDispatchReceipt(input) {
       };
       if (!(allowedByState[control.lifecycleState] ?? new Set()).has(dispatch.expectedRole)) {
         throw new Error(`role ${dispatch.expectedRole} is not allowed while ${dispatch.taskId} is ${control.lifecycleState}`);
+      }
+      const repairWindow = Array.isArray(control.transitionHistory) && control.transitionHistory.some((transition) =>
+        transition?.to === "IMPLEMENTING"
+        && ["CANDIDATE_FROZEN", "REVIEW_CLEAR", "VERIFIED"].includes(transition?.from));
+      const initialImplementationWindow = control.lifecycleState === "CONTRACT_FROZEN"
+        || (control.lifecycleState === "IMPLEMENTING" && !repairWindow);
+      if (dispatch.expectedRole === "IMPLEMENTER" && initialImplementationWindow) {
+        const slices = Array.isArray(control.contract?.implementationSlices)
+          ? control.contract.implementationSlices : [];
+        if (slices.length > 0) {
+          const acceptedSliceIds = new Set(control.roleRuns
+            .filter((run) => run?.role === "IMPLEMENTER" && run?.generation === 1
+              && run?.executorType === "SUBAGENT" && run?.executionOutcome === "COMPLETED"
+              && run?.artifactAccepted === true && ["COMPLETED", "CLOSED"].includes(run?.status))
+            .map((run) => run.sliceId));
+          const nextSlice = slices.find((slice) => !acceptedSliceIds.has(slice.id));
+          if (!nextSlice) {
+            throw new Error("all frozen implementation slices are complete; transition to global SELF_CHECKED before freezing one candidate");
+          }
+          if (!dispatch.sliceId) {
+            throw new Error(`IMPLEMENTER packet must declare '- Assigned implementation slice ID: ${nextSlice.id}'`);
+          }
+          if (dispatch.sliceId !== nextSlice.id) {
+            throw new Error(`next IMPLEMENTER must handle ${nextSlice.id}; received ${dispatch.sliceId}`);
+          }
+        }
       }
       const maxRoleRuns = MAX_ROLE_RUNS_BY_LANE[control.lane];
       if (!Number.isInteger(maxRoleRuns) || !Array.isArray(control.roleRuns)) {
@@ -481,9 +527,6 @@ async function recordDispatchReceipt(input) {
       }
     }
   }
-  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
-    sha256(dispatch.taskId));
-  await mkdir(directory, { recursive: true });
   for (const name of await readdir(directory)) {
     if (!name.endsWith(".json") || name.endsWith(".outcome.json")) continue;
     try {
@@ -504,6 +547,7 @@ async function recordDispatchReceipt(input) {
       dispatchId: dispatch.dispatchId,
       roleRunId: dispatch.roleRunId,
       role: dispatch.expectedRole,
+      sliceId: dispatch.sliceId,
       agentDefinition: dispatch.agentDefinition,
       parentSessionId,
       observedAt: new Date().toISOString(),

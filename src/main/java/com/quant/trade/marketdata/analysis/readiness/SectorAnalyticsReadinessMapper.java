@@ -31,6 +31,10 @@ public interface SectorAnalyticsReadinessMapper {
                                                                      @Param("fromDate") LocalDate fromDate,
                                                                      @Param("toDate") LocalDate toDate);
 
+    Integer countVerifiedTradingDays(@Param("marketCode") String marketCode,
+                                     @Param("fromDate") LocalDate fromDate,
+                                     @Param("toDate") LocalDate toDate);
+
     /** 统计某 CLOSE 批次的排行项数（actual_item_count；不从 expected 反填）。 */
     Integer countBatchItems(@Param("batchId") Long batchId);
 }

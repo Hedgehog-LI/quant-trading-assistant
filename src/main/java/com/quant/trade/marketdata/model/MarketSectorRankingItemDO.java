@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class MarketSectorRankingItemDO {
     private Long id;
     private Long batchId;
+    private Long sectorIdentityId;
     private Integer rankNo;
     private String providerSectorId;
     private String sectorName;

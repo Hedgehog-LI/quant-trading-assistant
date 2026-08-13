@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class MarketSectorSnapshotDO {
     private Long id;
     private Long watchId;
+    private Long sectorIdentityId;
     private LocalDateTime snapshotTime;
     private LocalDateTime snapshotBucketTime;
     private String triggerType;

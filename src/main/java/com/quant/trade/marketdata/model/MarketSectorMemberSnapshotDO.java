@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class MarketSectorMemberSnapshotDO {
     private Long id;
     private Long snapshotId;
+    private Long sectorIdentityId;
     private String canonicalSymbol;
     private String securityName;
     private BigDecimal currentPrice;

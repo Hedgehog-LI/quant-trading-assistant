@@ -8,6 +8,8 @@ import com.quant.trade.marketdata.dao.MarketSectorRankingConfigMapper;
 import com.quant.trade.marketdata.dao.MarketSectorWatchMapper;
 import com.quant.trade.marketdata.manager.MarketSectorScheduleManager;
 import com.quant.trade.marketdata.manager.TradingSessionManager;
+import com.quant.trade.marketdata.analysis.constant.SectorAnalyticsConstants;
+import com.quant.trade.marketdata.analysis.service.SectorAnalyticsCalculationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +32,7 @@ public class MarketSectorCollectionScheduler {
     private final MarketSectorWatchService watchService;
     private final MarketSectorScheduleManager scheduleManager;
     private final TradingSessionManager tradingSessionManager;
+    private final SectorAnalyticsCalculationService calculationService;
     private final Clock marketDataClock;
 
     @Scheduled(fixedDelayString = "${qta.market-data.sector-scheduler.scan-delay-ms:30000}",
@@ -76,11 +79,33 @@ public class MarketSectorCollectionScheduler {
                             MarketSectorScheduleManager.CollectionWindow window) {
         try {
             rankingService.collectScheduled(config, window);
+            if (MarketSectorCollectionConstants.SNAPSHOT_CLOSE.equals(window.snapshotType())) {
+                runAnalytics(config.getMarketCode(), window.tradeDate());
+            }
         } catch (BusinessException exception) {
             logBusiness("板块排行", config.getId(), exception);
         } catch (RuntimeException exception) {
             log.error("板块排行采集异常: configId={}, message={}", config.getId(), exception.getMessage(), exception);
         }
+    }
+
+    private void runAnalytics(String marketCode, java.time.LocalDate asOfDate) {
+        SectorAnalyticsConstants.SUPPORTED_WINDOWS.stream().sorted().forEach(window -> {
+            try {
+                calculationService.calculate(marketCode, asOfDate, window);
+            } catch (BusinessException exception) {
+                if (exception.getErrorCode() == ErrorCodeEnum.BUSINESS_RULE_VIOLATION) {
+                    log.info("板块衍生计算暂未发布: market={}, window={}, reason={}",
+                            marketCode, window, exception.getMessage());
+                } else {
+                    log.warn("板块衍生计算失败: market={}, window={}, code={}, message={}",
+                            marketCode, window, exception.getErrorCode().getCode(), exception.getMessage());
+                }
+            } catch (RuntimeException exception) {
+                log.error("板块衍生计算异常: market={}, window={}, message={}",
+                        marketCode, window, exception.getMessage(), exception);
+            }
+        });
     }
 
     private void runWatch(com.quant.trade.marketdata.model.MarketSectorWatchDO watch, LocalDateTime bucket) {

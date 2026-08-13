@@ -147,7 +147,10 @@ public class MarketSectorRankingService {
         return MarketSectorRankingBatchDO.builder()
                 .providerCode(config.getProviderCode()).marketCode(config.getMarketCode())
                 .tradeDate(window.tradeDate()).snapshotType(window.snapshotType())
-                .snapshotBucketTime(window.bucketTime()).snapshotTime(now).itemCount(ranks.size())
+                .snapshotBucketTime(window.bucketTime()).snapshotTime(now)
+                .providerQuoteTime(ranks.stream().map(MarketSectorRankVO::sourceQuoteTime)
+                        .filter(java.util.Objects::nonNull).findFirst().orElse(null))
+                .itemCount(ranks.size())
                 .risingCount(count(ranks, 1)).fallingCount(count(ranks, -1)).flatCount(count(ranks, 0))
                 .leaderSectorId(leader.providerSectorId()).leaderSectorName(leader.name())
                 .leaderChangeRate(leader.changeRate()).laggardSectorId(laggard.providerSectorId())
@@ -231,6 +234,7 @@ public class MarketSectorRankingService {
     private MarketSectorRankingBatchVO toBatchVO(MarketSectorRankingBatchDO item) {
         return new MarketSectorRankingBatchVO(item.getId(), item.getProviderCode(), item.getMarketCode(),
                 item.getTradeDate(), item.getSnapshotType(), item.getSnapshotBucketTime(), item.getSnapshotTime(),
+                item.getProviderQuoteTime(),
                 item.getItemCount(), item.getRisingCount(), item.getFallingCount(), item.getFlatCount(),
                 item.getLeaderSectorId(), item.getLeaderSectorName(), item.getLeaderChangeRate(),
                 item.getLaggardSectorId(), item.getLaggardSectorName(), item.getLaggardChangeRate(), item.getQualityStatus());

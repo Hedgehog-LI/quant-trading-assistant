@@ -27,7 +27,7 @@
 | Security Directory（目录/搜索/详情） | ❌ D2 尚未实现前端 adapter，不伪造目录结果 | ✅ D1 `/security-directory/import` + `/securities/search` + `/securities/{canonicalSymbol}` | 仅本地 DB；不调用 provider、报价或 K 线 |
 | Security Metadata Enrichment（D3-03） | ❌ 不支持；必须明确提示切换到后端模式，不得伪造 LongPort Static Info，不得用静态演示数据冒充元数据补全结果 | ✅ `POST /market-data/security-directory/enrich` | `persist=false` 只查询返回、不落库；`persist=true` 只补全 `stock_basic` 空字段（name_cn/name_hk/name_en/exchange/currency），不覆盖非空值，不改 `source_updated_at`/`data_source`/`source_hash`；lotSize 只在响应返回、不持久化；provider 无数据 → `enriched=false`/`persisted=false`/`reason=PROVIDER_NOT_FOUND` |
 | Market Segments（市场板块/自定义分组） | ✅ 市场板块仅演示数据；自定义分组 localStorage | ✅ `/sector-catalog/*` + `/segments/*` | 演示数据必须标 `LOCAL_DEMO`，不得冒充 LongPort |
-| Sector Analytics（P1.7，规划） | ⚠️ 仅 `LOCAL_DEMO` 视觉样例，不伪造计算和资金数据 | 规划 `/sector-analytics/*`，尚未实现 | `RANKED_UNIVERSE` 与 `WATCHED_SECTORS` 必须分开展示 |
+| Market Research（P1.10-A） | ✅ 只使用虚构证券/板块并持续显示 `LOCAL_DEMO` 水印；不得回退真实身份 | ✅ `/market-research/*` adapter 与页面已接入 | remote 只读已发布衍生结果；`RANKED_UNIVERSE` 不得冒充全市场，资金流不可用时必须为 null |
 
 ## 3. localStorage 规则
 

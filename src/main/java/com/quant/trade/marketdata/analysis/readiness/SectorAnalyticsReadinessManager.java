@@ -87,7 +87,7 @@ public class SectorAnalyticsReadinessManager {
         }
 
         // 权威交易日历门禁（HK/US 长窗口 INFERRED → INSUFFICIENT_RAW，fail closed）
-        if (isHkOrUs(marketCode) && !hasVerifiedCalendar(marketCode, asOfDate)) {
+        if (isHkOrUs(marketCode) && !hasVerifiedCalendar(marketCode, asOfDate, RS_WINDOW)) {
             reasonCodes.add("CALENDAR_INFERRED");
             reasonCodes.add("INSUFFICIENT_RAW");
             return build(marketCode, scope, batchId, asOfDate, sourceQuoteTime, actualItemCount,
@@ -120,11 +120,11 @@ public class SectorAnalyticsReadinessManager {
      * HK/US 是否具备权威交易日历（窗口内所有交易日 verification_status ∈ {EXCHANGE_FILE, MANUAL_VERIFIED}）。
      * 无日历行或含 INFERRED → false（fail closed）。
      */
-    private boolean hasVerifiedCalendar(String marketCode, LocalDate asOfDate) {
+    public boolean hasVerifiedCalendar(String marketCode, LocalDate asOfDate, int requiredDays) {
         if (asOfDate == null) {
             return false;
         }
-        LocalDate from = asOfDate.minusDays((long) RS_WINDOW * 2 + 10);
+        LocalDate from = asOfDate.minusDays((long) requiredDays * 2 + 10);
         LocalDate to = asOfDate;
         List<Map<String, Object>> dist = readinessMapper.selectCalendarVerificationDistribution(
                 marketCode, from, to);
@@ -137,7 +137,8 @@ public class SectorAnalyticsReadinessManager {
                 return false;
             }
         }
-        return true;
+        Integer verifiedDays = readinessMapper.countVerifiedTradingDays(marketCode, from, to);
+        return verifiedDays != null && verifiedDays >= requiredDays;
     }
 
     private SectorAnalyticsReadinessVO build(String market, String scope, Long batchId, LocalDate asOfDate,

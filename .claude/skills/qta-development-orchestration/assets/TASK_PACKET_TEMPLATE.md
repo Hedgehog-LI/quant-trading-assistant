@@ -45,6 +45,11 @@ For an implementer packet, assign exactly one frozen slice with at most three AC
 500 production-line additions. A timeout/plan-only/failure/cancellation still returns a terminal dispatch
 record. Two timeouts for the same slice require `BLOCKED`; the parent must not implement it.
 
+An implementer's `SELF_CHECKED` output is slice-local. It authorizes the parent to append that slice's accepted
+role run only. The parent must keep the global lifecycle at `IMPLEMENTING` and leave candidate identity fields
+empty while any frozen initial slice remains. Only the last accepted initial slice permits the one global
+`SELF_CHECKED` transition and cumulative candidate freeze.
+
 Implementer and final-verifier profiles run with `bypassPermissions` for unattended Bash. This never expands
 the packet's write paths, tools, candidate scope, Git policy, or prohibited actions.
 

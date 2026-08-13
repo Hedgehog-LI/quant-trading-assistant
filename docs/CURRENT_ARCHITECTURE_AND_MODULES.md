@@ -62,6 +62,7 @@ convert     # MapStruct 转换器
 | Portfolio Ledger | `portfolio` | `/api/v1/portfolio/*` | `trade_journal`, `portfolio_price_snapshot` |
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
 | Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、本地目录 CSV 导入、确定性搜索/详情、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V17 新增目录字段与 `stock_alias`；V18 新增 `security_directory_sync_state` 与 D3 目录同步（CSV 快照 provider、五阶段管线、复用 `market_data_sync_task` 的 `SECURITY_MASTER_SYNC`） |
+| Market Research | `marketdata.analysis` | `/api/v1/market-research/*` | 只读板块原始排行，计算相对强弱和固定 5 日轮动持续性；使用稳定板块身份、公式/参数/源批次身份和原子发布批次；查询端不调用 provider、不写原始事实 |
 | Agent Assistant | `agent` | `/api/v1/agent/**` | `agent_api_audit_log`（V16）。Spring Security Bearer Token 鉴权 + 限流 + 持久化脱敏审计 + TrustedAnswer 可信回答契约。8 个固定只读 GET 端点。OpenClaw Tool Plugin 在 `integrations/openclaw/qta-assistant/`。默认关闭。 |
 
 ## 4. 当前数据库迁移
@@ -86,8 +87,12 @@ convert     # MapStruct 转换器
 | `V16__add_agent_api_audit_log.sql` | agent_api_audit_log（Agent 只读 API 持久化脱敏审计） |
 | `V17__add_security_directory.sql` | 扩展 stock_basic 目录字段，新增 stock_alias 与目录检索索引 |
 | `V18__add_security_directory_sync_state.sql` | security_directory_sync_state，证券目录同步（D3）按 provider 维护最近成功时间/快照标识/计数/错误 |
+| `V19__add_sector_analytics_readiness.sql` | market_sector_identity 稳定身份与板块分析 readiness 基础 |
+| `V20__add_sector_analytics_run_and_publication.sql` | 原始排行稳定身份/sourceQuoteTime、计算 run、原子发布批次及成员 |
+| `V21__add_sector_relative_strength_and_rotation.sql` | 相对强弱和轮动持续性衍生结果 |
+| `V22__strengthen_sector_analytics_publication_scope.sql` | 强度/动量双窗口身份、跨市场发布约束和查询索引 |
 
-已发布的 V1-V17 migration 不应修改；后续表结构调整继续新增更高版本 migration。
+已发布的 V1-V22 migration 不应修改；后续表结构调整继续新增更高版本 migration。
 
 ## 5. 交易账本口径
 
@@ -201,9 +206,21 @@ npm run build
 - `MarketDataPlanExecutionService` 在 provider 调用外使用短事务写入 task/item/minute bar/watermark；V13 DB run claim 防止同计划重入。
 - `MarketDataIntradayScheduler` 通过可注入 `Clock` 按 A 股交易日/时段/采集频率扫描，非交易时段不创建空任务；启动时收敛遗留执行。
 
-## 12. 后续规划（未实现）
+## 11.1 市场研究当前事实
 
-行情 P1.2/P1.3 工作台、采集计划、LongPort 分钟 K、A 股盘中调度、任务明细/水位和板块已实现并通过 Docker MySQL 与最小真实外联验收。下一步尚未完成的是异动观察、港美股盘中时区/日历和多数据源，而不是直接进入策略回测：
+- `marketdata.analysis` 是行情模块内的衍生研究边界，不建立平行行情源，也不直连 LongPort。
+- 数据输入仅来自已落库且成功的 CLOSE 排行批次；排行项通过 `market_sector_identity.id` 建立稳定身份，provider 名称/代码只作为可演进属性。
+- 来源时间由 provider HTTP 响应 `Date` 头进入 `provider_quote_time/sourceQuoteTime`；该时间证明上游响应新鲜度，不冒充交易所成交时间。
+- 相对强弱采用固定 cohort、等权每日基准、对数相对收益和平均并列名次；收益字段均为小数比率。
+- 一个市场雷达发布同时绑定请求强度窗口和固定 5 日动量窗口。计算 run、公式版本、参数哈希、源批次哈希和发布成员共同保证可重算与可审计。
+- HK/US 的 20/50 日长窗口必须有足量权威交易日历；缺失时 fail closed，不使用工作日猜测。CN 有权威日期时也会拒绝中间交易日缺口。
+- `MarketSectorCollectionScheduler` 在 CLOSE 排行成功落库后尝试计算 `5/10/20/50` 强度窗口；分析样本不足不会反向污染原始采集结果。
+- 查询 API 只读取 `PUBLISHED` 结果。当前只有 `RANKED_UNIVERSE`，真实资金流为 `UNAVAILABLE/null`，不得显示为零或解释为全市场资金流。
+- 后端自动化和 package 已通过；前端 `/market-research` 与板块详情已接入 remote adapter，并通过自动化及 mock 桌面/390px 浏览器交互。Docker/MySQL、真实 provider 样本、remote 页面和服务器尚未验收。
+
+## 12. 后续规划
+
+行情 P1.2/P1.3 工作台、采集计划、LongPort 分钟 K、A 股盘中调度、任务明细/水位和板块已实现并通过 Docker MySQL 与最小真实外联验收。P1.10-A 前后端候选已完成，下一步优先做真实数据运行时验收；之后再做真实资金流、量价证据、候选扫描和个股决策，而不是直接进入策略回测：
 
 - `docs/features/LONGPORT_MARKET_DATA_PROVIDER_DESIGN.md`
 - `docs/features/LONGPORT_SINGLE_SYMBOL_SYNC_ENGINE_DESIGN.md`

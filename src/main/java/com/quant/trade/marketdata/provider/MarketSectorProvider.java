@@ -1,6 +1,7 @@
 package com.quant.trade.marketdata.provider;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /** 市场板块只读数据源，不承担自定义分组 CRUD。 */
@@ -18,7 +19,8 @@ public interface MarketSectorProvider {
 
     record SectorRank(String market, String name, String providerSectorId, BigDecimal changeRate,
                       String leadingName, String leadingSymbol, BigDecimal leadingChangeRate,
-                      String indicatorName, String indicatorValue, String providerCode) {}
+                      String indicatorName, String indicatorValue, String providerCode,
+                      LocalDateTime sourceQuoteTime) {}
 
     record SectorPeer(String market, String topName, String name, String providerSectorId,
                       Integer stockCount, BigDecimal changeRate, BigDecimal yearToDateChangeRate,

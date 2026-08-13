@@ -28,6 +28,15 @@
         GROUP BY verification_status
     </select>
 
+    <select id="countVerifiedTradingDays" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM market_calendar
+        WHERE market_code = #{marketCode}
+          AND trade_date &gt;= #{fromDate}
+          AND trade_date &lt;= #{toDate}
+          AND is_trading_day = TRUE
+          AND verification_status IN ('EXCHANGE_FILE', 'MANUAL_VERIFIED')
+    </select>
+
     <select id="countBatchItems" resultType="java.lang.Integer">
         SELECT COUNT(*) FROM market_sector_ranking_item WHERE batch_id = #{batchId}
     </select>

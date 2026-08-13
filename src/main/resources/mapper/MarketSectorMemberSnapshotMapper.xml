@@ -3,6 +3,7 @@
 <mapper namespace="com.quant.trade.marketdata.dao.MarketSectorMemberSnapshotMapper">
     <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketSectorMemberSnapshotDO">
         <id column="id" property="id"/><result column="snapshot_id" property="snapshotId"/>
+        <result column="sector_identity_id" property="sectorIdentityId"/>
         <result column="canonical_symbol" property="canonicalSymbol"/><result column="security_name" property="securityName"/>
         <result column="current_price" property="currentPrice"/><result column="previous_close" property="previousClose"/>
         <result column="change_rate" property="changeRate"/><result column="net_inflow" property="netInflow"/>
@@ -12,17 +13,17 @@
         <result column="is_delayed" property="delayed"/><result column="created_at" property="createdAt"/>
     </resultMap>
     <insert id="insertBatch">
-        INSERT INTO market_sector_member_snapshot (snapshot_id, canonical_symbol, security_name, current_price,
+        INSERT INTO market_sector_member_snapshot (snapshot_id, sector_identity_id, canonical_symbol, security_name, current_price,
             previous_close, change_rate, net_inflow, turnover_amount, volume, total_shares, circulating_shares,
             tags, trade_status, is_delayed) VALUES
         <foreach collection="records" item="item" separator=",">
-            (#{item.snapshotId}, #{item.canonicalSymbol}, #{item.securityName}, #{item.currentPrice},
+            (#{item.snapshotId}, #{item.sectorIdentityId}, #{item.canonicalSymbol}, #{item.securityName}, #{item.currentPrice},
             #{item.previousClose}, #{item.changeRate}, #{item.netInflow}, #{item.turnoverAmount}, #{item.volume},
             #{item.totalShares}, #{item.circulatingShares}, #{item.tags}, #{item.tradeStatus}, #{item.delayed})
         </foreach>
     </insert>
     <select id="selectBySnapshotId" resultMap="BaseResultMap">
-        SELECT id, snapshot_id, canonical_symbol, security_name, current_price, previous_close, change_rate,
+        SELECT id, snapshot_id, sector_identity_id, canonical_symbol, security_name, current_price, previous_close, change_rate,
             net_inflow, turnover_amount, volume, total_shares, circulating_shares, tags, trade_status, is_delayed, created_at
         FROM market_sector_member_snapshot WHERE snapshot_id = #{snapshotId}
         ORDER BY net_inflow DESC, turnover_amount DESC, id ASC

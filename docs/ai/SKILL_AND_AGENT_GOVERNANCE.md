@@ -191,7 +191,12 @@ repair history 必须绑定发现问题的 reviewer/verifier role run 与下一�
 匹配且控制文件身份有效的 active lock；禁止静默抢占其他任务或让模型手工删除审计文件。
 
 初始实现必须在契约中拆成 bounded slice：每个 slice 最多 3 个 AC、8 个预期文件、500 行生产代码
-增量，一个干净 implementer 只做一个 slice。父协调器只组装状态和 Git，不写业务实现。
+增量，一个干净 implementer 只做一个 slice。父协调器只组装状态和 Git，不写业务实现。所有初始
+slice 在同一个 `IMPLEMENTING` 窗口中按冻结顺序累积：子实施者返回的 `SELF_CHECKED` 只代表其 slice
+自检完成，不能写成全局生命周期状态。每个非末尾 slice 只追加 accepted role run；候选字段保持空。
+只有全部初始 slice 各有且仅有一个 accepted generation-1 implementer 后，才能执行一次全局
+`IMPLEMENTING -> SELF_CHECKED` 并冻结一个包含全部 slice 的累计候选。控制校验器和 Hook 必须分别在
+状态迁移与角色派发前阻止提前冻结、重复派发或跳过 slice。
 
 ## 6. Git、Commit 和 Push
 

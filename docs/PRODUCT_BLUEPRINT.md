@@ -34,7 +34,7 @@ Quant Trading Assistant 是个人交易辅助工作台。它帮助用户把短�
 | Workflow Optimization 基础闭环优化 | 串联计划、交易、账本、快照和复盘 | v0.1.1 已完成 | 原始数据落 DB，差异实时计算 |
 | Market Data Foundation 行情基础 | 统一证券代码并沉淀价格和日 K | P1.0 证券主数据 + CSV 日 K 已完成；P1.1 LongPort 只读行情源真实外联已完成 | 行情需记录来源和抓取时间 |
 | Market Data Workbench 行情工作台 | 一屏看重点股票、板块、采集任务和异动提醒 | P1.2 工作台、LongPort 分钟 K、手工补档与 A 股盘中 scheduler 已通过自动化、Docker 和真实外联验收 | 最新价、分钟线、任务、水位、提醒落 DB |
-| Market Research Decision Center 市场研究与个股决策中心 | 从市场发现板块、从板块收敛候选，并结合个人持仓与计划研究个股 | P1.10 产品、页面和金融语义已冻结，待分片实现 | 只读原始事实、P1.7 衍生指标和个人业务数据；不自动交易 |
+| Market Research Decision Center 市场研究与个股决策中心 | 从市场发现板块、从板块收敛候选，并结合个人持仓与计划研究个股 | P1.10-A 前后端候选已实现、真实运行时待验；B/C 阶段待开发 | 只读原始事实、可重算衍生指标和个人业务数据；不自动交易 |
 | Market Data Detail 行情数据详情 | 核对已落库日/分钟 K、来源、质量、水位和任务追溯 | P1.9-A read model 与页面设计保留，产品定位已降为数据检查工具 | 只读现有行情事实，不调用 provider、不写回原始表 |
 | Security Directory 证券目录与智能检索 | 输入代码或名称选择 A/H/US 证券并自动填充 | P1.4a 已完成；P1.4b-D1 后端本地目录/导入/搜索/详情已验收，D2-D4 待开发 | 精确验证只读；目录搜索只读本地 DB，不触发行情 |
 | Market Sector Catalog 市场板块目录 | 查看 A/H/US 行业排行，自动沉淀全市场强弱榜和关注板块/成分资金快照 | P1.6 双层自动采集、5/10/15/30/60 分钟或仅收盘、历史榜单与质量状态已完成代码交付 | 市场板块与自定义分组分离；外部权限/鉴权异常会阻断或退避，不伪造数据 |
@@ -116,7 +116,7 @@ Quant Trading Assistant 是个人交易辅助工作台。它帮助用户把短�
 - LongPort 仅作为行情 provider，不接交易、账户、订单、真实持仓能力。
 - P1.6 已在 P1.5 上建设全市场排行快照与关注板块明细双层采集；CN/HK/US 独立交易时区，盘中频率可选 5/10/15/30/60 分钟或仅收盘，并保留立即采集入口、DB claim、时间桶幂等、失败退避和质量状态。下一步基于连续快照计算相对强弱、资金趋势、轮动持续性和异动解释。
 - P1.8 已完成 OpenClaw 远程助手设计：通过专用只读 Agent Facade 和固定 Tool Plugin，让用户从 QQ 查询采集健康、失败任务、板块排行、持仓摘要和交易待办。第一期不开放写操作；生产必须使用回环网络、QQ OpenID 白名单、Bearer Token、限流和审计。详见 `docs/features/OPENCLAW_AGENT_ASSISTANT_DESIGN.md`。
-- P1.10 市场研究与个股决策中心设计已冻结：产品主流程为“市场雷达 → 板块详情 → 候选扫描 → 个股决策台 → 计划/交易/复盘”。P1.7 作为衍生指标引擎，P1.9 作为原始行情数据详情，不再分别建设竞争性的产品入口。详见 `docs/features/MARKET_RESEARCH_DECISION_CENTER_DESIGN.md` 与 ADR-0013。
+- P1.10 市场研究与个股决策中心设计已冻结：产品主流程为“市场雷达 → 板块详情 → 候选扫描 → 个股决策台 → 计划/交易/复盘”。P1.10-A 已实现稳定板块身份、数据门禁、相对强弱、轮动持续性、原子发布、只读研究 API、市场雷达和板块详情；真实 Docker/MySQL/provider/remote 页面验收待完成。P1.7 作为衍生指标引擎，P1.9 作为原始行情数据详情。详见 `docs/features/MARKET_RESEARCH_DECISION_CENTER_DESIGN.md`、`docs/api/MARKET_RESEARCH_API.md` 与 ADR-0013。
 - P1.9 保留有界 read model、K 线、成交量、质量、水位和任务追溯，但页面重新定位为“行情数据详情”；板块历史并入板块详情，多证券比较并入候选扫描。
 - 指标、策略和回测要等分钟线/日线质量治理和采集水位稳定后再推进。
 

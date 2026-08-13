@@ -54,7 +54,7 @@ class MarketSectorCatalogServiceTest {
             String segment = "CN".equals(market) ? "SH" : market;
             return List.of(new SectorRank(market, "科技", "BK/" + segment + "/IN001",
                     new BigDecimal("0.02"), "领涨股", "TEST." + market, new BigDecimal("0.05"),
-                    indicator, "1", "LONGPORT"));
+                    indicator, "1", "LONGPORT", java.time.LocalDateTime.of(2026, 1, 1, 8, 0)));
         }
 
         @Override

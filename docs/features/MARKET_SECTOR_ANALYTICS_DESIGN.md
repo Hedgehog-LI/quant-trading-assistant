@@ -1,13 +1,15 @@
 # 板块分析（每日总览 / 相对强弱 / 资金趋势 / 轮动持续性 / 量价确认 / 异动提醒）设计基线
 
-> 版本：v1.1 · 状态：专家复审修订（P1.7，未实现；只有 P1.7-A 前置门禁通过后才可开发 P1.7-B）
+> 版本：v1.1 · 状态：设计冻结；P1.10-A 前后端候选已实现（2026-08-13）
 > 关联：`../BUILD_CHECKLIST.md`、`../api/MARKET_DATA_API.md` §5（规划）、`../DATABASE_DESIGN.md` 板块分析规划表（V19+）、`../development/P17_SECTOR_ANALYTICS_IMPLEMENTATION_PLAN.md`、`MARKET_SECTOR_CATALOG_DESIGN.md`、`MARKET_SECTOR_AUTOMATIC_COLLECTION_DESIGN.md`、`MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`MARKET_ALERT_RULES_DESIGN.md`。
 > 前置事实：板块原始事实表（V14/V15）`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item` 已落地；`market_data_alert`（V7）已存在并可复用；最新 migration V18，本设计规划 V19+。
 > 上位产品流程：`MARKET_RESEARCH_DECISION_CENTER_DESIGN.md`。P1.7 是衍生研究引擎，不单独建设与“市场雷达/板块详情”竞争的页面。
 
+> 实施快照：V19-V22 已落地稳定身份、来源时间、readiness、相对强弱、固定 5 日轮动持续性、计算 run、原子发布和 `/api/v1/market-research/*` 查询；前端已实现市场雷达和板块详情。真实资金流、成交集中度、量价确认、市场稳定度和提醒仍属于后续范围；不得把当前 `RANKED_UNIVERSE` 结果解释为全市场资金流。实现契约见 `../api/MARKET_RESEARCH_API.md`。
+
 ## 0. 设计状态与定位
 
-本文档是**规划/未实现**的板块分析层（P1.7）设计基线。P1.7 分成两个强制阶段：P1.7-A 先修复数据单位、完整性、稳定身份、收盘快照、交易日历和血缘；P1.7-B 才实现每日总览与可解释指标。P1.7-A 未验收时，任何分析结果都不得标记为 `OK` 或“全市场”。
+本文档是板块分析层（P1.7）的冻结设计基线。P1.7 分成两个强制阶段：P1.7-A 先修复数据单位、完整性、稳定身份、收盘快照、交易日历和血缘；P1.7-B 再实现每日总览与可解释指标。当前已实现 P1.10-A 所需的 A 阶段门禁，以及 B 阶段中的相对强弱和轮动持续性最小子集；其余指标仍未实现。任何不满足门禁的分析结果都不得标记为 `OK` 或“全市场”。
 
 本系统是**只读研究工具**：所有派生指标只读原始事实表，**禁止写回** `market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_*` 与 `stock_*` 原始事实表。衍生结果只存新表，可重算、可丢弃、可下线，原始事实不可变。第一版不生成买卖指令、不自动交易、不连接券商、不读取密钥、不引入黑盒 ML 评分。
 

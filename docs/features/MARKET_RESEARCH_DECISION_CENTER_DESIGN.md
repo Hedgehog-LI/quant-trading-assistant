@@ -10,6 +10,8 @@
 >
 > 关联：`MARKET_SECTOR_ANALYTICS_DESIGN.md`、`MARKET_DATA_ASSET_CENTER_DESIGN.md`、`MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md`、`../decisions/ADR-0013-research-funnel-and-asset-inspection-boundary.md`。
 
+> 实施快照（2026-08-13）：P1.10-A **前后端候选已实现**，包含稳定板块身份、数据就绪门禁、相对强弱、固定 5 日轮动持续性、原子发布、收盘后自动触发、只读研究 API、市场雷达和板块详情。自动化与 mock 浏览器已通过；真实 Docker/MySQL/provider/remote 页面、真实资金流和 P1.10-B/C 仍未完成。实现契约见 `../api/MARKET_RESEARCH_API.md`。
+
 ## 0. 设计结论
 
 ### 0.1 当前问题（FACT）

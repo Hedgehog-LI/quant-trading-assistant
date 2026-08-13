@@ -9,6 +9,7 @@ import com.quant.trade.marketdata.dto.CreateMarketSectorWatchDTO;
 import com.quant.trade.marketdata.dto.UpdateMarketSectorWatchCollectionDTO;
 import com.quant.trade.marketdata.constant.MarketSectorCollectionConstants;
 import com.quant.trade.marketdata.manager.MarketSectorPersistenceManager;
+import com.quant.trade.marketdata.analysis.manager.SectorIdentityManager;
 import com.quant.trade.marketdata.model.MarketSectorMemberSnapshotDO;
 import com.quant.trade.marketdata.model.MarketSectorSnapshotDO;
 import com.quant.trade.marketdata.model.MarketSectorWatchDO;
@@ -27,6 +28,7 @@ import org.springframework.dao.DuplicateKeyException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +47,7 @@ public class MarketSectorWatchService {
     private final MarketSectorCatalogService catalogService;
     private final MarketSectorProvider provider;
     private final MarketSectorPersistenceManager persistenceManager;
+    private final SectorIdentityManager sectorIdentityManager;
     private final Clock marketDataClock;
 
     public MarketSectorWatchVO create(CreateMarketSectorWatchDTO dto) {
@@ -180,8 +183,12 @@ public class MarketSectorWatchService {
         int delayedCount = (int) stocks.stream().filter(item -> Boolean.TRUE.equals(item.delayed())).count();
         int unmappedCount = Math.max(expectedCount - stocks.size(), 0);
         int coverage = expectedCount == 0 ? 100 : stocks.size() * 100 / expectedCount;
+        Long sectorIdentityId = sectorIdentityManager.claimIdentity(constituents.providerCode(), market,
+                providerSectorId, "LONGPORT_INDUSTRY_V1", rank == null ? null : rank.name(),
+                LocalDate.now(marketDataClock), null).getId();
         MarketSectorSnapshotDO snapshot = MarketSectorSnapshotDO.builder()
-                .watchId(watchId).snapshotTime(now).snapshotBucketTime(bucketTime).triggerType(triggerType)
+                .watchId(watchId).sectorIdentityId(sectorIdentityId).snapshotTime(now)
+                .snapshotBucketTime(bucketTime).triggerType(triggerType)
                 .fetchedAt(now).rankIndicator(SNAPSHOT_INDICATOR)
                 .changeRate(rank == null ? changeRate : rank.changeRate())
                 .yearToDateChangeRate(yearToDateChangeRate)
@@ -196,7 +203,8 @@ public class MarketSectorWatchService {
                 .qualityStatus(coverage >= MarketSectorCollectionConstants.MIN_VALID_MEMBER_COVERAGE_PERCENT
                         ? MarketSectorCollectionConstants.QUALITY_VALID
                         : MarketSectorCollectionConstants.QUALITY_SUSPECT).build();
-        List<MarketSectorMemberSnapshotDO> members = stocks.stream().map(this::toMemberDO).toList();
+        List<MarketSectorMemberSnapshotDO> members = stocks.stream().map(this::toMemberDO)
+                .peek(member -> member.setSectorIdentityId(sectorIdentityId)).toList();
         return new SnapshotBundle(snapshot, members);
     }
 

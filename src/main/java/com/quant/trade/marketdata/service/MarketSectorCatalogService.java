@@ -37,7 +37,7 @@ public class MarketSectorCatalogService {
         return provider.getIndustryRank(normalizedMarket, normalizedIndicator, normalizedSortType, limit).stream()
                 .map(item -> new MarketSectorRankVO(item.market(), item.name(), item.providerSectorId(),
                         item.changeRate(), item.leadingName(), item.leadingSymbol(), item.leadingChangeRate(),
-                        item.indicatorName(), item.indicatorValue(), item.providerCode()))
+                        item.indicatorName(), item.indicatorValue(), item.providerCode(), item.sourceQuoteTime()))
                 .toList();
     }
 

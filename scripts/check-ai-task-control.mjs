@@ -69,6 +69,14 @@ function roleRunAccepted(run) {
     && present(run?.artifactPath) && present(run?.artifactSha256);
 }
 
+function acceptedInitialSliceIds(roleRuns, slices) {
+  const frozenSliceIds = new Set(slices.map((slice) => slice.id));
+  return new Set(roleRuns
+    .filter((run) => run?.role === "IMPLEMENTER" && run?.generation === 1
+      && frozenSliceIds.has(run?.sliceId) && roleRunAccepted(run))
+    .map((run) => run.sliceId));
+}
+
 function parsedTimestamp(value) {
   return present(value) ? Date.parse(value) : Number.NaN;
 }
@@ -396,6 +404,29 @@ export function validateTaskControl(control) {
       errors.push(`implementation slice ${slice.id} reached two timeouts and requires BLOCKED before reslicing`);
     }
   }
+  const completedInitialSlices = acceptedInitialSliceIds(roleRuns, slices);
+  const completedInitialSliceSequence = roleRuns
+    .filter((run) => run.role === "IMPLEMENTER" && run.generation === 1
+      && sliceIds.has(run.sliceId) && roleRunAccepted(run))
+    .map((run) => run.sliceId);
+  const expectedInitialSlicePrefix = slices.slice(0, completedInitialSliceSequence.length)
+    .map((slice) => slice.id);
+  if (state !== "BLOCKED"
+      && JSON.stringify(completedInitialSliceSequence) !== JSON.stringify(expectedInitialSlicePrefix)) {
+    errors.push("accepted initial implementation slices must follow the frozen slice order without gaps or duplicates");
+  }
+  const missingInitialSlices = slices.filter((slice) => !completedInitialSlices.has(slice.id));
+  if (state === "SELF_CHECKED" && missingInitialSlices.length > 0) {
+    errors.push(`global SELF_CHECKED requires every frozen implementation slice; missing: ${missingInitialSlices
+      .map((slice) => slice.id).join(", ")}`);
+  }
+  for (const slice of slices) {
+    const acceptedRuns = roleRuns.filter((run) => run.role === "IMPLEMENTER" && run.generation === 1
+      && run.sliceId === slice.id && roleRunAccepted(run));
+    if (state !== "BLOCKED" && acceptedRuns.length > 1) {
+      errors.push(`initial implementation slice ${slice.id} has more than one accepted implementer role run`);
+    }
+  }
   repairHistory.forEach((repair, index) => {
     const findingRun = roleRuns.find((run) => run.roleRunId === repair?.findingRoleRunId);
     const implementerRun = roleRuns.find((run) => run.roleRunId === repair?.implementerRoleRunId);
@@ -411,6 +442,18 @@ export function validateTaskControl(control) {
 
   const candidate = control?.candidate ?? {};
   const expectedGeneration = (budget.repairRound ?? 0) + 1;
+  const candidateMustRemainEmpty = [
+    "CONTEXT_READY", "CONTRACT_DRAFTED", "TEST_DESIGN_READY", "CONTRACT_FROZEN", "IMPLEMENTING"
+  ].includes(state) || (state === "SELF_CHECKED" && missingInitialSlices.length > 0);
+  if (expectedGeneration === 1 && candidateMustRemainEmpty) {
+    const prematureFields = [
+      "identity", "commit", "treeHash", "patchSha256", "manifestPath", "manifestSha256",
+      "entrySetSha256", "diffArtifactSha256"
+    ].filter((field) => present(candidate[field]));
+    if (prematureFields.length > 0) {
+      errors.push(`initial candidate must remain unfrozen until all slices are globally SELF_CHECKED; populated: ${prematureFields.join(", ")}`);
+    }
+  }
   if (atLeast(state, "CANDIDATE_FROZEN")) {
     if (candidate.generation !== expectedGeneration) errors.push("candidate generation must equal repairRound + 1");
     if (!present(candidate.identity)) errors.push("frozen candidate identity is required");
@@ -443,8 +486,7 @@ export function validateTaskControl(control) {
       }
     }
     for (const slice of slices) {
-      if (!roleRuns.some((run) => run.role === "IMPLEMENTER" && run.generation === 1
-          && run.sliceId === slice.id && roleRunAccepted(run))) {
+      if (!completedInitialSlices.has(slice.id)) {
         errors.push(`accepted implementer role run missing for initial slice ${slice.id}`);
       }
     }

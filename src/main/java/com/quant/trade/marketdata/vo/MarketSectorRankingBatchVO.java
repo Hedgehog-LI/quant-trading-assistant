@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record MarketSectorRankingBatchVO(
         Long id, String providerCode, String marketCode, LocalDate tradeDate,
         String snapshotType, LocalDateTime snapshotBucketTime, LocalDateTime snapshotTime,
+        LocalDateTime providerQuoteTime,
         Integer itemCount, Integer risingCount, Integer fallingCount, Integer flatCount,
         String leaderSectorId, String leaderSectorName, BigDecimal leaderChangeRate,
         String laggardSectorId, String laggardSectorName, BigDecimal laggardChangeRate,
