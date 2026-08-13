@@ -1,0 +1,356 @@
+{
+  "schemaVersion": 3,
+  "taskId": "P110-A-BE-MARKET-DISCOVERY-20260812-R1",
+  "controlPath": "docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-R1-CONTROL.json",
+  "startedAt": "2026-08-12T14:58:44Z",
+  "lane": "L2",
+  "lifecycleState": "BLOCKED",
+  "contract": {
+    "path": "docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-R1-CONTRACT.md",
+    "version": "3",
+    "sha256": "2eec3a037ea90e1d94223fb3e8ce30829c288ec8a9a0625d88ed1b80b429b73d",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-02", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-03", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-04", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-05", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-06", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-07", "requiredEvidence": ["STATIC", "AUTOMATION"]},
+      {"id": "AC-08", "requiredEvidence": ["STATIC", "AUTOMATION"]}
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "V19 identity + readiness gate + change_rate unit contract",
+        "acIds": ["AC-01", "AC-02"],
+        "allowedWritePaths": [
+          "src/main/resources/db/migration/V19__add_sector_analytics_identity_and_readiness.sql",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/MarketSectorIdentityDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/dao/MarketSectorIdentityMapper.java",
+          "src/main/resources/mapper/MarketSectorIdentityMapper.xml",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/SectorIdentityManager.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/readiness/",
+          "src/main/java/com/quant/trade/marketdata/analysis/controller/SectorAnalyticsReadinessController.java",
+          "src/test/java/com/quant/trade/marketdata/analysis/"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-02",
+        "description": "V20 calculation run + publication batch + source manifest hash + atomic publish",
+        "acIds": ["AC-03"],
+        "allowedWritePaths": [
+          "src/main/resources/db/migration/V20__add_sector_analytics_calculation_run.sql",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/CalculationRunDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/PublicationBatchDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/PublicationMemberDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/dao/",
+          "src/main/resources/mapper/CalculationRunMapper.xml",
+          "src/main/resources/mapper/PublicationBatchMapper.xml",
+          "src/main/resources/mapper/PublicationMemberMapper.xml"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-03",
+        "description": "RS fixed-cohort equal-weight percentile + sector rotation persistence metrics",
+        "acIds": ["AC-04", "AC-05"],
+        "allowedWritePaths": [
+          "src/main/resources/db/migration/V21__add_sector_relative_strength_and_rotation.sql",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/SectorRelativeStrengthSnapshotDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/model/SectorRotationSectorPersistenceDO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/dao/SectorRelativeStrengthSnapshotMapper.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/dao/SectorRotationSectorPersistenceMapper.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/derived/",
+          "src/main/resources/mapper/SectorRelativeStrengthSnapshotMapper.xml",
+          "src/main/resources/mapper/SectorRotationSectorPersistenceMapper.xml"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-04",
+        "description": "Market radar read model + rotation quadrant classifier + controller",
+        "acIds": ["AC-06"],
+        "allowedWritePaths": [
+          "src/main/java/com/quant/trade/marketdata/analysis/vo/MarketRadarVO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/MarketRadarReadModelManager.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/RotationStateClassifier.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/service/MarketRadarQueryService.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/controller/MarketRadarController.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/enums/RotationStateEnum.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/enums/FlowMetricNatureEnum.java",
+          "src/test/java/com/quant/trade/marketdata/analysis/"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-05",
+        "description": "Ranking history + sector detail read model + architecture guard tests",
+        "acIds": ["AC-07", "AC-08"],
+        "allowedWritePaths": [
+          "src/main/java/com/quant/trade/marketdata/analysis/vo/SectorRankingHistoryVO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/vo/SectorDetailVO.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/SectorRankingHistoryManager.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/SectorDetailReadModelManager.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/service/SectorResearchQueryService.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/controller/SectorResearchController.java",
+          "src/main/java/com/quant/trade/marketdata/analysis/manager/TrackingSymbolBenchmarkGuard.java",
+          "src/test/java/com/quant/trade/marketdata/analysis/"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      }
+    ],
+    "testInventory": [
+      {"testId": "TEST-01", "acIds": ["AC-01"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/readiness/SectorAnalyticsReadinessManagerTest.java",
+        "selector": "class SectorAnalyticsReadinessManagerTest"},
+      {"testId": "TEST-02", "acIds": ["AC-01"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/controller/SectorAnalyticsReadinessControllerTest.java",
+        "selector": "class SectorAnalyticsReadinessControllerTest"},
+      {"testId": "TEST-03", "acIds": ["AC-02"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/manager/SectorIdentityManagerTest.java",
+        "selector": "class SectorIdentityManagerTest"},
+      {"testId": "TEST-04", "acIds": ["AC-03"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/run/CalculationRunManagerTest.java",
+        "selector": "class CalculationRunManagerTest"},
+      {"testId": "TEST-05", "acIds": ["AC-03"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/run/PublicationBatchManagerTest.java",
+        "selector": "class PublicationBatchManagerTest"},
+      {"testId": "TEST-06", "acIds": ["AC-04"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/derived/RelativeStrengthCalculatorTest.java",
+        "selector": "class RelativeStrengthCalculatorTest"},
+      {"testId": "TEST-07", "acIds": ["AC-05"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/derived/SectorRotationPersistenceCalculatorTest.java",
+        "selector": "class SectorRotationPersistenceCalculatorTest"},
+      {"testId": "TEST-08", "acIds": ["AC-06"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/controller/MarketRadarControllerTest.java",
+        "selector": "class MarketRadarControllerTest"},
+      {"testId": "TEST-09", "acIds": ["AC-07"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/controller/SectorRankingHistoryControllerTest.java",
+        "selector": "class SectorRankingHistoryControllerTest"},
+      {"testId": "TEST-10", "acIds": ["AC-07"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/controller/SectorDetailControllerTest.java",
+        "selector": "class SectorDetailControllerTest"},
+      {"testId": "TEST-11", "acIds": ["AC-08"], "kind": "STATIC", "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/analysis/SectorAnalyticsArchitectureGuardTest.java",
+        "selector": "class SectorAnalyticsArchitectureGuardTest"},
+      {"testId": "TEST-12", "acIds": ["AC-01", "AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-08"], "kind": "AUTOMATION", "required": true,
+        "sourcePath": "pom.xml",
+        "selector": "./mvnw -q test"},
+      {"testId": "TEST-13", "acIds": ["AC-08"], "kind": "AUTOMATION", "required": true,
+        "sourcePath": "pom.xml",
+        "selector": "./mvnw -q -DskipTests=false package"}
+    ],
+    "blockingAmendments": [
+      {
+        "id": "BLOCKING_AMENDMENT_01",
+        "reason": "watch cascade FK removal exceeds single L2 slice; V19 only adds sector_identity_id without dropping existing FK",
+        "impact": "AC-02 identity independence proven at derived layer, not FK drop"
+      },
+      {
+        "id": "BLOCKING_AMENDMENT_02",
+        "reason": "capital flow / concentration / volume confirmation / anomaly alerts formulas frozen in design but deferred; radar returns NO_DERIVED_DATA/UNAVAILABLE placeholders",
+        "impact": "AC-06 capital/volume columns return explicit degradation"
+      },
+      {
+        "id": "BLOCKING_AMENDMENT_03",
+        "reason": "HK/US authoritative trading calendar is deployment data governance, not code; market_calendar new columns default INFERRED, RS long-window fails closed for HK/US until calendar verified",
+        "impact": "HK/US RS returns INSUFFICIENT_RAW degradation, not fabricated"
+      }
+    ]
+  },
+  "git": {
+    "automation": "COMMIT",
+    "branch": "codex/p110-a-be-market-discovery-20260812-r1",
+    "baselineCommit": "0bc907ae50d27965113cfcf996137828f56b5eb7",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-12T14:58:44Z",
+      "actor": "parent-qta-orchestrator-20260812-r1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "TEST_DESIGN_READY",
+      "at": "2026-08-12T15:02:00Z",
+      "actor": "parent-qta-orchestrator-20260812-r1",
+      "reason": "Fresh TEST_DESIGNER rr-p110a-r1-td-7e3a1c92b4d0 returned ACCEPTED_WITH_AMENDMENTS (NEW-A1 non-blocking). Artifact persisted at docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-R1-TEST-DESIGN.md"
+    },
+    {
+      "sequence": 3,
+      "from": "TEST_DESIGN_READY",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-12T15:03:00Z",
+      "actor": "parent-qta-orchestrator-20260812-r1",
+      "reason": "NEW-A1 folded into AC-04; contract_hash frozen at 2eec3a037ea90e1d94223fb3e8ce30829c288ec8a9a0625d88ed1b80b429b73d"
+    },
+    {
+      "sequence": 4,
+      "from": "CONTRACT_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-12T15:10:00Z",
+      "actor": "parent-qta-orchestrator-20260812-r1",
+      "reason": "Dispatched fresh IMPLEMENTER rr-p110a-r1-impl-s1-a1b2c3d4 for SLICE-01 (AC-01, AC-02)"
+    },
+    {
+      "sequence": 5,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-12T15:25:00Z",
+      "actor": "parent-qta-orchestrator-20260812-r1",
+      "reason": "SLICE-01 implementer returned SELF_CHECKED/COMPLETED: 16 focused tests green (5 identity + 9 readiness + 2 controller), 11 regression tests green, architecture gate exit 0 (8 files, 358 additions, 0 warnings/errors). Candidate commit aae33c7c."
+    },
+    {
+      "sequence": 6,
+      "from": "SELF_CHECKED",
+      "to": "BLOCKED",
+      "at": "2026-08-12T15:28:00Z",
+      "actor": "parent-qta-orchestrator-20260812-r1",
+      "reason": "Orchestration deadlock: parent prematurely froze SLICE-01 candidate at generation 1 (state SELF_CHECKED, candidate identity aae33c7c) and the control anchor store locked it. The lifecycle state machine forbids SELF_CHECKED->IMPLEMENTING (only CANDIDATE_FROZEN/REVIEW_CLEAR/VERIFIED->IMPLEMENTING), so subsequent SLICE-02..05 IMPLEMENTER dispatches are rejected by the Hook. Candidate identity cannot change without incrementing generation, but the CANDIDATE_FROZEN gate requires all 5 slice implementers at generation 1. Recovery requires a new retry task (R2) implementing all 5 slices under a single IMPLEMENTING window and freezing the candidate exactly once after all slices complete. SLICE-01 work (aae33c7c) is valid and reusable as R2 design input."
+    }
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "aae33c7c94d436a3591ea2d4027aeafb7d3ed0dc",
+    "commit": "aae33c7c94d436a3591ea2d4027aeafb7d3ed0dc",
+    "treeHash": "4ca0aeed7b834498d18ace53c4687ce131585bb8",
+    "patchSha256": "5770e9e3697dfdd25f5c0dda3293e8ff9a7ab2f9360d8b74ae5e854c0300e35a",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": ".qta-governance/candidates/P110-A-BE-MARKET-DISCOVERY-20260812-R1/generation-1.patch",
+    "diffArtifactSha256": "5770e9e3697dfdd25f5c0dda3293e8ff9a7ab2f9360d8b74ae5e854c0300e35a"
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [
+    {
+      "role": "TEST_DESIGNER",
+      "roleRunId": "rr-p110a-r1-td-7e3a1c92b4d0",
+      "dispatchId": "dispatch-p110a-r1-td-20260812-7e3a1c92b4d0",
+      "sessionId": "agent_2fab1c35-b293-4ae5-81db-80095800d007",
+      "parentSessionId": "parent-qta-orchestrator-20260812-r1",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/2ad379ab9318e76680d0a3b2c4d6cd48d9ab5422f149c7ff41ec70e0601e45b7/24a7482231ac10870487a844b19af3eb147ec5a7ba3a0a2c6a20bc60d49ff373.json",
+      "runtimeReceiptPath": "",
+      "startedAt": "2026-08-12T14:59:00Z",
+      "finishedAt": "2026-08-12T15:02:00Z",
+      "status": "CLOSED",
+      "generation": 0,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-test-designer.md",
+      "capability": "READ_ONLY",
+      "executionOutcome": "COMPLETED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-R1-TEST-DESIGN.md",
+      "artifactSha256": "31e3732caf14312af363dd406289e9de9f614cac661e7a951b8727bac82256e3",
+      "verdict": "ACCEPTED_WITH_AMENDMENTS",
+      "sliceId": "",
+      "contextMode": "FRESH",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 3,
+      "compactionCount": 0,
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "fresh FRESH_ONLY subagent; parent owns all writes; no inherited child history; no Git/recursive-agent/AskUserQuestion allowed"
+    },
+    {
+      "role": "IMPLEMENTER",
+      "roleRunId": "rr-p110a-r1-impl-s1-a1b2c3d4",
+      "dispatchId": "dispatch-p110a-r1-impl-s1-20260812-a1b2c3d4",
+      "sessionId": "agent_2f58cefe-b8f7-4217-bbbb-600dabcfbc87",
+      "parentSessionId": "parent-qta-orchestrator-20260812-r1",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/2ad379ab9318e76680d0a3b2c4d6cd48d9ab5422f149c7ff41ec70e0601e45b7/7a4631c11b33325aefdfdfb87de27742307b479682798eda8a1c9fd422014557.json",
+      "runtimeReceiptPath": "",
+      "startedAt": "2026-08-12T15:10:00Z",
+      "finishedAt": "2026-08-12T15:25:00Z",
+      "status": "CLOSED",
+      "generation": 1,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "capability": "READ_WRITE",
+      "executionOutcome": "COMPLETED",
+      "artifactAccepted": true,
+      "artifactPath": ".qta-governance/candidates/P110-A-BE-MARKET-DISCOVERY-20260812-R1/generation-1.patch",
+      "artifactSha256": "5770e9e3697dfdd25f5c0dda3293e8ff9a7ab2f9360d8b74ae5e854c0300e35a",
+      "verdict": "SELF_CHECKED",
+      "sliceId": "SLICE-01",
+      "contextMode": "FRESH",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 3,
+      "compactionCount": 0,
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "fresh FRESH_ONLY subagent; parent owns Git and all commits; bypassPermissions used only for bounded focused-test Bash; no recursive agents; write-path allowlist enforced"
+    }
+  ],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "architectureGate": {
+    "required": true,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": -1,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
+      "RUNTIME": {"required": false, "status": "NOT_REQUIRED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}

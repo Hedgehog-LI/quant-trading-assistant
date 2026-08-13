@@ -30,7 +30,8 @@ class LongPortMarketSectorProviderTest {
         @Override public List<LongPortIndustryRank> getIndustryRank(String market, String indicator,
                                                                     String sortType, int limit) {
             return List.of(new LongPortIndustryRank("科技", "BK/HK/IN001", new BigDecimal("0.02"),
-                    "龙头", "00001.HK", new BigDecimal("0.03"), indicator, "1"));
+                    "龙头", "00001.HK", new BigDecimal("0.03"), indicator, "1",
+                    java.time.LocalDateTime.of(2026, 1, 1, 8, 0)));
         }
         @Override public LongPortIndustryPeer getIndustryPeers(String market, String counterId) {
             return new LongPortIndustryPeer(market, "全部", "科技", counterId, 12,

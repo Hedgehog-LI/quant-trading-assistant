@@ -29,7 +29,8 @@ public class LongPortMarketSectorProvider implements MarketSectorProvider {
         return client.getIndustryRank(market, indicator, sortType, limit).stream()
                 .map(item -> new SectorRank(market, item.name(), item.counterId(), item.changeRate(),
                         item.leadingName(), item.leadingSymbol(), item.leadingChangeRate(),
-                        item.indicatorName(), item.indicatorValue(), getProviderCode()))
+                        item.indicatorName(), item.indicatorValue(), getProviderCode(),
+                        item.sourceQuoteTime()))
                 .toList();
     }
 

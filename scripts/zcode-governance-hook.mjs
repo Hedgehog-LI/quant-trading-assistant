@@ -3,6 +3,7 @@
 import process from "node:process";
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { mkdir, open, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +30,7 @@ export function qtaDispatchMetadata(input) {
   if (!role) return null;
   const prompt = firstString(toolInput, ["prompt", "input", "task", "description"]);
   const prefix = prompt.match(/^# Task Packet:\s*([^/\r\n]+?)\s*\/\s*([^/\r\n]+?)\s*\/\s*([^\r\n]+?)\s*\r?\n- Dispatch ID:\s*(\S+)\s*(?:\r?\n|$)/);
+  const sliceId = prompt.match(/^[-*]\s*Assigned implementation slice ID:\s*(\S+)\s*$/mi)?.[1] ?? "";
   return {
     agentName,
     agentDefinition: `.zcode/agents/${agentName}.md`,
@@ -37,7 +39,8 @@ export function qtaDispatchMetadata(input) {
     taskId: prefix?.[1]?.trim() ?? "",
     declaredRole: prefix?.[2]?.trim() ?? "",
     roleRunId: prefix?.[3]?.trim() ?? "",
-    dispatchId: prefix?.[4]?.trim() ?? ""
+    dispatchId: prefix?.[4]?.trim() ?? "",
+    sliceId
   };
 }
 
@@ -57,7 +60,11 @@ function isProtectedGovernancePath(value) {
   return normalized.endsWith("/.zcode/config.json")
     || normalized.includes("/.zcode/agents/")
     || normalized.endsWith("/.zcode/commands/qta-run.md")
+    || normalized.endsWith("/.zcode/commands/qta-doctor.md")
     || normalized.endsWith("/scripts/zcode-governance-hook.mjs")
+    || normalized.endsWith("/scripts/zcode-governance-user-dispatcher.mjs")
+    || normalized.endsWith("/scripts/install-zcode-governance-user-hooks.mjs")
+    || normalized.endsWith("/scripts/qta-governance-doctor.mjs")
     || normalized.endsWith("/scripts/check-ai-task-control.mjs")
     || normalized.endsWith("/scripts/check-ai-delivery-ready.mjs")
     || normalized.endsWith("/scripts/check-ai-architecture.mjs")
@@ -249,7 +256,9 @@ function inputProjectRoot(input) {
 }
 
 function requestedResumeTask(prompt) {
-  return prompt.match(/(?:^|\s)\/qta-run\s+--resume\s+([A-Za-z0-9._-]+)(?:\s|$)/)?.[1] ?? "";
+  return prompt.match(/(?:^|\s)\/qta-run\s+--resume\s+([A-Za-z0-9._-]+)(?:\s|$)/)?.[1]
+    ?? prompt.match(/Invocation arguments:\s*--resume\s+([A-Za-z0-9._-]+)(?:\s|$)/)?.[1]
+    ?? "";
 }
 
 async function governanceActiveDirectory(projectRoot) {
@@ -376,6 +385,56 @@ async function recordRuntimeReceipt(input) {
   }
 }
 
+function isGovernedRunPrompt(prompt) {
+  return /(?:^|\s)\/qta-run(?:\s|$)/.test(prompt) || /(?:^|\s)QTA_GOVERNED_RUN(?:\s|$)/.test(prompt);
+}
+
+function isDoctorPrompt(prompt) {
+  return /(?:^|\s)\/qta-doctor(?:\s|$)/.test(prompt)
+    || /(?:^|\s)QTA_GOVERNANCE_DOCTOR(?:\s|$)/.test(prompt);
+}
+
+async function recordDoctorReceipt(input) {
+  if (process.env.QTA_GOVERNANCE_AUDIT === "off") return;
+  const event = hookEvent(input);
+  if (!new Set(["UserPromptSubmit", "PreToolUse"]).has(event)) return;
+  const sessionId = inputSessionId(input);
+  const projectRoot = inputProjectRoot(input);
+  if (!sessionId || !projectRoot) return;
+  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "doctor");
+  const receiptPath = path.join(directory, `${sha256(sessionId)}.json`);
+  await mkdir(directory, { recursive: true });
+
+  if (event === "UserPromptSubmit") {
+    const prompt = firstString(input, ["prompt", "user_prompt", "userPrompt"]);
+    if (!isGovernedRunPrompt(prompt) && !isDoctorPrompt(prompt)) return;
+    const temporary = `${receiptPath}.tmp-${process.pid}`;
+    await writeFile(temporary, `${JSON.stringify({
+      version: 1,
+      sessionId,
+      projectRootSha256: sha256(path.resolve(projectRoot)),
+      promptObservedAt: new Date().toISOString(),
+      preToolObservedAt: null,
+      promptKind: isGovernedRunPrompt(prompt) ? "QTA_RUN" : "QTA_DOCTOR",
+      nonce: randomUUID()
+    }, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporary, receiptPath);
+    return;
+  }
+
+  try {
+    const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    const temporary = `${receiptPath}.tmp-${process.pid}`;
+    await writeFile(temporary, `${JSON.stringify({
+      ...receipt,
+      preToolObservedAt: new Date().toISOString()
+    }, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporary, receiptPath);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
 async function recordDispatchReceipt(input) {
   if (process.env.QTA_GOVERNANCE_AUDIT === "off") return;
   if (hookEvent(input) !== "PreToolUse") return;
@@ -397,9 +456,27 @@ async function recordDispatchReceipt(input) {
     throw new Error(`parent session already owns active governed task ${active.taskId}`);
   }
   const controlPath = active?.controlPath || `docs/development/tasks/${dispatch.taskId}-CONTROL.json`;
+  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
+    sha256(dispatch.taskId));
+  await mkdir(directory, { recursive: true });
   if (active) {
     try {
       const control = JSON.parse(await readFile(path.resolve(projectRoot, controlPath), "utf8"));
+      const recordedDispatchIds = new Set((control.roleRuns ?? []).map((run) => run?.dispatchId));
+      for (const name of await readdir(directory)) {
+        if (!name.endsWith(".json") || name.endsWith(".outcome.json")) continue;
+        const receipt = JSON.parse(await readFile(path.join(directory, name), "utf8"));
+        if (recordedDispatchIds.has(receipt.dispatchId)) continue;
+        try {
+          const outcome = JSON.parse(await readFile(path.join(directory,
+            name.replace(/\.json$/, ".outcome.json")), "utf8"));
+          if (["SUCCEEDED", "FAILED"].includes(outcome.status)) {
+            throw new Error(`terminal dispatch ${receipt.dispatchId} must be appended to roleRuns before another role is dispatched`);
+          }
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+        }
+      }
       const allowedByState = {
         CONTRACT_DRAFTED: new Set(["TEST_DESIGNER"]),
         CONTRACT_FROZEN: new Set(["IMPLEMENTER"]),
@@ -409,6 +486,32 @@ async function recordDispatchReceipt(input) {
       };
       if (!(allowedByState[control.lifecycleState] ?? new Set()).has(dispatch.expectedRole)) {
         throw new Error(`role ${dispatch.expectedRole} is not allowed while ${dispatch.taskId} is ${control.lifecycleState}`);
+      }
+      const repairWindow = Array.isArray(control.transitionHistory) && control.transitionHistory.some((transition) =>
+        transition?.to === "IMPLEMENTING"
+        && ["CANDIDATE_FROZEN", "REVIEW_CLEAR", "VERIFIED"].includes(transition?.from));
+      const initialImplementationWindow = control.lifecycleState === "CONTRACT_FROZEN"
+        || (control.lifecycleState === "IMPLEMENTING" && !repairWindow);
+      if (dispatch.expectedRole === "IMPLEMENTER" && initialImplementationWindow) {
+        const slices = Array.isArray(control.contract?.implementationSlices)
+          ? control.contract.implementationSlices : [];
+        if (slices.length > 0) {
+          const acceptedSliceIds = new Set(control.roleRuns
+            .filter((run) => run?.role === "IMPLEMENTER" && run?.generation === 1
+              && run?.executorType === "SUBAGENT" && run?.executionOutcome === "COMPLETED"
+              && run?.artifactAccepted === true && ["COMPLETED", "CLOSED"].includes(run?.status))
+            .map((run) => run.sliceId));
+          const nextSlice = slices.find((slice) => !acceptedSliceIds.has(slice.id));
+          if (!nextSlice) {
+            throw new Error("all frozen implementation slices are complete; transition to global SELF_CHECKED before freezing one candidate");
+          }
+          if (!dispatch.sliceId) {
+            throw new Error(`IMPLEMENTER packet must declare '- Assigned implementation slice ID: ${nextSlice.id}'`);
+          }
+          if (dispatch.sliceId !== nextSlice.id) {
+            throw new Error(`next IMPLEMENTER must handle ${nextSlice.id}; received ${dispatch.sliceId}`);
+          }
+        }
       }
       const maxRoleRuns = MAX_ROLE_RUNS_BY_LANE[control.lane];
       if (!Number.isInteger(maxRoleRuns) || !Array.isArray(control.roleRuns)) {
@@ -424,9 +527,6 @@ async function recordDispatchReceipt(input) {
       }
     }
   }
-  const directory = path.join(await gitMetadataDirectory(projectRoot), "qta-governance", "dispatches",
-    sha256(dispatch.taskId));
-  await mkdir(directory, { recursive: true });
   for (const name of await readdir(directory)) {
     if (!name.endsWith(".json") || name.endsWith(".outcome.json")) continue;
     try {
@@ -447,6 +547,7 @@ async function recordDispatchReceipt(input) {
       dispatchId: dispatch.dispatchId,
       roleRunId: dispatch.roleRunId,
       role: dispatch.expectedRole,
+      sliceId: dispatch.sliceId,
       agentDefinition: dispatch.agentDefinition,
       parentSessionId,
       observedAt: new Date().toISOString(),
@@ -537,7 +638,7 @@ async function activateRunPrompt(input) {
   const event = hookEvent(input);
   if (event !== "UserPromptSubmit") return;
   const prompt = firstString(input, ["prompt", "user_prompt", "userPrompt"]);
-  if (!/(?:^|\s)\/qta-run(?:\s|$)/.test(prompt)) return;
+  if (!isGovernedRunPrompt(prompt)) return;
   const parentSessionId = inputSessionId(input);
   const projectRoot = inputProjectRoot(input);
   if (!parentSessionId || !projectRoot) throw new Error("/qta-run activation requires session and project root");
@@ -630,12 +731,14 @@ async function main() {
       process.exit(2);
     }
   }
+  await recordDoctorReceipt(input);
   await recordRuntimeReceipt(input);
   await recordDispatchReceipt(input);
   await recordDispatchOutcome(input);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1]
+    && realpathSync(path.resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) {
   main().catch((error) => {
     console.error(`QTA governance Hook failed closed: ${error?.message ?? error}`);
     process.exitCode = 2;

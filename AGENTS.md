@@ -97,6 +97,7 @@ docker compose down
 
 - 非简单任务先用 `qta-task-contract` 冻结范围、验收标准和证据；长任务按 `qta-task-checkpoint` 主动存档，禁止等到上下文耗尽才压缩。
 - 标准、跨仓或长任务由父上下文启用 `qta-development-orchestration`，也可用 `/qta-run` 显式启动。父协调者负责 L0-L3 风险 lane、TaskPacket、机器控制文件、角色顺序、候选哈希和 Git；子角色不得操作 Git。
+- ZCode 项目级 Hook 会被当前客户端安全策略忽略。首次使用或治理脚本更新后运行 `node scripts/install-zcode-governance-user-hooks.mjs --install`，重启 ZCode 并用 `/qta-doctor` 验证；`/qta-run` 的首个门禁必须是 runtime doctor。禁止恢复 Stop Hook。
 - 固定 Agent 是模板，不是持续会话。初始实现、每轮 repair、每代 review 和最终 verifier 必须使用新的 role/session；子角色结束即销毁。
 - 每次状态迁移运行任务控制校验，候选冻结前运行架构门禁；最终验收必须同时通过 FUNCTIONAL 与 ARCHITECTURE。
 - 实现者只可把任务标记为 `SELF_CHECKED`。独立验收必须由未参与实现的干净上下文使用 `qta-independent-verification` 完成，验收者不得同时修代码。

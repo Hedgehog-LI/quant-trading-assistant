@@ -21,6 +21,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -75,13 +78,15 @@ public class LongPortIndustryHttpClient implements LongPortSectorClient {
         String sortCode = requiredCode(SORT_CODES, sortType, "行业排行排序方式");
         String query = "market=" + encode(market) + "&indicator=" + indicatorCode
                 + "&sort_type=" + sortCode + "&limit=" + limit;
-        JsonNode data = executeGet(RANK_PATH, query);
+        ProviderResponse response = executeGet(RANK_PATH, query);
+        JsonNode data = response.data();
         List<LongPortIndustryRank> result = new ArrayList<>();
         for (JsonNode group : data.path("items")) {
             for (JsonNode item : group.path("lists")) {
                 result.add(new LongPortIndustryRank(text(item, "name"), text(item, "counter_id"),
                         decimal(item, "chg"), text(item, "leading_name"), leadingSymbol(item, market),
-                        decimal(item, "leading_chg"), text(item, "value_name"), text(item, "value_data")));
+                        decimal(item, "leading_chg"), text(item, "value_name"), text(item, "value_data"),
+                        response.sourceTime()));
             }
         }
         return result;
@@ -90,7 +95,7 @@ public class LongPortIndustryHttpClient implements LongPortSectorClient {
     @Override
     public LongPortIndustryPeer getIndustryPeers(String market, String counterId) {
         String query = "type=1&market=" + encode(market) + "&industry_id=&counter_id=" + encode(counterId);
-        JsonNode data = executeGet(PEERS_PATH, query);
+        JsonNode data = executeGet(PEERS_PATH, query).data();
         JsonNode chain = data.path("chain");
         if (chain.isMissingNode() || chain.isNull()) {
             return null;
@@ -102,7 +107,7 @@ public class LongPortIndustryHttpClient implements LongPortSectorClient {
 
     @Override
     public LongPortIndustryConstituents getIndustryConstituents(String counterId) {
-        JsonNode data = executeGet(CONSTITUENTS_PATH, "counter_id=" + encode(counterId));
+        JsonNode data = executeGet(CONSTITUENTS_PATH, "counter_id=" + encode(counterId)).data();
         List<LongPortIndustryConstituent> stocks = new ArrayList<>();
         for (JsonNode item : data.path("stocks")) {
             stocks.add(new LongPortIndustryConstituent(counterSymbol(item), text(item, "name"),
@@ -115,7 +120,7 @@ public class LongPortIndustryHttpClient implements LongPortSectorClient {
                 integer(data, "flat_num"), stocks);
     }
 
-    private JsonNode executeGet(String path, String query) {
+    private ProviderResponse executeGet(String path, String query) {
         ensureConfigured();
         String timestamp = Long.toString(clock.instant().getEpochSecond());
         String appKey = properties.effectiveAppKey();
@@ -134,13 +139,26 @@ public class LongPortIndustryHttpClient implements LongPortSectorClient {
                 .GET().build();
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return parseResponse(response.statusCode(), response.body());
+            JsonNode data = parseResponse(response.statusCode(), response.body());
+            LocalDateTime sourceTime = response.headers().firstValue("Date")
+                    .map(this::parseHttpDate).orElse(null);
+            return new ProviderResponse(data, sourceTime);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_TIMEOUT, "Longbridge 行业请求被中断");
         } catch (IOException exception) {
             throw new BusinessException(ErrorCodeEnum.MARKET_SECTOR_PROVIDER_UNAVAILABLE,
                     "Longbridge 行业请求失败: " + exception.getClass().getSimpleName());
+        }
+    }
+
+    private LocalDateTime parseHttpDate(String value) {
+        try {
+            return ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME)
+                    .withZoneSameInstant(properties.quoteZoneId()).toLocalDateTime();
+        } catch (RuntimeException exception) {
+            log.warn("Longbridge industry response Date header invalid");
+            return null;
         }
     }
 
@@ -289,5 +307,8 @@ public class LongPortIndustryHttpClient implements LongPortSectorClient {
     private Integer integer(JsonNode node, String field) {
         JsonNode value = node.path(field);
         return value.isNumber() ? value.intValue() : null;
+    }
+
+    private record ProviderResponse(JsonNode data, LocalDateTime sourceTime) {
     }
 }

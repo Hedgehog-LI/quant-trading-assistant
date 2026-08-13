@@ -16,11 +16,11 @@
 
 ## 当前并行优先级
 
-### P1.10：市场研究与个股决策中心（设计冻结，下一产品优先级）
+### P1.10：市场研究与个股决策中心（A 阶段全栈候选已完成）
 
 设计基线：`features/MARKET_RESEARCH_DECISION_CENTER_DESIGN.md`、`features/MARKET_SECTOR_ANALYTICS_DESIGN.md`、`decisions/ADR-0013-research-funnel-and-asset-inspection-boundary.md`。
 
-- P1.10-A：完成 P1.7-A 数据门禁与市场雷达，展示板块热力、轮动状态、排行变化、量价/资金证据和板块详情。
+- P1.10-A 前后端候选已完成：V19-V22、稳定板块身份、数据门禁、相对强弱、固定 5 日轮动、原子发布、自动触发、readiness/radar/history/detail API，以及 `/market-research` 雷达和板块详情。下一步是 Docker/MySQL/真实样本与 remote 页面验收；真实资金流、量价证据仍未实现。
 - P1.10-B：建设板块内候选扫描，支持可解释候选表和最多 16 图的统一尺度多股网格。
 - P1.10-C：建设个股决策台，叠加真实成交、持仓均价、计划止损止盈、板块背景和数据质量。
 - 原 `/market-assets` 改为数据详情和原始事实追溯，不再承担研究首页职责。

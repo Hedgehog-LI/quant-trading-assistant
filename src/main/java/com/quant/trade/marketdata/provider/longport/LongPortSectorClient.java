@@ -1,6 +1,7 @@
 package com.quant.trade.marketdata.provider.longport;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /** Longbridge 行业 HTTPS 只读客户端边界。 */
@@ -16,7 +17,8 @@ public interface LongPortSectorClient {
 
     record LongPortIndustryRank(String name, String counterId, BigDecimal changeRate,
                                 String leadingName, String leadingSymbol, BigDecimal leadingChangeRate,
-                                String indicatorName, String indicatorValue) {
+                                String indicatorName, String indicatorValue,
+                                LocalDateTime sourceQuoteTime) {
     }
 
     record LongPortIndustryPeer(String market, String topName, String name, String counterId,

@@ -15,7 +15,12 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 ## 当前状态（2026-08）
 
-- **P1.10 市场研究与个股决策中心设计冻结（2026-08-12，未实现）**：纠正此前“单证券行情查看器承担主研究入口”的产品错位，冻结“市场雷达 → 板块详情 → 候选扫描 → 个股决策台 → 计划/交易/复盘”三级研究漏斗。P1.7 作为板块衍生研究引擎；P1.9 `/market-assets` 重新定位为行情数据详情/质量追溯。设计同时冻结相对强弱、成交活跃度与真实资金流的语义边界，`RANKED_UNIVERSE/WATCHED_SECTORS` 不得冒充全市场；真实成交、人工计划和策略候选点严格分离；mock 必须使用虚构证券并持续显示演示水印。当前只有设计交付，P1.10-A/B/C 均未实现。入口：`docs/features/MARKET_RESEARCH_DECISION_CENTER_DESIGN.md`、ADR-0013。
+- **P1.10-A 市场发现全栈候选已实现（2026-08-13，自动化与 mock 浏览器通过、真实运行时待验）**：后端 V19-V22 已形成稳定板块身份、provider 来源时间、readiness、相对强弱、固定 5 日轮动持续性、计算 run、公式/参数/源批次身份和原子发布；新增 `/api/v1/market-research` 下 readiness、显式重算、市场雷达、排行历史和板块详情。前端新增 `/market-research` 和 `/market-research/sectors/:sectorId`，覆盖 CN/HK/US、5/10/20/50 日窗口、热力图、轮动矩阵、证据排行、质量水位、历史轨迹和可解释空态；mock 只用虚构身份并持续显示 `LOCAL_DEMO`。当前只证明 `RANKED_UNIVERSE`，真实资金流明确为 `UNAVAILABLE/null`。后端 **515 tests**，前端 **396 tests**、typecheck/lint/build、桌面与 390px mock 浏览器交互通过。**未执行** Docker/MySQL V19-V22、真实 provider CLOSE 样本、remote 页面和服务器验收；独立干净上下文验收未运行，不得升级为完整交付验收。入口：`docs/api/MARKET_RESEARCH_API.md`、`docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260813-R2-IMPLEMENTATION.md`。
+
+- **多切片治理死锁已修复（2026-08-13，已独立验收）**：P110-A R1 暴露出子实施者 `SELF_CHECKED` 与全局 `SELF_CHECKED` 语义混用，导致只完成 `SLICE-01/05` 就提前冻结候选并被 anchor 锁死。现已由控制校验器和 Hook 强制初始 slice 在单个 `IMPLEMENTING` 窗口按冻结顺序累积，全部完成后才允许一次全局收口；终态 dispatch 必须先写入 `roleRuns`，repair 窗口与历史 `BLOCKED` 兼容。完整治理测试 **70/70**、最终独立定向核验 **4/4 PASS**。原 R1 继续保持 `BLOCKED` 且未被篡改；本轮按用户要求由当前上下文直接恢复后端实现，没有伪造 R2 控制账本或独立验收结论。
+
+- **ZCode Hook 运行时兼容修复（2026-08-12，已真实验证）**：ZCode desktop 3.6.5 会按安全策略忽略项目级 `.zcode/config.json` Hook，现已迁移为用户级 `~/.zcode/cli/config.json` dispatcher + 仓库版本化规则；新增 `/qta-doctor` 和 `/qta-run` runtime preflight，治理测试 **66/66**、本机安装检查通过，且重启后的真实 ZCode 新任务返回 `PASS (user-config + runtime)`，证明 `UserPromptSubmit -> PreToolUse` 事件链有效，始终无 Stop Hook。原 P110-A control 保持 `BLOCKED`，后续以 `P110-A-BE-MARKET-DISCOVERY-20260812-R1` 新任务重试，不能直接 resume 终态 control。
+- **P1.10 市场研究与个股决策中心设计冻结（2026-08-12）**：纠正此前“单证券行情查看器承担主研究入口”的产品错位，冻结“市场雷达 → 板块详情 → 候选扫描 → 个股决策台 → 计划/交易/复盘”三级研究漏斗。P1.7 作为板块衍生研究引擎；P1.9 `/market-assets` 重新定位为行情数据详情/质量追溯。设计同时冻结相对强弱、成交活跃度与真实资金流的语义边界，`RANKED_UNIVERSE/WATCHED_SECTORS` 不得冒充全市场；真实成交、人工计划和策略候选点严格分离；mock 必须使用虚构证券并持续显示演示水印。当前 P1.10-A 前后端候选已实现，真实运行时验收和 B/C 阶段尚未完成。入口：`docs/features/MARKET_RESEARCH_DECISION_CENTER_DESIGN.md`、ADR-0013。
 
 - **AI 治理规则加固（2026-08-02 已独立验收）**：固定角色 TaskPacket 必须以前两行机器契约开头；派发使用 `PENDING` + `SUCCEEDED/FAILED` 两阶段回执并绑定 `tool_use_id`；active `main/master` 使用 Git 只读白名单，只允许安全切换到 `codex/*`；旧父会话不可用时使用 `/qta-run --resume <TASK-ID> <objective-or-control-path>` 精确接管；L0/收口不能省略 bounded implementer 和 clean verifier。治理测试 **58/58**、触发 **28/28**、最终独立 verifier `ACCEPTED`。入口：`docs/development/tasks/AI-GOVERNANCE-CLOSEOUT-HARDENING-20260802-*.md`。
 - **P1.4b-D3 证券目录同步基础（2026-08-02 代码与自动化验收完成，条件验收）**：按 `SECURITY_DIRECTORY_SEARCH_DESIGN.md` §6 + ADR-0009 + D3 实施计划实现 `SecurityDirectoryProvider` 接口、`DisabledSecurityDirectoryProvider` 兜底、`CsvSnapshotSecurityDirectoryProvider`（默认可审计，P2 解析器 `SecurityDirectoryCsvParser` 复用 D1 冻结口径）、五阶段 `SecurityDirectorySyncService`（解析→校验→staging/diff→质量门禁→原子发布，单事务 `txRequiresNew`）、`SecurityDirectorySyncScheduler`（默认安全关闭，每日增量/每周全量，测试 seam）、`SecurityDirectorySyncController`（sync/任务详情/status，provider disabled→400+BUSINESS_RULE_VIOLATION，不泄露凭据）、V18 `security_directory_sync_state`、`SecurityDirectoryProperties`/`SecurityDirectoryConstants`、`util/SecurityDirectoryIdentityCalculator`（内容身份 snapshotHash，幂等以内容为准）。复用 `market_data_sync_task` 的 `SECURITY_MASTER_SYNC`、`SyncScopeLockMapper` 行锁、`parent_task_id` retry 链。冻结候选 `ff393bc69279a85eddf0d54897df4f0cb67eb4fd`（gen3/repair2）；后端 **406 tests** + package、架构门禁通过（file-protocol ERROR 已修复）。独立 gen3 `qta-code-reviewer` 返回 `REVIEW_CLEAR`（CR-1 原子发布 self-invocation 陷阱、CR-2 缺失 UNIQUENESS 门禁已修复）。**条件**：三次 implementer 子代理超时后由父上下文实现/修复；`qta-final-verifier` 子代理进入 plan 模式未执行，父上下文运行了客观确定性门禁；Docker/MySQL RUNTIME/DEPLOYMENT 为 `NOT_VERIFIED`。建议 push 前补一次真正独立的 disposable-worktree 最终核验。D2 前端 selector 和 D4 跨模块推广仍未实现。入口：`docs/development/tasks/SECURITY-DIRECTORY-D3-20260802-*.md`。
@@ -47,13 +52,12 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 P1.0 证券主数据和 CSV 日 K 基础已由 `marketdata` 模块实现（V5/V6）。P1.1 LongPort provider facade + V7-V9 migration + 9 API + 6 Tab 前端已实现；后端反射式 SDK adapter 已实现。**P1.1 单股票手动同步真实外联已于 2026-07-12 全流程验收通过**（SDK 安装 + 域名覆盖 + 凭据 + 单 symbol 落库）。
 
-P1.2 行情采集执行引擎和 P1.6 板块双层自动采集已完成代码与自动化门禁。P1.6 部署后仍需最小真实采集验收。后续 P1 主线：
+P1.2 行情采集执行引擎和 P1.6 板块双层自动采集已完成代码与自动化门禁。P1.10-A 前后端候选也已完成自动化与 mock 浏览器验证。后续 P1 主线：
 
-1. 按 P1.8 实施 OpenClaw 远程只读助手，使用户可从 QQ 安全查询系统、采集和业务摘要；服务器真实 QQ 与公网阻断单独验收。
-2. 基于已落库的全市场板块排行和关注成分快照，建设相对强弱、轮动持续性、龙头贡献和异动提醒；分析不直接生成交易指令。
-3. P1.4b-D1 后端目录与 P1.4b-D3 目录同步基础已完成；后续按独立任务实施 D2 共享 `SecuritySelector`（前端），再实施 D4 跨模块推广，不把两者混入同一验收。
-4. 港股、美股分钟自动采集必须先补齐各市场交易日历、时区和交易时段，不能直接复用 A 股 scheduler。
-5. 数据资产稳定后再推进指标、策略和回测；信号必须经过风险模块。
+1. 用 Docker/MySQL 执行 V19-V22，在真实 CLOSE 排行样本上做 readiness/calculation/radar/history/detail curl 和 remote 浏览器验收。
+2. 后端继续补真实资金流、成交集中度、量价确认和异动提醒；完成后再进入 P1.10-B 候选扫描。
+4. P1.8 OpenClaw 只读助手代码已完成，服务器真实 QQ 与公网阻断仍需单独验收；未来可白名单暴露市场研究摘要，不直接开放重算写端点。
+5. 港股、美股长窗口依赖权威交易日历；不得用周末猜测替代。数据资产稳定后再推进策略和回测，信号必须经过风险模块。
 
 ## 接手顺序（新会话）
 

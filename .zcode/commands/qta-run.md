@@ -5,11 +5,24 @@ skills: qta-development-orchestration
 disable-noninteractive: false
 ---
 
+QTA_GOVERNED_RUN
+
 Use `$qta-development-orchestration` as the parent controller.
 
-Task input:
+Invocation arguments:
 
 $ARGUMENTS
+
+Before loading task context, writing files, or dispatching any fixed role, run exactly:
+
+```bash
+node scripts/qta-governance-doctor.mjs --runtime --require-active
+```
+
+If this gate fails, persist no synthetic receipts and dispatch no child. Report an infrastructure `BLOCKED`
+result with the command output and stop. Project-level `.zcode/config.json` Hooks are intentionally not used:
+ZCode desktop ignores them under its project-Hook security policy. The required dispatcher is installed in
+the user configuration by `node scripts/install-zcode-governance-user-hooks.mjs --install`.
 
 To replace an unavailable parent session, invoke
 `/qta-run --resume <TASK-ID> <objective-or-control-path>`. Resume only the exact active Task ID; do not start a
@@ -24,6 +37,13 @@ Validate it before every dispatch and transition. Every implementation, repair, 
 verification uses a fresh role/session and ends after one artifact. Use one long Agent wait plus at most one
 follow-up (two waits total); never perform status polling. Require both functional and architecture gates on
 the frozen candidate before finalization.
+
+For generation-1 multi-slice implementation, follow this loop exactly: determine the first frozen slice without
+an accepted implementer role run, dispatch only that slice, append its terminal role run, validate the control,
+and keep `lifecycleState=IMPLEMENTING`. The child verdict `SELF_CHECKED` is slice-local. Do not transition the
+control to global `SELF_CHECKED`, populate any candidate identity/hash field, create the candidate stage commit,
+or dispatch review while another frozen slice remains. After the last initial slice is accepted, transition once
+to global `SELF_CHECKED`, create one cumulative candidate, then transition to `CANDIDATE_FROZEN`.
 
 Every fixed-role Agent/Task prompt starts with the exact canonical prefix below, copied from the TaskPacket
 template. Do not paraphrase it or place the dispatch ID elsewhere:

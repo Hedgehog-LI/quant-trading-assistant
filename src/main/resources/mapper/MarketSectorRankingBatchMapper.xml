@@ -5,7 +5,8 @@
         <id column="id" property="id"/><result column="provider_code" property="providerCode"/>
         <result column="market_code" property="marketCode"/><result column="trade_date" property="tradeDate"/>
         <result column="snapshot_type" property="snapshotType"/><result column="snapshot_bucket_time" property="snapshotBucketTime"/>
-        <result column="snapshot_time" property="snapshotTime"/><result column="item_count" property="itemCount"/>
+        <result column="snapshot_time" property="snapshotTime"/><result column="provider_quote_time" property="providerQuoteTime"/>
+        <result column="item_count" property="itemCount"/>
         <result column="rising_count" property="risingCount"/><result column="falling_count" property="fallingCount"/>
         <result column="flat_count" property="flatCount"/><result column="leader_sector_id" property="leaderSectorId"/>
         <result column="leader_sector_name" property="leaderSectorName"/><result column="leader_change_rate" property="leaderChangeRate"/>
@@ -14,16 +15,16 @@
         <result column="created_at" property="createdAt"/>
     </resultMap>
     <sql id="Columns">id, provider_code, market_code, trade_date, snapshot_type, snapshot_bucket_time,
-        snapshot_time, item_count, rising_count, falling_count, flat_count, leader_sector_id,
+        snapshot_time, provider_quote_time, item_count, rising_count, falling_count, flat_count, leader_sector_id,
         leader_sector_name, leader_change_rate, laggard_sector_id, laggard_sector_name,
         laggard_change_rate, quality_status, created_at</sql>
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO market_sector_ranking_batch (provider_code, market_code, trade_date, snapshot_type,
-            snapshot_bucket_time, snapshot_time, item_count, rising_count, falling_count, flat_count,
+            snapshot_bucket_time, snapshot_time, provider_quote_time, item_count, rising_count, falling_count, flat_count,
             leader_sector_id, leader_sector_name, leader_change_rate, laggard_sector_id,
             laggard_sector_name, laggard_change_rate, quality_status)
         VALUES (#{providerCode}, #{marketCode}, #{tradeDate}, #{snapshotType}, #{snapshotBucketTime},
-            #{snapshotTime}, #{itemCount}, #{risingCount}, #{fallingCount}, #{flatCount},
+            #{snapshotTime}, #{providerQuoteTime}, #{itemCount}, #{risingCount}, #{fallingCount}, #{flatCount},
             #{leaderSectorId}, #{leaderSectorName}, #{leaderChangeRate}, #{laggardSectorId},
             #{laggardSectorName}, #{laggardChangeRate}, #{qualityStatus})
     </insert>

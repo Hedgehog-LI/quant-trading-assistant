@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.analysis.readiness.SectorAnalyticsReadinessMapper">
+
+    <!--
+      最新成功 CLOSE 批次。quality_status 排除 BLOCKED_AUTH/BLOCKED_PERMISSION/BACKOFF（这些不算成功）。
+      只读，不 JOIN watch_id；衍生层只用 batch 自身字段。
+      provider_quote_time 是 provider 行情时间（可空）；snapshot_time 是系统落库时间（NOT NULL）。
+      readiness 用 provider_quote_time 作为 sourceQuoteTime（null → SOURCE_TIME_UNKNOWN）。
+    -->
+    <select id="selectLatestCloseBatch" resultType="java.util.LinkedHashMap">
+        SELECT id, trade_date, snapshot_time, provider_quote_time, item_count, quality_status
+        FROM market_sector_ranking_batch
+        WHERE market_code = #{marketCode}
+          AND snapshot_type = 'CLOSE'
+          AND quality_status NOT IN ('BLOCKED_AUTH', 'BLOCKED_PERMISSION', 'BACKOFF')
+        ORDER BY snapshot_time DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectCalendarVerificationDistribution" resultType="java.util.LinkedHashMap">
+        SELECT verification_status, COUNT(*) AS day_count
+        FROM market_calendar
+        WHERE market_code = #{marketCode}
+          AND trade_date &gt;= #{fromDate}
+          AND trade_date &lt;= #{toDate}
+          AND is_trading_day = TRUE
+        GROUP BY verification_status
+    </select>
+
+    <select id="countVerifiedTradingDays" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM market_calendar
+        WHERE market_code = #{marketCode}
+          AND trade_date &gt;= #{fromDate}
+          AND trade_date &lt;= #{toDate}
+          AND is_trading_day = TRUE
+          AND verification_status IN ('EXCHANGE_FILE', 'MANUAL_VERIFIED')
+    </select>
+
+    <select id="countBatchItems" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM market_sector_ranking_item WHERE batch_id = #{batchId}
+    </select>
+</mapper>

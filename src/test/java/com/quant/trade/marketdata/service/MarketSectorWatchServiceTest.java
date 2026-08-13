@@ -4,6 +4,8 @@ import com.quant.trade.marketdata.dao.MarketSectorMemberSnapshotMapper;
 import com.quant.trade.marketdata.dao.MarketSectorSnapshotMapper;
 import com.quant.trade.marketdata.dao.MarketSectorWatchMapper;
 import com.quant.trade.marketdata.manager.MarketSectorPersistenceManager;
+import com.quant.trade.marketdata.analysis.manager.SectorIdentityManager;
+import com.quant.trade.marketdata.analysis.model.MarketSectorIdentityDO;
 import com.quant.trade.marketdata.model.MarketSectorSnapshotDO;
 import com.quant.trade.marketdata.model.MarketSectorWatchDO;
 import com.quant.trade.marketdata.provider.MarketSectorProvider;
@@ -36,6 +38,7 @@ class MarketSectorWatchServiceTest {
     @Mock MarketSectorCatalogService catalogService;
     @Mock MarketSectorProvider provider;
     @Mock MarketSectorPersistenceManager persistenceManager;
+    @Mock SectorIdentityManager sectorIdentityManager;
 
     @Test
     void refreshAggregatesCapitalAndPersistsConstituentSnapshot() {
@@ -51,8 +54,10 @@ class MarketSectorWatchServiceTest {
                 new MarketSectorProvider.SectorConstituents(1, 1, 0, List.of(
                         stock("SH.601857", "中国石油", "0.03", "281", "2693", "265"),
                         stock("SH.600028", "中国石化", "-0.01", "177", "1720", "341")), "LONGPORT"));
+        when(sectorIdentityManager.claimIdentity(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(MarketSectorIdentityDO.builder().id(99L).build());
         MarketSectorWatchService service = new MarketSectorWatchService(watchMapper, snapshotMapper,
-                memberMapper, catalogService, provider, persistenceManager,
+                memberMapper, catalogService, provider, persistenceManager, sectorIdentityManager,
                 Clock.fixed(Instant.parse("2026-07-18T02:00:00Z"), ZoneOffset.UTC));
 
         service.refresh(7L);
@@ -62,6 +67,7 @@ class MarketSectorWatchServiceTest {
         assertEquals(new BigDecimal("458"), captor.getValue().getTotalNetInflow());
         assertEquals(new BigDecimal("4413"), captor.getValue().getTotalTurnoverAmount());
         assertEquals("SH.601857", captor.getValue().getLeadingSymbol());
+        assertEquals(99L, captor.getValue().getSectorIdentityId());
     }
 
     private MarketSectorProvider.SectorConstituent stock(String symbol, String name, String change,

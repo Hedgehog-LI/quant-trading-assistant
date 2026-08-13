@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.analysis.dao.SectorAnalyticsMapper">
+    <resultMap id="PublicationBatchResultMap"
+               type="com.quant.trade.marketdata.analysis.model.SectorAnalyticsPublicationBatchDO">
+        <id property="id" column="id"/>
+        <result property="providerCode" column="provider_code"/>
+        <result property="marketCode" column="market_code"/>
+        <result property="asOfDate" column="as_of_date"/>
+        <result property="windowDays" column="window_days"/>
+        <result property="momentumWindowDays" column="momentum_window_days"/>
+        <result property="formulaVersion" column="formula_version"/>
+        <result property="parameterHash" column="parameter_hash"/>
+        <result property="requiredFormulaSetHash" column="required_formula_set_hash"/>
+        <result property="sourceManifestGroupHash" column="source_manifest_group_hash"/>
+        <result property="scopeCode" column="scope_code"/>
+        <result property="status" column="status"/>
+        <result property="qualityStatus" column="quality_status"/>
+        <result property="publishedAt" column="published_at"/>
+    </resultMap>
+    <select id="selectCloseBatches" resultType="com.quant.trade.marketdata.analysis.model.SectorAnalyticsSourceBatchDO">
+        SELECT id, provider_code, market_code, trade_date, provider_quote_time, item_count
+        FROM market_sector_ranking_batch batch
+        WHERE batch.provider_code = #{providerCode} AND batch.market_code = #{marketCode}
+          AND batch.snapshot_type = 'CLOSE' AND batch.quality_status = 'VALID'
+          AND batch.trade_date &lt;= #{asOfDate}
+          AND batch.id = (
+              SELECT MAX(candidate.id) FROM market_sector_ranking_batch candidate
+              WHERE candidate.provider_code = batch.provider_code
+                AND candidate.market_code = batch.market_code
+                AND candidate.snapshot_type = 'CLOSE'
+                AND candidate.quality_status = 'VALID'
+                AND candidate.trade_date = batch.trade_date
+          )
+        ORDER BY batch.trade_date DESC, batch.snapshot_time DESC, batch.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectSourceItems" resultType="com.quant.trade.marketdata.analysis.model.SectorAnalyticsSourceItemDO">
+        SELECT i.batch_id, b.trade_date, i.sector_identity_id, i.sector_name,
+               i.provider_sector_id, i.change_rate, i.leading_name, i.leading_symbol
+        FROM market_sector_ranking_item i
+        JOIN market_sector_ranking_batch b ON b.id = i.batch_id
+        WHERE i.batch_id IN
+        <foreach collection="batchIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+          AND i.sector_identity_id IS NOT NULL AND i.change_rate IS NOT NULL
+        ORDER BY b.trade_date, i.provider_sector_id
+    </select>
+
+    <select id="selectTradingDates" resultType="java.time.LocalDate">
+        SELECT trade_date FROM market_calendar
+        WHERE (market_code = #{marketCode}
+               OR (#{marketCode} = 'CN' AND market_code = 'CN_A'))
+          AND trade_date &gt;= #{fromDate}
+          AND trade_date &lt;= #{toDate}
+          AND is_trading_day = TRUE
+        ORDER BY trade_date
+    </select>
+
+    <select id="selectRunByIdentity" resultType="com.quant.trade.marketdata.analysis.model.SectorAnalyticsCalculationRunDO">
+        SELECT * FROM sector_analytics_calculation_run
+        WHERE formula_code = #{formulaCode} AND formula_version = #{formulaVersion}
+          AND parameter_hash = #{parameterHash} AND source_manifest_hash = #{sourceManifestHash}
+    </select>
+
+    <insert id="insertCalculationRun" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sector_analytics_calculation_run
+            (provider_code, market_code, as_of_date, formula_code, formula_version, window_days,
+             parameter_hash, source_manifest_hash, source_manifest, status, quality_status,
+             reason_codes, sample_size, started_at, completed_at)
+        VALUES
+            (#{providerCode}, #{marketCode}, #{asOfDate}, #{formulaCode}, #{formulaVersion}, #{windowDays},
+             #{parameterHash}, #{sourceManifestHash}, #{sourceManifest}, #{status}, #{qualityStatus},
+             #{reasonCodes}, #{sampleSize}, #{startedAt}, #{completedAt})
+    </insert>
+
+    <update id="completeCalculationRun">
+        UPDATE sector_analytics_calculation_run
+        SET status = 'SUCCEEDED', quality_status = #{qualityStatus}, reason_codes = #{reasonCodes},
+            sample_size = #{sampleSize}, completed_at = CURRENT_TIMESTAMP(6)
+        WHERE id = #{id} AND status = 'RUNNING'
+    </update>
+
+    <insert id="insertRelativeStrength">
+        INSERT INTO sector_relative_strength_snapshot
+            (calculation_run_id, sector_identity_id, as_of_date, window_days, sector_return,
+             benchmark_return, relative_return, rs_rank_percentile, quality_status, reason_codes)
+        VALUES
+        <foreach collection="records" item="item" separator=",">
+            (#{item.calculationRunId}, #{item.sectorIdentityId}, #{item.asOfDate}, #{item.windowDays},
+             #{item.sectorReturn}, #{item.benchmarkReturn}, #{item.relativeReturn},
+             #{item.rsRankPercentile}, #{item.qualityStatus}, #{item.reasonCodes})
+        </foreach>
+    </insert>
+
+    <insert id="insertPersistence">
+        INSERT INTO sector_rotation_sector_persistence
+            (calculation_run_id, sector_identity_id, as_of_date, window_days, current_rank,
+             previous_rank, mean_rank_percentile, rank_percentile_std_dev,
+             top_bucket_occupancy_rate, consecutive_leading_days, consecutive_lagging_days,
+             rank_percentile_change, quality_status, reason_codes)
+        VALUES
+        <foreach collection="records" item="item" separator=",">
+            (#{item.calculationRunId}, #{item.sectorIdentityId}, #{item.asOfDate}, #{item.windowDays},
+             #{item.currentRank}, #{item.previousRank}, #{item.meanRankPercentile},
+             #{item.rankPercentileStdDev}, #{item.topBucketOccupancyRate},
+             #{item.consecutiveLeadingDays}, #{item.consecutiveLaggingDays},
+             #{item.rankPercentileChange}, #{item.qualityStatus}, #{item.reasonCodes})
+        </foreach>
+    </insert>
+
+    <select id="selectPublicationByIdentity" resultMap="PublicationBatchResultMap">
+        SELECT * FROM sector_analytics_publication_batch
+        WHERE provider_code = #{providerCode} AND market_code = #{marketCode}
+          AND as_of_date = #{asOfDate} AND window_days = #{windowDays}
+          AND momentum_window_days = #{momentumWindowDays}
+          AND formula_version = #{formulaVersion} AND parameter_hash = #{parameterHash}
+          AND source_manifest_group_hash = #{sourceManifestGroupHash}
+    </select>
+
+    <insert id="insertPublication" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sector_analytics_publication_batch
+            (provider_code, market_code, as_of_date, window_days, momentum_window_days,
+             formula_version, parameter_hash,
+             required_formula_set_hash, source_manifest_group_hash, scope_code, status,
+             quality_status, published_at)
+        VALUES
+            (#{providerCode}, #{marketCode}, #{asOfDate}, #{windowDays}, #{momentumWindowDays}, #{formulaVersion},
+             #{parameterHash}, #{requiredFormulaSetHash}, #{sourceManifestGroupHash},
+             #{scopeCode}, #{status}, #{qualityStatus}, #{publishedAt})
+    </insert>
+
+    <insert id="insertPublicationMember">
+        INSERT INTO sector_analytics_publication_member
+            (publication_batch_id, calculation_run_id, formula_code,
+             provider_code, market_code, as_of_date)
+        SELECT #{publicationBatchId}, #{calculationRunId}, #{formulaCode},
+               batch.provider_code, batch.market_code, batch.as_of_date
+        FROM sector_analytics_publication_batch batch
+        JOIN sector_analytics_calculation_run run ON run.id = #{calculationRunId}
+        WHERE batch.id = #{publicationBatchId}
+          AND run.formula_code = #{formulaCode}
+          AND run.provider_code = batch.provider_code
+          AND run.market_code = batch.market_code
+          AND run.as_of_date = batch.as_of_date
+    </insert>
+
+    <select id="selectLatestPublication" resultMap="PublicationBatchResultMap">
+        SELECT * FROM sector_analytics_publication_batch
+        WHERE market_code = #{marketCode} AND window_days = #{windowDays}
+          AND momentum_window_days = #{momentumWindowDays} AND status = 'PUBLISHED'
+        ORDER BY as_of_date DESC, id DESC LIMIT 1
+    </select>
+
+    <sql id="ResearchColumns">
+        p.id AS publication_batch_id, rs.calculation_run_id, p.provider_code, p.market_code,
+        p.as_of_date, p.window_days, p.momentum_window_days, p.formula_version, p.parameter_hash, p.scope_code,
+        p.quality_status AS publication_quality_status, p.published_at,
+        persistence.calculation_run_id AS momentum_calculation_run_id,
+        source_batch.provider_quote_time, source_batch.item_count AS actual_item_count,
+        identity.id AS sector_id, identity.sector_name, identity.provider_sector_id,
+        identity.taxonomy_version, rs.sector_return, rs.benchmark_return, rs.relative_return,
+        rs.rs_rank_percentile, persistence.current_rank, persistence.previous_rank,
+        persistence.mean_rank_percentile, persistence.rank_percentile_std_dev,
+        persistence.top_bucket_occupancy_rate, persistence.consecutive_leading_days,
+        persistence.consecutive_lagging_days, persistence.rank_percentile_change,
+        source_item.leading_name, source_item.leading_symbol,
+        (SELECT MAX(w.tracking_symbol) FROM market_sector_watch w
+          WHERE w.provider_code = p.provider_code
+            AND w.market_code = p.market_code
+            AND w.provider_sector_id = identity.provider_sector_id) AS tracking_symbol
+    </sql>
+
+    <sql id="ResearchJoins">
+        JOIN sector_analytics_publication_member pm_rs
+          ON pm_rs.publication_batch_id = p.id AND pm_rs.formula_code = 'RELATIVE_STRENGTH'
+        JOIN sector_relative_strength_snapshot rs ON rs.calculation_run_id = pm_rs.calculation_run_id
+        JOIN sector_analytics_publication_member pm_persistence
+          ON pm_persistence.publication_batch_id = p.id AND pm_persistence.formula_code = 'ROTATION_PERSISTENCE'
+        JOIN sector_rotation_sector_persistence persistence
+          ON persistence.calculation_run_id = pm_persistence.calculation_run_id
+         AND persistence.sector_identity_id = rs.sector_identity_id
+        JOIN market_sector_identity identity ON identity.id = rs.sector_identity_id
+        LEFT JOIN market_sector_ranking_batch source_batch
+          ON source_batch.id = (SELECT MAX(source_batch_pick.id) FROM market_sector_ranking_batch source_batch_pick
+              WHERE source_batch_pick.provider_code = p.provider_code
+                AND source_batch_pick.market_code = p.market_code
+                AND source_batch_pick.trade_date = p.as_of_date
+                AND source_batch_pick.snapshot_type = 'CLOSE')
+        LEFT JOIN market_sector_ranking_item source_item
+          ON source_item.batch_id = source_batch.id AND source_item.sector_identity_id = identity.id
+    </sql>
+
+    <select id="selectResearchRows" resultType="com.quant.trade.marketdata.analysis.model.MarketResearchRowDO">
+        SELECT <include refid="ResearchColumns"/>
+        FROM sector_analytics_publication_batch p
+        <include refid="ResearchJoins"/>
+        WHERE p.id = #{publicationBatchId}
+        ORDER BY rs.rs_rank_percentile DESC, identity.id
+    </select>
+
+    <select id="selectRankingHistoryRows" resultType="com.quant.trade.marketdata.analysis.model.MarketResearchRowDO">
+        SELECT <include refid="ResearchColumns"/>
+        FROM sector_analytics_publication_batch p
+        <include refid="ResearchJoins"/>
+        JOIN (
+            SELECT publication.id FROM sector_analytics_publication_batch publication
+            WHERE publication.market_code = #{marketCode} AND publication.window_days = #{windowDays}
+              AND publication.momentum_window_days = 5
+              AND publication.status = 'PUBLISHED'
+            ORDER BY publication.as_of_date DESC, publication.id DESC LIMIT #{days}
+        ) recent_publication ON recent_publication.id = p.id
+        ORDER BY identity.id, p.as_of_date
+    </select>
+
+    <select id="selectSectorHistory" resultType="com.quant.trade.marketdata.analysis.model.MarketResearchRowDO">
+        SELECT <include refid="ResearchColumns"/>
+        FROM sector_analytics_publication_batch p
+        <include refid="ResearchJoins"/>
+        WHERE p.market_code = #{marketCode} AND p.window_days = #{windowDays}
+          AND p.momentum_window_days = 5
+          AND p.status = 'PUBLISHED' AND identity.id = #{sectorId}
+        ORDER BY p.as_of_date DESC, p.id DESC LIMIT #{days}
+    </select>
+</mapper>

@@ -36,6 +36,9 @@ scripts/run-ai-evidence-command.mjs
 scripts/run-ai-governance-gates.mjs
 scripts/validate-ai-governance.mjs
 scripts/zcode-governance-hook.mjs
+scripts/zcode-governance-user-dispatcher.mjs
+scripts/install-zcode-governance-user-hooks.mjs
+scripts/qta-governance-doctor.mjs
 scripts/tests/ai-governance.test.mjs
 ```
 
@@ -44,8 +47,8 @@ scripts/tests/ai-governance.test.mjs
 从本仓库复制到目标项目根目录的相同相对路径：
 
 ```text
-.zcode/config.json
 .zcode/commands/qta-run.md
+.zcode/commands/qta-doctor.md
 .zcode/agents/
 .agents/schemas/qta-task-control.schema.json
 .agents/skills/qta-development-orchestration/
@@ -60,6 +63,9 @@ scripts/create-candidate-diff.mjs
 scripts/create-candidate-manifest.mjs
 scripts/run-ai-evidence-command.mjs
 scripts/zcode-governance-hook.mjs
+scripts/zcode-governance-user-dispatcher.mjs
+scripts/install-zcode-governance-user-hooks.mjs
+scripts/qta-governance-doctor.mjs
 scripts/validate-ai-governance.mjs
 scripts/evaluate-skill-triggers.mjs
 scripts/run-ai-governance-gates.mjs
@@ -95,12 +101,15 @@ docs/DEVELOPMENT_WORKFLOW.md
 
 ## 5. 启用规则
 
-1. 不注册 `Stop` Hook；客户端原生 Goal 是唯一续跑控制器。
-2. 一个 control 只负责一个 Git 仓库；跨仓任务按仓库拆分。
-3. 子角色禁止 Git 和递归创建 Agent，父协调器是唯一 Git owner。
-4. 候选补丁只放 `.qta-governance/candidates/`，不得提交到任务文档。
-5. 首次只跑 L0 小任务；治理测试和显式 delivery gate 通过后再使用 L1/L2。
-6. 不要一开始运行整夜 L3 或跨仓 Goal。
+1. 运行 `node scripts/install-zcode-governance-user-hooks.mjs --install`，然后重启 ZCode。项目级
+   `.zcode/config.json` Hook 不可作为替代，因为当前 ZCode 安全策略会忽略它。
+2. 在新 ZCode 任务运行 `/qta-doctor`，只有 runtime doctor 通过才可运行 `/qta-run`。
+3. 不注册 `Stop` Hook；客户端原生 Goal 是唯一续跑控制器。
+4. 一个 control 只负责一个 Git 仓库；跨仓任务按仓库拆分。
+5. 子角色禁止 Git 和递归创建 Agent，父协调器是唯一 Git owner。
+6. 候选补丁只放 `.qta-governance/candidates/`，不得提交到任务文档。
+7. 首次只跑 L0 小任务；治理测试和显式 delivery gate 通过后再使用 L1/L2。
+8. 不要一开始运行整夜 L3 或跨仓 Goal。
 
 ## 6. 安装后验证
 
@@ -109,7 +118,9 @@ node scripts/evaluate-skill-triggers.mjs
 node scripts/validate-ai-governance.mjs
 node --test scripts/tests/ai-governance.test.mjs
 node scripts/run-ai-governance-gates.mjs
+node scripts/install-zcode-governance-user-hooks.mjs --check
 ```
 
 以上四条适用于同一 QTA 项目，或已经完成 Skill、Agent、manifest、触发用例和静态验证器适配的新项目。
-静态门禁通过后，再用一个只改一份文档、最多两个 AC 的 L0 任务做真实 ZCode 冒烟测试。
+静态门禁和 `/qta-doctor` 通过后，再用一个只改一份文档、最多两个 AC 的 L0 任务做真实 ZCode
+冒烟测试。换电脑、更新 dispatcher 或 ZCode 升级后均重新安装并运行 doctor。

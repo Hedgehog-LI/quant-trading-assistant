@@ -51,7 +51,7 @@ class AgentParameterFilterTest {
         // CN batch
         var cnBatch = new MarketSectorRankingBatchVO(
             1L, "LONGPORT", "CN", LocalDate.of(2026, 7, 26),
-            "DAILY", LocalDateTime.now(), LocalDateTime.now(),
+            "DAILY", LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now(),
             10, 7, 2, 1,
             "cn-leader", "白酒", new java.math.BigDecimal("3.5"),
             "cn-laggard", "地产", new java.math.BigDecimal("-2.1"),
@@ -60,7 +60,7 @@ class AgentParameterFilterTest {
         // HK batch
         var hkBatch = new MarketSectorRankingBatchVO(
             2L, "LONGPORT", "HK", LocalDate.of(2026, 7, 26),
-            "DAILY", LocalDateTime.now(), LocalDateTime.now(),
+            "DAILY", LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now(),
             8, 5, 2, 1,
             "hk-leader", "科技", new java.math.BigDecimal("2.8"),
             "hk-laggard", "金融", new java.math.BigDecimal("-1.5"),

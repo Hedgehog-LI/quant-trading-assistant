@@ -3,6 +3,7 @@
 <mapper namespace="com.quant.trade.marketdata.dao.MarketSectorSnapshotMapper">
     <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.model.MarketSectorSnapshotDO">
         <id column="id" property="id"/><result column="watch_id" property="watchId"/>
+        <result column="sector_identity_id" property="sectorIdentityId"/>
         <result column="snapshot_time" property="snapshotTime"/><result column="rank_indicator" property="rankIndicator"/>
         <result column="snapshot_bucket_time" property="snapshotBucketTime"/>
         <result column="trigger_type" property="triggerType"/><result column="fetched_at" property="fetchedAt"/>
@@ -19,18 +20,18 @@
         <result column="unmapped_member_count" property="unmappedMemberCount"/>
         <result column="quality_status" property="qualityStatus"/>
     </resultMap>
-    <sql id="Columns">id, watch_id, snapshot_time, rank_indicator, change_rate, year_to_date_change_rate,
+    <sql id="Columns">id, watch_id, sector_identity_id, snapshot_time, rank_indicator, change_rate, year_to_date_change_rate,
         leading_name, leading_symbol, leading_change_rate, constituent_count, rise_count, fall_count, flat_count,
         total_net_inflow, total_turnover_amount, total_volume, data_source, snapshot_bucket_time,
         trigger_type, fetched_at, expected_member_count, valid_member_count, delayed_member_count,
         unmapped_member_count, quality_status, created_at</sql>
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO market_sector_snapshot (watch_id, snapshot_time, rank_indicator, change_rate,
+        INSERT INTO market_sector_snapshot (watch_id, sector_identity_id, snapshot_time, rank_indicator, change_rate,
             year_to_date_change_rate, leading_name, leading_symbol, leading_change_rate, constituent_count,
             rise_count, fall_count, flat_count, total_net_inflow, total_turnover_amount, total_volume, data_source,
             snapshot_bucket_time, trigger_type, fetched_at, expected_member_count, valid_member_count,
             delayed_member_count, unmapped_member_count, quality_status)
-        VALUES (#{watchId}, #{snapshotTime}, #{rankIndicator}, #{changeRate}, #{yearToDateChangeRate},
+        VALUES (#{watchId}, #{sectorIdentityId}, #{snapshotTime}, #{rankIndicator}, #{changeRate}, #{yearToDateChangeRate},
             #{leadingName}, #{leadingSymbol}, #{leadingChangeRate}, #{constituentCount}, #{riseCount},
             #{fallCount}, #{flatCount}, #{totalNetInflow}, #{totalTurnoverAmount}, #{totalVolume}, #{dataSource},
             #{snapshotBucketTime}, #{triggerType}, #{fetchedAt}, #{expectedMemberCount}, #{validMemberCount},

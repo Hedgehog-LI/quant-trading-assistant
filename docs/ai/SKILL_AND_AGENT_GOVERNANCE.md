@@ -15,9 +15,9 @@
 | 3 | 父协调器、顺序状态机和 L0-L3 风险通道 | 核心流程层 | IMPLEMENTED；静态门禁通过，待真实试运行 |
 | 4 | TaskPacket、机器控制文件、契约/候选/补丁哈希和跨角色 artifact | 核心流程层 | IMPLEMENTED；静态门禁通过，待真实试运行 |
 | 5 | 任务分支、阶段 commit、checkpoint push 和 delivery push | 核心流程层 | IMPLEMENTED；静态门禁通过，待真实试运行 |
-| 6 | Hook：阻止通用危险 Git/Bash/密钥访问 | 强制执行层 | IMPLEMENTED；本地防误操作，不是同用户安全边界 |
+| 6 | Hook：阻止通用危险 Git/Bash/密钥访问 | 强制执行层 | IMPLEMENTED；用户级挂载 + 项目规则，本地防误操作 |
 | 7 | 控制文件、原子同步、精确静态路由、架构和生命周期门禁 | 强制执行层 | IMPLEMENTED；本地篡改可见，远程强锚待建设 |
-| 8 | ZCode 真实 Skill/Agent 发现、调用和拒写冒烟测试 | 强制执行层 | PARTIAL；静态与 Hook 脚本已验证，真实角色调用待试运行 |
+| 8 | ZCode 真实 Skill/Agent 发现、调用和拒写冒烟测试 | 强制执行层 | PARTIAL；runtime doctor 已真实通过，固定角色完整闭环待 R1 试运行 |
 | 9 | CI/pre-commit、跨平台和 Claude/Codex 兼容验证 | 持续治理层 | PLANNED |
 | 10 | 真实模型触发抽样、治理指标、定期复盘和版本维护 | 持续治理层 | PLANNED |
 
@@ -32,7 +32,8 @@
 - `.claude/skills/`：Claude 兼容镜像，内容必须与规范源一致。
 - `.zcode/agents/`：四个项目级固定 ZCode 角色模板。
 - `.zcode/commands/qta-run.md`：显式父协调入口 `/qta-run`。
-- `.zcode/config.json`：项目级 ZCode Hook，启用通用危险操作前置拦截。
+- `.zcode/commands/qta-doctor.md`：验证当前真实 ZCode task 是否加载 UserPromptSubmit/PreToolUse Hook。
+- `~/.zcode/cli/config.json`：ZCode 用户级 Hook 挂载点，不入仓库；只由安装器合并 QTA 事件组。
 - `docs/development/tasks/`：任务契约、状态、角色 artifact 和验收报告。
 - `docs/development/tasks/<TASK-ID>-CONTROL.json`：生命周期和预算的机器事实源。
 - `scripts/evaluate-skill-triggers.mjs`：启发式静态路由 lint，不代表模型真实选择结果。
@@ -43,6 +44,9 @@
 - `scripts/create-candidate-diff.mjs`：生成有大小上限、Git 忽略的候选补丁，避免补丁递归入库。
 - `scripts/check-ai-delivery-ready.mjs`：显式完成门禁，检查角色来源、机器证据、Git 跟踪和脏路径。
 - `scripts/zcode-governance-hook.mjs`：ZCode 通用危险操作前置拦截。
+- `scripts/zcode-governance-user-dispatcher.mjs`：用户级轻量分发器；只在当前 Git 根存在项目 Hook 时转发。
+- `scripts/install-zcode-governance-user-hooks.mjs`：幂等安装、检查、卸载用户级 QTA Hook，不覆盖其他配置。
+- `scripts/qta-governance-doctor.mjs`：检查安装状态与当前 task 的真实事件回执。
 - `.git/qta-governance/`：Hook 生成的 session 首见回执、固定角色 dispatch 回执与控制文件哈希链；
   不入库、禁止角色直接访问。
 
@@ -102,7 +106,16 @@ dispatch ID，并在 `.git/qta-governance/dispatches/` 生成不可覆盖回执�
 `roleRuns` 为验收集合，逐条检查其 Hook 回执和终态 outcome；额外运行时回执只作诊断，不得在核验
 期间扩张验收集合。它仍是同用户下的防误操作证据，不是密码学签名。
 
-输入 `/qta-run` 时，UserPromptSubmit Hook 为父 session 建立 active-task 记录。项目不注册 Stop
+ZCode desktop 3.6.5 的运行日志表明，项目级 `.zcode/config.json` Hook 会被安全策略忽略；因此项目
+不再把该文件当作运行时入口。安装器把四个事件组挂到 `~/.zcode/cli/config.json`，用户级 dispatcher
+再按当前 Git 根加载版本受控的项目 Hook。这样用户配置只负责“接线”，策略实现仍随仓库演进。
+
+输入 `/qta-run` 时，无论客户端把自定义命令保留为 `/qta-run` 还是展开成正文，稳定标记
+`QTA_GOVERNED_RUN` 都会让 UserPromptSubmit Hook 建立 active-task 记录。父协调器的第一个工具调用
+必须运行 `qta-governance-doctor --runtime --require-active`；它会核对同一真实 task 的
+UserPromptSubmit 与 PreToolUse 回执。直接执行 Hook、静态单测或人工生成 JSON 均不算运行时证据。
+
+项目不注册 Stop
 Hook，也不自动创建下一轮模型调用；使用 Goal 模式时只有 ZCode 原生 Goal 可以决定续跑。活动任务
 期间，父角色和子角色都禁止 `AskUserQuestion`。任务可以在 `CHECKPOINTED` 或 `BLOCKED` 停止，但
 只有显式 delivery-ready 门禁通过后才能报告交付。
@@ -116,6 +129,15 @@ PreToolUse 接受回执，只表示该派发从未成立，必须幂等忽略，
 可逆工程选择采用文档或明确推荐项；产品/金融含义、破坏性授权、凭据或外部依赖确实无法安全继续
 时，父协调器必须写入 `BLOCKED`，不能悬挂等待用户。`bypassPermissions` 只移除 implementer 和 final
 verifier 的 Bash 审批，不扩大工具白名单、写路径、Git 权限或任务范围。
+
+安装和恢复规则：
+
+1. 运行 `node scripts/install-zcode-governance-user-hooks.mjs --install`，该操作保留已有用户配置并
+   只替换 QTA 自己的事件组；安装器绝不创建 `Stop` 事件。
+2. 重启 ZCode，在新任务运行 `/qta-doctor`。失败时不得开启开发任务。
+3. 已因 Hook 基础设施进入 `BLOCKED` 的 control 保留为审计事实，不修改成通过；修复后用新 Task ID
+   创建重试任务，并重新派发干净角色。只有非终态 control 才允许精确 `--resume`。
+4. 临时禁用只运行安装器的 `--uninstall`；不要手改或删除其他用户 Hook。
 
 威胁模型必须说清：本地 Hook、回执和 `.git` 哈希链用于防误操作、漂移和普通重写，不能抵抗拥有
 同一 macOS 用户任意 Bash 权限的恶意代码。后者只有 ZCode 原生签名证明、受保护远程分支/CI 或更高
@@ -169,7 +191,12 @@ repair history 必须绑定发现问题的 reviewer/verifier role run 与下一�
 匹配且控制文件身份有效的 active lock；禁止静默抢占其他任务或让模型手工删除审计文件。
 
 初始实现必须在契约中拆成 bounded slice：每个 slice 最多 3 个 AC、8 个预期文件、500 行生产代码
-增量，一个干净 implementer 只做一个 slice。父协调器只组装状态和 Git，不写业务实现。
+增量，一个干净 implementer 只做一个 slice。父协调器只组装状态和 Git，不写业务实现。所有初始
+slice 在同一个 `IMPLEMENTING` 窗口中按冻结顺序累积：子实施者返回的 `SELF_CHECKED` 只代表其 slice
+自检完成，不能写成全局生命周期状态。每个非末尾 slice 只追加 accepted role run；候选字段保持空。
+只有全部初始 slice 各有且仅有一个 accepted generation-1 implementer 后，才能执行一次全局
+`IMPLEMENTING -> SELF_CHECKED` 并冻结一个包含全部 slice 的累计候选。控制校验器和 Hook 必须分别在
+状态迁移与角色派发前阻止提前冻结、重复派发或跳过 slice。
 
 ## 6. Git、Commit 和 Push
 

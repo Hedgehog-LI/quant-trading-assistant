@@ -13,6 +13,22 @@ child roles to redefine completion, or accepting a candidate that differs from t
 
 This Skill is a controller. It does not implement, review, or verify work itself.
 
+## Runtime Preflight
+
+Before loading task context, writing files, or dispatching a fixed role, `/qta-run` must execute:
+
+```bash
+node scripts/qta-governance-doctor.mjs --runtime --require-active
+```
+
+The gate proves that the current ZCode task reached the user-level `UserPromptSubmit` and `PreToolUse` Hook
+chain and that the governed active lock exists. A static test or direct invocation of the project Hook is not
+a substitute. If preflight fails, dispatch no role, create no synthetic evidence, persist an infrastructure
+`BLOCKED` result, and stop. Install or refresh the user Hook with
+`node scripts/install-zcode-governance-user-hooks.mjs --install`, restart ZCode, and retry from a new task.
+Project-level `.zcode/config.json` Hooks are intentionally absent because supported ZCode desktop builds may
+ignore them by security policy. No install path registers a Stop Hook.
+
 ## Trigger Conditions
 
 Invoke when:
@@ -92,7 +108,7 @@ implementation option without asking the user and record the decision and eviden
 Never invoke `AskUserQuestion` in an active governed run. If product/financial meaning is unresolved, a
 destructive or credential-bearing action requires authorization, or external state makes every safe path
 impossible, persist an evidence-backed `BLOCKED` checkpoint and stop; do not leave the task waiting for a
-human response. The workspace Hook enforces this policy for every session while the project has an active
+human response. The installed user-level dispatcher enforces this policy for every session while the project has an active
 governed task, including child roles.
 
 ## Task Packet
@@ -132,14 +148,23 @@ This gate validates the JSON schema, actual contract/candidate/artifact hashes, 
 role generations, ZCode runtime session receipts, hash-chained control anchors, SNAPSHOT changed-path coverage,
 AC evidence, quality verdicts, and finalization identity. A prose status cannot override it.
 
+For multi-slice generation 1, `SELF_CHECKED` is a global barrier. A child implementer's `SELF_CHECKED` verdict
+means only that its assigned slice may be recorded as accepted. It never authorizes a lifecycle transition or
+candidate freeze by itself. If another initial slice remains, dispatch that next slice while the control stays
+`IMPLEMENTING`.
+
 ## Role Dispatch
 
 1. Parent drafts the contract with `$qta-task-contract`.
 2. A fresh `qta-test-designer` instance challenges the draft and returns an artifact payload.
 3. Parent persists accepted amendments and freezes `contract_hash`.
-4. Dispatch one fresh `qta-implementer` per frozen slice. One slice has at most three ACs, eight expected
-   files, and 500 production-line additions. The parent assembles slices but never edits implementation.
-5. Parent freezes candidate identity:
+4. Dispatch one fresh `qta-implementer` per frozen slice, strictly in the frozen slice order. One slice has
+   at most three ACs, eight expected files, and 500 production-line additions. Each accepted implementer
+   artifact is a **slice-local self-check**, not the global lifecycle state. After every non-final slice, append
+   its terminal role run and keep the control at `IMPLEMENTING`; do not populate candidate identity fields and
+   do not transition to global `SELF_CHECKED`. The parent assembles slices but never edits implementation.
+5. Only after every frozen initial slice has exactly one accepted generation-1 implementer role run, transition
+   once from `IMPLEMENTING` to global `SELF_CHECKED`. Then parent freezes one cumulative candidate identity:
    - `COMMIT`: create the candidate commit and record commit/tree/patch hashes.
    - `SNAPSHOT`: create a deterministic allowlisted candidate manifest and record manifest/entry-set hashes.
    - In both modes, persist an exact frozen diff artifact and its SHA-256 for read-only review.

@@ -43,7 +43,9 @@ written down before editing.
 7. Write acceptance criteria as externally observable outcomes and stay within the lane cap: L0=3, L1=5,
    L2=8, L3=10.
 8. Split initial implementation into coherent slices. Each slice owns at most three ACs, eight expected files,
-   500 production-line additions, and an explicit write-path allowlist.
+   500 production-line additions, and an explicit write-path allowlist. Freeze their execution order. A
+   slice-local implementer self-check does not advance the global lifecycle; all initial slices accumulate in
+   one `IMPLEMENTING` window before the single global `SELF_CHECKED` transition and candidate freeze.
 9. Freeze a test inventory before implementation. Every required case has a stable test ID, mapped AC IDs,
    evidence kind, source path, and exact selector observable by a machine receipt.
 10. Attach an evidence method and owner role to every criterion.

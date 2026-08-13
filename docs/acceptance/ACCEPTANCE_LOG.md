@@ -4,6 +4,28 @@
 
 ---
 
+## 2026-08-13 — P1.10-A 市场发现全栈候选（自动化与 mock 浏览器通过，真实运行时未验）
+
+- **范围**：稳定板块身份/source time、readiness、相对强弱、固定 5 日轮动、计算 run、原子发布、市场研究只读 API、CLOSE 后自动触发、市场雷达和板块详情。
+- **功能证据**：集成测试覆盖 5 日发布全链路、20 日强度 + 5 日动量双 run、幂等复跑、雷达/历史/详情一致发布批次、无数据空态、source time 缺失拒绝、HK 长窗口无权威日历拒绝及跨市场发布成员 DB 约束。
+- **数值证据**：golden tests 覆盖固定 cohort、等权基准、对数相对收益、decimal ratio、并列平均名次、平均/总体标准差、头部占用率和连续状态；真实 LongPort 格式 fixture `0.0240/2.40%` 贯穿生产解析与展示格式。
+- **自动化**：`./mvnw test` 汇总 **515 tests / 0 failures / 0 errors / 1 skipped**；package PASS；H2 Flyway V1-V22 PASS；架构脚本 0 error；AI 治理 **70/70**；`git diff --check` PASS。
+- **前端自动化**：typecheck、lint、`npm run test -- --run` **51 files / 396 tests**、production build 和 `git diff --check` 全部 PASS。
+- **浏览器**：mock 模式实测 1280x720 市场雷达和 390x844 窄屏；CN/HK/US、窗口控件、热力/矩阵/证据表可见，从热力块进入板块详情成功，页面无水平溢出，虚构身份与 `LOCAL_DEMO` 水印持续可见。浏览器首次加载记录的 Ant Design deprecated warnings 已修复并由全量门禁复验；日志 API 返回历史累计记录，不作为修复后新告警。
+- **未执行**：Docker/MySQL、真实 provider CLOSE 样本、服务器/Nginx/curl 和 remote 页面。当前上下文同时实施和自测，未执行干净上下文独立验收。
+- **结论**：`FULL_STACK_CANDIDATE / AUTOMATION_PASS / MOCK_BROWSER_PASS / RUNTIME_NOT_VERIFIED / INDEPENDENT_ACCEPTANCE_NOT_RUN`。允许进入独立评审和本地运行时验收，不得宣称 P1.10-A 完整交付。
+- **事故说明**：测试配置修复前曾误连本机开发 MySQL，执行 V20/V21 并清理本机板块排行/分析测试数据；服务器未受影响，后续测试已强制 H2 test profile。
+
+## 2026-08-13 — AI 多切片编排治理修复（通过）
+
+- **范围**：控制状态机、ZCode Hook、orchestration/task-contract Skill、TaskPacket、`/qta-run`、兼容镜像和治理文档；无业务代码。
+- **事故重放**：构造 5 个冻结 slice，仅 `SLICE-01` accepted 后写入全局 `SELF_CHECKED` 与 candidate identity，控制校验器同时拒绝缺失 `SLICE-02..05` 和提前候选冻结，避免错误状态写入 anchor。
+- **正常演练**：Hook 依次放行 `SLICE-01..05`，拒绝跳片、重复/额外派发以及终态 outcome 未写入 `roleRuns`；全部 slice accepted 后允许累计候选；repair `IMPLEMENTING` 正常放行。
+- **兼容性**：`P110-A-BE-MARKET-DISCOVERY-20260812-R1-CONTROL.json` 的历史 `BLOCKED` 状态通过正式 CLI 校验，不改写原失败审计。
+- **自动化证据**：`node scripts/run-ai-governance-gates.mjs` 通过，**70 tests / 0 failed**；`git diff --check` 通过；用户级 Hook 安装检查及 doctor 通过。
+- **独立核验**：前两轮只读审查分别发现并关闭历史 BLOCKED 兼容、终态派发未入账窗口和事故重放不完全问题；最终全新只读核验者限定读取最终 diff 并运行定向测试，**4 passed / 0 failed**，返回 `PASS`，无 P0-P2。
+- **结论**：允许本地提交治理修复。未运行 Maven/npm/Docker/浏览器，未验收业务功能；R1 仍为 `BLOCKED`，后续业务必须使用 R2 新任务。
+
 ## 2026-08-02 — AI 治理收口规则加固（通过）
 
 - **范围**：Hook、派发/交付审计、活动锁、默认分支保护、TaskPacket 模板、Skill/命令/治理文档；无业务代码。

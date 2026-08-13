@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-08-13 — P1.10-A 市场发现全栈候选
+
+- **目标**：把已落库的板块 CLOSE 排行从“只能看当日榜单”升级为可解释、可重算、可追溯的市场发现闭环；不实现通达信式通用看盘或买卖建议。
+- **数据与架构**：V19-V22 落地稳定板块身份、provider 来源时间、计算 run、原子发布批次、相对强弱和轮动持续性。分析代码归属 `marketdata.analysis`，只读原始排行事实，禁止调用 provider 和回写原始表。
+- **金融口径**：固定 cohort 等权基准、对数相对收益、并列平均名次和 decimal ratio；强度支持 5/10/20/50 日，雷达动量固定 5 日。`RANKED_UNIVERSE` 不冒充全市场，真实资金流不可用时返回 `UNAVAILABLE/null`。
+- **接口与调度**：新增 `/api/v1/market-research` readiness/calculations/radar/ranking-history/sector-detail；CLOSE 排行成功后自动尝试各强度窗口，分析不足不污染原始采集状态。
+- **前端**：新增 `/market-research` 和 `/market-research/sectors/:sectorId`，提供市场/窗口切换、热力图、轮动矩阵、证据排行、质量水位、历史轨迹、显式生成和错误空态；mock 只用虚构身份并持续显示 `LOCAL_DEMO`，资金流不可用时明确说明而不显示 0。
+- **验证**：全量后端 **515 tests / 0 failures / 0 errors / 1 skipped**，H2 Flyway V1-V22、package、架构门禁、真实格式 JSON fixture、跨市场 FK、幂等发布和治理 **70/70** 通过；前端 typecheck、lint、**51 files / 396 tests**、production build、桌面 1280px 与窄屏 390px mock 浏览器交互通过。
+- **未完成**：Docker/MySQL、真实 provider CLOSE 样本、remote 页面、服务器和独立干净上下文验收均未执行；真实资金流、量价、提醒、P1.10-B/C 不在本轮。
+- **事故透明度**：早期集成测试缺 test profile，误连本机开发 MySQL 并清理本机板块排行/分析测试数据；已强制 `@ActiveProfiles("test")`，服务器不受影响，本机数据可通过采集重建。
+- **关联**：`api/MARKET_RESEARCH_API.md`、`development/tasks/P110-A-BE-MARKET-DISCOVERY-20260813-R2-IMPLEMENTATION.md`。
+
+## 2026-08-13 — 多切片编排死锁修复与前向演练
+
+- **目标**：修复 P110-A R1 在只完成 `SLICE-01/05` 后误把子实施者 `SELF_CHECKED` 写成全局状态、提前冻结候选并被审计锚点锁死的问题；不改业务代码、API、DB 或部署。
+- **流程语义**：子实施者的 `SELF_CHECKED` 只代表单个 slice 自检完成；所有初始 slice 必须在同一个 `IMPLEMENTING` 窗口按冻结顺序累积。只有每个初始 slice 各有且仅有一个 accepted generation-1 implementer 后，才能执行一次全局 `SELF_CHECKED` 并冻结一个累计候选。
+- **机器门禁**：控制校验器拒绝跳片、重复 accepted slice、缺片全局收口及提前候选身份；Hook 从 TaskPacket 读取 assigned slice，只允许下一个冻结 slice，并要求任何终态 dispatch outcome 先写入 `roleRuns` 才能继续派发。repair `IMPLEMENTING` 窗口与初始窗口分离；历史 `BLOCKED` 账本不被新规则追溯改判。
+- **规则同步**：更新 orchestration/task-contract Skill、TaskPacket、`/qta-run` 和治理文档，并通过同步器更新 Claude 兼容镜像。
+- **演练与验证**：五切片 Hook 演练覆盖顺序派发、跳片拒绝、终态未入账拒绝、完成后额外派发拒绝和 repair 放行；R1 同构回归覆盖“仅 SLICE-01 accepted + 全局 SELF_CHECKED + candidate 提前冻结”并在锚定前拒绝。完整治理套件 **70/70**、`git diff --check`、用户级 Hook `--check` 与 doctor 均通过；真实 R1 `BLOCKED` control 重新通过兼容校验。最终全新只读核验者执行定向测试 **4/4** 后返回 `PASS`，无 P0-P2。
+- **边界**：未运行 Maven、Docker、前端或业务验收；原 R1 继续保持终态 `BLOCKED`，不得恢复或改写。后续业务实现使用新 Task ID `P110-A-BE-MARKET-DISCOVERY-20260812-R2`。
+
+## 2026-08-12 — ZCode Hook 运行时兼容修复
+
+- **目标**：修复 `/qta-run` 静态治理门禁全绿、但 ZCode 实际未加载项目 Hook，导致固定角色无机器回执并在 P110-A 契约阶段阻塞的问题；不改业务代码/API/DB。
+- **根因**：ZCode desktop 3.6.5 日志明确报告 `Project hooks were ignored by the security policy`；项目级 `.zcode/config.json` 从未挂载。原有静态测试只验证配置与脚本，未验证真实 ZCode 事件链。
+- **改动**：删除误导性的项目 Hook 配置；新增幂等用户级安装器、按 Git 根动态加载项目规则的 dispatcher、`/qta-doctor` 与 `/qta-run` runtime preflight；自定义命令增加稳定 sentinel，兼容 ZCode 在 Hook 前保留或展开命令正文；保留 `Stop Hook` 禁用。
+- **安全边界**：用户配置只负责接线，项目规则仍由仓库版本控制；dispatcher 在非 QTA 仓库无操作；安装器保留其他用户配置、只替换自己的事件组并支持 `--check/--uninstall`。
+- **验证**：`run-ai-governance-gates.mjs` 通过，治理测试 **66/66**；安装器隔离目录的安装/检查/幂等/卸载测试通过；本机用户级安装与 `--check` 通过；重启后的真实 ZCode 新任务运行 `/qta-doctor` 返回 `PASS (user-config + runtime)`，证明 `UserPromptSubmit -> PreToolUse` 事件链有效。
+- **恢复决策**：原 `P110-A-BE-MARKET-DISCOVERY-20260812` 保持 `BLOCKED` 审计事实；doctor 通过后使用新 `-R1` Task ID 重试并重新派发 fresh test designer，不篡改旧 receipt，也不直接 resume 终态 control。
+- **关联**：`docs/ai/SKILL_AND_AGENT_GOVERNANCE.md`、`docs/ai/PORTABLE_AI_GOVERNANCE_INSTALL.md`、`docs/development/tasks/P110-A-BE-MARKET-DISCOVERY-20260812-CHECKPOINT-BLOCKED.md`。
+
 ## 2026-08-10 — P1.9 行情数据资产中心设计冻结
 
 - **目标**：解决“采集任务有了，但采集后数据分散且难以查看”的产品问题，把现有日 K、分钟 K、最新价、水位和任务转为可解释的只读数据资产视图。

@@ -250,6 +250,146 @@ test("rejects skipped implementation and accepted blocked roles", () => {
   assert.match(errors, /accepted artifact requires a completed SUBAGENT, CLOSED\/COMPLETED/);
 });
 
+test("multi-slice lifecycle keeps implementing until every initial slice is accepted", () => {
+  const control = validVerifiedControl();
+  control.contract.implementationSlices = Array.from({ length: 5 }, (_, index) => ({
+    id: `SLICE-0${index + 1}`,
+    description: `bounded slice ${index + 1}`,
+    acIds: index === 0 ? ["AC-01"] : ["AC-02"],
+    allowedWritePaths: [`src/main/java/example/slice${index + 1}`],
+    maxExpectedFiles: 2,
+    maxProductionLineDelta: 100
+  }));
+  control.lifecycleState = "IMPLEMENTING";
+  control.transitionHistory = transitions([
+    "CONTEXT_READY", "CONTRACT_DRAFTED", "TEST_DESIGN_READY", "CONTRACT_FROZEN", "IMPLEMENTING"
+  ]);
+  control.roleRuns = [role("TEST_DESIGNER", 0, "test-1")];
+  control.candidate = {
+    ...control.candidate, identity: "", commit: "", treeHash: "", patchSha256: "",
+    diffArtifactSha256: ""
+  };
+
+  for (let index = 1; index <= 4; index += 1) {
+    const implementer = role("IMPLEMENTER", 1, `impl-${index}`);
+    implementer.sliceId = `SLICE-0${index}`;
+    control.roleRuns.push(implementer);
+    assert.deepEqual(validateTaskControl(control).errors, [], `slice ${index} must stay IMPLEMENTING`);
+  }
+
+  const premature = structuredClone(control);
+  premature.lifecycleState = "SELF_CHECKED";
+  premature.transitionHistory.push({
+    sequence: premature.transitionHistory.length + 1,
+    from: "IMPLEMENTING",
+    to: "SELF_CHECKED",
+    at: "2026-08-01T00:00:10Z",
+    actor: "parent-1"
+  });
+  assert.match(validateTaskControl(premature).errors.join("\n"),
+    /global SELF_CHECKED requires every frozen implementation slice; missing: SLICE-05/);
+
+  premature.candidate = {
+    ...premature.candidate, identity: "premature-commit", commit: "premature-commit",
+    treeHash: "premature-tree", patchSha256: "premature-patch",
+    diffArtifactSha256: "premature-patch"
+  };
+  const deadlockErrors = validateTaskControl(premature).errors.join("\n");
+  assert.match(deadlockErrors, /global SELF_CHECKED requires every frozen implementation slice/);
+  assert.match(deadlockErrors, /initial candidate must remain unfrozen until all slices are globally SELF_CHECKED/);
+
+  const finalImplementer = role("IMPLEMENTER", 1, "impl-5");
+  finalImplementer.sliceId = "SLICE-05";
+  control.roleRuns.push(finalImplementer);
+  control.lifecycleState = "SELF_CHECKED";
+  control.transitionHistory.push({
+    sequence: control.transitionHistory.length + 1,
+    from: "IMPLEMENTING",
+    to: "SELF_CHECKED",
+    at: "2026-08-01T00:00:10Z",
+    actor: "parent-1"
+  });
+  assert.deepEqual(validateTaskControl(control).errors, []);
+
+  control.lifecycleState = "CANDIDATE_FROZEN";
+  control.transitionHistory.push({
+    sequence: control.transitionHistory.length + 1,
+    from: "SELF_CHECKED",
+    to: "CANDIDATE_FROZEN",
+    at: "2026-08-01T00:00:11Z",
+    actor: "parent-1"
+  });
+  control.candidate = {
+    ...control.candidate, identity: "cumulative-commit", commit: "cumulative-commit",
+    treeHash: "cumulative-tree", patchSha256: "cumulative-patch",
+    diffArtifactPath: ".qta-governance/candidates/GOVERNANCE-SMOKE/generation-1.patch",
+    diffArtifactSha256: "cumulative-patch"
+  };
+  assert.deepEqual(validateTaskControl(control).errors, []);
+});
+
+test("multi-slice lifecycle rejects premature candidate identity and duplicate accepted slices", () => {
+  const control = validVerifiedControl();
+  control.contract.implementationSlices.push({
+    id: "SLICE-02", description: "second slice", acIds: ["AC-02"],
+    allowedWritePaths: ["src/main/java/example/two"], maxExpectedFiles: 2, maxProductionLineDelta: 100
+  });
+  control.lifecycleState = "IMPLEMENTING";
+  control.transitionHistory = transitions([
+    "CONTEXT_READY", "CONTRACT_DRAFTED", "TEST_DESIGN_READY", "CONTRACT_FROZEN", "IMPLEMENTING"
+  ]);
+  control.roleRuns = [role("TEST_DESIGNER", 0, "test-1"), role("IMPLEMENTER", 1, "impl-1")];
+  const duplicate = role("IMPLEMENTER", 1, "impl-duplicate");
+  duplicate.sliceId = "SLICE-01";
+  control.roleRuns.push(duplicate);
+  const errors = validateTaskControl(control).errors.join("\n");
+  assert.match(errors, /initial candidate must remain unfrozen until all slices are globally SELF_CHECKED/);
+  assert.match(errors, /SLICE-01 has more than one accepted implementer role run/);
+
+  control.lifecycleState = "BLOCKED";
+  control.transitionHistory.push({
+    sequence: control.transitionHistory.length + 1,
+    from: "IMPLEMENTING",
+    to: "BLOCKED",
+    at: "2026-08-01T00:00:10Z",
+    actor: "parent-1"
+  });
+  const historicalErrors = validateTaskControl(control).errors.join("\n");
+  assert.doesNotMatch(historicalErrors, /frozen slice order|more than one accepted implementer/);
+});
+
+test("replays the R1 deadlock shape and rejects candidate freeze after only slice one", () => {
+  const control = validVerifiedControl();
+  control.contract.implementationSlices = Array.from({ length: 5 }, (_, index) => ({
+    id: `SLICE-0${index + 1}`,
+    description: `R1 replay slice ${index + 1}`,
+    acIds: index === 0 ? ["AC-01"] : ["AC-02"],
+    allowedWritePaths: [`src/main/java/example/replay${index + 1}`],
+    maxExpectedFiles: 2,
+    maxProductionLineDelta: 100
+  }));
+  control.lifecycleState = "SELF_CHECKED";
+  control.transitionHistory = transitions([
+    "CONTEXT_READY", "CONTRACT_DRAFTED", "TEST_DESIGN_READY", "CONTRACT_FROZEN",
+    "IMPLEMENTING", "SELF_CHECKED"
+  ]);
+  control.roleRuns = [role("TEST_DESIGNER", 0, "test-1"), role("IMPLEMENTER", 1, "impl-slice-1")];
+  control.candidate = {
+    ...control.candidate,
+    identity: "premature-slice-one-commit",
+    commit: "premature-slice-one-commit",
+    treeHash: "premature-slice-one-tree",
+    patchSha256: "premature-slice-one-patch",
+    diffArtifactSha256: "premature-slice-one-patch"
+  };
+
+  const errors = validateTaskControl(control).errors.join("\n");
+  assert.match(errors,
+    /global SELF_CHECKED requires every frozen implementation slice; missing: SLICE-02, SLICE-03, SLICE-04, SLICE-05/);
+  assert.match(errors,
+    /initial candidate must remain unfrozen until all slices are globally SELF_CHECKED/);
+});
+
 test("enforces repair generations and per-lane contract budgets", () => {
   const control = validVerifiedControl();
   control.lane = "L1";
@@ -830,6 +970,113 @@ test("ZCode unattended qta-run blocks AskUserQuestion but ordinary sessions rema
   }
 });
 
+test("expanded qta-run sentinel activates governance and records real doctor event sequence", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-expanded-run-"));
+  const script = path.resolve("scripts/zcode-governance-hook.mjs");
+  const sessionId = "expanded-run-session";
+  const environment = { ...process.env, ZCODE_PROJECT_DIR: directory };
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    const activation = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "UserPromptSubmit", session_id: sessionId, cwd: directory,
+        prompt: "QTA_GOVERNED_RUN\n\nInvocation arguments:\nfinish one bounded task"
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(activation.status, 0, activation.stderr);
+    const preTool = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory,
+        tool_name: "Bash", tool_input: { command: "git status" }
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(preTool.status, 0, preTool.stderr);
+
+    const sessionHash = createHash("sha256").update(sessionId).digest("hex");
+    const active = JSON.parse(await readFile(
+      path.join(directory, ".git", "qta-governance", "active", `${sessionHash}.json`), "utf8"));
+    const doctor = JSON.parse(await readFile(
+      path.join(directory, ".git", "qta-governance", "doctor", `${sessionHash}.json`), "utf8"));
+    assert.equal(active.parentSessionId, sessionId);
+    assert.equal(doctor.promptKind, "QTA_RUN");
+    assert.ok(doctor.promptObservedAt);
+    assert.ok(doctor.preToolObservedAt);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("user-level ZCode Hook installer preserves config and never registers Stop", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-user-hook-install-"));
+  const installer = path.resolve("scripts/install-zcode-governance-user-hooks.mjs");
+  const environment = { ...process.env, ZCODE_USER_CONFIG_DIR: directory };
+  try {
+    await writeFile(path.join(directory, "config.json"), `${JSON.stringify({
+      theme: "existing",
+      hooks: { events: { SessionStart: [{ matcher: "startup", hooks: [] }] } }
+    }, null, 2)}\n`);
+    const installed = spawnSync(process.execPath, [installer, "--install"], {
+      encoding: "utf8", env: environment
+    });
+    assert.equal(installed.status, 0, installed.stderr);
+    const config = JSON.parse(await readFile(path.join(directory, "config.json"), "utf8"));
+    assert.equal(config.theme, "existing");
+    assert.equal(config.hooks.enabled, true);
+    assert.equal(config.hooks.events.SessionStart.length, 1);
+    assert.equal(config.hooks.events.Stop, undefined);
+    for (const event of ["UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure"]) {
+      assert.equal(config.hooks.events[event].length, 1);
+    }
+
+    const checked = spawnSync(process.execPath, [installer, "--check"], {
+      encoding: "utf8", env: environment
+    });
+    assert.equal(checked.status, 0, checked.stderr);
+    const reinstalled = spawnSync(process.execPath, [installer, "--install"], {
+      encoding: "utf8", env: environment
+    });
+    assert.equal(reinstalled.status, 0, reinstalled.stderr);
+    const idempotent = JSON.parse(await readFile(path.join(directory, "config.json"), "utf8"));
+    assert.equal(idempotent.hooks.events.PreToolUse.length, 1);
+
+    const removed = spawnSync(process.execPath, [installer, "--uninstall"], {
+      encoding: "utf8", env: environment
+    });
+    assert.equal(removed.status, 0, removed.stderr);
+    const afterRemoval = JSON.parse(await readFile(path.join(directory, "config.json"), "utf8"));
+    assert.equal(afterRemoval.theme, "existing");
+    assert.equal(afterRemoval.hooks.events.SessionStart.length, 1);
+    assert.equal(afterRemoval.hooks.events.PreToolUse, undefined);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("user-level dispatcher routes only repositories that contain the QTA project Hook", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-user-hook-dispatch-"));
+  const dispatcher = path.resolve("scripts/zcode-governance-user-dispatcher.mjs");
+  try {
+    await mkdir(path.join(directory, ".git"), { recursive: true });
+    await mkdir(path.join(directory, "scripts"), { recursive: true });
+    const absent = spawnSync(process.execPath, [dispatcher], {
+      input: JSON.stringify({ cwd: directory, tool_name: "Bash", tool_input: { command: "git reset --hard" } }),
+      encoding: "utf8", env: { ...process.env, QTA_GOVERNANCE_AUDIT: "off" }
+    });
+    assert.equal(absent.status, 0, absent.stderr);
+
+    await writeFile(path.join(directory, "scripts", "zcode-governance-hook.mjs"),
+      await readFile("scripts/zcode-governance-hook.mjs", "utf8"));
+    const blocked = spawnSync(process.execPath, [dispatcher], {
+      input: JSON.stringify({ cwd: directory, tool_name: "Bash", tool_input: { command: "git reset --hard" } }),
+      encoding: "utf8", env: { ...process.env, QTA_GOVERNANCE_AUDIT: "off" }
+    });
+    assert.equal(blocked.status, 2);
+    assert.match(blocked.stderr, /QTA governance blocked this action/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("ZCode Hook receipt binds ADVISORY evidence to an observed runtime session", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "qta-runtime-receipt-"));
   const sessionId = "runtime-session-1";
@@ -1009,6 +1256,114 @@ test("governed dispatches enforce lifecycle role order and one pending role at a
     });
     assert.notEqual(exhausted.status, 0);
     assert.match(exhausted.stderr, /role-run budget is exhausted/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("multi-slice Hook dispatches all initial slices in order before global self-check", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-multislice-dispatch-"));
+  const sessionId = "multislice-parent";
+  const taskId = "MULTISLICE-TASK";
+  const script = path.resolve("scripts/zcode-governance-hook.mjs");
+  const environment = { ...process.env, ZCODE_PROJECT_DIR: directory };
+  const controlPath = path.join(directory, "docs", "development", "tasks", `${taskId}-CONTROL.json`);
+  try {
+    assert.equal(spawnSync("git", ["init", "-q"], { cwd: directory }).status, 0);
+    await mkdir(path.dirname(controlPath), { recursive: true });
+    assert.equal(spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "UserPromptSubmit", session_id: sessionId, cwd: directory,
+        prompt: "/qta-run multislice task"
+      }), encoding: "utf8", env: environment
+    }).status, 0);
+
+    const control = {
+      taskId,
+      lane: "L2",
+      lifecycleState: "CONTRACT_FROZEN",
+      contract: {
+        implementationSlices: Array.from({ length: 5 }, (_, index) => ({ id: `SLICE-0${index + 1}` }))
+      },
+      roleRuns: []
+    };
+    await writeFile(controlPath, JSON.stringify(control));
+
+    const outOfOrder = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory, tool_name: "Agent",
+        tool_input: {
+          subagent_type: "qta-implementer",
+          prompt: `# Task Packet: ${taskId} / IMPLEMENTER / impl-wrong\n- Dispatch ID: dispatch-wrong\n- Assigned implementation slice ID: SLICE-02`
+        }
+      }), encoding: "utf8", env: environment
+    });
+    assert.notEqual(outOfOrder.status, 0);
+    assert.match(outOfOrder.stderr, /next IMPLEMENTER must handle SLICE-01/);
+
+    for (let index = 1; index <= 5; index += 1) {
+      const sliceId = `SLICE-0${index}`;
+      const roleRunId = `impl-${index}`;
+      const dispatchId = `dispatch-impl-${index}`;
+      const toolUseId = `tool-${index}`;
+      const prompt = `# Task Packet: ${taskId} / IMPLEMENTER / ${roleRunId}\n- Dispatch ID: ${dispatchId}\n- Assigned implementation slice ID: ${sliceId}`;
+      const input = {
+        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory, tool_use_id: toolUseId,
+        tool_name: "Agent", tool_input: { subagent_type: "qta-implementer", prompt }
+      };
+      const dispatched = spawnSync(process.execPath, [script], {
+        input: JSON.stringify(input), encoding: "utf8", env: environment
+      });
+      assert.equal(dispatched.status, 0, dispatched.stderr);
+      const completed = spawnSync(process.execPath, [script], {
+        input: JSON.stringify({ ...input, hook_event_name: "PostToolUse" }), encoding: "utf8", env: environment
+      });
+      assert.equal(completed.status, 0, completed.stderr);
+
+      const beforeLedgerUpdate = spawnSync(process.execPath, [script], {
+        input: JSON.stringify({
+          hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory, tool_name: "Agent",
+          tool_input: {
+            subagent_type: "qta-implementer",
+            prompt: `# Task Packet: ${taskId} / IMPLEMENTER / duplicate-${index}\n- Dispatch ID: duplicate-dispatch-${index}\n- Assigned implementation slice ID: ${sliceId}`
+          }
+        }), encoding: "utf8", env: environment
+      });
+      assert.notEqual(beforeLedgerUpdate.status, 0);
+      assert.match(beforeLedgerUpdate.stderr, /must be appended to roleRuns before another role is dispatched/);
+
+      control.lifecycleState = "IMPLEMENTING";
+      control.roleRuns.push({
+        role: "IMPLEMENTER", generation: 1, sliceId, dispatchId, executorType: "SUBAGENT",
+        executionOutcome: "COMPLETED", artifactAccepted: true, status: "CLOSED"
+      });
+      await writeFile(controlPath, JSON.stringify(control));
+    }
+
+    const extra = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory, tool_name: "Agent",
+        tool_input: {
+          subagent_type: "qta-implementer",
+          prompt: `# Task Packet: ${taskId} / IMPLEMENTER / impl-extra\n- Dispatch ID: dispatch-extra\n- Assigned implementation slice ID: SLICE-05`
+        }
+      }), encoding: "utf8", env: environment
+    });
+    assert.notEqual(extra.status, 0);
+    assert.match(extra.stderr, /all frozen implementation slices are complete/);
+
+    control.transitionHistory = [{ from: "REVIEW_CLEAR", to: "IMPLEMENTING" }];
+    await writeFile(controlPath, JSON.stringify(control));
+    const repair = spawnSync(process.execPath, [script], {
+      input: JSON.stringify({
+        hook_event_name: "PreToolUse", session_id: sessionId, cwd: directory, tool_name: "Agent",
+        tool_input: {
+          subagent_type: "qta-implementer",
+          prompt: `# Task Packet: ${taskId} / IMPLEMENTER / repair-1\n- Dispatch ID: dispatch-repair-1\n- Assigned implementation slice ID: REPAIR-1`
+        }
+      }), encoding: "utf8", env: environment
+    });
+    assert.equal(repair.status, 0, repair.stderr);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -1293,8 +1648,8 @@ test("ZCode has no Stop continuation hook", async () => {
     const activePath = path.join(directory, ".git", "qta-governance", "active",
       `${createHash("sha256").update(sessionId).digest("hex")}.json`);
     assert.equal(JSON.parse(await readFile(activePath, "utf8")).parentSessionId, sessionId);
-    const config = JSON.parse(await readFile(".zcode/config.json", "utf8"));
-    assert.equal(config.hooks.events.Stop, undefined);
+    const installer = await readFile("scripts/install-zcode-governance-user-hooks.mjs", "utf8");
+    assert.doesNotMatch(installer, /\bStop\s*:/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

@@ -18,6 +18,7 @@ public class MarketSectorRankingBatchDO {
     private String snapshotType;
     private LocalDateTime snapshotBucketTime;
     private LocalDateTime snapshotTime;
+    private LocalDateTime providerQuoteTime;
     private Integer itemCount;
     private Integer risingCount;
     private Integer fallingCount;
