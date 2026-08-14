@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTROL.json",
   "startedAt": "2026-08-14T16:38:01Z",
   "lane": "L2",
-  "lifecycleState": "CANDIDATE_FROZEN",
+  "lifecycleState": "REVIEW_CLEAR",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTRACT.md",
     "version": "1.0",
@@ -335,6 +335,14 @@
       "at": "2026-08-14T19:11:45Z",
       "actor": "PARENT-RUN-1",
       "reason": "gen-2 candidate frozen with architecture gate bound"
+    },
+    {
+      "sequence": 13,
+      "from": "CANDIDATE_FROZEN",
+      "to": "REVIEW_CLEAR",
+      "at": "2026-08-14T19:21:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "review G2 FUNCTIONAL PASS + ARCHITECTURE PASS; P3 findings routed to finalization/MR-1"
     }
   ],
   "candidate": {
@@ -591,31 +599,50 @@
       "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-SELF-CHECK-REPAIR-1.md",
       "artifactSha256": "f138601f0e9803644451713408d29070ae14ef3c0ba6776cac79dc437f715432"
+    },
+    {
+      "roleRunId": "ROLE-RUN-CR-G2",
+      "dispatchId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CR-G2-D1",
+      "sessionId": "agent_0d8079af-892b-4f77-82a0-7c3de87cec29",
+      "startedAt": "2026-08-14T19:14:00Z",
+      "finishedAt": "2026-08-14T19:20:00Z",
+      "runtimeReceiptPath": "",
+      "role": "CODE_REVIEWER",
+      "generation": 2,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-code-reviewer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/ac6e8a02c3e19f746b80544c16c6394369b741ca486118cc900961fb0b8ec254/7c595c860f0ba9825eac1aa9ee35e48dcd0dfe1fd06c38b17a1b8ff540ff1019.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only reviewer gen-2; frozen diff artifact via Read tool; verified repair boundaries gen-1 vs gen-2",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPathX": "",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-REVIEW-G2.md",
+      "artifactSha256": "931f44d4d538a3df1fe794af18838220dee69ea021cc940dc3c04d83d4d5115b"
     }
   ],
   "review": {
     "omitted": false,
     "omissionReason": "",
-    "generation": 1,
-    "candidateIdentity": "1d136c18195883e8551aeb9e8b6cf2c72d92fd64",
-    "functionalVerdict": "FAIL",
-    "architectureVerdict": "FAIL",
-    "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-REVIEW-G1.md",
-    "artifactSha256": "b8ae0f7a7892430fcd28716a8c490dbd47fcb994908e61ae144925c1ab243e70",
-    "architectureGateSha256": "",
+    "generation": 2,
+    "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "functionalVerdict": "PASS",
+    "architectureVerdict": "PASS",
+    "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-REVIEW-G2.md",
+    "artifactSha256": "931f44d4d538a3df1fe794af18838220dee69ea021cc940dc3c04d83d4d5115b",
+    "architectureGateSha256": "9572ee83a3f8d57c56c38a5ca3df76ff1dde02dda9a492968fb310883ef6b0bb",
     "findingIds": [
-      "CR-1",
-      "CR-2",
-      "CR-3",
-      "CR-4",
-      "CR-5",
-      "CR-6",
-      "CR-7",
-      "CR-8",
-      "CR-9",
-      "CR-10",
-      "CR-11",
-      "CR-12"
+      "CR2-1",
+      "CR2-2",
+      "CR2-3",
+      "CR2-4"
     ]
   },
   "architectureGate": {
