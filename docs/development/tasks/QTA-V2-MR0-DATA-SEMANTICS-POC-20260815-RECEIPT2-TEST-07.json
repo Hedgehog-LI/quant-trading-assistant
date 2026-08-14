@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G2",
+  "sessionId": "ROLE-RUN-FV-G2",
+  "testId": "TEST-07",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+  "command": [
+    "bash",
+    "-c",
+    "bash scripts/run-mr0-poc.sh; code=$?; git checkout -- docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-EVIDENCE.json 2>/dev/null || true; exit $code"
+  ],
+  "startedAt": "2026-08-14T19:58:18.241Z",
+  "finishedAt": "2026-08-14T20:02:03.632Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "f25aebff213419e6151ea6aca49942882950b6e2d26df7a38cabdc0b661c051e",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [
+    {
+      "path": "scripts/run-mr0-poc.sh",
+      "sha256": "6d9d28862eb6b7be93df35370ea1b9f09b8b611b0298d8821912e359432bddb3"
+    }
+  ],
+  "expectedSelectors": [
+    "bash scripts/run-mr0-poc.sh (exit 0; POC-EVIDENCE.json key set + analysisHashRun1==analysisHashRun2 + second ingest inserted=0)"
+  ],
+  "observedSelectors": [
+    "bash scripts/run-mr0-poc.sh (exit 0; POC-EVIDENCE.json key set + analysisHashRun1==analysisHashRun2 + second ingest inserted=0)"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "1ee861ac017fe6371c6ff0d6a33bd55db80d1efd24f315c8e7c7cf5dd6726f36",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "1ee861ac017fe6371c6ff0d6a33bd55db80d1efd24f315c8e7c7cf5dd6726f36",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G2",
+  "sessionId": "ROLE-RUN-FV-G2",
+  "testId": "TEST-05",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+  "command": [
+    "./mvnw",
+    "-q",
+    "test",
+    "-Dtest=Mr0PocAnalysisServiceTest"
+  ],
+  "startedAt": "2026-08-14T19:57:02.014Z",
+  "finishedAt": "2026-08-14T19:57:07.949Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "85fce68f34e033bf1f72d56bde56dce7efc7d7e3a1b81fef72301c8b48f69852",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [
+    {
+      "path": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisServiceTest.java",
+      "sha256": "2c6f32e929911f590c6b25651830364d9b0022f52930b94bd5c88d1efeac5243"
+    }
+  ],
+  "expectedSelectors": [
+    "./mvnw -q test -Dtest=Mr0PocAnalysisServiceTest (7 methods: marketBreadthMatchesDictionaryFormulas, industryTurnoverShareSumsWithinCoverage, moneyFlowIndustryDeviationIsReported, analysisBlocksWhenWarmupInsufficient, volatilityAndLiquidityProxyMatchDictionaryFormulas, everyAnalysisMetricCarriesSingleProviderAttribution, analysisRereadsStorageEachCall)"
+  ],
+  "observedSelectors": [
+    "./mvnw -q test -Dtest=Mr0PocAnalysisServiceTest (7 methods: marketBreadthMatchesDictionaryFormulas, industryTurnoverShareSumsWithinCoverage, moneyFlowIndustryDeviationIsReported, analysisBlocksWhenWarmupInsufficient, volatilityAndLiquidityProxyMatchDictionaryFormulas, everyAnalysisMetricCarriesSingleProviderAttribution, analysisRereadsStorageEachCall)"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "f952cb907cca957c0a27d0ec6eb1a37c89d68aa8aa48b3ae53aac43a0046f61c",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "f952cb907cca957c0a27d0ec6eb1a37c89d68aa8aa48b3ae53aac43a0046f61c",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

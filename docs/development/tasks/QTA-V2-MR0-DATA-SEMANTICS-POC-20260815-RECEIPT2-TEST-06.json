@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G2",
+  "sessionId": "ROLE-RUN-FV-G2",
+  "testId": "TEST-06",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+  "command": [
+    "./mvnw",
+    "-q",
+    "test",
+    "-Dtest=Mr0PocQualityServiceTest"
+  ],
+  "startedAt": "2026-08-14T19:57:13.349Z",
+  "finishedAt": "2026-08-14T19:57:19.903Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "15b060a73dc45bedcf9c5ad142ae890cb170936b246883ffde5dd8694b1bfe57",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [
+    {
+      "path": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocQualityServiceTest.java",
+      "sha256": "199598c64fe45df2f35e9015855e425e3a78f2da09d4a96a1c81385bd68289ad"
+    }
+  ],
+  "expectedSelectors": [
+    "./mvnw -q test -Dtest=Mr0PocQualityServiceTest (5 methods incl. nested analyzeAndReportDoNotInvokePublicClient)"
+  ],
+  "observedSelectors": [
+    "./mvnw -q test -Dtest=Mr0PocQualityServiceTest (5 methods incl. nested analyzeAndReportDoNotInvokePublicClient)"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "e193c0b889d66e79609b798a08301cf9d6ef3aa2f1b1e3b718878ea76f0b2ca7",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "e193c0b889d66e79609b798a08301cf9d6ef3aa2f1b1e3b718878ea76f0b2ca7",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

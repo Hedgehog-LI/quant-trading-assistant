@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTROL.json",
   "startedAt": "2026-08-14T16:38:01Z",
   "lane": "L2",
-  "lifecycleState": "REVIEW_CLEAR",
+  "lifecycleState": "VERIFIED",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTRACT.md",
     "version": "1.0",
@@ -407,6 +407,14 @@
       "at": "2026-08-14T19:57:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "review G3 PASS/PASS"
+    },
+    {
+      "sequence": 22,
+      "from": "REVIEW_CLEAR",
+      "to": "VERIFIED",
+      "at": "2026-08-14T20:06:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "final verifier FV-G2 ACCEPTED (gen-3, machine-bound receipts)"
     }
   ],
   "candidate": {
@@ -807,6 +815,32 @@
       "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-REVIEW-G3.md",
       "artifactSha256": "0c1435090f49cf1ee0ee26242f4930cc8b25e37b213cce93fa334d1ff8970928"
+    },
+    {
+      "roleRunId": "ROLE-RUN-FV-G2",
+      "dispatchId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-FV-G2-D1",
+      "sessionId": "ROLE-RUN-FV-G2",
+      "startedAt": "2026-08-14T19:53:16Z",
+      "finishedAt": "2026-08-14T20:04:10Z",
+      "runtimeReceiptPath": "",
+      "role": "FINAL_VERIFIER",
+      "generation": 3,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-final-verifier.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "VERIFY_EXECUTE",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/ac6e8a02c3e19f746b80544c16c6394369b741ca486118cc900961fb0b8ec254/52582a52d0036417a01ed60d52deebc86a37bbb37e1d7c2c21d974b182b0d561.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "disposable worktree at gen-3 candidate; machine receipts with verbatim frozen selectors; main repo read-only",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 2,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-VERIFICATION-G3.md",
+      "artifactSha256": "b8c9ccdba1a367cd02f6aeba5e3a2f0b351f2a91d012e1a8b07a38afbd27e888"
     }
   ],
   "review": {
@@ -854,14 +888,14 @@
     "generatedBy": "scripts/check-ai-architecture.mjs"
   },
   "verification": {
-    "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
     "verdict": "ACCEPTED",
     "deliveryPermitted": true,
     "functionalVerdict": "PASS",
     "architectureVerdict": "PASS",
-    "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-VERIFICATION.md",
-    "artifactSha256": "4cc60c14cd5a624ecba4f1ccef106f41f8ab2313f3c6c19201a91cb570584602",
-    "architectureGateSha256": "9572ee83a3f8d57c56c38a5ca3df76ff1dde02dda9a492968fb310883ef6b0bb",
+    "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-VERIFICATION-G3.md",
+    "artifactSha256": "b8c9ccdba1a367cd02f6aeba5e3a2f0b351f2a91d012e1a8b07a38afbd27e888",
+    "architectureGateSha256": "f00bb5d5732fd6e9d3a5f6bb4482e45cb86f6c29d01c68312ab1a875ab25e596",
     "dimensions": {
       "STATIC": {
         "required": true,
@@ -884,129 +918,120 @@
   "testEvidence": [
     {
       "testId": "TEST-01",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-01.json",
-      "receiptSha256": "f108cc440dc30ef10e44519c153d43c92f956e43448e6654f45ccda66dce9bb7",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-01.json",
+      "receiptSha256": "c6ae762039bb11b25b6019f9aa777376c6f3d8268f5642eabaa166e3d51f15d8",
       "observedSelectors": [
         "grep -c '^### M-' docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md -> >=15"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": ""
+      "executedAt": "2026-08-14T20:04:10Z"
     },
     {
       "testId": "TEST-02",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-02.json",
-      "receiptSha256": "04275d6c2323d9af2f093701cacc088e3b863556626e3e00dc5de6aee992597b",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-02.json",
+      "receiptSha256": "72137da0cf019d51b8309af498a3c3df556226435366a7615d177a5690fa9486",
       "observedSelectors": [
         "grep status markers and TUSHARE/LONGBRIDGE/TENCENT_PUBLIC/SINA_PUBLIC/SOHU_PUBLIC rows -> >=5 each"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": ""
+      "executedAt": "2026-08-14T20:04:10Z"
     },
     {
       "testId": "TEST-03",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-03.json",
-      "receiptSha256": "1206aa765c72d5718d7eb238727c6ea7290cec5661088933b551d1c99359e976",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-03.json",
+      "receiptSha256": "43a05ba1cf1bada653b6d37ed5b698c721bfee2f7b2af476907f288eafbab484",
       "observedSelectors": [
         "grep -c '^## I-' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md -> >=9"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": ""
+      "executedAt": "2026-08-14T20:04:10Z"
     },
     {
       "testId": "TEST-04",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-04.json",
-      "receiptSha256": "016f79fb72f8d7c8a7b8ad57306da228acd576839df2bd3afbfc69d103fa67e9",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-04.json",
+      "receiptSha256": "3a259934c3c1b3c6bed151e334c286974d34d2801a9cb7de1d36e5669d4d4c39",
       "observedSelectors": [
         "./mvnw -q test -Dtest=Mr0PocIngestServiceTest (6 methods: ingestDailyBarsTwiceWritesNoDuplicates, ingestRowsCarryPublicProviderLabel, ingestPreservesExistingProviderRows, ingestConvertsUnitsPerFrozenDictionary, ingestMembershipAndMoneyFlowAreIdempotentWithPointInTimeColumns, ingestBackfillsMinimalStockBasicIdentityIdempotently)"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": ""
+      "executedAt": "2026-08-14T20:04:10Z"
     },
     {
       "testId": "TEST-05",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-05.json",
-      "receiptSha256": "cc327e49a9fe111aea5e68e89ab9877955c388e70cbc315c57e69d197a498c58",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-05.json",
+      "receiptSha256": "83243930ec3a596097e871f85e5590504a515b8e5f04ab7c04d4a0952a94d0a3",
       "observedSelectors": [
         "./mvnw -q test -Dtest=Mr0PocAnalysisServiceTest (7 methods: marketBreadthMatchesDictionaryFormulas, industryTurnoverShareSumsWithinCoverage, moneyFlowIndustryDeviationIsReported, analysisBlocksWhenWarmupInsufficient, volatilityAndLiquidityProxyMatchDictionaryFormulas, everyAnalysisMetricCarriesSingleProviderAttribution, analysisRereadsStorageEachCall)"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": ""
+      "executedAt": "2026-08-14T20:04:10Z"
     },
     {
       "testId": "TEST-06",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-06.json",
-      "receiptSha256": "bd41b16e34671978eace27d860e54ef0cd296f85d89cd3d638e6051339dfa8d1",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-06.json",
+      "receiptSha256": "80f3c3a78a092bb5528d02ddb9029282d28ac087438065c55d9c1b41d4808054",
       "observedSelectors": [
         "./mvnw -q test -Dtest=Mr0PocQualityServiceTest (5 methods incl. nested analyzeAndReportDoNotInvokePublicClient)"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": ""
+      "executedAt": "2026-08-14T20:04:10Z"
     },
     {
       "testId": "TEST-07",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-07.json",
-      "receiptSha256": "5bf1cf6b1efb913a885e0b0e8bf898051bd77db407dff52dc2cb686f0bef6804",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-07.json",
+      "receiptSha256": "4d7a4807031e3a3f4b7ecea01c53f0df7acb29cc5993b4352e49c777e1004b96",
       "observedSelectors": [
         "bash scripts/run-mr0-poc.sh (exit 0; POC-EVIDENCE.json key set + analysisHashRun1==analysisHashRun2 + second ingest inserted=0)"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": "TEST-07 receipt mechanically records candidateUnchanged=false (script overwrites its own tracked artifacts by design); substance PASS per verifier F-1"
+      "executedAt": "2026-08-14T20:04:10Z"
     },
     {
       "testId": "TEST-08",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-08.json",
-      "receiptSha256": "2e98a0131b77a2ace7ae5be2ce07851f97b6d32b8d8736c7fce55826f71303e7",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-08.json",
+      "receiptSha256": "5d518c15ab20a424970256bce097a4b1345fc19dd3fc5a7346ec83217b2a0458",
       "observedSelectors": [
         "grep -c 'MR-1 输入边界' -> >=1 with four required elements present"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": ""
+      "executedAt": "2026-08-14T20:04:10Z"
     },
     {
       "testId": "TEST-FULL",
-      "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
-      "executedByRoleRunId": "ROLE-RUN-FV-G1",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "executedByRoleRunId": "ROLE-RUN-FV-G2",
       "exitCode": 0,
       "result": "PASS",
-      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT-TEST-FULL.json",
-      "receiptSha256": "592485f6e904c94ee2e6f848584456e75dd3cc05a673d13c6942a43c2fd7916c",
+      "receiptPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-FULL.json",
+      "receiptSha256": "25c7cb784197b91c80ecad32b02d4fc3545b0d10010656499b851abd25ae0350",
       "observedSelectors": [
         "./mvnw -q test && ./mvnw -q -DskipTests package"
       ],
-      "executedAt": "2026-08-14T19:31:28Z",
-      "note": ""
+      "executedAt": "2026-08-14T20:04:10Z"
     }
   ],
   "finalization": {
@@ -1017,5 +1042,86 @@
     "completedAt": "",
     "changedPaths": []
   },
-  "evidence": []
+  "evidence": [
+    {
+      "evidenceId": "EV-AC-01-TEST-01",
+      "acId": "AC-01",
+      "kind": "STATIC",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-01",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-01.json",
+      "artifactSha256": "c6ae762039bb11b25b6019f9aa777376c6f3d8268f5642eabaa166e3d51f15d8"
+    },
+    {
+      "evidenceId": "EV-AC-02-TEST-02",
+      "acId": "AC-02",
+      "kind": "STATIC",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-02",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-02.json",
+      "artifactSha256": "72137da0cf019d51b8309af498a3c3df556226435366a7615d177a5690fa9486"
+    },
+    {
+      "evidenceId": "EV-AC-03-TEST-03",
+      "acId": "AC-03",
+      "kind": "STATIC",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-03",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-03.json",
+      "artifactSha256": "43a05ba1cf1bada653b6d37ed5b698c721bfee2f7b2af476907f288eafbab484"
+    },
+    {
+      "evidenceId": "EV-AC-04-TEST-04",
+      "acId": "AC-04",
+      "kind": "AUTOMATION",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-04",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-04.json",
+      "artifactSha256": "3a259934c3c1b3c6bed151e334c286974d34d2801a9cb7de1d36e5669d4d4c39"
+    },
+    {
+      "evidenceId": "EV-AC-05-TEST-05",
+      "acId": "AC-05",
+      "kind": "AUTOMATION",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-05",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-05.json",
+      "artifactSha256": "83243930ec3a596097e871f85e5590504a515b8e5f04ab7c04d4a0952a94d0a3"
+    },
+    {
+      "evidenceId": "EV-AC-06-TEST-06",
+      "acId": "AC-06",
+      "kind": "AUTOMATION",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-06",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-06.json",
+      "artifactSha256": "80f3c3a78a092bb5528d02ddb9029282d28ac087438065c55d9c1b41d4808054"
+    },
+    {
+      "evidenceId": "EV-AC-07-TEST-07",
+      "acId": "AC-07",
+      "kind": "RUNTIME",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-07",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-07.json",
+      "artifactSha256": "4d7a4807031e3a3f4b7ecea01c53f0df7acb29cc5993b4352e49c777e1004b96"
+    },
+    {
+      "evidenceId": "EV-AC-08-TEST-08",
+      "acId": "AC-08",
+      "kind": "STATIC",
+      "sourceType": "TEST_RECEIPT",
+      "sourceId": "TEST-08",
+      "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-RECEIPT2-TEST-08.json",
+      "artifactSha256": "5d518c15ab20a424970256bce097a4b1345fc19dd3fc5a7346ec83217b2a0458"
+    }
+  ]
 }

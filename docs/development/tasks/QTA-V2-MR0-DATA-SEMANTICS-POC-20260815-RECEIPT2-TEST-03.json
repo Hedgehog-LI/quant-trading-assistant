@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G2",
+  "sessionId": "ROLE-RUN-FV-G2",
+  "testId": "TEST-03",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+  "command": [
+    "bash",
+    "-c",
+    "for T in 'I-01 证券主数据' 'I-02 日K' 'I-03 分钟K' 'I-04 板块目录' 'I-05 板块成分' 'I-06 排行' 'I-07 快照' 'I-08 资金字段' 'I-09 质量字段'; do grep -c \"^## ${T}\" docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md | grep -qv '^0$' || exit 1; done && test $(awk '/^## I-/{sec++;next} sec>0 && /V[0-9]+__|src\\/(main\\|test)\\/|实测行数/{c[sec]++} END{b=0;for(i=1;i<=sec;i++)if(!c[i])b++;print b}' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md) -eq 0"
+  ],
+  "startedAt": "2026-08-14T19:56:35.910Z",
+  "finishedAt": "2026-08-14T19:56:35.932Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [
+    {
+      "path": "docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md",
+      "sha256": "915eb491cb90539530b1e0ceed9052f70002ad0f1abfe0b1827870abce7f65f5"
+    }
+  ],
+  "expectedSelectors": [
+    "grep -c '^## I-' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md -> >=9"
+  ],
+  "observedSelectors": [
+    "grep -c '^## I-' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md -> >=9"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "077e40735eefd782abace1b622695e347580bd36d37b5ef69eb27c0ded2af4e2",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "077e40735eefd782abace1b622695e347580bd36d37b5ef69eb27c0ded2af4e2",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

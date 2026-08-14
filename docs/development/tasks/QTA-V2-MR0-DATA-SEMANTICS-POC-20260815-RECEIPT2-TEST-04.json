@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G2",
+  "sessionId": "ROLE-RUN-FV-G2",
+  "testId": "TEST-04",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+  "command": [
+    "./mvnw",
+    "-q",
+    "test",
+    "-Dtest=Mr0PocIngestServiceTest"
+  ],
+  "startedAt": "2026-08-14T19:56:42.362Z",
+  "finishedAt": "2026-08-14T19:56:56.746Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "ae82c90c4851804e6ca33cc87d2a018aa384f81a93f89ac237b48036124e7fdc",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [
+    {
+      "path": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocIngestServiceTest.java",
+      "sha256": "01acd77c99ea42d3273a95d5dc6f9781b983ba0f9e1a59ded2176718d13c0a15"
+    }
+  ],
+  "expectedSelectors": [
+    "./mvnw -q test -Dtest=Mr0PocIngestServiceTest (6 methods: ingestDailyBarsTwiceWritesNoDuplicates, ingestRowsCarryPublicProviderLabel, ingestPreservesExistingProviderRows, ingestConvertsUnitsPerFrozenDictionary, ingestMembershipAndMoneyFlowAreIdempotentWithPointInTimeColumns, ingestBackfillsMinimalStockBasicIdentityIdempotently)"
+  ],
+  "observedSelectors": [
+    "./mvnw -q test -Dtest=Mr0PocIngestServiceTest (6 methods: ingestDailyBarsTwiceWritesNoDuplicates, ingestRowsCarryPublicProviderLabel, ingestPreservesExistingProviderRows, ingestConvertsUnitsPerFrozenDictionary, ingestMembershipAndMoneyFlowAreIdempotentWithPointInTimeColumns, ingestBackfillsMinimalStockBasicIdentityIdempotently)"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "b2ac56df035d2d3006ee014162108c362e6c982ac5d755883d2b50c0684d1314",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "b2ac56df035d2d3006ee014162108c362e6c982ac5d755883d2b50c0684d1314",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

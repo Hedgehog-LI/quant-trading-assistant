@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G2",
+  "sessionId": "ROLE-RUN-FV-G2",
+  "testId": "TEST-02",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+  "command": [
+    "bash",
+    "-c",
+    "for P in LONGBRIDGE TUSHARE TENCENT_PUBLIC SINA_PUBLIC SOHU_PUBLIC; do R=$(grep -E \"^\\|[^|]*${P}[^|]*\\|\" docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md | grep -cE 'VERIFIED|NOT_VERIFIED|NOT_RETESTED'); test \"$R\" -ge 1 || exit 1; done && grep -E '^\\|[^|]*TUSHARE[^|]*\\|' docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md | grep -c 'NOT_VERIFIED' | grep -qv '^0$' && test $(grep -cE 'proxy\\.finance\\.qq\\.com|getHQNodeData|newSinaHy|ssl_qsfx_zjlrqs|hisHq' docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md) -ge 4"
+  ],
+  "startedAt": "2026-08-14T19:56:28.521Z",
+  "finishedAt": "2026-08-14T19:56:28.541Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [
+    {
+      "path": "docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md",
+      "sha256": "7dd852ad5e9cff8b80a2350a39cadf405660039ab2d8fbc502f56dc5d4379520"
+    }
+  ],
+  "expectedSelectors": [
+    "grep status markers and TUSHARE/LONGBRIDGE/TENCENT_PUBLIC/SINA_PUBLIC/SOHU_PUBLIC rows -> >=5 each"
+  ],
+  "observedSelectors": [
+    "grep status markers and TUSHARE/LONGBRIDGE/TENCENT_PUBLIC/SINA_PUBLIC/SOHU_PUBLIC rows -> >=5 each"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "9d79c92379f1bd69df429550157a2012e17f8c1302dca836dd8b75c60e1a7b39",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+    "tree": "68025bcdf67a23376867730da32b206641831ae2",
+    "statusSha256": "9d79c92379f1bd69df429550157a2012e17f8c1302dca836dd8b75c60e1a7b39",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}
