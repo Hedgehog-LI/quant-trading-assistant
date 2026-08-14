@@ -83,10 +83,14 @@ class Mr0PocQualityServiceTest {
             assertThat(family.getDetails()).isNotNull();
         }
         String markdown = report.toMarkdown();
-        for (String family : List.of("COVERAGE", "GAPS", "DUPLICATES", "STALENESS",
-                "TIME_POINT_LOOKAHEAD", "PROVIDER_MIXING", "UNIT_ANOMALY", "RECOMPUTE_CONSISTENCY")) {
+        for (String family : List.of("COVERAGE", "GAPS", "DUPLICATES", "STALENESS", "TIME_POINT_LOOKAHEAD",
+                "PROVIDER_MIXING", "UNIT_ANOMALY", "RECOMPUTE_CONSISTENCY")) {
             assertThat(markdown).contains("## " + family);
         }
+        // CR-2：重算总体=分析样本（排除基准与非样本符号）→ 中位日 advancing 重算一致 OK
+        // （修复前把基准 3050→3060 计入，recomputed=2≠advancing=1 假 FAIL）
+        assertThat(family(report, "RECOMPUTE_CONSISTENCY").getStatus()).isEqualTo("OK");
+        assertThat(family(report, "RECOMPUTE_CONSISTENCY").getReasonCode()).isEqualTo("RECOMPUTED_MATCH");
         // markdown 确定性：同数据两次生成一致，且不含时间戳字段
         assertThat(qualityService.generateReport(analysisService.analyze(analyzeCommand())).toMarkdown())
                 .isEqualTo(markdown);
@@ -226,11 +230,13 @@ class Mr0PocQualityServiceTest {
         seedStock("SZ.000001", "2026-06-30", "20");
         seedStock("SZ.000001", "2026-07-01", "20");
         jdbcTemplate.update("INSERT INTO mr0_universe_snapshot(provider_code, canonical_symbol, symbol,"
-                + " name, market, turnover_rate, as_of_date, fetched_at) VALUES ('SINA_PUBLIC', 'SH.600519',"
-                + " '600519', '股票600519', 'SH', 0.01, '2026-07-01', ?)", FETCHED);
+                + " name, market, turnover_rate, circulating_market_cap, as_of_date, fetched_at)"
+                + " VALUES ('SINA_PUBLIC', 'SH.600519', '600519', '股票600519', 'SH', 0.01, 2000000,"
+                + " '2026-07-01', ?)", FETCHED);
         jdbcTemplate.update("INSERT INTO mr0_universe_snapshot(provider_code, canonical_symbol, symbol,"
-                + " name, market, turnover_rate, as_of_date, fetched_at) VALUES ('SINA_PUBLIC', 'SZ.000001',"
-                + " '000001', '股票000001', 'SZ', 0.01, '2026-07-01', ?)", FETCHED);
+                + " name, market, turnover_rate, circulating_market_cap, as_of_date, fetched_at)"
+                + " VALUES ('SINA_PUBLIC', 'SZ.000001', '000001', '股票000001', 'SZ', 0.01, 1000000,"
+                + " '2026-07-01', ?)", FETCHED);
         jdbcTemplate.update("INSERT INTO mr0_industry_membership(taxonomy_code, provider_code, industry_code,"
                 + " industry_name, canonical_symbol, as_of_date, fetched_at) VALUES ('SINA_INDUSTRY',"
                 + " 'SINA_PUBLIC', 'new_blhy', '玻璃行业', 'SH.600519', '2026-06-01', ?)", FETCHED);

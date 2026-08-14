@@ -19,7 +19,9 @@ import java.util.stream.Collectors;
 /**
  * MR-0 PoC 质量报告引擎（AC-06，report 引擎并入，REC-7）。八检查族全部为结构化对象
  * （family/status/reasonCode/affectedCount/details，REC-8），status∈OK/WARN/FAIL/BLOCKED。
- * 只读库+分析结果，零外联。toMarkdown() 确定性：固定族顺序、无时间戳。跨进程重算一致性由
+ * 只读库+分析结果，零外联。COVERAGE/GAPS/RECOMPUTE_CONSISTENCY 均以 analysis 结果的样本清单
+ * 为口径（CR-2/CR-3：排除基准与非样本符号，与 breadth 分母一致）；基准 SH.000001 指数行免
+ * 字典 §3 个股 VWAP 自检（CR-1）。toMarkdown() 确定性：固定族顺序、无时间戳。跨进程重算一致性由
  * TEST-07 两次运行与 analysisRereadsStorageEachCall 用例证明，本引擎只做进程内中位日重算比对。
  */
 @Service
@@ -74,7 +76,8 @@ public class Mr0PocQualityService {
         List<String> details = new ArrayList<>();
         if (dates.isEmpty()) { return family(COVERAGE, "BLOCKED", "NO_TRADING_DAYS", 0, details); }
         long sampleSize = analysis.getUniverse().getSampleSymbols();
-        Map<String, Long> barsPerDay = tencentBars(analysis).stream().filter(bar -> !"SH.000001".equals(bar.getCanonicalSymbol()))
+        Set<String> sample = new HashSet<>(sampleListOf(analysis));  // CR-3：分母口径=分析样本
+        Map<String, Long> barsPerDay = tencentBars(analysis).stream().filter(bar -> sample.contains(bar.getCanonicalSymbol()))
                 .collect(Collectors.groupingBy(bar -> bar.getTradeDate().toString(), Collectors.counting()));
         BigDecimal worst = BigDecimal.ONE;
         for (String date : dates) {
@@ -97,12 +100,13 @@ public class Mr0PocQualityService {
         Map<String, Set<String>> present = tencentBars(analysis).stream().collect(Collectors.groupingBy(
                 Mr0PocAnalysisMapper.BarRow::getCanonicalSymbol,
                 Collectors.mapping(bar -> bar.getTradeDate().toString(), Collectors.toSet())));
-        long missing = dates.size() * analysis.getUniverse().getSampleSymbols();
-        missing -= present.entrySet().stream().filter(e -> !"SH.000001".equals(e.getKey()))
-                .mapToLong(e -> dates.stream().filter(e.getValue()::contains).count()).sum();
-        List<String> zeroBarSymbols = present.entrySet().stream()
-                .filter(e -> !"SH.000001".equals(e.getKey()) && dates.stream().noneMatch(e.getValue()::contains))
-                .map(Map.Entry::getKey).sorted().toList();
+        List<String> sample = sampleListOf(analysis);  // CR-3：缺口口径=分析样本（排除基准与非样本符号）
+        long missing = dates.size() * (long) sample.size();
+        missing -= sample.stream()
+                .mapToLong(symbol -> dates.stream().filter(present.getOrDefault(symbol, Set.of())::contains).count()).sum();
+        List<String> zeroBarSymbols = sample.stream()
+                .filter(symbol -> dates.stream().noneMatch(present.getOrDefault(symbol, Set.of())::contains))
+                .sorted().toList();
         long coverageGapDays = analysis.getIndustryTurnover().getCoverageGap().getCount() * dates.size();
         details.add("missingStockDays=" + missing);
         details.add("zeroBarSymbols=" + zeroBarSymbols);
@@ -193,7 +197,9 @@ public class Mr0PocQualityService {
         long vwapViolations = 0;
         long nonPositiveAmount = 0;
         for (Mr0PocAnalysisMapper.BarRow row : mapper.selectDailyBars(analysis.getAnalysisStart(), analysis.getAnalysisEnd(), null)) {
-            if (row.getVolume() != null && row.getVolume() > 0 && row.getAmount() != null
+            // 基准 SH.000001 为指数点位非个股价格域，字典 §3 VWAP∈[low,high] 个股自检不适用（CR-1）
+            if (!"SH.000001".equals(row.getCanonicalSymbol())
+                    && row.getVolume() != null && row.getVolume() > 0 && row.getAmount() != null
                     && row.getLowPrice() != null && row.getHighPrice() != null) {
                 BigDecimal vwap = row.getAmount().divide(BigDecimal.valueOf(row.getVolume()), 6, RoundingMode.HALF_UP);
                 BigDecimal lowFloor = row.getLowPrice().subtract(row.getLowPrice().multiply(VWAP_EPS));
@@ -243,9 +249,13 @@ public class Mr0PocQualityService {
         }
         LocalDate day = LocalDate.parse(medianDay.getDate());
         LocalDate prev = closes.getOrDefault("SH.000001", new TreeMap<>()).floorKey(day.minusDays(1));
+        // CR-2：重算总体=分析样本（从 analysis 结果样本清单取，排除基准与非样本符号），与 breadth 口径一致
+        List<String> sample = sampleListOf(analysis);
         long recomputed = 0;
         if (prev != null) {
-            for (TreeMap<LocalDate, BigDecimal> series : closes.values()) {
+            for (String symbol : sample) {
+                TreeMap<LocalDate, BigDecimal> series = closes.get(symbol);
+                if (series == null) { continue; }
                 BigDecimal close = series.get(day), previous = series.get(prev);
                 if (close != null && previous != null && close.compareTo(previous) > 0) { recomputed++; }
             }
@@ -260,6 +270,12 @@ public class Mr0PocQualityService {
 
     private List<Mr0PocAnalysisMapper.BarRow> tencentBars(AnalysisResult analysis) {
         return mapper.selectDailyBars(analysis.getAnalysisStart(), analysis.getAnalysisEnd(), Mr0PocAnalysisService.PROVIDER_TENCENT_PUBLIC);
+    }
+
+    /** 分析样本清单（CR-2/CR-3 口径来源：analysis 结果；缺失时返回空列表以兼容旧结果对象）。 */
+    private static List<String> sampleListOf(AnalysisResult analysis) {
+        return analysis.getUniverse().getSampleSymbolList() == null ? List.of()
+                : analysis.getUniverse().getSampleSymbolList();
     }
 
     private CheckFamily family(String family, String status, String reasonCode, long affectedCount, List<String> details) {

@@ -183,7 +183,9 @@ Content-Type: application/json
 ```
 
 启用时返回 `data.universe/membership/dailyBar/moneyFlow` 各表 `inserted/updated/skipped` 计数、
-`failures` 明细与 `sampleSymbols`（结构同 SLICE-02 `IngestResult`）。
+`failures` 明细与 `sampleSymbols`（结构同 SLICE-02 `IngestResult`）。ingest 恒抓基准 SH.000001
+日 K（样本循环后追加，指数点位非个股价格域，免字典 §3 个股 VWAP 自检；失败仅记入 `failures`
+`stage=BENCHMARK_DAILY_BAR` 不中断）；基准不参与资金流/成分/`sampleSymbols`/`stock_basic` 身份回填。
 
 ### 7.2 GET /api/v1/market-research/mr0-poc/analyze（只读分析）
 
@@ -200,8 +202,10 @@ GET /api/v1/market-research/mr0-poc/analyze?start=2026-07-01&end=2026-07-31
   "runId": "6f9c…", "generatedAt": "2026-08-15T10:00:00", "durationMs": 812,
   "analysisStart": "2026-07-01", "analysisEnd": "2026-07-31",
   "universe": { "asOfDate": "2026-08-15", "universeSize": 151, "sampleSymbols": 150,
+    "sampleSymbolList": ["BJ.430047", "…（Top-150 全列表，symbol 升序）"],
     "benchmarkSymbol": "SH.000001", "universeSymbolsSha256": "ab12…", "status": "OK",
-    "providers": ["SINA_PUBLIC"], "caliber": "最新 as_of≤窗口结束日的证券池快照；基准恒入快照不算样本" },
+    "providers": ["SINA_PUBLIC"],
+    "caliber": "分析时点可见最新档快照（as_of 无上界；时点穿越由 TIME_POINT_LOOKAHEAD 族显式标记）；基准恒入快照不算样本" },
   "tradingDays": { "calendar": "INDEX_KLINE_DERIVED", "dates": ["2026-07-01", "…"], "count": 23,
     "providers": ["TENCENT_PUBLIC"] },
   "breadth": { "caliber": "adv/dec/flat 需 t 与 t-1 两根 bar，首日 t-1 取预热窗；adLine 首日种子=adv−dec",
@@ -221,7 +225,7 @@ GET /api/v1/market-research/mr0-poc/analyze?start=2026-07-01&end=2026-07-31
     "marketMedian": 0.000000031234, "marketP90": 0.000000112345, "providers": ["TENCENT_PUBLIC"] },
   "moneyFacts": { "byIndustry": [ { "industryCode": "new_blhy", "days": [ { "date": "2026-07-01",
         "sumMainNetInflow": -32102345.67, "cateNaValue": -23456789.01,
-        "deviation": -0.368550715646, "inconsistentCateNa": false } ] } ],
+        "deviation": -8645556.66, "inconsistentCateNa": false } ] } ],
     "inconsistentCateNaDays": 0,
     "flowIntensity": { "providers": ["SINA_PUBLIC", "TENCENT_PUBLIC"], "window": "analysisWindow",
       "windowNetInflow": -1234567890.12, "windowTurnover": 912345678901.23,
@@ -233,11 +237,15 @@ GET /api/v1/market-research/mr0-poc/analyze?start=2026-07-01&end=2026-07-31
   "mixedMetrics": ["flowIntensity"] }, "timestamp": "2026-08-15T10:00:01" }
 ```
 
-语义要点：预热不足（不足 21 根收盘）时 `volatility.status=INSUFFICIENT_WARMUP` 且不输出任何
-部分数值；空有效池输出原因码 `EMPTY_VALID_UNIVERSE`（`advanceRatio`/`adLine` 为 `null`，
-禁止 NaN/Infinity）；`industryTurnover.share` 分母=覆盖域（有成分样本股），无成分股票计入
-`coverageGap` 不入分母，逐日 `sumShare=1±1e-6`；`moneyFacts.deviation` 只报告不判等；
-`flowIntensity` 为混源指标（新浪净流入 + 腾讯成交额），在 `mixedMetrics` 中显式列出。
+语义要点：样本=分析时点可见最新档快照按流通市值降序 Top-150（`sampleSize` 可调，默认 150；排除基准
+与 null 市值行），`universeSize=Top-N+1`（恒含基准），`universeSymbolsSha256`=(Top-N 符号 ∪ 基准)
+排序后逗号拼接的 sha256；全池快照行仅作事实保留，不进任何分母。预热不足（不足 21 根收盘，或 asOf
+末交易日当日无 bar）时 `volatility.status=INSUFFICIENT_WARMUP` 且不输出任何部分数值；空有效池输出
+原因码 `EMPTY_VALID_UNIVERSE`（`advanceRatio`/`adLine` 为 `null`，禁止 NaN/Infinity）；
+`industryTurnover.share` 分母=覆盖域（有成分样本股），无成分股票计入 `coverageGap` 不入分母，
+逐日 `sumShare=1±1e-6`，`share`/`sumShare` 输出 10 位小数；`moneyFacts.deviation` 为绝对差
+（元）`Σ成员main_net_inflow − cate_na`（字典 M-15，cate_na 为 `null` 时 deviation 为 `null`），
+只报告不判等；`flowIntensity` 为混源指标（新浪净流入 + 腾讯成交额），在 `mixedMetrics` 中显式列出。
 
 ### 7.3 GET /api/v1/market-research/mr0-poc/report（只读质量报告）
 
@@ -262,5 +270,7 @@ GET /api/v1/market-research/mr0-poc/report?start=2026-07-01&end=2026-07-31&forma
 （`family/status/reasonCode/affectedCount/details`），`status∈OK/WARN/FAIL/BLOCKED`。
 `DUPLICATES` 为信息级（uk 保证同源无重复，报告跨 data_source 并存事实）；
 `STALENESS` 在 `market_calendar` CN 空表时记 WARN（本地事实，不外联）；
-`RECOMPUTE_CONSISTENCY` 抽窗口中位日用原始行重算 advancing 数比对，跨进程重算一致性由
+`RECOMPUTE_CONSISTENCY` 抽窗口中位日用原始行重算 advancing 数比对（重算总体=分析样本
+`universe.sampleSymbolList`，排除基准与非样本符号，与广度分母同口径），`COVERAGE`/`GAPS` 同以
+该样本清单为分母口径；基准 SH.000001 指数行免字典 §3 个股 VWAP 单位自检；跨进程重算一致性由
 PoC 脚本两次运行（TEST-07）与"每次调用重读存储"用例证明。

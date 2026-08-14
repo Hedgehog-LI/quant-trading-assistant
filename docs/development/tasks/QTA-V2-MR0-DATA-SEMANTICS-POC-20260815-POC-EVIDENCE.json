@@ -1,0 +1,60 @@
+{
+  "task": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "slice": "SLICE-04",
+  "generatedBy": "scripts/run-mr0-poc.sh",
+  "generatedAt": "2026-08-14T18:56:03Z",
+  "status": "SUCCESS",
+  "exitCode": 0,
+  "diagnostic": "",
+  "startedAt": "2026-08-15T02:52:50+0800",
+  "durationSeconds": 193,
+  "timezone": "CST",
+  "analysisHashRun1": "4a0a73c8048e8a0104f38f72bf6c9ccbad36b2a5074c2e575439e36b7a31564d",
+  "analysisHashRun2": "4a0a73c8048e8a0104f38f72bf6c9ccbad36b2a5074c2e575439e36b7a31564d",
+  "hashAlgorithm": "sha256",
+  "hashFieldWhitelist": [
+    "analysisStart",
+    "analysisEnd",
+    "universe",
+    "tradingDays",
+    "breadth",
+    "industryTurnover",
+    "volatility",
+    "liquidityProxy",
+    "moneyFacts"
+  ],
+  "secondIngestCounts": {
+    "universe": {
+      "inserted": 0,
+      "updated": 5543
+    },
+    "membership": {
+      "inserted": 0,
+      "updated": 101
+    },
+    "dailyBar": {
+      "inserted": 0,
+      "updated": 11199
+    },
+    "moneyFlow": {
+      "inserted": 0,
+      "updated": 3432
+    }
+  },
+  "universeAsOfDate": "2026-08-15",
+  "universeSize": 151,
+  "universeSymbolsSha256": "e8ea955c474fcffd207e53326328c7bb12d558e032f19b568e9c8b725c1144d3",
+  "realRowCounts": {
+    "bar": 3080,
+    "membership": 101,
+    "moneyflow": 3432,
+    "derivation": "bar=Σ(report COVERAGE details tencentBars, 分析窗); membership=universe.sampleSymbols-industryTurnover.coverageGap.count(analyze); moneyflow=ingest#1 moneyFlow inserted+updated(分析窗)"
+  },
+  "window": {
+    "analysisStart": "2026-07-01",
+    "analysisEnd": "2026-07-31",
+    "warmupStart": "2026-04-01"
+  },
+  "failures": [],
+  "pocReportWritten": true
+}

@@ -24,10 +24,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * MR-0 PoC 幂等导入服务（AC-04）。流程：证券池分页全量 → 流通市值降序前 sampleSize（基准 SH.000001
- * 恒入 universe 记录但不算样本 K 线）→ 行业目录+全行业分页成分（样本外丢弃不落库）→ 逐样本腾讯日 K
- * （换算后落既有 stock_daily_bar，data_source=TENCENT_PUBLIC、adjust_type=NONE）→ 逐样本新浪资金流
- * （窗口过滤后落 mr0 表）→ 全样本幂等补齐 stock_basic 最小身份（不覆盖已有 name/list_date）。
+ * MR-0 PoC 幂等导入服务（AC-04）。流程：证券池分页全量 → 流通市值降序前 sampleSize → 行业目录+全行业
+ * 分页成分（样本外丢弃不落库）→ 逐样本腾讯日 K（换算后落既有 stock_daily_bar，
+ * data_source=TENCENT_PUBLIC、adjust_type=NONE）→ 逐样本新浪资金流（窗口过滤后落 mr0 表）→ 恒抓基准
+ * SH.000001 日 K（CR-1：样本循环后追加，指数行免字典 §3 个股 VWAP 自检；失败仅记 failure 不中断；
+ * 不参与资金流/成分/sampleSize/ensureRegistered）→ 全样本幂等补齐 stock_basic 最小身份
+ * （不覆盖已有 name/list_date；基准不回填身份）。
  * 冻结口径：amount=万元×10000、volume=手×100、换手率 %/100 仅作用于 universe 快照（快照值不拼日频
  * 序列，字典 M-05）；资金净额原值元；腾讯换手率不写任何表（无归属列）。幂等靠 uk + ON DUPLICATE
  * KEY UPDATE（重跑 inserted=0）；单 symbol 失败记录后继续。失效场景：公共源结构变化按 symbol 抛错
@@ -158,6 +160,14 @@ public class Mr0PocIngestService {
                 result.getFailures().add(new SymbolFailure(entry.getCanonicalSymbol(), "MONEY_FLOW", reason(exception)));
             }
         }
+        // CR-1：恒抓基准 SH.000001 日 K（tradingDays 由基准推导，D8）；失败仅记 failure 不中断。
+        // 基准不参与资金流/成分/sampleSize/ensureRegistered，sampleSymbols 不含基准。
+        try {
+            ingestDailyBars(UniverseEntry.builder()
+                    .sinaSymbol("sh000001").canonicalSymbol(BENCHMARK_CANONICAL).build(), command, fetchedAt, result, false);
+        } catch (RuntimeException exception) {
+            result.getFailures().add(new SymbolFailure(BENCHMARK_CANONICAL, "BENCHMARK_DAILY_BAR", reason(exception)));
+        }
         if (!command.isDryRun() && !sample.isEmpty()) {
             stockBasicRegistrationManager.ensureRegistered(result.getSampleSymbols());
         }
@@ -239,9 +249,18 @@ public class Mr0PocIngestService {
         return memberships;
     }
 
-    /** 日 K：amount 万元×10000、volume 手×100 + VWAP∈[low,high] 自检（字典 §3）后落 stock_daily_bar。 */
+    /**
+     * 日 K：amount 万元×10000、volume 手×100 + VWAP∈[low,high] 自检（字典 §3）后落 stock_daily_bar。
+     * vwapSelfCheck=false 仅供基准指数行（CR-1）：指数 low/high 为点位非成交价，字典 §3 检查对象
+     * 为个股价格域，对指数行不适用（否则基准 bar 恒被丢弃，tradingDays=0，即审查 F-001/CR-1）。
+     */
     private void ingestDailyBars(UniverseEntry entry, IngestCommand command,
                                  LocalDateTime fetchedAt, IngestResult result) {
+        ingestDailyBars(entry, command, fetchedAt, result, true);
+    }
+
+    private void ingestDailyBars(UniverseEntry entry, IngestCommand command,
+                                 LocalDateTime fetchedAt, IngestResult result, boolean vwapSelfCheck) {
         List<DailyBarEntry> bars = client.fetchDailyBars(
                 entry.getSinaSymbol(), command.getWarmupStart(), command.getAnalysisEnd());
         List<StockDailyBarDO> rows = new ArrayList<>(bars.size());
@@ -258,7 +277,7 @@ public class Mr0PocIngestService {
                     .closePrice(bar.getClose()).volume(bar.getVolumeHands() == null ? 0L
                             : bar.getVolumeHands().multiply(HUNDRED).longValueExact())
                     .amount(multiplyWan(bar.getAmountTenThousand())).fetchedAt(fetchedAt).build();
-            if (vwapWithinRange(row)) {
+            if (!vwapSelfCheck || vwapWithinRange(row)) {
                 rows.add(row);
             } else {
                 result.getDailyBar().addSkipped(1);

@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTROL.json",
   "startedAt": "2026-08-14T16:38:01Z",
   "lane": "L2",
-  "lifecycleState": "SELF_CHECKED",
+  "lifecycleState": "IMPLEMENTING",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTRACT.md",
     "version": "1.0",
@@ -281,11 +281,26 @@
       "to": "SELF_CHECKED",
       "at": "2026-08-14T18:23:00Z",
       "actor": "PARENT-RUN-1"
+    },
+    {
+      "sequence": 6,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-14T18:25:00Z",
+      "actor": "PARENT-RUN-1"
+    },
+    {
+      "sequence": 7,
+      "from": "CANDIDATE_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-14T18:40:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "review G1 FAIL: findings CR-1..CR-12; repair round 1"
     }
   ],
   "candidate": {
     "mode": "COMMIT",
-    "generation": 1,
+    "generation": 2,
     "identity": "",
     "commit": "",
     "treeHash": "",
@@ -293,21 +308,41 @@
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
-    "diffArtifactPath": ".qta-governance/candidates/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815/generation-1.patch",
+    "diffArtifactPath": ".qta-governance/candidates/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815/generation-2.patch",
     "diffArtifactSha256": ""
   },
   "budget": {
     "contextPercent": null,
     "contextMeasurement": "UNAVAILABLE",
     "compactionCount": 0,
-    "repairRound": 0,
+    "repairRound": 1,
     "maxRepairRounds": 2,
     "maxWaitCallsPerRole": 2,
     "maxShellPollsPerCommand": 3,
     "rawTokens": null,
     "weeklyAllowancePercent": null
   },
-  "repairHistory": [],
+  "repairHistory": [
+    {
+      "round": 1,
+      "failureFingerprint": "REVIEW-G1-CR-1-2-3-4-6-7-10",
+      "fromGeneration": 1,
+      "toGeneration": 2,
+      "findingRoleRunId": "ROLE-RUN-CR-G1",
+      "implementerRoleRunId": "ROLE-RUN-IMP-R1-G2",
+      "findingIds": [
+        "CR-1",
+        "CR-2",
+        "CR-3",
+        "CR-4",
+        "CR-6",
+        "CR-7",
+        "CR-10"
+      ],
+      "parentDisposition": "CR-5 gate bound at gen-2 freeze; CR-8/9/11/12 parent-approved disclosures/metadata in REVIEW-G1",
+      "repairedAt": "2026-08-14T19:01:00Z"
+    }
+  ],
   "roleRuns": [
     {
       "roleRunId": "ROLE-RUN-TD-G1",
@@ -438,19 +473,85 @@
       "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-SELF-CHECK-SLICE-04.md",
       "artifactSha256": "68cdc935fa66a087ce737e603dfd2bfd168d26b450dd2fcf244fd354ec5ed311"
+    },
+    {
+      "roleRunId": "ROLE-RUN-CR-G1",
+      "dispatchId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CR-G1-D1",
+      "sessionId": "agent_0da735a8-153e-4146-b7bc-07748fb9f8d4",
+      "startedAt": "2026-08-14T18:28:00Z",
+      "finishedAt": "2026-08-14T18:38:00Z",
+      "runtimeReceiptPath": "",
+      "role": "CODE_REVIEWER",
+      "generation": 1,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-code-reviewer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/ac6e8a02c3e19f746b80544c16c6394369b741ca486118cc900961fb0b8ec254/2f6ba98667bc4b0942d8e655e4359ab4f735deb7094f7144af0b7619215e1472.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only reviewer; frozen diff artifact via Read tool; no Bash, no Git, no edits",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath2": "",
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-REVIEW-G1.md",
+      "artifactSha256": "b8ae0f7a7892430fcd28716a8c490dbd47fcb994908e61ae144925c1ab243e70"
+    },
+    {
+      "roleRunId": "ROLE-RUN-IMP-R1-G2",
+      "dispatchId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-IMP-R1-G2-D1",
+      "sessionId": "agent_67b4c910-a155-4763-8745-65c70c750869",
+      "startedAt": "2026-08-14T18:40:00Z",
+      "finishedAt": "2026-08-14T19:01:00Z",
+      "runtimeReceiptPath": "",
+      "role": "IMPLEMENTER",
+      "generation": 2,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "sliceId": "SLICE-02",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_WRITE",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/ac6e8a02c3e19f746b80544c16c6394369b741ca486118cc900961fb0b8ec254/280ad2b3cf663bede34dce148f1873e944ca874bbb4393fde5e7474438b962b1.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "repair round 1 bounded paths; no Git writes; real run via frozen script; disclosed deviations recorded",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 1,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-SELF-CHECK-REPAIR-1.md",
+      "artifactSha256": "f138601f0e9803644451713408d29070ae14ef3c0ba6776cac79dc437f715432"
     }
   ],
   "review": {
     "omitted": false,
     "omissionReason": "",
-    "generation": 0,
-    "candidateIdentity": "",
-    "functionalVerdict": "NOT_REQUIRED",
-    "architectureVerdict": "NOT_REQUIRED",
-    "artifactPath": "",
-    "artifactSha256": "",
+    "generation": 1,
+    "candidateIdentity": "1d136c18195883e8551aeb9e8b6cf2c72d92fd64",
+    "functionalVerdict": "FAIL",
+    "architectureVerdict": "FAIL",
+    "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-REVIEW-G1.md",
+    "artifactSha256": "b8ae0f7a7892430fcd28716a8c490dbd47fcb994908e61ae144925c1ab243e70",
     "architectureGateSha256": "",
-    "findingIds": []
+    "findingIds": [
+      "CR-1",
+      "CR-2",
+      "CR-3",
+      "CR-4",
+      "CR-5",
+      "CR-6",
+      "CR-7",
+      "CR-8",
+      "CR-9",
+      "CR-10",
+      "CR-11",
+      "CR-12"
+    ]
   },
   "architectureGate": {
     "required": true,

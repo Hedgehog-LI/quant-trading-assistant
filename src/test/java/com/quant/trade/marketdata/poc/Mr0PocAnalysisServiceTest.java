@@ -6,6 +6,7 @@ import com.quant.trade.marketdata.poc.Mr0PocAnalysisService.AnalysisResult;
 import com.quant.trade.marketdata.poc.Mr0PocAnalysisService.DailyBreadth;
 import com.quant.trade.marketdata.poc.Mr0PocAnalysisService.IndustryTurnoverBlock;
 import com.quant.trade.marketdata.poc.Mr0PocAnalysisService.MoneyFactsBlock;
+import com.quant.trade.marketdata.poc.Mr0PocAnalysisService.UniverseBlock;
 import com.quant.trade.marketdata.poc.Mr0PocAnalysisService.VolatilityBlock;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -149,11 +150,12 @@ class Mr0PocAnalysisServiceTest {
         assertThat(days).hasSize(2);
         assertThat(days.get(0).getSumMainNetInflow()).isEqualByComparingTo("300");
         assertThat(days.get(0).getCateNaValue()).isEqualByComparingTo("350");
-        // deviation=(300−350)/|350|=−0.142857142857（手算）
-        assertThat(days.get(0).getDeviation()).isEqualByComparingTo(new BigDecimal("-0.142857142857"));
+        // deviation=Σ成员main_net_inflow−cate_na=300−350=−50（M-15 冻结绝对差，元；CR-4）
+        assertThat(days.get(0).getDeviation()).isEqualByComparingTo(new BigDecimal("-50"));
         assertThat(days.get(0).isInconsistentCateNa()).isFalse();
         assertThat(days.get(1).isInconsistentCateNa()).isTrue();
         assertThat(days.get(1).getCateNaValue()).isEqualByComparingTo("350");  // 众数（并列取较小）
+        assertThat(days.get(1).getDeviation()).isEqualByComparingTo(new BigDecimal("-150"));  // 200−350（绝对差）
         assertThat(money.getInconsistentCateNaDays()).isEqualTo(1L);
         // flowIntensity 混源：Σ净流入/Σ成交额=500/4000000
         assertThat(money.getFlowIntensity().getProviders())
@@ -196,6 +198,25 @@ class Mr0PocAnalysisServiceTest {
         assertThat(ready.getExcludedForWarmup()).isZero();
         assertThat(ready.getMarketMedian()).isNotNull();
         assertThat(ready.isAnnualized()).isFalse();
+
+        // CR-6：21 根收盘但 asOf（末交易日 2026-07-01）当日无 bar 的陈旧窗口 → 不合格计入 excluded。
+        // 与上方同理经 MyBatis 写入（jdbcTemplate 直插不刷新一级缓存，第二次分析看不到新行）。
+        mr0PocMapper.upsertUniverseSnapshotBatch(List.of(
+                com.quant.trade.marketdata.poc.Mr0PocIngestService.UniverseSnapshotRow.builder()
+                        .providerCode("SINA_PUBLIC").canonicalSymbol("SH.600520").symbol("600520")
+                        .name("股票600520").market("SH").circulatingMarketCap(new BigDecimal("1000000"))
+                        .turnoverRate(new BigDecimal("0.01")).asOfDate(LocalDate.of(2026, 6, 11))
+                        .fetchedAt(FETCHED).build()));
+        List<StockDailyBarDO> staleBars = new ArrayList<>();
+        for (int i = 0; i < 21; i++) {
+            LocalDate day = LocalDate.of(2026, 6, 10).plusDays(i);  // 06-10..06-30，均无 07-01 bar
+            staleBars.add(bar("SH.600520", day.toString(), String.valueOf(200 + i)));
+        }
+        mr0PocMapper.upsertStockDailyBarBatch(staleBars);
+        VolatilityBlock stale = service.analyze(command()).getVolatility();
+        assertThat(stale.getStatus()).isEqualTo("OK");              // SH.600519 仍合格
+        assertThat(stale.getQualifiedStocks()).isEqualTo(1L);
+        assertThat(stale.getExcludedForWarmup()).isEqualTo(1L);     // SH.600520：asOf 当日无 bar
     }
 
     // ==================== M5 波动率/流动性代理公式（字典 M-19/M-20，手算） ====================
@@ -258,7 +279,14 @@ class Mr0PocAnalysisServiceTest {
         seedBenchmarks("2026-06-30", "2026-07-01", "2026-07-02");
         seedStock("SH.600519", new String[] {"2026-06-30", "2026-07-01", "2026-07-02"},
                 new String[] {"10", "11", "12"});
+        // CR-3 附加快照行在首次 analyze 前种好（jdbcTemplate 直插不刷新 MyBatis 一级缓存）：
+        // 基准在列且市值最高也不算样本；SZ.000002 为流通市值 Top-1；SH.601398 出于 sampleSize=1 之外；
+        // SZ.301999 无市值 → 排除。首次 analyze（sampleSize 默认 150）不受影响。
         seedUniverse("2026-07-01", "SH.600519");
+        seedUniverseCap("2026-07-01", "SH.000001", "9999999");
+        seedUniverseCap("2026-07-01", "SZ.000002", "2000000");
+        seedUniverseCap("2026-07-01", "SH.601398", "500000");
+        seedUniverseCap("2026-07-01", "SZ.301999", null);
         seedMembership("2026-06-01", "new_blhy", "玻璃行业", "SH.600519");
         seedFlow("SH.600519", "2026-07-01", "100", "350");
 
@@ -278,6 +306,19 @@ class Mr0PocAnalysisServiceTest {
         assertThat(result.getMetricAttributions()).allSatisfy(attribution ->
                 assertThat(attribution.getProviders()).isNotEmpty());
         assertThat(result.getAnalysisContentHash()).hasSize(64).matches("[0-9a-f]{64}");
+
+        // CR-3：样本=最新档快照流通市值 Top-N（排除基准与 null 市值）；universeSize=Top-N+1（含基准）；
+        // universeSymbolsSha256=(Top-N ∪ 基准) 排序逗号拼接哈希
+        UniverseBlock universe = service.analyze(AnalysisCommand.builder()
+                .analysisStart(START).analysisEnd(END).sampleSize(1).build()).getUniverse();
+        assertThat(universe.getSampleSymbols()).isEqualTo(1L);
+        assertThat(universe.getSampleSymbolList()).containsExactly("SZ.000002");
+        assertThat(universe.getUniverseSize()).isEqualTo(2L);    // Top-1 + 基准
+        List<String> hashInput = new ArrayList<>(List.of("SH.000001", "SZ.000002"));
+        java.util.Collections.sort(hashInput);
+        assertThat(universe.getUniverseSymbolsSha256()).isEqualTo(sha256Hex(String.join(",", hashInput)));
+        assertThat(universe.getStatus()).isEqualTo("OK");
+        assertThat(universe.getCaliber()).contains("as_of 无上界");
     }
 
     // ==================== M7 每次调用重读存储（无缓存，关闭恒等假阳） ====================
@@ -331,11 +372,17 @@ class Mr0PocAnalysisServiceTest {
 
     private void seedUniverse(String asOf, String... symbols) {
         for (String symbol : symbols) {
-            jdbcTemplate.update("INSERT INTO mr0_universe_snapshot(provider_code, canonical_symbol, symbol,"
-                    + " name, market, turnover_rate, as_of_date, fetched_at) VALUES ('SINA_PUBLIC', ?, ?, ?,"
-                    + " 'SH', 0.01, ?, ?)", symbol, symbol.substring(3), "股票" + symbol.substring(3),
-                    LocalDate.parse(asOf), FETCHED);
+            seedUniverseCap(asOf, symbol, "1000000");
         }
+    }
+
+    /** CR-3：快照行带流通市值（元）；cap=null 表示无市值行（不得入样本）。 */
+    private void seedUniverseCap(String asOf, String symbol, String cap) {
+        jdbcTemplate.update("INSERT INTO mr0_universe_snapshot(provider_code, canonical_symbol, symbol,"
+                + " name, market, turnover_rate, circulating_market_cap, as_of_date, fetched_at)"
+                + " VALUES ('SINA_PUBLIC', ?, ?, ?, 'SH', 0.01, ?, ?, ?)", symbol, symbol.substring(3),
+                "股票" + symbol.substring(3), cap == null ? null : new BigDecimal(cap),
+                LocalDate.parse(asOf), FETCHED);
     }
 
     private void seedMembership(String asOf, String industryCode, String industryName, String... symbols) {
@@ -360,5 +407,14 @@ class Mr0PocAnalysisServiceTest {
                 .openPrice(new BigDecimal(close)).highPrice(new BigDecimal(close))
                 .lowPrice(new BigDecimal(close)).closePrice(new BigDecimal(close))
                 .volume(100000L).amount(new BigDecimal("1000000")).fetchedAt(FETCHED).build();
+    }
+
+    private static String sha256Hex(String input) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 不可用", exception);
+        }
     }
 }

@@ -37,10 +37,11 @@ public interface Mr0PocAnalysisMapper {
     /**
      * 证券池快照行（symbol 升序、as_of 倒序，调用方取最新一档）。asOfDate=null 不设上界：真实 PoC 用
      * 抓取日快照聚合历史窗口，须可见且由 TIME_POINT_LOOKAHEAD 族显式标记（冻结测试 M4 场景）。
+     * circulating_market_cap 供 CR-3 样本派生（最新档快照流通市值 Top-N）。
      */
     @Select("""
             <script>
-            SELECT canonical_symbol, name, market, turnover_rate, provider_code, as_of_date
+            SELECT canonical_symbol, name, market, turnover_rate, circulating_market_cap, provider_code, as_of_date
             FROM mr0_universe_snapshot
             WHERE provider_code = #{providerCode}
             <if test="asOfDate != null">AND as_of_date &lt;= #{asOfDate}</if>
@@ -99,9 +100,9 @@ public interface Mr0PocAnalysisMapper {
         private LocalDateTime fetchedAt;
     }
 
-    /** 证券池快照只读行。 */
+    /** 证券池快照只读行（circulatingMarketCap 单位元，CR-3 Top-N 排序键；基准行该列为 null）。 */
     @Data
-    class UniverseRow { private String canonicalSymbol, name, market, providerCode; private BigDecimal turnoverRate; private LocalDate asOfDate; }
+    class UniverseRow { private String canonicalSymbol, name, market, providerCode; private BigDecimal turnoverRate, circulatingMarketCap; private LocalDate asOfDate; }
 
     /** 行业成分只读行。 */
     @Data

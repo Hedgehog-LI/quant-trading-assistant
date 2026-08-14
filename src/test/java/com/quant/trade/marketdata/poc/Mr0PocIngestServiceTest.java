@@ -73,7 +73,10 @@ class Mr0PocIngestServiceTest {
     void ingestDailyBarsTwiceWritesNoDuplicates() {
         IngestResult first = service.ingest(command());
         Long countAfterFirst = tencentBarCount();
-        assertThat(first.getDailyBar().getInserted()).isEqualTo(6L);
+        // 样本(sh600519 4 行 + sz000001 2 行) + 基准 sh000001 1 行（CR-1 恒抓）
+        assertThat(first.getDailyBar().getInserted()).isEqualTo(7L);
+        // 基准不算样本：sampleSymbols 不含 SH.000001
+        assertThat(first.getSampleSymbols()).doesNotContain("SH.000001");
 
         // 值可更新：变更 fixture 中 2026-07-02 成交额后重跑，行数不变、值更新
         fixtureClient.overrideDailyBarAmount("sh600519", "2026-07-02", "450000.00");
@@ -81,12 +84,22 @@ class Mr0PocIngestServiceTest {
 
         assertThat(tencentBarCount()).isEqualTo(countAfterFirst);
         assertThat(second.getDailyBar().getInserted()).isZero();
-        assertThat(second.getDailyBar().getUpdated()).isEqualTo(6L);
+        assertThat(second.getDailyBar().getUpdated()).isEqualTo(7L);
         BigDecimal amount = jdbcTemplate.queryForObject(
                 "SELECT amount FROM stock_daily_bar WHERE canonical_symbol='SH.600519'"
                         + " AND trade_date='2026-07-02' AND adjust_type='NONE' AND data_source='TENCENT_PUBLIC'",
                 BigDecimal.class);
         assertThat(amount).isEqualByComparingTo("4500000000");
+
+        // CR-1：基准 SH.000001 日 K 行存在（TENCENT_PUBLIC/NONE）且二次导入幂等不新增；
+        // 收盘价来自 fixture sh000001 真实探针行（3424.612 指数点位）
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM stock_daily_bar WHERE canonical_symbol='SH.000001'"
+                        + " AND adjust_type='NONE' AND data_source='TENCENT_PUBLIC'", Long.class)).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT close_price FROM stock_daily_bar WHERE canonical_symbol='SH.000001'"
+                        + " AND trade_date='2026-07-01' AND adjust_type='NONE' AND data_source='TENCENT_PUBLIC'",
+                BigDecimal.class)).isEqualByComparingTo("3424.612");
     }
 
     // ==================== M2 Provider 标签 ====================
@@ -235,11 +248,13 @@ class Mr0PocIngestServiceTest {
         assertThat(identity.get("canonical_symbol")).isEqualTo("SH.600519");
         assertThat(identity.get("name")).isEqualTo("贵州茅台OLD");
         assertThat((java.sql.Date) identity.get("list_date")).isEqualTo(java.sql.Date.valueOf("2001-08-27"));
-        // 样本内另一证券被回填、样本外（SH.601398）不回填
+        // 样本内另一证券被回填、样本外（SH.601398）不回填；基准不参与 ensureRegistered（CR-1）
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(1) FROM stock_basic WHERE canonical_symbol='SZ.000001'", Long.class)).isEqualTo(1L);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(1) FROM stock_basic WHERE canonical_symbol='SH.601398'", Long.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM stock_basic WHERE canonical_symbol='SH.000001'", Long.class)).isZero();
     }
 
     // ==================== helpers ====================

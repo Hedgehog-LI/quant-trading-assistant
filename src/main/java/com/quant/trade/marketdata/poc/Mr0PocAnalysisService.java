@@ -18,10 +18,13 @@ import java.util.*;
 
 /**
  * MR-0 PoC 分析引擎（AC-05）。只读库（Mr0PocAnalysisMapper）、零外联、无进程内结果缓存。
+ * 样本派生（CR-3）：最新档快照流通市值降序 Top-N（默认 150；排除基准与 null 市值），
+ * universeSize=Top-N+1（含基准）；全池快照行仅作事实保留，不进任何分母。
  * 公式冻结于 docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md：adLine 首日种子=adv(t0)−dec(t0)；
  * advanceRatio=adv/validStocks，validStocks=0 → EMPTY_VALID_UNIVERSE 禁止 NaN；占比覆盖域=有成分的
- * 样本股，无成分股票计入 coverageGap 不入分母，Σshare=1±1e-6；rv20=简单收益 ddof=1 不年化；
- * illiquidity=|r|/amount(元)；行业净流入与 cate_na 只报偏差不判等；flowIntensity 混源必须标注。
+ * 样本股，无成分股票计入 coverageGap 不入分母，Σshare=1±1e-6；rv20=简单收益 ddof=1 不年化且要求
+ * asOf 当日有 bar（CR-6）；illiquidity=|r|/amount(元)；行业净流入与 cate_na 偏差=绝对差元（M-15，
+ * CR-4）只报告不判等；flowIntensity 混源必须标注；share/sumShare 输出 10 位小数（CR-10）。
  * 失效场景：NONE 复权除权日收益失真（D7）；当前成分聚合历史=时点穿越（质量族标记；快照/成分读取
  * 不设 as-of 上界，取分析时点可见最新档——冻结 TEST-06 M4 场景）。
  */
@@ -47,10 +50,11 @@ public class Mr0PocAnalysisService {
 
     private final Mr0PocAnalysisMapper mapper;
 
-    /** 分析命令；默认即冻结 PoC 窗口（D5）。 */
+    /** 分析命令；默认即冻结 PoC 窗口与样本规模（D5；CR-3 Top-N=150）。 */
     @Data @Builder public static class AnalysisCommand {
         @Builder.Default private LocalDate analysisStart = LocalDate.of(2026, 7, 1);
         @Builder.Default private LocalDate analysisEnd = LocalDate.of(2026, 7, 31);
+        @Builder.Default private int sampleSize = 150;
     }
 
     /** 分析结果（runId/generatedAt/durationMs 为运行元数据，不参与 analysisContentHash）。 */
@@ -62,7 +66,7 @@ public class Mr0PocAnalysisService {
         private LiquidityProxyBlock liquidityProxy; private MoneyFactsBlock moneyFacts;
         private List<MetricAttribution> metricAttributions; private List<String> mixedMetrics;
     }
-    @Data @Builder public static class UniverseBlock { private LocalDate asOfDate; private long universeSize, sampleSymbols; private String benchmarkSymbol, universeSymbolsSha256, status, caliber; private List<String> providers; }
+    @Data @Builder public static class UniverseBlock { private LocalDate asOfDate; private long universeSize, sampleSymbols; private List<String> sampleSymbolList; private String benchmarkSymbol, universeSymbolsSha256, status, caliber; private List<String> providers; }
     @Data @Builder public static class TradingDaysBlock { private String calendar; private List<String> dates; private int count; private List<String> providers; }
     @Data @Builder public static class BreadthBlock { private String caliber; private List<DailyBreadth> daily; private List<String> providers; }
     @Data @Builder public static class DailyBreadth { private String date, status; private long advancing, declining, flat, validStocks; private BigDecimal advanceRatio; private Long adLine; }
@@ -93,8 +97,18 @@ public class Mr0PocAnalysisService {
         LocalDate universeAsOf = universeRows.isEmpty() ? null : universeRows.get(0).getAsOfDate();
         List<Mr0PocAnalysisMapper.UniverseRow> latestSnapshot = universeAsOf == null ? List.of()
                 : universeRows.stream().filter(row -> universeAsOf.equals(row.getAsOfDate())).toList();
-        List<String> snapshotSymbols = latestSnapshot.stream().map(Mr0PocAnalysisMapper.UniverseRow::getCanonicalSymbol).distinct().sorted().toList();
-        List<String> sampleSymbols = snapshotSymbols.stream().filter(symbol -> !BENCHMARK.equals(symbol)).toList();
+        // CR-3：样本=最新档快照流通市值降序 Top-N（排除基准与 null 市值；全池快照行仅作事实保留），
+        // coverageGap/excludedForWarmup/COVERAGE/GAPS 全部以该 Top-N 样本为分母口径。
+        List<String> sampleSymbols = latestSnapshot.stream()
+                .filter(row -> !BENCHMARK.equals(row.getCanonicalSymbol()))
+                .filter(row -> row.getCirculatingMarketCap() != null)
+                .sorted(Comparator.comparing(Mr0PocAnalysisMapper.UniverseRow::getCirculatingMarketCap).reversed()
+                        .thenComparing(Mr0PocAnalysisMapper.UniverseRow::getCanonicalSymbol))
+                .limit(Math.max(command.getSampleSize(), 0))
+                .map(Mr0PocAnalysisMapper.UniverseRow::getCanonicalSymbol).distinct().sorted().toList();
+        List<String> hashSymbols = new ArrayList<>(sampleSymbols);
+        hashSymbols.add(BENCHMARK);  // 哈希=Top-N ∪ 基准（排序后），检测样本漂移
+        Collections.sort(hashSymbols);
         Map<String, Mr0PocAnalysisMapper.MembershipRow> membership = new LinkedHashMap<>();
         for (Mr0PocAnalysisMapper.MembershipRow row : mapper.selectIndustryMemberships(null, TAXONOMY_SINA_INDUSTRY)) { membership.putIfAbsent(row.getCanonicalSymbol(), row); }
         List<LocalDate> benchmarkDays = new ArrayList<>(closes.getOrDefault(BENCHMARK, new TreeMap<>()).keySet());
@@ -106,10 +120,13 @@ public class Mr0PocAnalysisService {
                 flows.computeIfAbsent(row.getCanonicalSymbol(), k -> new TreeMap<>()).put(row.getTradeDate(), row));
         AnalysisResult result = AnalysisResult.builder().runId(UUID.randomUUID().toString()).generatedAt(LocalDateTime.now())
                 .analysisStart(start).analysisEnd(end)
-                .universe(UniverseBlock.builder().asOfDate(universeAsOf).universeSize(latestSnapshot.size()).sampleSymbols(sampleSymbols.size())
-                        .benchmarkSymbol(BENCHMARK).universeSymbolsSha256(sha256(String.join(",", snapshotSymbols)))
-                        .status(latestSnapshot.isEmpty() ? STATUS_EMPTY : "OK")
-                        .caliber("最新 as_of≤窗口结束日的证券池快照；基准恒入快照不算样本").providers(List.of(PROVIDER_SINA_PUBLIC)).build())
+                .universe(UniverseBlock.builder().asOfDate(universeAsOf)
+                        .universeSize(sampleSymbols.size() + 1L).sampleSymbols(sampleSymbols.size())
+                        .sampleSymbolList(sampleSymbols).benchmarkSymbol(BENCHMARK)
+                        .universeSymbolsSha256(sha256(String.join(",", hashSymbols)))
+                        .status(latestSnapshot.isEmpty() || sampleSymbols.isEmpty() ? STATUS_EMPTY : "OK")
+                        .caliber("分析时点可见最新档快照（as_of 无上界；时点穿越由 TIME_POINT_LOOKAHEAD 族显式标记）；基准恒入快照不算样本")
+                        .providers(List.of(PROVIDER_SINA_PUBLIC)).build())
                 .tradingDays(TradingDaysBlock.builder().calendar(CALENDAR).dates(tradingDays.stream().map(LocalDate::toString).toList())
                         .count(tradingDays.size()).providers(List.of(PROVIDER_TENCENT_PUBLIC)).build())
                 .breadth(breadth(tradingDays, prevDay, closes, sampleSymbols))
@@ -182,13 +199,15 @@ public class Mr0PocAnalysisService {
             BigDecimal sumShare = BigDecimal.ZERO;
             for (BigDecimal sector : sectorSum.values()) { sumShare = sumShare.add(sector.divide(market, 10, RoundingMode.HALF_UP)); }
             if (!sectorSum.isEmpty()) {
-                dailyMarket.add(DailyMarketTurnover.builder().date(day.toString()).marketTurnover(setScale(market)).sumShare(setScale(sumShare)).build());
+                dailyMarket.add(DailyMarketTurnover.builder().date(day.toString()).marketTurnover(setScale(market))
+                        .sumShare(setScale10(sumShare)).build());  // CR-10：占比输出 10 位小数
             }
             for (Map.Entry<String, BigDecimal> sector : sectorSum.entrySet()) {
                 byIndustryMap.computeIfAbsent(sector.getKey(), code -> IndustryTurnover.builder().industryCode(code)
                         .industryName(industryNames.getOrDefault(code, code)).days(new ArrayList<>()).build())
                         .getDays().add(IndustryDay.builder().date(day.toString()).sectorTurnover(setScale(sector.getValue()))
-                                .share(setScale(sector.getValue().divide(market, 10, RoundingMode.HALF_UP))).lookaheadAffected(lookahead).build());
+                                .share(setScale10(sector.getValue().divide(market, 10, RoundingMode.HALF_UP)))  // CR-10
+                                .lookaheadAffected(lookahead).build());
             }
         }
         List<String> gap = sampleSymbols.stream().filter(symbol -> membership.get(symbol) == null).sorted().toList();
@@ -203,8 +222,10 @@ public class Mr0PocAnalysisService {
         List<BigDecimal> vols = new ArrayList<>();
         long excluded = 0;
         for (String symbol : sampleSymbols) {
-            List<BigDecimal> history = asOf == null ? List.of()
-                    : List.copyOf(closes.getOrDefault(symbol, new TreeMap<>()).headMap(asOf, true).values());
+            TreeMap<LocalDate, BigDecimal> series = closes.getOrDefault(symbol, new TreeMap<>());
+            // CR-6：asOf 当日必须有 bar（headMap 会接受无 asOf bar 的陈旧窗口，视为不合格）
+            if (asOf == null || !series.containsKey(asOf)) { excluded++; continue; }
+            List<BigDecimal> history = List.copyOf(series.headMap(asOf, true).values());
             if (history.size() < 21) { excluded++; continue; }  // 边界两侧：恰好 21=成功，20=阻断
             vols.add(realizedVol20(history.subList(history.size() - 21, history.size())));
         }
@@ -278,8 +299,8 @@ public class Mr0PocAnalysisService {
                 BigDecimal cateNa = modeOf(cateNas);  // 同行业成员同值；不一致取众数（并列取较小）
                 industryDays.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
                         .add(MoneyDay.builder().date(day.toString()).sumMainNetInflow(setScale(sum)).cateNaValue(cateNa)
-                                .deviation(cateNa == null || cateNa.signum() == 0 ? null
-                                        : sum.subtract(cateNa).divide(cateNa.abs(), 12, RoundingMode.HALF_UP))
+                                // CR-4：字典 M-15 冻结绝对差（元）deviation=Σ成员净流入−cate_na；cate_na null→null
+                                .deviation(cateNa == null ? null : sum.subtract(cateNa))
                                 .inconsistentCateNa(inconsistent).build());
             }
         }
@@ -377,6 +398,9 @@ public class Mr0PocAnalysisService {
     }
 
     private static BigDecimal setScale(BigDecimal value) { return value == null ? null : value.setScale(2, RoundingMode.HALF_UP); }
+
+    /** CR-10：share/sumShare 输出 10 位小数（与 ε=1e-6 求和容差同数量级，去除 2 位粗粒度）。 */
+    private static BigDecimal setScale10(BigDecimal value) { return value == null ? null : value.setScale(10, RoundingMode.HALF_UP); }
 
     private static String sha256(String input) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8))); }
