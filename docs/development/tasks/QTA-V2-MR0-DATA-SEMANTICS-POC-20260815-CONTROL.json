@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTROL.json",
   "startedAt": "2026-08-14T16:38:01Z",
   "lane": "L2",
-  "lifecycleState": "FINALIZED",
+  "lifecycleState": "DELIVERY_READY",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTRACT.md",
     "version": "1.0",
@@ -423,6 +423,14 @@
       "at": "2026-08-14T20:12:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "finalization artifacts written, docs synced"
+    },
+    {
+      "sequence": 24,
+      "from": "FINALIZED",
+      "to": "DELIVERY_READY",
+      "at": "2026-08-14T20:15:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "delivery-ready gate"
     }
   ],
   "candidate": {
@@ -891,7 +899,7 @@
         "dueDate": "2026-08-15"
       }
     ],
-    "reportPath": ".qta-governance/candidates/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815/arch-gate-g3.json",
+    "reportPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-ARCH-GATE-G3.json",
     "reportSha256": "f00bb5d5732fd6e9d3a5f6bb4482e45cb86f6c29d01c68312ab1a875ab25e596",
     "generatedBy": "scripts/check-ai-architecture.mjs"
   },

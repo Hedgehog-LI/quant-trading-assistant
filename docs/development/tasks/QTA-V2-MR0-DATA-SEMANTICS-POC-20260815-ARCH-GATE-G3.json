@@ -1,0 +1,385 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/check-ai-architecture.mjs",
+  "generatedAt": "2026-08-14T19:44:08.604Z",
+  "candidateIdentity": "981cd47ff56e60a871a53c5c572f4fe484e306e8",
+  "base": "fcf758c23829ea13216291e180a640e5d30ab81a",
+  "manifestPath": "",
+  "architectureReviewCount": 2,
+  "files": [
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisMapper.java",
+      "lines": 52,
+      "methods": 0,
+      "longestMethod": 0,
+      "methodLengths": [],
+      "dependencies": 5,
+      "responsibilities": [
+        "persistence",
+        "provider"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisService.java",
+      "lines": 358,
+      "methods": 16,
+      "longestMethod": 55,
+      "methodLengths": [
+        {
+          "name": "analyze",
+          "lines": 55
+        },
+        {
+          "name": "breadth",
+          "lines": 32
+        },
+        {
+          "name": "industryTurnover",
+          "lines": 39
+        },
+        {
+          "name": "volatility",
+          "lines": 20
+        },
+        {
+          "name": "liquidity",
+          "lines": 27
+        },
+        {
+          "name": "moneyFacts",
+          "lines": 54
+        },
+        {
+          "name": "computeContentHash",
+          "lines": 11
+        },
+        {
+          "name": "canonicalize",
+          "lines": 15
+        },
+        {
+          "name": "attributions",
+          "lines": 10
+        },
+        {
+          "name": "realizedVol20",
+          "lines": 8
+        },
+        {
+          "name": "ratio",
+          "lines": 1
+        },
+        {
+          "name": "percentile",
+          "lines": 7
+        },
+        {
+          "name": "modeOf",
+          "lines": 5
+        },
+        {
+          "name": "setScale",
+          "lines": 1
+        },
+        {
+          "name": "setScale10",
+          "lines": 1
+        },
+        {
+          "name": "sha256",
+          "lines": 4
+        }
+      ],
+      "dependencies": 7,
+      "responsibilities": [
+        "persistence",
+        "search-scoring"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocController.java",
+      "lines": 58,
+      "methods": 4,
+      "longestMethod": 8,
+      "methodLengths": [
+        {
+          "name": "ingest",
+          "lines": 6
+        },
+        {
+          "name": "analyze",
+          "lines": 3
+        },
+        {
+          "name": "report",
+          "lines": 8
+        },
+        {
+          "name": "command",
+          "lines": 4
+        }
+      ],
+      "dependencies": 3,
+      "responsibilities": [
+        "http",
+        "provider"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocIngestService.java",
+      "lines": 285,
+      "methods": 13,
+      "longestMethod": 45,
+      "methodLengths": [
+        {
+          "name": "accumulate",
+          "lines": 8
+        },
+        {
+          "name": "addSkipped",
+          "lines": 3
+        },
+        {
+          "name": "ingest",
+          "lines": 45
+        },
+        {
+          "name": "fetchUniverseAll",
+          "lines": 11
+        },
+        {
+          "name": "upsertUniverse",
+          "lines": 18
+        },
+        {
+          "name": "fetchMemberships",
+          "lines": 39
+        },
+        {
+          "name": "ingestDailyBars",
+          "lines": 3
+        },
+        {
+          "name": "ingestDailyBars",
+          "lines": 31
+        },
+        {
+          "name": "ingestMoneyFlow",
+          "lines": 21
+        },
+        {
+          "name": "vwapWithinRange",
+          "lines": 8
+        },
+        {
+          "name": "multiplyWan",
+          "lines": 3
+        },
+        {
+          "name": "percentToDecimal",
+          "lines": 3
+        },
+        {
+          "name": "reason",
+          "lines": 4
+        }
+      ],
+      "dependencies": 11,
+      "responsibilities": [
+        "persistence",
+        "provider",
+        "search-scoring"
+      ],
+      "warnings": [
+        "direct dependencies 11 > 10"
+      ],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocMapper.java",
+      "lines": 23,
+      "methods": 0,
+      "longestMethod": 0,
+      "methodLengths": [],
+      "dependencies": 0,
+      "responsibilities": [
+        "persistence",
+        "file-protocol"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocQualityService.java",
+      "lines": 248,
+      "methods": 15,
+      "longestMethod": 33,
+      "methodLengths": [
+        {
+          "name": "toMarkdown",
+          "lines": 11
+        },
+        {
+          "name": "generateReport",
+          "lines": 5
+        },
+        {
+          "name": "coverage",
+          "lines": 22
+        },
+        {
+          "name": "gaps",
+          "lines": 20
+        },
+        {
+          "name": "duplicates",
+          "lines": 15
+        },
+        {
+          "name": "staleness",
+          "lines": 17
+        },
+        {
+          "name": "lookahead",
+          "lines": 19
+        },
+        {
+          "name": "providerMixing",
+          "lines": 18
+        },
+        {
+          "name": "emptyProviders",
+          "lines": 3
+        },
+        {
+          "name": "unitAnomaly",
+          "lines": 32
+        },
+        {
+          "name": "scanForbiddenTokens",
+          "lines": 8
+        },
+        {
+          "name": "recomputeConsistency",
+          "lines": 33
+        },
+        {
+          "name": "tencentBars",
+          "lines": 3
+        },
+        {
+          "name": "sampleListOf",
+          "lines": 4
+        },
+        {
+          "name": "family",
+          "lines": 4
+        }
+      ],
+      "dependencies": 2,
+      "responsibilities": [
+        "persistence"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/PublicMarketDataClient.java",
+      "lines": 186,
+      "methods": 15,
+      "longestMethod": 17,
+      "methodLengths": [
+        {
+          "name": "fetchUniversePage",
+          "lines": 4
+        },
+        {
+          "name": "fetchIndustryCatalog",
+          "lines": 3
+        },
+        {
+          "name": "fetchIndustryMembers",
+          "lines": 7
+        },
+        {
+          "name": "fetchDailyBars",
+          "lines": 17
+        },
+        {
+          "name": "fetchMoneyFlow",
+          "lines": 5
+        },
+        {
+          "name": "parseList",
+          "lines": 1
+        },
+        {
+          "name": "httpGet",
+          "lines": 16
+        },
+        {
+          "name": "parseNodeEntries",
+          "lines": 11
+        },
+        {
+          "name": "parseCatalog",
+          "lines": 14
+        },
+        {
+          "name": "toCanonical",
+          "lines": 7
+        },
+        {
+          "name": "parseList",
+          "lines": 11
+        },
+        {
+          "name": "readTree",
+          "lines": 11
+        },
+        {
+          "name": "decimal",
+          "lines": 6
+        },
+        {
+          "name": "decimalOf",
+          "lines": 3
+        },
+        {
+          "name": "snippet",
+          "lines": 4
+        }
+      ],
+      "dependencies": 5,
+      "responsibilities": [
+        "persistence",
+        "provider"
+      ],
+      "warnings": [],
+      "errors": []
+    }
+  ],
+  "additions": 1495,
+  "warnings": [
+    {
+      "id": "ARCH-W-001",
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocIngestService.java",
+      "message": "direct dependencies 11 > 10"
+    },
+    {
+      "id": "ARCH-W-002",
+      "file": "<candidate>",
+      "message": "candidate adds 1495 production lines across 7 files"
+    }
+  ],
+  "errorCount": 0,
+  "errors": [],
+  "status": "PASS",
+  "exitCode": 0
+}
