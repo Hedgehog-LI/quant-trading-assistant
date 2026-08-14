@@ -1,0 +1,387 @@
+{
+  "schemaVersion": 3,
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "controlPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTROL.json",
+  "startedAt": "2026-08-14T16:38:01Z",
+  "lane": "L2",
+  "lifecycleState": "CONTRACT_FROZEN",
+  "contract": {
+    "path": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTRACT.md",
+    "version": "1.0",
+    "sha256": "8ba3b1aa7668fe5597b8ab164a1ebf49c5c312819769b94d3de3f1ac09a12e79",
+    "acceptanceCriteria": [
+      {
+        "id": "AC-01",
+        "requiredEvidence": [
+          "STATIC"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "requiredEvidence": [
+          "STATIC"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "requiredEvidence": [
+          "STATIC"
+        ]
+      },
+      {
+        "id": "AC-04",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-05",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-06",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-07",
+        "requiredEvidence": [
+          "RUNTIME"
+        ]
+      },
+      {
+        "id": "AC-08",
+        "requiredEvidence": [
+          "STATIC"
+        ]
+      }
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "Freeze MR-0 metric dictionary, provider capability matrix, and current-state data inventory documents",
+        "acIds": [
+          "AC-01",
+          "AC-02",
+          "AC-03"
+        ],
+        "allowedWritePaths": [
+          "docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md",
+          "docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md",
+          "docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md"
+        ],
+        "maxExpectedFiles": 3,
+        "maxProductionLineDelta": 1
+      },
+      {
+        "id": "SLICE-02",
+        "description": "V23 minimal migration (mr0_ fact tables), public no-auth provider client, idempotent ingest service and tests",
+        "acIds": [
+          "AC-04"
+        ],
+        "allowedWritePaths": [
+          "src/main/resources/db/migration/V23__add_mr0_poc_tables.sql",
+          "src/main/java/com/quant/trade/marketdata/poc/",
+          "src/main/resources/mapper/Mr0PocMapper.xml",
+          "src/test/java/com/quant/trade/marketdata/poc/",
+          "src/test/resources/mr0/mr0-public-probe-fixtures.json"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-03",
+        "description": "MR-0 analysis engine (breadth, industry turnover share, volatility, liquidity proxy, money facts), quality report engine, REST endpoints, API doc section",
+        "acIds": [
+          "AC-05",
+          "AC-06"
+        ],
+        "allowedWritePaths": [
+          "src/main/java/com/quant/trade/marketdata/poc/",
+          "src/test/java/com/quant/trade/marketdata/poc/",
+          "docs/api/MARKET_RESEARCH_API.md"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 500
+      },
+      {
+        "id": "SLICE-04",
+        "description": "One-shot reproducible PoC run script, real 2026-07 trading-month execution, POC report/evidence artifacts and MR-1 input boundary",
+        "acIds": [
+          "AC-07",
+          "AC-08"
+        ],
+        "allowedWritePaths": [
+          "scripts/run-mr0-poc.sh",
+          "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md",
+          "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-EVIDENCE.json"
+        ],
+        "maxExpectedFiles": 4,
+        "maxProductionLineDelta": 200
+      }
+    ],
+    "testInventory": [
+      {
+        "testId": "TEST-01",
+        "acIds": [
+          "AC-01"
+        ],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md",
+        "selector": "grep -c '^### M-' docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md -> >=15"
+      },
+      {
+        "testId": "TEST-02",
+        "acIds": [
+          "AC-02"
+        ],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md",
+        "selector": "grep status markers and TUSHARE/LONGBRIDGE/TENCENT_PUBLIC/SINA_PUBLIC/SOHU_PUBLIC rows -> >=5 each"
+      },
+      {
+        "testId": "TEST-03",
+        "acIds": [
+          "AC-03"
+        ],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md",
+        "selector": "grep -c '^## I-' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md -> >=9"
+      },
+      {
+        "testId": "TEST-04",
+        "acIds": [
+          "AC-04"
+        ],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocIngestServiceTest.java",
+        "selector": "./mvnw -q test -Dtest=Mr0PocIngestServiceTest (6 methods: ingestDailyBarsTwiceWritesNoDuplicates, ingestRowsCarryPublicProviderLabel, ingestPreservesExistingProviderRows, ingestConvertsUnitsPerFrozenDictionary, ingestMembershipAndMoneyFlowAreIdempotentWithPointInTimeColumns, ingestBackfillsMinimalStockBasicIdentityIdempotently)"
+      },
+      {
+        "testId": "TEST-05",
+        "acIds": [
+          "AC-05"
+        ],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisServiceTest.java",
+        "selector": "./mvnw -q test -Dtest=Mr0PocAnalysisServiceTest (7 methods: marketBreadthMatchesDictionaryFormulas, industryTurnoverShareSumsWithinCoverage, moneyFlowIndustryDeviationIsReported, analysisBlocksWhenWarmupInsufficient, volatilityAndLiquidityProxyMatchDictionaryFormulas, everyAnalysisMetricCarriesSingleProviderAttribution, analysisRereadsStorageEachCall)"
+      },
+      {
+        "testId": "TEST-06",
+        "acIds": [
+          "AC-06"
+        ],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocQualityServiceTest.java",
+        "selector": "./mvnw -q test -Dtest=Mr0PocQualityServiceTest (5 methods incl. nested analyzeAndReportDoNotInvokePublicClient)"
+      },
+      {
+        "testId": "TEST-07",
+        "acIds": [
+          "AC-07"
+        ],
+        "kind": "RUNTIME",
+        "required": true,
+        "sourcePath": "scripts/run-mr0-poc.sh",
+        "selector": "bash scripts/run-mr0-poc.sh (exit 0; POC-EVIDENCE.json key set + analysisHashRun1==analysisHashRun2 + second ingest inserted=0)"
+      },
+      {
+        "testId": "TEST-08",
+        "acIds": [
+          "AC-08"
+        ],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md",
+        "selector": "grep -c 'MR-1 输入边界' -> >=1 with four required elements present"
+      },
+      {
+        "testId": "TEST-FULL",
+        "acIds": [
+          "AC-01",
+          "AC-02",
+          "AC-03",
+          "AC-04",
+          "AC-05",
+          "AC-06",
+          "AC-07",
+          "AC-08"
+        ],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "pom.xml",
+        "selector": "./mvnw -q test && ./mvnw -q -DskipTests package"
+      }
+    ],
+    "blockingAmendments": [
+      {
+        "id": "AMD-1",
+        "verdict": "ACCEPTED",
+        "summary": "AC-07/TEST-07 exit-code semantics, hash field whitelist, second-ingest step, evidence JSON key set"
+      },
+      {
+        "id": "AMD-2",
+        "verdict": "ACCEPTED",
+        "summary": "AC-04/TEST-04 six ingest test methods incl. unit conversion and identity backfill; single fixture file under src/test/resources/mr0/"
+      },
+      {
+        "id": "AMD-3",
+        "verdict": "ACCEPTED",
+        "summary": "AC-01/AC-05 frozen A/D seed, volatility spec, epsilon and coverage domain; seven analysis test methods; warmup boundary both sides"
+      }
+    ]
+  },
+  "git": {
+    "automation": "COMMIT_AND_CHECKPOINT_PUSH",
+    "branch": "codex/qta-v2-mr0-data-semantics-poc",
+    "baselineCommit": "fcf758c23829ea13216291e180a640e5d30ab81a",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-14T16:38:01Z",
+      "actor": "PARENT-RUN-1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "TEST_DESIGN_READY",
+      "at": "2026-08-14T16:42:00Z",
+      "actor": "PARENT-RUN-1"
+    },
+    {
+      "sequence": 3,
+      "from": "TEST_DESIGN_READY",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-14T16:48:00Z",
+      "actor": "PARENT-RUN-1"
+    }
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": ".qta-governance/candidates/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815/generation-1.patch",
+    "diffArtifactSha256": ""
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [
+    {
+      "roleRunId": "ROLE-RUN-TD-G1",
+      "sessionId": "agent_470d4fc9-1c21-47be-b633-e4cae21741b8",
+      "startedAt": "2026-08-14T16:41:00Z",
+      "finishedAt": "2026-08-14T16:47:00Z",
+      "runtimeReceiptPath": "",
+      "role": "TEST_DESIGNER",
+      "generation": 0,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only qta-test-designer; no edits, no Git, no shell; parent persists returned artifact",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-TEST-DESIGN.md",
+      "artifactSha256": "c07ab913c7897b3d23a4df8e61cb1f3e060adba6bb9f6932ee122e9d7b5e408b",
+      "dispatchId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-TD-G1-D1",
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-test-designer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/ac6e8a02c3e19f746b80544c16c6394369b741ca486118cc900961fb0b8ec254/cd3d19887ac46542e3fe41ee23c0d0a478beb430d2cf4e835a0b66100c728627.json"
+    }
+  ],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_REQUIRED",
+    "architectureVerdict": "NOT_REQUIRED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "architectureGate": {
+    "required": true,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": -1,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {
+        "required": true,
+        "status": "NOT_VERIFIED"
+      },
+      "AUTOMATION": {
+        "required": true,
+        "status": "NOT_VERIFIED"
+      },
+      "RUNTIME": {
+        "required": true,
+        "status": "NOT_VERIFIED"
+      },
+      "DEPLOYMENT": {
+        "required": false,
+        "status": "NOT_REQUIRED"
+      }
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
