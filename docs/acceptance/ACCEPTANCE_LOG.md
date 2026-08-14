@@ -741,3 +741,10 @@
 - 后端基础测试 + 前端基础测试通过（具体数量低于 v0.1.1，已被后续版本覆盖）。
 - Docker 冷构建 + 联调通过。
 - 详细结果见 `../BUILD_CHECKLIST.md` 第 2-5 节勾选项。
+## 2026-08-13 — P1.9-D 行情采集与资产查看闭环（自动化通过，待部署验收）
+
+- 后端全量 `./mvnw -q test`：**519 tests / 0 failures / 0 errors / 1 skipped**，`./mvnw -q -DskipTests package` 通过；H2 MySQL 模式覆盖 `INSERT IGNORE` 幂等登记、旧 bar 无主数据兼容和资产目录聚合 SQL。
+- 前端 `npm run typecheck`、`npm run lint`、`npm run test -- --run`、`npm run build`：**51 files / 399 tests** 通过；聚焦覆盖资产目录、未登记 404 空态、已登记无数据和详情回归。
+- 静态边界：无新 migration、无远程失败回退 mock、无固定真实证券合成入口；资产目录只认真实日 K/分钟 K 行。
+- **本地运行**：`docker compose up -d --build` 成功，MySQL 8.4 healthy、后端 health UP；`GET /api/v1/market-data/assets` 和 `market=CN` 均 200，从本地 MySQL 聚合出 7 只实际已入库资产；未知证券 availability 返回 404 + `STOCK_NOT_FOUND`。浏览器验证 mock 资产目录与全局布局无固定真实证券、无大水印、无全局重复风险提示。
+- **未执行**：服务器部署与服务器 remote 浏览器验收；当前结论为本地 `RUNTIME_VERIFIED`，不标记 `DEPLOYED`。

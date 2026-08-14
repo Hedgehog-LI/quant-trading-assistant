@@ -16,6 +16,7 @@ import com.quant.trade.marketdata.provider.MarketDataProvider;
 import com.quant.trade.marketdata.provider.MarketDataProvider.ProviderDailyBar;
 import com.quant.trade.marketdata.provider.MarketDataProvider.ProviderQuote;
 import com.quant.trade.marketdata.util.CanonicalSymbolUtils;
+import com.quant.trade.marketdata.manager.StockBasicRegistrationManager;
 import com.quant.trade.marketdata.vo.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,7 @@ public class MarketQuoteService {
     private final MarketDataAlertMapper alertMapper;
     private final StockDailyBarMapper dailyBarMapper;
     private final SyncScopeLockMapper syncScopeLockMapper;
+    private final StockBasicRegistrationManager stockBasicRegistrationManager;
     private final TransactionTemplate txRequiresNew;
     private final ObjectMapper objectMapper;
 
@@ -136,6 +138,7 @@ public class MarketQuoteService {
         } catch (IllegalArgumentException exception) {
             throw new BusinessException(ErrorCodeEnum.INVALID_CANONICAL_SYMBOL, exception.getMessage());
         }
+        stockBasicRegistrationManager.ensureRegistered(List.of(canonicalSymbol));
         // 结构化 scope -> JSON（Jackson 序列化）
         Map<String, Object> scopeMap = new LinkedHashMap<>();
         scopeMap.put("canonicalSymbol", canonicalSymbol);

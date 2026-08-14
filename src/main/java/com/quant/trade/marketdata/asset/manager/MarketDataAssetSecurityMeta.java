@@ -5,6 +5,8 @@ import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.asset.vo.MarketDataAssetSecurityVO;
 import com.quant.trade.marketdata.constant.WorkbenchConstants;
 import com.quant.trade.marketdata.dao.StockBasicMapper;
+import com.quant.trade.marketdata.dao.StockDailyBarMapper;
+import com.quant.trade.marketdata.dao.StockMinuteBarMapper;
 import com.quant.trade.marketdata.exception.MarketDataAssetNotFoundException;
 import com.quant.trade.marketdata.model.StockBasicDO;
 import com.quant.trade.marketdata.util.CanonicalSymbolUtils;
@@ -25,6 +27,8 @@ import java.util.Objects;
 public class MarketDataAssetSecurityMeta {
 
     private final StockBasicMapper stockBasicMapper;
+    private final StockDailyBarMapper dailyBarMapper;
+    private final StockMinuteBarMapper minuteBarMapper;
 
     /** 规范化 canonical symbol，非法格式抛业务异常。 */
     public String normalize(String raw) {
@@ -38,7 +42,17 @@ public class MarketDataAssetSecurityMeta {
     public StockBasicDO loadSecurity(String canonicalSymbol) {
         StockBasicDO security = stockBasicMapper.selectByCanonicalSymbol(canonicalSymbol);
         if (security == null) {
-            throw new MarketDataAssetNotFoundException(canonicalSymbol);
+            boolean hasPersistedBars = dailyBarMapper.countByCanonicalSymbol(canonicalSymbol) > 0
+                    || minuteBarMapper.countByCanonicalSymbol(canonicalSymbol) > 0;
+            if (!hasPersistedBars) {
+                throw new MarketDataAssetNotFoundException(canonicalSymbol);
+            }
+            int separator = canonicalSymbol.indexOf('.');
+            security = StockBasicDO.builder()
+                    .canonicalSymbol(canonicalSymbol)
+                    .symbol(canonicalSymbol.substring(separator + 1))
+                    .market(canonicalSymbol.substring(0, separator))
+                    .build();
         }
         return security;
     }

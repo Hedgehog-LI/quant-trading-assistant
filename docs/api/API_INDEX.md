@@ -103,9 +103,10 @@
 | P1.7 量价确认 | GET | `/api/v1/market-data/sector-analytics/volume-confirmation` | 规划 v1.1 | `MARKET_DATA_API.md` §5.4 |
 | P1.7 量价确认详情 | GET | `/api/v1/market-data/sector-analytics/volume-confirmation/{sectorId}` | 规划 v1.1 | `MARKET_DATA_API.md` §5.4 |
 | P1.7 板块提醒扩展 | GET | `/api/v1/market-data/alerts` | 规划增加 `subjectType=SECTOR&sectorId=&alertTypePrefix=SECTOR_` | `MARKET_DATA_API.md` §5.5 |
-| P1.9-A 行情资产可用性 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/availability` | 规划；只读现有日/分钟 K、来源、复权和水位 | `MARKET_DATA_API.md` §6 |
-| P1.9-A 行情资产序列 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/series` | 规划；有界 K 线/成交量/摘要/质量 read model | `MARKET_DATA_API.md` §6 |
-| P1.9-A 相关采集记录 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/related-tasks` | 规划；相关任务，不声称行级血缘 | `MARKET_DATA_API.md` §6 |
+| P1.9-D 已入库资产目录 | GET | `/api/v1/market-data/assets` | 已实现；只返回真实存在日 K 或分钟 K 的证券，支持市场/关键词/分页 | `MARKET_DATA_API.md` §6 |
+| P1.9-A 行情资产可用性 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/availability` | 已实现；只读现有日/分钟 K、来源、复权和水位 | `MARKET_DATA_API.md` §6 |
+| P1.9-A 行情资产序列 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/series` | 已实现；有界 K 线/成交量/摘要/质量 read model | `MARKET_DATA_API.md` §6 |
+| P1.9-A 相关采集记录 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/related-tasks` | 已实现；相关任务，不声称行级血缘 | `MARKET_DATA_API.md` §6 |
 
 ## 维护规则
 

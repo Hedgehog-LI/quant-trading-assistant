@@ -11,6 +11,7 @@ import java.util.List;
 public interface StockBasicMapper {
     int insert(StockBasicDO record);
     int insertDirectory(StockBasicDO record);
+    int insertMinimalIfAbsent(StockBasicDO record);
     int updateById(StockBasicDO record);
     int updateDirectoryById(StockBasicDO record);
     StockBasicDO selectById(@Param("id") Long id);

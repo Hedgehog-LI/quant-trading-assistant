@@ -71,6 +71,17 @@
         )
     </insert>
 
+    <!-- 采集计划只补齐最小证券身份；重复 canonical symbol 不覆盖目录元数据。 -->
+    <insert id="insertMinimalIfAbsent">
+        INSERT IGNORE INTO stock_basic (
+            canonical_symbol, symbol, name, market, exchange, currency,
+            security_type, list_status, data_source, delisted
+        ) VALUES (
+            #{canonicalSymbol}, #{symbol}, #{name}, #{market}, #{exchange}, #{currency},
+            #{securityType}, #{listStatus}, #{dataSource}, #{delisted}
+        )
+    </insert>
+
     <update id="updateById">
         UPDATE stock_basic
         <set>

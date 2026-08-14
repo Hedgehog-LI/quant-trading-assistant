@@ -873,17 +873,18 @@ GET /api/v1/market-data/alerts?severity=&resolved=&subjectType=SECTOR&sectorId=&
 
 200 + `qualityStatus` 非 `OK` 的响应统一在字段层降级标注，由前端灰显处理；不作为错误码返回。规划码遵循 `MARKET_SECTOR_*` 前缀，与现有 `MARKET_SECTOR_PROVIDER_UNAVAILABLE` / `MARKET_DATA_*` 命名一致。
 
-## 6. P1.9-A 行情数据资产只读查询（规划，未实现）
+## 6. P1.9 行情数据资产只读查询（已实现，P1.9-D 闭环增强）
 
-> 冻结设计：`../features/MARKET_DATA_ASSET_CENTER_DESIGN.md`。本节是规划契约，不得当作当前已实现 API 调用。
+> 设计：`../features/MARKET_DATA_ASSET_CENTER_DESIGN.md`。接口只读已落库行情，不调用 provider。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
+| GET | `/api/v1/market-data/assets?market=&keyword=&page=1&size=20` | 分页查询至少存在一条日 K 或分钟 K 的行情资产；`market=CN` 聚合 SH/SZ/BJ，最大 size=100 |
 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/availability` | 查询该证券已存在的 interval/dataSource/adjustType、首末时间、条数、最新抓取和水位 |
 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/series?interval=&from=&to=&adjustType=&dataSource=` | 返回最多 2000 条升序 bars，以及区间摘要、质量、覆盖和截断状态 |
 | GET | `/api/v1/market-data/assets/{canonicalSymbol}/related-tasks?interval=&from=&to=&page=&size=` | 查询范围相关的计划/任务；不声称 bar 级精确血缘 |
 
-冻结约束：
+实现约束：
 
 - `interval` 为 `1D/1M/5M/15M/30M/60M`；日 K 与分钟 K 不拼接。
 - 必须显式选择单一 `dataSource` 和 `adjustType`，禁止来源/复权混合。
@@ -897,7 +898,7 @@ GET /api/v1/market-data/alerts?severity=&resolved=&subjectType=SECTOR&sectorId=&
 - 价格、金额与比率使用 BigDecimal 字符串；分钟时间返回含市场 offset 的 ISO-8601，bars 按时间升序。
 - 本查询只读现有表，不调用 provider、不写 DB、不创建任务、不新增 migration。
 
-规划错误码：
+错误码：
 
 - `MARKET_DATA_ASSET_RANGE_TOO_LARGE`：时间范围或 bar 上限不满足查询契约。
 - `MARKET_DATA_ASSET_COMBINATION_NOT_FOUND`：证券存在但所选 interval/source/adjust 组合不存在；页面应先查 availability 避免正常触发。

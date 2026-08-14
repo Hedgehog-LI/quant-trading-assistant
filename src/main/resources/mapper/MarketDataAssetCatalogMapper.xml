@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.asset.dao.MarketDataAssetCatalogMapper">
+
+    <resultMap id="CatalogResultMap" type="com.quant.trade.marketdata.asset.model.MarketDataAssetCatalogDO">
+        <result column="canonical_symbol" property="canonicalSymbol"/>
+        <result column="name" property="name"/>
+        <result column="name_cn" property="nameCn"/>
+        <result column="name_hk" property="nameHk"/>
+        <result column="name_en" property="nameEn"/>
+        <result column="market" property="market"/>
+        <result column="currency" property="currency"/>
+        <result column="daily_bar_count" property="dailyBarCount"/>
+        <result column="minute_bar_count" property="minuteBarCount"/>
+        <result column="minute_interval_count" property="minuteIntervalCount"/>
+        <result column="first_daily_date" property="firstDailyDate"/>
+        <result column="last_daily_date" property="lastDailyDate"/>
+        <result column="first_minute_time" property="firstMinuteTime"/>
+        <result column="last_minute_time" property="lastMinuteTime"/>
+        <result column="latest_daily_fetched_at" property="latestDailyFetchedAt"/>
+        <result column="latest_minute_fetched_at" property="latestMinuteFetchedAt"/>
+    </resultMap>
+
+    <sql id="Aggregated_From">
+        FROM (
+            SELECT canonical_symbol FROM stock_daily_bar
+            UNION
+            SELECT canonical_symbol FROM stock_minute_bar
+        ) a
+        LEFT JOIN stock_basic s ON s.canonical_symbol = a.canonical_symbol
+        LEFT JOIN (
+            SELECT canonical_symbol, COUNT(1) AS bar_count,
+                   MIN(trade_date) AS first_bar_date, MAX(trade_date) AS last_bar_date,
+                   MAX(fetched_at) AS latest_fetched_at
+            FROM stock_daily_bar
+            GROUP BY canonical_symbol
+        ) d ON d.canonical_symbol = a.canonical_symbol
+        LEFT JOIN (
+            SELECT canonical_symbol, COUNT(1) AS bar_count,
+                   COUNT(DISTINCT interval_type) AS interval_count,
+                   MIN(bar_start_time) AS first_bar_time, MAX(bar_start_time) AS last_bar_time,
+                   MAX(fetched_at) AS latest_fetched_at
+            FROM stock_minute_bar
+            GROUP BY canonical_symbol
+        ) m ON m.canonical_symbol = a.canonical_symbol
+    </sql>
+
+    <sql id="Catalog_Where">
+        <where>
+            <if test="market != null and market != ''">
+                <choose>
+                    <when test="market == 'CN'">
+                        AND (s.market IN ('SH', 'SZ', 'BJ')
+                            OR a.canonical_symbol LIKE 'SH.%'
+                            OR a.canonical_symbol LIKE 'SZ.%'
+                            OR a.canonical_symbol LIKE 'BJ.%')
+                    </when>
+                    <otherwise>
+                        AND (s.market = #{market}
+                            OR a.canonical_symbol LIKE CONCAT(#{market}, '.%'))
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    UPPER(a.canonical_symbol) LIKE CONCAT('%', UPPER(#{keyword}), '%')
+                    OR LOWER(COALESCE(s.name, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                    OR LOWER(COALESCE(s.name_cn, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                    OR LOWER(COALESCE(s.name_hk, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                    OR LOWER(COALESCE(s.name_en, '')) LIKE CONCAT('%', LOWER(#{keyword}), '%')
+                )
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectByFilter" resultMap="CatalogResultMap">
+        SELECT a.canonical_symbol, s.name, s.name_cn, s.name_hk, s.name_en, s.market, s.currency,
+               COALESCE(d.bar_count, 0) AS daily_bar_count,
+               COALESCE(m.bar_count, 0) AS minute_bar_count,
+               COALESCE(m.interval_count, 0) AS minute_interval_count,
+               d.first_bar_date AS first_daily_date,
+               d.last_bar_date AS last_daily_date,
+               m.first_bar_time AS first_minute_time,
+               m.last_bar_time AS last_minute_time,
+               d.latest_fetched_at AS latest_daily_fetched_at,
+               m.latest_fetched_at AS latest_minute_fetched_at
+        <include refid="Aggregated_From"/>
+        <include refid="Catalog_Where"/>
+        ORDER BY
+            CASE
+                WHEN d.latest_fetched_at IS NULL THEN m.latest_fetched_at
+                WHEN m.latest_fetched_at IS NULL THEN d.latest_fetched_at
+                WHEN d.latest_fetched_at &gt;= m.latest_fetched_at THEN d.latest_fetched_at
+                ELSE m.latest_fetched_at
+            END DESC,
+            a.canonical_symbol ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilter" resultType="long">
+        SELECT COUNT(1)
+        <include refid="Aggregated_From"/>
+        <include refid="Catalog_Where"/>
+    </select>
+</mapper>

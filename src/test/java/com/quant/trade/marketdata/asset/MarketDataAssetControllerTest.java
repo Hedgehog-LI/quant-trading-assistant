@@ -176,6 +176,78 @@ class MarketDataAssetControllerTest {
                 .andExpect(jsonPath("$.code").value("INVALID_CANONICAL_SYMBOL"));
     }
 
+    @Test
+    void catalogListsOnlySecuritiesWithPersistedBarsAndSupportsMarketFilter() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_basic (canonical_symbol, symbol, name, market, currency)
+                VALUES ('SH.600519', '600519', '贵州茅台', 'SH', 'CNY'),
+                       ('HK.02498', '02498', '速腾聚创', 'HK', 'HKD'),
+                       ('US.NVDA', 'NVDA', 'NVIDIA', 'US', 'USD')
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO stock_daily_bar (canonical_symbol, trade_date, adjust_type, data_source,
+                    open_price, high_price, low_price, close_price, volume, amount, fetched_at)
+                VALUES ('SH.600519', '2026-08-12', 'NONE', 'LONGPORT',
+                    1400, 1410, 1390, 1405, 1000, 1405000, '2026-08-12 15:01:00')
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO stock_minute_bar (canonical_symbol, trade_date, bar_start_time, bar_end_time,
+                    interval_type, session_type, open_price, high_price, low_price, close_price,
+                    volume, amount, adjust_type, data_source, fetched_at, quality_status)
+                VALUES ('HK.02498', '2026-08-12', '2026-08-12 09:30:00', '2026-08-12 09:35:00',
+                    '5M', 'REGULAR', 30, 31, 29, 30.5, 2000, 61000,
+                    'NONE', 'LONGPORT', '2026-08-12 09:36:00', 'VALID')
+                """);
+
+        mockMvc.perform(get("/api/v1/market-data/assets").param("page", "1").param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.items", hasSize(2)))
+                .andExpect(jsonPath("$.data.items[0].security.canonicalSymbol").value("SH.600519"))
+                .andExpect(jsonPath("$.data.items[0].dailyBarCount").value(1))
+                .andExpect(jsonPath("$.data.items[0].latestFetchedAt").value("2026-08-12T15:01:00+08:00"));
+
+        mockMvc.perform(get("/api/v1/market-data/assets").param("market", "HK"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].security.canonicalSymbol").value("HK.02498"))
+                .andExpect(jsonPath("$.data.items[0].minuteBarCount").value(1));
+
+        mockMvc.perform(get("/api/v1/market-data/assets").param("market", "CN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].security.canonicalSymbol").value("SH.600519"));
+    }
+
+    @Test
+    void catalogRejectsOversizedPage() throws Exception {
+        mockMvc.perform(get("/api/v1/market-data/assets").param("size", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PARAM_ERROR"));
+    }
+
+    @Test
+    void legacyBarWithoutStockBasicRemainsDiscoverableAndReadable() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO stock_daily_bar (canonical_symbol, trade_date, adjust_type, data_source,
+                    open_price, high_price, low_price, close_price, volume, amount, fetched_at)
+                VALUES ('SZ.002415', '2026-08-12', 'NONE', 'LONGPORT',
+                    70, 72, 69, 71, 1200, 85200, '2026-08-12 15:02:00')
+                """);
+
+        mockMvc.perform(get("/api/v1/market-data/assets").param("keyword", "002415"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].security.canonicalSymbol").value("SZ.002415"))
+                .andExpect(jsonPath("$.data.items[0].security.displayName").value("SZ.002415"))
+                .andExpect(jsonPath("$.data.items[0].dailyBarCount").value(1));
+
+        mockMvc.perform(get("/api/v1/market-data/assets/SZ.002415/availability"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.security.displayName").value("SZ.002415"))
+                .andExpect(jsonPath("$.data.combinations", hasSize(1)));
+    }
+
     // ==================== series ====================
 
     @Test

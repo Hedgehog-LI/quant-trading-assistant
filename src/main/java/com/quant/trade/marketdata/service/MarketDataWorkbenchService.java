@@ -14,6 +14,7 @@ import com.quant.trade.marketdata.dto.CreateSyncTaskDTO;
 import com.quant.trade.marketdata.manager.MinuteBarQualityManager;
 import com.quant.trade.marketdata.manager.TradingSessionManager;
 import com.quant.trade.marketdata.manager.SyncPlanValidationManager;
+import com.quant.trade.marketdata.manager.StockBasicRegistrationManager;
 import com.quant.trade.marketdata.model.*;
 import com.quant.trade.marketdata.util.CanonicalSymbolUtils;
 import com.quant.trade.marketdata.vo.*;
@@ -55,6 +56,7 @@ public class MarketDataWorkbenchService {
     private final ObjectMapper objectMapper;
     private final TaskReconcileService taskReconcileService;
     private final SyncPlanValidationManager syncPlanValidationManager;
+    private final StockBasicRegistrationManager stockBasicRegistrationManager;
     private final MarketDataPlanExecutionService planExecutionService;
 
     private static final int MAX_PAGE_SIZE = 500;
@@ -96,7 +98,8 @@ public class MarketDataWorkbenchService {
                 .enabled(true)
                 .description(dto.getDescription())
                 .build();
-        syncPlanValidationManager.validate(plan);
+        var validation = syncPlanValidationManager.validate(plan);
+        stockBasicRegistrationManager.ensureRegistered(validation.scope().symbols());
         syncPlanMapper.insert(plan);
         log.info("创建采集计划: id={}, name={}, type={}", plan.getId(), plan.getPlanName(), plan.getTaskType());
         return toPlanVO(plan);
@@ -138,7 +141,8 @@ public class MarketDataWorkbenchService {
         existing.setCollectFrequency(dto.getCollectFrequency());
         existing.setDescription(dto.getDescription());
         validateTaskType(existing.getTaskType());
-        syncPlanValidationManager.validate(existing);
+        var validation = syncPlanValidationManager.validate(existing);
+        stockBasicRegistrationManager.ensureRegistered(validation.scope().symbols());
         syncPlanMapper.updateById(existing);
         return toPlanVO(existing);
     }
@@ -149,7 +153,10 @@ public class MarketDataWorkbenchService {
         if (existing == null) {
             throw new BusinessException(ErrorCodeEnum.BUSINESS_RULE_VIOLATION, "采集计划不存在: " + id);
         }
-        if (enabled) syncPlanValidationManager.validate(existing);
+        if (enabled) {
+            var validation = syncPlanValidationManager.validate(existing);
+            stockBasicRegistrationManager.ensureRegistered(validation.scope().symbols());
+        }
         syncPlanMapper.updateEnabled(id, enabled, LocalDateTime.now());
         existing.setEnabled(enabled);
         return toPlanVO(existing);
@@ -182,6 +189,7 @@ public class MarketDataWorkbenchService {
         }
 
         var validation = syncPlanValidationManager.validate(plan);
+        stockBasicRegistrationManager.ensureRegistered(validation.scope().symbols());
         if (WorkbenchConstants.TASK_MINUTE_BAR_BACKFILL.equals(plan.getTaskType())) {
             planExecutionService.executeMinutePlan(plan, LocalDateTime.now());
             return toPlanVO(syncPlanMapper.selectById(planId));
@@ -505,6 +513,7 @@ public class MarketDataWorkbenchService {
             // SUSPECT 仍可落库但标记，不阻断
         }
 
+        stockBasicRegistrationManager.ensureRegistered(List.of(bar.getCanonicalSymbol()));
         StockMinuteBarDO existing = minuteBarMapper.selectByUniqueKey(bar.getCanonicalSymbol(),
                 bar.getBarStartTime(), bar.getIntervalType(), bar.getAdjustType(), bar.getDataSource());
         if (existing != null) {

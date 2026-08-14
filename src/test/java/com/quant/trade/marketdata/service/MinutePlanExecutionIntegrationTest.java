@@ -4,6 +4,7 @@ import com.quant.trade.marketdata.dao.MarketDataSyncTaskItemMapper;
 import com.quant.trade.marketdata.dao.MarketDataSyncTaskMapper;
 import com.quant.trade.marketdata.dao.MarketDataWatermarkMapper;
 import com.quant.trade.marketdata.dao.StockMinuteBarMapper;
+import com.quant.trade.marketdata.dao.StockBasicMapper;
 import com.quant.trade.marketdata.dto.CreateSyncPlanDTO;
 import com.quant.trade.marketdata.provider.FakeMarketDataProvider;
 import com.quant.trade.marketdata.provider.MarketDataProvider.ProviderMinuteBar;
@@ -27,6 +28,7 @@ class MinutePlanExecutionIntegrationTest {
     @Autowired MarketDataSyncTaskMapper taskMapper;
     @Autowired MarketDataSyncTaskItemMapper itemMapper;
     @Autowired StockMinuteBarMapper minuteBarMapper;
+    @Autowired StockBasicMapper stockBasicMapper;
     @Autowired MarketDataWatermarkMapper watermarkMapper;
     @Autowired FakeMarketDataProvider fakeProvider;
 
@@ -41,6 +43,7 @@ class MinutePlanExecutionIntegrationTest {
         assertEquals(2, minuteBarMapper.countByFilter("SH.603308", "5M", "NONE", "FAKE",
                 null, null, null));
         assertNotNull(watermarkMapper.selectByUniqueKey("SH.603308", "FAKE", "5M", "NONE"));
+        assertNotNull(stockBasicMapper.selectByCanonicalSymbol("SH.603308"));
 
         var second = workbenchService.runPlan(plan.getId());
         var secondTask = taskMapper.selectById(second.getLastTaskId());

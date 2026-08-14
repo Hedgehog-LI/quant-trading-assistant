@@ -10,6 +10,7 @@ import com.quant.trade.marketdata.dao.MarketDataSyncTaskItemMapper;
 import com.quant.trade.marketdata.dao.MarketDataSyncTaskMapper;
 import com.quant.trade.marketdata.dto.MinuteBarUpsertDTO;
 import com.quant.trade.marketdata.manager.SyncPlanValidationManager;
+import com.quant.trade.marketdata.manager.StockBasicRegistrationManager;
 import com.quant.trade.marketdata.manager.SyncPlanValidationManager.PlanScope;
 import com.quant.trade.marketdata.manager.TradingSessionManager;
 import com.quant.trade.marketdata.model.MarketDataSyncPlanDO;
@@ -40,6 +41,7 @@ public class MarketDataPlanExecutionService {
     private final MarketDataSyncTaskMapper taskMapper;
     private final MarketDataSyncTaskItemMapper itemMapper;
     private final SyncPlanValidationManager validationManager;
+    private final StockBasicRegistrationManager stockBasicRegistrationManager;
     private final TradingSessionManager tradingSessionManager;
     private final MinuteBarIngestService ingestService;
     private final TransactionTemplate txRequiresNew;
@@ -48,6 +50,7 @@ public class MarketDataPlanExecutionService {
 
     public MarketDataSyncTaskDO executeMinutePlan(MarketDataSyncPlanDO plan, LocalDateTime requestedAt) {
         var validation = validationManager.validate(plan);
+        stockBasicRegistrationManager.ensureRegistered(validation.scope().symbols());
         if (!plan.getProvider().equalsIgnoreCase(provider.getProviderCode())) {
             throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PLAN_INVALID,
                     "计划 provider=" + plan.getProvider() + "，当前运行 provider=" + provider.getProviderCode());

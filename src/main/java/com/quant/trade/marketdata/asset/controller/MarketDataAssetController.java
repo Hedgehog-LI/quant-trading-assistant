@@ -5,6 +5,7 @@ import com.quant.trade.common.constant.ApiConstants;
 import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.asset.service.MarketDataAssetQueryService;
 import com.quant.trade.marketdata.asset.vo.MarketDataAssetAvailabilityVO;
+import com.quant.trade.marketdata.asset.vo.MarketDataAssetCatalogItemVO;
 import com.quant.trade.marketdata.asset.vo.MarketDataAssetRelatedTasksVO;
 import com.quant.trade.marketdata.asset.vo.MarketDataAssetSeriesVO;
 import com.quant.trade.marketdata.exception.MarketDataAssetNotFoundException;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
+import com.quant.trade.marketdata.vo.PageResultVO;
 
 /**
  * P1.9-A 行情资产只读查询 REST 控制器。
@@ -35,6 +37,16 @@ import java.time.LocalDateTime;
 public class MarketDataAssetController {
 
     private final MarketDataAssetQueryService assetQueryService;
+
+    /** 分页查询已实际落入日 K 或分钟 K 的行情资产。 */
+    @GetMapping
+    public ApiResponse<PageResultVO<MarketDataAssetCatalogItemVO>> listAssets(
+            @RequestParam(required = false) String market,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(assetQueryService.listAssets(market, keyword, page, size));
+    }
 
     /** 查询该证券已存在的 interval/dataSource/adjustType 组合及覆盖概况。 */
     @GetMapping("/{canonicalSymbol}/availability")

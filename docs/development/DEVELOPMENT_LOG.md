@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-08-13 — P1.9-D 行情采集与资产查看闭环
+
+- **目标**：修复采集计划、`stock_basic`、K 线事实表和 `/market-assets` 之间的断链，消除远程模式固定真实证券入口造成的 404。
+- **后端**：创建、修改、启用和执行采集计划时幂等补齐最小证券身份；直接日 K 同步同样登记证券。新增 `GET /api/v1/market-data/assets`，聚合 `stock_daily_bar`/`stock_minute_bar`，只返回真实已有 bars 的证券，支持市场、关键词和分页。
+- **前端**：行情数据资产首页改为真实已入库资产目录；支持市场/关键词筛选、覆盖范围、日/分钟条数和最近入库时间。`STOCK_NOT_FOUND`、已登记无 bars、范围为空和系统错误分开表达，并提供返回目录/行情工作台操作；移除固定真实证券快捷入口、页面水印、全局重复风险提示和重复免责声明。
+- **架构**：不新增 migration，不调用 provider 组装目录，不回写行情事实表。计划登记仅补最小身份，不覆盖证券目录已有名称、交易所、货币等元数据。
+- **验证**：后端全量 519 tests（0 failures/errors，1 skipped）与 package 通过；前端 typecheck、lint、51 files / 399 tests 与 build 通过。Docker/MySQL 8.4 重建后 health UP，资产目录全量/A 股筛选返回 200 且实际读取 7 只已入库资产，未知证券返回 404 + `STOCK_NOT_FOUND`；本地 mock 页面无固定真实证券和全局重复提示。服务器部署尚未执行。
+- **关联**：`features/MARKET_DATA_ASSET_CENTER_DESIGN.md` v1.2、`development/tasks/MARKET-DATA-ASSET-INGESTION-LOOP-P19D-CONTRACT.md`、`api/MARKET_DATA_API.md` §6。
+
 ## 2026-08-13 — P1.10-A 市场发现全栈候选
 
 - **目标**：把已落库的板块 CLOSE 排行从“只能看当日榜单”升级为可解释、可重算、可追溯的市场发现闭环；不实现通达信式通用看盘或买卖建议。

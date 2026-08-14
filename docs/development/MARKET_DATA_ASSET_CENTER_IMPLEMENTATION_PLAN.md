@@ -42,7 +42,7 @@
 - remote/mock adapter、URL 状态、TanStack Query、loading/empty/error/partial。
 - availability 驱动粒度/来源/复权选项。
 - 前端聚焦测试，包括 chart adapter、URL、过期请求和空/错状态。
-- mock 使用虚构证券身份、遵守示例交易日历并在图表区持续显示 `LOCAL_DEMO` 水印；不得使用真实证券名称承载合成 K 线。
+- mock 使用虚构证券身份并遵守示例交易日历；不得使用真实证券名称承载合成 K 线，也不在个人工具工作页增加大面积演示水印。
 - 摘要金额/成交量使用紧凑单位与完整值 tooltip，桌面和窄屏均有防重叠约束。
 
 ### A3：入口串联与验收
@@ -91,7 +91,7 @@ flowchart LR
 - 查询切换后旧请求不覆盖新请求。
 - 图表创建/resize/destroy，attribution 未关闭。
 - 摘要、健康、truncated、UNKNOWN 文案。
-- mock 使用虚构证券 + 持续 LOCAL_DEMO 水印，remote 不回退 mock。
+- mock 只使用虚构证券且不伪造采集记录，remote 不回退 mock。
 - 桌面与窄屏无重叠。
 
 ## 5. 门禁

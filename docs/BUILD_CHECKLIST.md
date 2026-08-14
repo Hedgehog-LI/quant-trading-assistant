@@ -311,9 +311,12 @@
 - [x] 2026-08-12 定位修订：本能力只做数据检查；板块历史并入 P1.10 板块详情，多资产对比并入 P1.10 候选扫描。
 - [x] ADR-0012：使用有界只读 read model + Lightweight Charts，不手写 K 线、不前端循环分页。
 - [x] P1.9-A API、页面、质量状态、范围上限和验收标准冻结。
-- [ ] P1.9-A 后端 availability/series/related-tasks 只读 API。
-- [ ] P1.9-A 前端 `/market-assets`：K 线、成交量、摘要、质量、水位、原始表格和相关任务。
-- [ ] P1.9-A 从采集计划、日 K、分钟 K 页面跳转并完成 Docker/curl/浏览器验收。
+- [x] P1.9-A 后端 availability/series/related-tasks 只读 API。
+- [x] P1.9-A 前端 `/market-assets`：K 线、成交量、摘要、质量、水位、原始表格和相关任务。
+- [x] P1.9-A 从采集计划、日 K、分钟 K 页面跳转（自动化已通过；Docker/curl/部署验收待执行）。
+- [x] P1.9-D 采集计划幂等登记证券主数据 + 已入库资产目录 + 404/空数据分级状态。
+- [x] P1.9-D 本地 Docker/MySQL 8.4、health、资产目录/404 curl 和 mock 浏览器验收。
+- [ ] P1.9-D 服务器部署与服务器 remote 浏览器验收。
 - [ ] P1.9-B 板块历史榜单与关注板块原始事实趋势展示。
 - [ ] P1.9-C 标准化对比、导出和保存视图。
 - [ ] P1.7/P2 衍生指标继续保持独立任务，不混入 P1.9-A。

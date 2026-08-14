@@ -7,6 +7,7 @@ import com.quant.trade.marketdata.dao.StockMinuteBarMapper;
 import com.quant.trade.marketdata.dto.MinuteBarUpsertDTO;
 import com.quant.trade.marketdata.manager.MinuteBarQualityManager;
 import com.quant.trade.marketdata.manager.TradingSessionManager;
+import com.quant.trade.marketdata.manager.StockBasicRegistrationManager;
 import com.quant.trade.marketdata.model.MarketDataAlertDO;
 import com.quant.trade.marketdata.model.MarketDataWatermarkDO;
 import com.quant.trade.marketdata.model.StockMinuteBarDO;
@@ -28,6 +29,7 @@ public class MinuteBarIngestService {
     private final MarketDataAlertMapper alertMapper;
     private final MinuteBarQualityManager qualityManager;
     private final TradingSessionManager tradingSessionManager;
+    private final StockBasicRegistrationManager stockBasicRegistrationManager;
     private final Clock marketDataClock;
 
     @Transactional
@@ -50,6 +52,7 @@ public class MinuteBarIngestService {
             bar.setQualityStatus(WorkbenchConstants.QUALITY_SUSPECT);
             createAlert(bar, "分钟K时段校验失败，标记 SUSPECT");
         }
+        stockBasicRegistrationManager.ensureRegistered(List.of(bar.getCanonicalSymbol()));
         StockMinuteBarDO existing = minuteBarMapper.selectByUniqueKey(bar.getCanonicalSymbol(),
                 bar.getBarStartTime(), bar.getIntervalType(), bar.getAdjustType(), bar.getDataSource());
         if (existing != null) {

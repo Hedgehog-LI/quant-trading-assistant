@@ -8,6 +8,7 @@ import com.quant.trade.marketdata.dto.UpdateSyncPlanDTO;
 import com.quant.trade.marketdata.manager.MinuteBarQualityManager;
 import com.quant.trade.marketdata.manager.TradingSessionManager;
 import com.quant.trade.marketdata.manager.SyncPlanValidationManager;
+import com.quant.trade.marketdata.manager.StockBasicRegistrationManager;
 import com.quant.trade.marketdata.model.MarketDataSyncPlanDO;
 import com.quant.trade.marketdata.model.MarketDataSyncTaskDO;
 import com.quant.trade.marketdata.model.MarketDataSyncTaskItemDO;
@@ -52,6 +53,7 @@ class MarketDataWorkbenchServiceTest {
     @Spy private com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
     @Mock private TaskReconcileService taskReconcileService;
     @Mock private SyncPlanValidationManager syncPlanValidationManager;
+    @Mock private StockBasicRegistrationManager stockBasicRegistrationManager;
     @Mock private MarketDataPlanExecutionService planExecutionService;
 
     @InjectMocks private MarketDataWorkbenchService service;
@@ -179,6 +181,7 @@ class MarketDataWorkbenchServiceTest {
 
         assertNotNull(vo);
         assertEquals("茅台30M补档", vo.getPlanName());
+        verify(stockBasicRegistrationManager).ensureRegistered(List.of("SH.600519"));
         verify(syncPlanMapper).insert(any());
     }
 
