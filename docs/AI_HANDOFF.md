@@ -15,6 +15,8 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 ## 当前状态（2026-08）
 
+- **QTA V2 产品与机构化市场研究设计已冻结（2026-08-15，未开始实现）**：冻结“市场研究 / 策略实验室 / 交易与复盘 / 数据中心 / 系统”一级信息架构，以及“趋势与风险 → 广度 → 流动性与交易活跃度 → 行业成交占比迁移 → Provider 资金事实 → 相对强弱与动量 → 板块下钻 → 候选”的研究证据链。V2 复用现有采集、P1.7 衍生引擎、P1.9 数据详情、P1.10-A 和交易闭环，不推倒重写；下一项实施必须先做 MR-0 数据/语义 PoC，不能直接用 mock 页面或排行样本宣称全市场能力。入口：`docs/features/QTA_V2_QUANT_RESEARCH_PLATFORM_PRD.md`、`docs/features/QTA_V2_INSTITUTIONAL_MARKET_RESEARCH_DESIGN.md`、ADR-0014。
+
 - **P1.9-D 行情采集与资产查看闭环（2026-08-13，本地运行验证通过、待服务器部署）**：采集计划创建/修改/启用/执行和直接日 K 同步会幂等补齐最小 `stock_basic` 身份；新增真实已入库资产目录 API，前端 `/market-assets` 不再展示固定真实证券，而是展示实际存在日 K/分钟 K 的资产，并区分未登记、未采集、范围为空和系统错误。后端 **519 tests** + package、前端 **399 tests** + typecheck/lint/build 通过；Docker/MySQL 8.4 health 与资产目录/404 curl 通过，服务器部署待验。入口：`docs/development/tasks/MARKET-DATA-ASSET-INGESTION-LOOP-P19D-CONTRACT.md`。
 
 - **P1.10-A/A1 市场发现全栈候选已实现（2026-08-14，自动化与独立代码核验通过、真实运行时待验）**：既有 `5/10/20/50` 日已发布相对强弱与固定 5 日轮动保持不变；新增 `window=1` 直接读取最新合格 `CLOSE` 原始事实，提供当日收益、等权相对收益、强度百分位、原始源排名、历史和板块详情，不创建发布批次，也不输出持续性或轮动结论。前端 `/market-research` 默认一日强度，新增市场宽度、强弱梯队、源排名、每日强度历史和多日无结果回退。当前仍只证明 `RANKED_UNIVERSE`，真实资金流为 `UNAVAILABLE/null`。后端 **520 tests**；前端 **400 tests**、typecheck/lint/build、桌面与 390px mock 浏览器通过；最终全新只读核验者给出 `FUNCTIONAL/CODE_ARCHITECTURE PASS / CONDITIONALLY_ACCEPTED`。**未执行** Docker/MySQL、真实 CLOSE 样本、remote 页面和服务器验收，不能标记 `DEPLOYED`。入口：`docs/api/MARKET_RESEARCH_API.md`、`docs/development/tasks/MARKET-RESEARCH-ONE-DAY-STRENGTH-20260814-VERIFICATION.md`。
@@ -54,12 +56,13 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 P1.0 证券主数据和 CSV 日 K 基础已由 `marketdata` 模块实现（V5/V6）。P1.1 LongPort provider facade + V7-V9 migration + 9 API + 6 Tab 前端已实现；后端反射式 SDK adapter 已实现。**P1.1 单股票手动同步真实外联已于 2026-07-12 全流程验收通过**（SDK 安装 + 域名覆盖 + 凭据 + 单 symbol 落库）。
 
-P1.2 行情采集执行引擎和 P1.6 板块双层自动采集已完成代码与自动化门禁。P1.10-A 前后端候选也已完成自动化与 mock 浏览器验证。后续 P1 主线：
+P1.2 行情采集执行引擎、P1.6 板块双层自动采集和 P1.10-A 自动化候选均保留。V2 冻结后按以下顺序推进：
 
-1. 用 Docker/MySQL 执行 V19-V22，在真实 CLOSE 排行样本上做 readiness/calculation/radar/history/detail curl 和 remote 浏览器验收。
-2. 后端继续补真实资金流、成交集中度、量价确认和异动提醒；完成后再进入 P1.10-B 候选扫描。
-4. P1.8 OpenClaw 只读助手代码已完成，服务器真实 QQ 与公网阻断仍需单独验收；未来可白名单暴露市场研究摘要，不直接开放重算写端点。
-5. 港股、美股长窗口依赖权威交易日历；不得用周末猜测替代。数据资产稳定后再推进策略和回测，信号必须经过风险模块。
+1. 新建 MR-0 有界任务契约：冻结指标数据字典、Provider 候选、样本范围、覆盖率阈值、质量门禁和明确非目标。
+2. 用一个完整 A 股交易月完成全市场日频、point-in-time 行业成分、资金事实的低成本 PoC；PoC 结论另行冻结 ADR，不把未知权限写成既成事实。
+3. MR-0 通过后再拆 MR-1 市场全景 MVP；先交付基准走势、成交量、流动性/活跃度、市场广度和行业成交占比迁移，不一次承包全部 V2。
+4. 现有 P1.10-A 仍需在 Docker/MySQL 真实 CLOSE 样本和 remote 页面完成部署验收，但该维护任务不得扩展旧页面规格。
+5. P1.8 OpenClaw 只读助手保留；港股、美股研究在各自交易日历、分类体系、币种和资金语义冻结前不开放。
 
 ## 接手顺序（新会话）
 

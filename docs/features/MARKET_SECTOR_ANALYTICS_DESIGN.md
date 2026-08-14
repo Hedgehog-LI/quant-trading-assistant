@@ -5,6 +5,11 @@
 > 前置事实：板块原始事实表（V14/V15）`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`、`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item` 已落地；`market_data_alert`（V7）已存在并可复用；最新 migration V18，本设计规划 V19+。
 > 上位产品流程：`MARKET_RESEARCH_DECISION_CENTER_DESIGN.md`。P1.7 是衍生研究引擎，不单独建设与“市场雷达/板块详情”竞争的页面。
 
+> V2 继承关系（2026-08-15）：本文的稳定身份、数据门禁、可重算衍生层和现有公式继续有效；
+> 面向用户的市场全景、流动性、资金与轮动、板块下钻和候选连接改由
+> `QTA_V2_INSTITUTIONAL_MARKET_RESEARCH_DESIGN.md` 定义。任何新增指标仍必须遵守本文的原始事实只读、
+> scope 和质量语义，但不得用 P1.7 旧页面编排覆盖 V2 产品设计。
+
 > 实施快照：V19-V22 已落地稳定身份、来源时间、readiness、相对强弱、固定 5 日轮动持续性、计算 run、原子发布和 `/api/v1/market-research/*` 查询；前端已实现市场雷达和板块详情。真实资金流、成交集中度、量价确认、市场稳定度和提醒仍属于后续范围；不得把当前 `RANKED_UNIVERSE` 结果解释为全市场资金流。实现契约见 `../api/MARKET_RESEARCH_API.md`。
 
 ## 0. 设计状态与定位

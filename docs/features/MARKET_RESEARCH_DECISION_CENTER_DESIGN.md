@@ -10,6 +10,11 @@
 >
 > 关联：`MARKET_SECTOR_ANALYTICS_DESIGN.md`、`MARKET_DATA_ASSET_CENTER_DESIGN.md`、`MARKET_DATA_WORKBENCH_AND_COLLECTION_DESIGN.md`、`TRADE_WORKFLOW_OPTIMIZATION_DESIGN.md`、`../decisions/ADR-0013-research-funnel-and-asset-inspection-boundary.md`。
 
+> V2 继承关系（2026-08-15）：本文继续作为 P1.10 已实现能力、接口兼容和三级漏斗的事实基线；
+> V2 的一级信息架构、页面证据链、图形规格与后续建设顺序已由
+> `QTA_V2_QUANT_RESEARCH_PLATFORM_PRD.md`、`QTA_V2_INSTITUTIONAL_MARKET_RESEARCH_DESIGN.md`
+> 和 ADR-0014 取代。实施者不得据本文另建一套与 V2 平行的研究页面，也不得删除可复用的 P1.10 引擎。
+
 > 实施快照（2026-08-13）：P1.10-A **前后端候选已实现**，包含稳定板块身份、数据就绪门禁、相对强弱、固定 5 日轮动持续性、原子发布、收盘后自动触发、只读研究 API、市场雷达和板块详情。自动化与 mock 浏览器已通过；真实 Docker/MySQL/provider/remote 页面、真实资金流和 P1.10-B/C 仍未完成。实现契约见 `../api/MARKET_RESEARCH_API.md`。
 
 ## 0. 设计结论
