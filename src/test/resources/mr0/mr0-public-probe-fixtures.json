@@ -1,0 +1,53 @@
+{
+  "capturedAt": "2026-08-15",
+  "provenance": "契约 QTA-V2-MR0-DATA-SEMANTICS-POC-20260815 F5 父上下文真实探针摘录 + 少量合成周边行（覆盖分页/窗口过滤/样本外丢弃）。真实冻结值：腾讯日K amount=503383.82万元、volume=42474手、universe turnoverratio=1.86913%。合成行仅用于控制流覆盖，不冒充 Provider 验收证据（Provider 验收只认 TEST-07 真实运行）。",
+  "endpoints": {
+    "universe": "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page={p}&num={n}&sort=symbol&asc=1&node=hs_a",
+    "industryCatalog": "https://vip.stock.finance.sina.com.cn/q/view/newSinaHy.php",
+    "industryMembers": "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page={p}&num={n}&sort=symbol&asc=1&node={industryCode}",
+    "dailyBars": "https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get?param={code},day,{start},{end},640,",
+    "moneyFlow": "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/MoneyFlow.ssl_qsfx_zjlrqs?daima={code}"
+  },
+  "sinaUniverse": [
+    { "symbol": "sh600519", "code": "600519", "name": "贵州茅台", "mktcap": "23614566.52", "nmc": "23614566.52", "turnoverratio": "1.86913" },
+    { "symbol": "sz000001", "code": "000001", "name": "平安银行", "mktcap": "12345000.00", "nmc": "9876000.00", "turnoverratio": "0.53200" },
+    { "symbol": "sh601398", "code": "601398", "name": "工商银行", "mktcap": "9988000.00", "nmc": "7566000.00", "turnoverratio": "0.12345" }
+  ],
+  "sinaIndustryCatalog": "var S_Finance_bankuai_sinaindustry = {\"new_blhy\":\"new_blhy,玻璃行业,19,平均价格:7.27\",\"new_yh\":\"new_yh,银行行业,42,平均价格:6.38\"}",
+  "sinaIndustryMembers": {
+    "new_blhy": [
+      { "symbol": "sh600519", "code": "600519", "name": "贵州茅台", "mktcap": "23614566.52", "nmc": "23614566.52", "turnoverratio": "1.86913" },
+      { "symbol": "bj920099", "code": "920099", "name": "样本外个股", "mktcap": "10.00", "nmc": "10.00", "turnoverratio": "0.01000" }
+    ],
+    "new_yh": [
+      { "symbol": "sz000001", "code": "000001", "name": "平安银行", "mktcap": "12345000.00", "nmc": "9876000.00", "turnoverratio": "0.53200" }
+    ]
+  },
+  "tencentDailyBars": {
+    "sh600519": [
+      ["2026-04-01", "1168.000", "1185.000", "1192.000", "1160.000", "39110.000", { "ai": "0" }, "1.72083", "463834.230", "0.00", "0.00"],
+      ["2026-07-01", "1174.000", "1180.000", "1198.000", "1155.000", "42474.000", { "ai": "0" }, "1.86913", "503383.820", "0.00", "0.00"],
+      ["2026-07-02", "1181.000", "1190.000", "1200.000", "1162.000", "38120.000", { "ai": "0" }, "1.67862", "452116.680", "0.00", "0.00"],
+      ["2026-07-03", "1191.000", "1186.000", "1195.000", "1170.000", "29840.000", { "ai": "0" }, "1.31422", "354628.460", "0.00", "0.00"]
+    ],
+    "sz000001": [
+      ["2026-07-01", "10.560", "10.620", "10.680", "10.500", "553310.000", { "ai": "0" }, "0.28532", "58721.340", "0.00", "0.00"],
+      ["2026-07-02", "10.640", "10.580", "10.700", "10.520", "481260.000", { "ai": "0" }, "0.24814", "50941.980", "0.00", "0.00"]
+    ],
+    "sh000001": [
+      ["2026-07-01", "3412.553", "3424.612", "3431.209", "3405.871", "301544300.000", { "ai": "0" }, "0.00000", "45237087.000", "0.00", "0.00"]
+    ]
+  },
+  "sinaMoneyFlow": {
+    "sh600519": [
+      { "opendate": "2026-03-16", "netamount": "-98765432.10", "ratioamount": "-8.76", "r0_net": "-45678901.23", "cate_na": "-112233445.66" },
+      { "opendate": "2026-07-01", "netamount": "-32102345.67", "ratioamount": "-5.23", "r0_net": "-12345678.90", "cate_na": "-23456789.01" },
+      { "opendate": "2026-07-02", "netamount": "45678901.23", "ratioamount": "6.78", "r0_net": "23456789.01", "cate_na": "34567890.12" },
+      { "opendate": "2026-08-01", "netamount": "11111111.11", "ratioamount": "1.11", "r0_net": "2222222.22", "cate_na": "3333333.33" }
+    ],
+    "sz000001": [
+      { "opendate": "2026-07-01", "netamount": "1234567.89", "ratioamount": "1.23", "r0_net": "987654.32", "cate_na": "-8765432.10" },
+      { "opendate": "2026-07-02", "netamount": "-7654321.09", "ratioamount": "-2.34", "r0_net": "-1234567.89", "cate_na": "-7654321.09" }
+    ]
+  }
+}

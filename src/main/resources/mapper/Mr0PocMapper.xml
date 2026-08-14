@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    MR-0 PoC 幂等写（MySQL 8.4 与 H2 MODE=MySQL 兼容，先例 SyncScopeLockMapper.xml；禁用
+    MERGE INTO ... KEY 与 INSERT IGNORE）。批量 ODKU 更新子句用 VALUES(col)（foreach 变量
+    作用域不覆盖循环体外）；uk 冲突时更新 fetched_at 与事实值，重跑同窗口 inserted=0。
+    日 K 写既有 stock_daily_bar，uk 含 data_source，不覆盖 CSV/LONGPORT 行。
+-->
+<mapper namespace="com.quant.trade.marketdata.poc.Mr0PocMapper">
+
+    <insert id="upsertUniverseSnapshotBatch">
+        INSERT INTO mr0_universe_snapshot (provider_code, canonical_symbol, symbol, name, market,
+            total_market_cap, circulating_market_cap, turnover_rate, as_of_date, fetched_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.providerCode}, #{item.canonicalSymbol}, #{item.symbol}, #{item.name}, #{item.market},
+             #{item.totalMarketCap}, #{item.circulatingMarketCap}, #{item.turnoverRate}, #{item.asOfDate}, #{item.fetchedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE symbol = VALUES(symbol), name = VALUES(name), market = VALUES(market),
+            total_market_cap = VALUES(total_market_cap), circulating_market_cap = VALUES(circulating_market_cap),
+            turnover_rate = VALUES(turnover_rate), fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <insert id="upsertIndustryMembershipBatch">
+        INSERT INTO mr0_industry_membership (taxonomy_code, provider_code, industry_code, industry_name,
+            canonical_symbol, as_of_date, fetched_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.taxonomyCode}, #{item.providerCode}, #{item.industryCode}, #{item.industryName},
+             #{item.canonicalSymbol}, #{item.asOfDate}, #{item.fetchedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE industry_name = VALUES(industry_name), fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <insert id="upsertMoneyFlowBatch">
+        INSERT INTO mr0_stock_money_flow_daily (canonical_symbol, trade_date, provider_code, main_net_inflow,
+            main_net_inflow_ratio, super_net, industry_code, industry_net_inflow, fetched_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.canonicalSymbol}, #{item.tradeDate}, #{item.providerCode}, #{item.mainNetInflow},
+             #{item.mainNetInflowRatio}, #{item.superNet}, #{item.industryCode}, #{item.industryNetInflow}, #{item.fetchedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE main_net_inflow = VALUES(main_net_inflow),
+            main_net_inflow_ratio = VALUES(main_net_inflow_ratio), super_net = VALUES(super_net),
+            industry_code = VALUES(industry_code), industry_net_inflow = VALUES(industry_net_inflow),
+            fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <insert id="upsertStockDailyBarBatch">
+        INSERT INTO stock_daily_bar (canonical_symbol, trade_date, adjust_type, data_source, open_price,
+            high_price, low_price, close_price, volume, amount, fetched_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.canonicalSymbol}, #{item.tradeDate}, #{item.adjustType}, #{item.dataSource}, #{item.openPrice},
+             #{item.highPrice}, #{item.lowPrice}, #{item.closePrice}, #{item.volume}, #{item.amount}, #{item.fetchedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE open_price = VALUES(open_price), high_price = VALUES(high_price),
+            low_price = VALUES(low_price), close_price = VALUES(close_price), volume = VALUES(volume),
+            amount = VALUES(amount), fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <select id="countUniverse" resultType="long">
+        SELECT COUNT(1) FROM mr0_universe_snapshot WHERE provider_code = #{providerCode}
+        AND as_of_date = #{asOfDate} AND canonical_symbol IN
+        <foreach collection="canonicalSymbols" item="symbol" open="(" separator="," close=")">#{symbol}</foreach>
+    </select>
+
+    <select id="countIndustryMembership" resultType="long">
+        SELECT COUNT(1) FROM mr0_industry_membership WHERE taxonomy_code = #{taxonomyCode}
+        AND as_of_date = #{asOfDate} AND canonical_symbol IN
+        <foreach collection="canonicalSymbols" item="symbol" open="(" separator="," close=")">#{symbol}</foreach>
+    </select>
+
+    <select id="countMoneyFlow" resultType="long">
+        SELECT COUNT(1) FROM mr0_stock_money_flow_daily WHERE provider_code = #{providerCode}
+        AND trade_date &gt;= #{fromDate} AND trade_date &lt;= #{toDate} AND canonical_symbol IN
+        <foreach collection="canonicalSymbols" item="symbol" open="(" separator="," close=")">#{symbol}</foreach>
+    </select>
+
+    <select id="countStockDailyBar" resultType="long">
+        SELECT COUNT(1) FROM stock_daily_bar WHERE canonical_symbol = #{canonicalSymbol}
+        AND data_source = #{dataSource} AND adjust_type = #{adjustType}
+        AND trade_date &gt;= #{fromDate} AND trade_date &lt;= #{toDate}
+    </select>
+</mapper>

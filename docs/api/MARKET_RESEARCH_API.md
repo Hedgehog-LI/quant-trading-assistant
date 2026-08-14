@@ -154,3 +154,113 @@ HTTP 400 + `RESOURCE_NOT_FOUND`。
 - Docker/MySQL、真实 provider 数据、服务器部署和 remote 浏览器验收。
 - 真实资金流、成交额集中度、量价确认、板块异动提醒。
 - P1.10-B 候选扫描与 P1.10-C 个股决策台。
+
+## 7. MR-0 数据与语义 PoC（QTA-V2-MR0-DATA-SEMANTICS-POC-20260815）
+
+PoC 入口，不承诺 MR-1 稳定契约。公式、单位与缺失语义冻结于
+`docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md`；表结构见 V23 migration。
+分析/报告只读本地库，不外联任何公共源。
+
+### 7.1 POST /api/v1/market-research/mr0-poc/ingest（受控写入口）
+
+仅当 `qta.mr0-poc.ingest-enabled=true`（默认 `false`，`application.properties` 声明；本地运行由
+脚本用 `--qta.mr0-poc.ingest-enabled=true` 或环境变量 `QTA_MR0_POC_INGEST_ENABLED` 开启）时执行，
+否则 HTTP 400 `BUSINESS_RULE_VIOLATION`。body 与 SLICE-02 `IngestCommand` 同构，可省略。
+
+```http
+POST /api/v1/market-research/mr0-poc/ingest
+Content-Type: application/json
+
+{ "analysisStart": "2026-07-01", "analysisEnd": "2026-07-31",
+  "warmupStart": "2026-04-01", "sampleSize": 150 }
+```
+
+未启用时响应（不泄露内部细节）：
+
+```json
+{ "success": false, "code": "BUSINESS_RULE_VIOLATION",
+  "message": "MR-0 PoC ingest 未启用", "data": null, "timestamp": "2026-08-15T10:00:00" }
+```
+
+启用时返回 `data.universe/membership/dailyBar/moneyFlow` 各表 `inserted/updated/skipped` 计数、
+`failures` 明细与 `sampleSymbols`（结构同 SLICE-02 `IngestResult`）。
+
+### 7.2 GET /api/v1/market-research/mr0-poc/analyze（只读分析）
+
+`start`/`end` 缺省为 `2026-07-01`/`2026-07-31`（D5 冻结窗口）。只读库、无进程内结果缓存，
+每次调用重新查询；结果含 `analysisContentHash`（字段白名单规范化 JSON 的 sha256，
+排除 `runId/generatedAt/durationMs/fetchedAt` 等运行元数据）。
+
+```http
+GET /api/v1/market-research/mr0-poc/analyze?start=2026-07-01&end=2026-07-31
+```
+
+```json
+{ "success": true, "code": "SUCCESS", "data": {
+  "runId": "6f9c…", "generatedAt": "2026-08-15T10:00:00", "durationMs": 812,
+  "analysisStart": "2026-07-01", "analysisEnd": "2026-07-31",
+  "universe": { "asOfDate": "2026-08-15", "universeSize": 151, "sampleSymbols": 150,
+    "benchmarkSymbol": "SH.000001", "universeSymbolsSha256": "ab12…", "status": "OK",
+    "providers": ["SINA_PUBLIC"], "caliber": "最新 as_of≤窗口结束日的证券池快照；基准恒入快照不算样本" },
+  "tradingDays": { "calendar": "INDEX_KLINE_DERIVED", "dates": ["2026-07-01", "…"], "count": 23,
+    "providers": ["TENCENT_PUBLIC"] },
+  "breadth": { "caliber": "adv/dec/flat 需 t 与 t-1 两根 bar，首日 t-1 取预热窗；adLine 首日种子=adv−dec",
+    "providers": ["TENCENT_PUBLIC"],
+    "daily": [ { "date": "2026-07-01", "advancing": 78, "declining": 61, "flat": 11,
+      "validStocks": 150, "advanceRatio": 0.5200000000, "adLine": 17, "status": "OK" } ] },
+  "industryTurnover": { "byIndustry": [ { "industryCode": "new_blhy", "industryName": "玻璃行业",
+      "days": [ { "date": "2026-07-01", "sectorTurnover": 1234567890.00,
+        "share": 0.0312000000, "lookaheadAffected": true } ] } ],
+    "dailyMarket": [ { "date": "2026-07-01", "marketTurnover": 39580000000.00, "sumShare": 1.0000000000 } ],
+    "coverageGap": { "count": 2, "symbols": ["BJ.920099", "…"] },
+    "providers": ["TENCENT_PUBLIC"] },
+  "volatility": { "asOfDate": "2026-07-31", "annualized": false, "status": "OK",
+    "qualifiedStocks": 147, "excludedForWarmup": 3,
+    "marketMedian": 0.018765432109, "marketP90": 0.031234567890, "providers": ["TENCENT_PUBLIC"] },
+  "liquidityProxy": { "unit": "1/元", "status": "OK", "qualifiedStocks": 150, "zeroAmountRows": 0,
+    "marketMedian": 0.000000031234, "marketP90": 0.000000112345, "providers": ["TENCENT_PUBLIC"] },
+  "moneyFacts": { "byIndustry": [ { "industryCode": "new_blhy", "days": [ { "date": "2026-07-01",
+        "sumMainNetInflow": -32102345.67, "cateNaValue": -23456789.01,
+        "deviation": -0.368550715646, "inconsistentCateNa": false } ] } ],
+    "inconsistentCateNaDays": 0,
+    "flowIntensity": { "providers": ["SINA_PUBLIC", "TENCENT_PUBLIC"], "window": "analysisWindow",
+      "windowNetInflow": -1234567890.12, "windowTurnover": 912345678901.23,
+      "value": -0.001353384702, "status": "OK" },
+    "providers": ["SINA_PUBLIC"] },
+  "analysisContentHash": "9a8b7c…",
+  "metricAttributions": [ { "metric": "flowIntensity", "providers": ["SINA_PUBLIC", "TENCENT_PUBLIC"],
+    "caliber": "Σ净流入/Σ成交额 同窗口同覆盖域（混源）" } ],
+  "mixedMetrics": ["flowIntensity"] }, "timestamp": "2026-08-15T10:00:01" }
+```
+
+语义要点：预热不足（不足 21 根收盘）时 `volatility.status=INSUFFICIENT_WARMUP` 且不输出任何
+部分数值；空有效池输出原因码 `EMPTY_VALID_UNIVERSE`（`advanceRatio`/`adLine` 为 `null`，
+禁止 NaN/Infinity）；`industryTurnover.share` 分母=覆盖域（有成分样本股），无成分股票计入
+`coverageGap` 不入分母，逐日 `sumShare=1±1e-6`；`moneyFacts.deviation` 只报告不判等；
+`flowIntensity` 为混源指标（新浪净流入 + 腾讯成交额），在 `mixedMetrics` 中显式列出。
+
+### 7.3 GET /api/v1/market-research/mr0-poc/report（只读质量报告）
+
+先执行 7.2 的分析，再生成八检查族质量报告。`format=markdown` 返回 `text/markdown` 文本，
+其余返回 ApiResponse 包装 JSON。
+
+```http
+GET /api/v1/market-research/mr0-poc/report?start=2026-07-01&end=2026-07-31&format=json
+```
+
+```json
+{ "success": true, "code": "SUCCESS", "data": { "families": [ {
+  "family": "UNIT_ANOMALY", "status": "OK", "reasonCode": "NONE", "affectedCount": 0,
+  "details": [] }, { "family": "TIME_POINT_LOOKAHEAD", "status": "WARN",
+  "reasonCode": "CURRENT_MEMBERSHIP_FOR_HISTORY", "affectedCount": 3450,
+  "details": ["当前成分聚合历史=时点穿越风险，PoC 显式假设", "…"] } ] },
+  "timestamp": "2026-08-15T10:00:02" }
+```
+
+八检查族固定顺序：`COVERAGE`、`GAPS`、`DUPLICATES`、`STALENESS`、`TIME_POINT_LOOKAHEAD`、
+`PROVIDER_MIXING`、`UNIT_ANOMALY`、`RECOMPUTE_CONSISTENCY`；每族为结构化对象
+（`family/status/reasonCode/affectedCount/details`），`status∈OK/WARN/FAIL/BLOCKED`。
+`DUPLICATES` 为信息级（uk 保证同源无重复，报告跨 data_source 并存事实）；
+`STALENESS` 在 `market_calendar` CN 空表时记 WARN（本地事实，不外联）；
+`RECOMPUTE_CONSISTENCY` 抽窗口中位日用原始行重算 advancing 数比对，跨进程重算一致性由
+PoC 脚本两次运行（TEST-07）与"每次调用重读存储"用例证明。
