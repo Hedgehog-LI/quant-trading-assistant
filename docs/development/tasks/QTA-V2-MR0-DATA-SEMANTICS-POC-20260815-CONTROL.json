@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTROL.json",
   "startedAt": "2026-08-14T16:38:01Z",
   "lane": "L2",
-  "lifecycleState": "SELF_CHECKED",
+  "lifecycleState": "CANDIDATE_FROZEN",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTRACT.md",
     "version": "1.0",
@@ -304,20 +304,51 @@
       "at": "2026-08-14T19:04:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "repair round 1 accepted; gen-2 ready for freeze"
+    },
+    {
+      "sequence": 9,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-14T19:08:00Z",
+      "actor": "PARENT-RUN-1"
+    },
+    {
+      "sequence": 10,
+      "from": "CANDIDATE_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-14T19:09:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "CR-5 gate-runner dispatch window (no code change; gen-2 identity recorded in history/diff artifact, re-freeze after gate)"
+    },
+    {
+      "sequence": 11,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-14T19:11:30Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "gen-2 gate bound (PASS, 0 errors)"
+    },
+    {
+      "sequence": 12,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-14T19:11:45Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "gen-2 candidate frozen with architecture gate bound"
     }
   ],
   "candidate": {
     "mode": "COMMIT",
     "generation": 2,
-    "identity": "",
-    "commit": "",
-    "treeHash": "",
-    "patchSha256": "",
+    "identity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "commit": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "treeHash": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "patchSha256": "7c3eeb73ed436f3f6f5372d911ce809df05a068b965c73055ef7419f9159eeb5",
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
     "diffArtifactPath": ".qta-governance/candidates/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815/generation-2.patch",
-    "diffArtifactSha256": ""
+    "diffArtifactSha256": "7c3eeb73ed436f3f6f5372d911ce809df05a068b965c73055ef7419f9159eeb5"
   },
   "budget": {
     "contextPercent": null,
@@ -534,6 +565,32 @@
       "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-SELF-CHECK-REPAIR-1.md",
       "artifactSha256": "f138601f0e9803644451713408d29070ae14ef3c0ba6776cac79dc437f715432"
+    },
+    {
+      "roleRunId": "ROLE-RUN-IMP-GATE-G2",
+      "dispatchId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-IMP-GATE-G2-D1",
+      "sessionId": "agent_4da3ed3a-a70c-4493-9c9f-4bcaffd6efd3",
+      "startedAt": "2026-08-14T19:09:30Z",
+      "finishedAt": "2026-08-14T19:11:00Z",
+      "runtimeReceiptPath": "",
+      "role": "IMPLEMENTER",
+      "generation": 2,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "sliceId": "SLICE-02",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_WRITE",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/ac6e8a02c3e19f746b80544c16c6394369b741ca486118cc900961fb0b8ec254/1c0a41e8aa2410ed78244542c3307a49a72d513f9e4ce9e1a6e73657e31e9f76.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "gate-runner only: executes frozen governance script, writes no repo files, no code change",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-SELF-CHECK-REPAIR-1.md",
+      "artifactSha256": "f138601f0e9803644451713408d29070ae14ef3c0ba6776cac79dc437f715432"
     }
   ],
   "review": {
@@ -563,14 +620,31 @@
   },
   "architectureGate": {
     "required": true,
-    "candidateIdentity": "",
-    "status": "NOT_RUN",
-    "exitCode": -1,
+    "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "status": "PASS",
+    "exitCode": 0,
     "errorCount": 0,
-    "warningCount": 0,
-    "warningDispositions": [],
-    "reportPath": "",
-    "reportSha256": "",
+    "warningCount": 2,
+    "warningDispositions": [
+      {
+        "warningId": "ARCH-W-001",
+        "warning": "Mr0PocIngestService direct dependencies 11 > 10",
+        "disposition": "ACCEPTED",
+        "rationale": "orchestration-layer service aggregates 7 nested model record types plus 3 collaborators; splitting nested records into files would exceed frozen 8-file slice caps with no behavior benefit; disclosed at SLICE-02/03 self-checks and confirmed by review G1",
+        "owner": "PARENT-RUN-1",
+        "dueDate": "2026-08-15"
+      },
+      {
+        "warningId": "ARCH-W-002",
+        "warning": "candidate adds 1495 production lines across 7 files",
+        "disposition": "ACCEPTED",
+        "rationale": "parent-approved disclosed exception over the indicative S2+S3 line budget; overrun maps to frozen acceptance requirements (AMD-1 hash whitelist, per-metric provider/caliber attribution, eight-family quality engine, deterministic markdown); disclosed to reviewer G1 and carried to FINAL_VERIFIER",
+        "owner": "PARENT-RUN-1",
+        "dueDate": "2026-08-15"
+      }
+    ],
+    "reportPath": ".qta-governance/candidates/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815/arch-gate-g2.json",
+    "reportSha256": "9572ee83a3f8d57c56c38a5ca3df76ff1dde02dda9a492968fb310883ef6b0bb",
     "generatedBy": "scripts/check-ai-architecture.mjs"
   },
   "verification": {
