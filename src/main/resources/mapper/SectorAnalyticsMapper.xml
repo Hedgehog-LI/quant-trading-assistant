@@ -36,11 +36,34 @@
         LIMIT #{limit}
     </select>
 
+    <select id="selectLatestCloseBatches" resultType="com.quant.trade.marketdata.analysis.model.SectorAnalyticsSourceBatchDO">
+        SELECT id, provider_code, market_code, trade_date, provider_quote_time, item_count
+        FROM market_sector_ranking_batch batch
+        WHERE batch.provider_code = #{providerCode} AND batch.market_code = #{marketCode}
+          AND batch.snapshot_type = 'CLOSE' AND batch.quality_status = 'VALID'
+          AND batch.id = (
+              SELECT MAX(candidate.id) FROM market_sector_ranking_batch candidate
+              WHERE candidate.provider_code = batch.provider_code
+                AND candidate.market_code = batch.market_code
+                AND candidate.snapshot_type = 'CLOSE'
+                AND candidate.quality_status = 'VALID'
+                AND candidate.trade_date = batch.trade_date
+          )
+        ORDER BY batch.trade_date DESC, batch.snapshot_time DESC, batch.id DESC
+        LIMIT #{limit}
+    </select>
+
     <select id="selectSourceItems" resultType="com.quant.trade.marketdata.analysis.model.SectorAnalyticsSourceItemDO">
-        SELECT i.batch_id, b.trade_date, i.sector_identity_id, i.sector_name,
-               i.provider_sector_id, i.change_rate, i.leading_name, i.leading_symbol
+        SELECT i.batch_id, b.trade_date, i.sector_identity_id, i.rank_no, i.sector_name,
+               i.provider_sector_id, identity.taxonomy_version, i.change_rate,
+               i.leading_name, i.leading_symbol,
+               (SELECT MAX(w.tracking_symbol) FROM market_sector_watch w
+                 WHERE w.provider_code = b.provider_code
+                   AND w.market_code = b.market_code
+                   AND w.provider_sector_id = i.provider_sector_id) AS tracking_symbol
         FROM market_sector_ranking_item i
         JOIN market_sector_ranking_batch b ON b.id = i.batch_id
+        JOIN market_sector_identity identity ON identity.id = i.sector_identity_id
         WHERE i.batch_id IN
         <foreach collection="batchIds" item="id" open="(" separator="," close=")">#{id}</foreach>
           AND i.sector_identity_id IS NOT NULL AND i.change_rate IS NOT NULL
@@ -153,7 +176,8 @@
     </select>
 
     <sql id="ResearchColumns">
-        p.id AS publication_batch_id, rs.calculation_run_id, p.provider_code, p.market_code,
+        p.id AS publication_batch_id, source_batch.id AS source_batch_id,
+        rs.calculation_run_id, p.provider_code, p.market_code,
         p.as_of_date, p.window_days, p.momentum_window_days, p.formula_version, p.parameter_hash, p.scope_code,
         p.quality_status AS publication_quality_status, p.published_at,
         persistence.calculation_run_id AS momentum_calculation_run_id,

@@ -103,6 +103,14 @@
 
 ### 5.1 相对强弱（N 日对数相对收益 / RS-rank 百分位）
 
+#### 5.1.1 一日横截面强度
+
+`window=1` 是只读 raw-fact 视图，不进入强度/动量原子发布。它只使用最新合格 CLOSE 批次，
+以同批次有效板块的等权收益为基准，复用本节对数相对收益和并列平均秩公式。最小有效板块数
+为 5；来源时间缺失、稳定身份缺失或有效样本不足时不得输出 OK。一日结果只表达当日横截面
+位置，轮动、持续性和位次变化统一标为不可用。历史轨迹可以读取已经积累的每日 CLOSE 事实，
+但不得伪造 provider 未提供的过去排行。
+
 - **输入与单位**：只读 `market_sector_ranking_batch/item` 的 `snapshot_type='CLOSE'`。当前适配器 fixture 同一响应项同时给出 `chg="0.0240"` 与 `value_data="2.40%"`，且客户端直接透传 `chg`，因此冻结为 **decimal ratio**；`sectorReturn(t)=change_rate(t)`，禁止再次 `/100`。P1.7-A 必须增加读取真实 fixture 的映射断言，不能仅在设计测试中硬编码数值。
 - **身份**：唯一身份为 `(provider_code, market_code, provider_sector_id, taxonomy_version)`。`watch_id` 只是关注关系，永远不能参与历史身份、幂等键或跨表连接。
 - **范围**：当前 LongPort 排行接口最大返回 100 条，且不提供独立总数或分页，因此 P1.7 MVP **只能**产 `RANKED_UNIVERSE`，不得产 `VERIFIED_FULL_MARKET`。后者是预留值，只有未来 provider 提供独立于当前响应的权威总数或可遍历分页，并证明 `actual_item_count=expected_item_count`、`is_truncated=false`、`coverage_rate=1` 时才能启用；禁止用当前返回条数反填 expected count。前端必须显示“排行样本，不代表全市场”。

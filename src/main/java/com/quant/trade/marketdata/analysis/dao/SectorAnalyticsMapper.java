@@ -21,6 +21,10 @@ public interface SectorAnalyticsMapper {
             @Param("providerCode") String providerCode, @Param("marketCode") String marketCode,
             @Param("asOfDate") LocalDate asOfDate, @Param("limit") int limit);
 
+    List<SectorAnalyticsSourceBatchDO> selectLatestCloseBatches(
+            @Param("providerCode") String providerCode, @Param("marketCode") String marketCode,
+            @Param("limit") int limit);
+
     List<SectorAnalyticsSourceItemDO> selectSourceItems(@Param("batchIds") List<Long> batchIds);
 
     List<LocalDate> selectTradingDates(@Param("marketCode") String marketCode,

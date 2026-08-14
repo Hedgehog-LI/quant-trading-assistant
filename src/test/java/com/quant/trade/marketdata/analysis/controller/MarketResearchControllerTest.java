@@ -95,6 +95,61 @@ class MarketResearchControllerTest {
     }
 
     @Test
+    void readsOneDayStrengthDirectlyFromLatestCloseWithoutPublishingRotation() throws Exception {
+        Long strongestSectorId = jdbcTemplate.queryForObject(
+                "SELECT MAX(id) FROM market_sector_identity", Long.class);
+
+        mockMvc.perform(get("/api/v1/market-research/radar")
+                        .param("market", "CN").param("window", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.publicationBatchId").isEmpty())
+                .andExpect(jsonPath("$.data.sourceBatchId").isNumber())
+                .andExpect(jsonPath("$.data.strengthCalculationRunId").isEmpty())
+                .andExpect(jsonPath("$.data.momentumCalculationRunId").isEmpty())
+                .andExpect(jsonPath("$.data.analysisMode").value("ONE_DAY_STRENGTH"))
+                .andExpect(jsonPath("$.data.rotationAvailable").value(false))
+                .andExpect(jsonPath("$.data.strengthWindowDays").value(1))
+                .andExpect(jsonPath("$.data.momentumWindowDays").value(0))
+                .andExpect(jsonPath("$.data.sectors.length()").value(5))
+                .andExpect(jsonPath("$.data.sectors[0].sectorId").value(strongestSectorId))
+                .andExpect(jsonPath("$.data.sectors[0].currentRank").value(5))
+                .andExpect(jsonPath("$.data.sectors[0].rsRankPercentile").value(1.0))
+                .andExpect(jsonPath("$.data.sectors[0].meanRankPercentile").isEmpty())
+                .andExpect(jsonPath("$.data.sectors[0].consecutiveLeadingDays").isEmpty())
+                .andExpect(jsonPath("$.data.sectors[0].consecutiveLaggingDays").isEmpty())
+                .andExpect(jsonPath("$.data.sectors[0].rotationState").value("INSUFFICIENT_DATA"))
+                .andExpect(jsonPath("$.data.sectors[0].reasonCodes[0]").value("ONE_DAY_STRENGTH_ONLY"))
+                .andExpect(jsonPath("$.data.sectors[0].reasonCodes[1]").value("ROTATION_REQUIRES_5_DAYS"));
+
+        mockMvc.perform(get("/api/v1/market-research/sectors/ranking-history")
+                        .param("market", "CN").param("window", "1").param("days", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sectors.length()").value(5))
+                .andExpect(jsonPath("$.data.sectors[0].points.length()").value(5))
+                .andExpect(jsonPath("$.data.sectors[0].points[0].publicationBatchId").isEmpty())
+                .andExpect(jsonPath("$.data.sectors[0].points[0].sourceBatchId").isNumber())
+                .andExpect(jsonPath("$.data.sectors[0].points[0].meanRankPercentile").isEmpty())
+                .andExpect(jsonPath("$.data.sectors[0].points[0].asOfDate").value("2026-01-05"));
+
+        mockMvc.perform(get("/api/v1/market-research/sectors/{sectorId}", strongestSectorId)
+                        .param("market", "CN").param("window", "1").param("days", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.analysisMode").value("ONE_DAY_STRENGTH"))
+                .andExpect(jsonPath("$.data.rotationAvailable").value(false))
+                .andExpect(jsonPath("$.data.sourceQuoteTime").value("2026-01-05T15:00:00"))
+                .andExpect(jsonPath("$.data.history.length()").value(5));
+
+        Integer publications = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sector_analytics_publication_batch", Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, publications);
+
+        mockMvc.perform(post("/api/v1/market-research/calculations")
+                        .param("market", "CN").param("window", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void defaultRadarPublishesTwentyDayStrengthWithFiveDayMomentumAndRejectsCrossMarketMember()
             throws Exception {
         seedAdditionalCloseFacts(6, 20);

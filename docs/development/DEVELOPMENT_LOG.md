@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-08-14 — P1.10-A1 市场雷达一日强度
+
+- **目标**：只有一个合格收盘排行批次时也能查看当天板块强弱，同时避免把单日横截面结果冒充多日轮动。
+- **后端**：查询接口新增 `window=1`，只读最新 `CLOSE + VALID` 原始事实，复用并列友好的等权相对强弱计算；返回原始 `sourceBatchId/rankNo`，持续性字段为 `null`，不创建计算 run 或发布批次。排行历史与板块详情读取已积累的收盘事实；`POST /calculations` 仍只接受 `5/10/20/50`。
+- **前端**：市场雷达默认显示 `1 日强度`，新增当日市场宽度、强弱梯队、源排名、当日证据和一日详情历史；一日模式隐藏重算与轮动矩阵，多日无结果可回退到一日。mock 与 remote 使用相同的 null/来源语义。
+- **验证**：后端全量 **520 tests / 0 failures / 0 errors / 1 skipped**；前端 typecheck、lint、**51 files / 400 tests**、build 通过；桌面与 390px mock 页面及详情导航检查通过。最终全新只读核验者确认 `FUNCTIONAL=PASS`、`CODE_ARCHITECTURE=PASS`，结论 `CONDITIONALLY_ACCEPTED`。
+- **限制**：本轮由父上下文按用户要求直接实施，未补造 CONTROL/角色回执；Docker/MySQL、真实 CLOSE 数据、remote 页面和服务器部署仍未验，不得标记 `DEPLOYED`。
+- **关联**：`tasks/MARKET-RESEARCH-ONE-DAY-STRENGTH-20260814-CONTRACT.md`、`tasks/MARKET-RESEARCH-ONE-DAY-STRENGTH-20260814-VERIFICATION.md`、`../api/MARKET_RESEARCH_API.md`。
+
 ## 2026-08-13 — P1.9-D 行情采集与资产查看闭环
 
 - **目标**：修复采集计划、`stock_basic`、K 线事实表和 `/market-assets` 之间的断链，消除远程模式固定真实证券入口造成的 404。

@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Data
 public class MarketResearchRowDO {
     private Long publicationBatchId;
+    private Long sourceBatchId;
     private Long calculationRunId;
     private Long momentumCalculationRunId;
     private String providerCode;

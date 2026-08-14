@@ -1,6 +1,6 @@
 # Market Research API
 
-> 实现状态：P1.10-A 前后端候选已实现（2026-08-13）；自动化与 mock 浏览器通过，真实数据 remote 运行时待验。
+> 实现状态：P1.10-A/A1 前后端候选已实现（2026-08-14）；`1/5/10/20/50` 查询窗口的自动化与 mock 浏览器通过，真实数据 remote 运行时待验。
 
 ## 1. 能力边界
 
@@ -10,7 +10,7 @@
 - `sourceQuoteTime` 当前来自 LongPort HTTP 响应的 `Date` 头，表示 provider 响应时间，不是交易所逐笔成交时间。
 - `flowMetricNature=UNAVAILABLE` 时 `capitalFlow=null`；禁止用 `0` 冒充没有资金流入。
 - 雷达只输出相对强弱与轮动状态，不输出买入、卖出或收益预测，不构成投资建议。
-- 默认计算 20 个交易日的相对强弱和固定 5 个交易日的轮动动量；相对强弱窗口支持 `5/10/20/50`。
+- 查询窗口支持 `1/5/10/20/50`。`1` 表示最新合格 CLOSE 批次的当日横截面强度，不生成轮动结论；`5/10/20/50` 使用已发布相对强弱和固定 5 日轮动动量。
 
 ## 2. 公式与发布语义
 
@@ -37,7 +37,17 @@ relativeReturn = exp(sum(log(1 + sectorReturn) - log(1 + benchmarkReturn))) - 1
 | `LAGGING` | 强度和短期位次均偏弱 |
 | `INSUFFICIENT_DATA` | 样本不足，不能分类 |
 
-### 2.3 原子发布
+### 2.3 一日强度
+
+`window=1` 直接读取最新合格 `CLOSE` 排行事实，使用同一批次板块的等权收益作为共同基准，
+计算当日收益、对数相对收益和并列友好的横截面强度百分位。它不创建
+`sector_analytics_publication_batch`，响应通过 `analysisMode=ONE_DAY_STRENGTH`、
+`rotationAvailable=false` 和原始 `sourceBatchId` 明确来源。
+
+一日模式不输出改善、转弱、连续性或排名动量；所有板块的 `rotationState` 固定为
+`INSUFFICIENT_DATA`，原因码包含 `ONE_DAY_STRENGTH_ONLY` 与 `ROTATION_REQUIRES_5_DAYS`。
+
+### 2.4 原子发布
 
 一次雷达发布同时绑定强度 run、5 日动量 run、源批次集合、公式版本和参数哈希。只有两种公式都成功且 scope/market/as-of 一致时才发布；查询端只读取 `PUBLISHED` 批次，不读取计算中的半成品。相同输入重复计算会复用同一发布批次。
 
@@ -63,7 +73,7 @@ POST /api/v1/market-research/calculations?market=CN&asOfDate=2026-08-13&window=2
 | --- | --- | --- |
 | `market` | 否 | 默认 `CN`，支持 `CN/HK/US` |
 | `asOfDate` | 否 | 默认当前日期；只使用该日及以前已落库的成功 CLOSE 批次 |
-| `window` | 否 | 相对强弱窗口，默认 `20`，支持 `5/10/20/50`；动量固定为 `5` |
+| `window` | 否 | 多日发布窗口，默认 `20`，仅支持 `5/10/20/50`；动量固定为 `5`。一日强度无需调用本接口 |
 
 成功返回：
 
@@ -91,7 +101,11 @@ POST /api/v1/market-research/calculations?market=CN&asOfDate=2026-08-13&window=2
 GET /api/v1/market-research/radar?market=CN&window=20
 ```
 
-返回最新已发布批次、强度/动量 run ID、公式与参数身份、数据水位、覆盖率、质量原因以及所有板块的相对收益、百分位、持续性和四象限状态。尚无发布数据时，沿用当前全局异常映射返回 HTTP 400 + `RESOURCE_NOT_FOUND`。
+`window=1` 返回最新合格 CLOSE 原始批次的当日强度；`publicationBatchId`、计算 run ID、
+`momentumFormulaCode` 和 `publishedAt` 为 `null`，`sourceBatchId` 指向来源排行批次。
+`window=5/10/20/50` 返回最新已发布批次、强度/动量 run ID、公式与参数身份、数据水位、
+覆盖率、质量原因以及所有板块的相对收益、百分位、持续性和四象限状态。对应数据不存在时，
+沿用当前全局异常映射返回 HTTP 400 + `RESOURCE_NOT_FOUND`。
 
 前端必须展示：
 
@@ -106,7 +120,9 @@ GET /api/v1/market-research/radar?market=CN&window=20
 GET /api/v1/market-research/sectors/ranking-history?market=CN&window=20&days=20
 ```
 
-返回最多 120 个已发布交易日的板块历史点，用于热力图和排行轨迹。`days` 小于 1 时按 1，大于 120 时按 120。
+`window=1` 返回最多 120 个已落库合格 CLOSE 交易日的当日强度历史点，并使用
+`sourceBatchId` 标识来源；多日窗口返回已发布交易日的板块历史点。`days` 小于 1 时按 1，
+大于 120 时按 120。
 
 ### 3.5 板块详情
 
@@ -114,7 +130,9 @@ GET /api/v1/market-research/sectors/ranking-history?market=CN&window=20&days=20
 GET /api/v1/market-research/sectors/123?market=CN&window=20&days=20
 ```
 
-`sectorId` 是 `market_sector_identity.id` 稳定内部身份，不是 provider 临时代码。返回板块名称、provider 标识、taxonomy 版本、领先证券、关联跟踪证券、历史轨迹和数据质量。没有已发布数据时返回 HTTP 400 + `RESOURCE_NOT_FOUND`。
+`sectorId` 是 `market_sector_identity.id` 稳定内部身份，不是 provider 临时代码。返回板块名称、provider 标识、taxonomy 版本、领先证券、关联跟踪证券、历史轨迹和数据质量。
+`window=1` 的历史来自已落库 CLOSE 原始事实；多日窗口来自已发布结果。对应数据不存在时返回
+HTTP 400 + `RESOURCE_NOT_FOUND`。
 
 ## 4. 自动触发
 

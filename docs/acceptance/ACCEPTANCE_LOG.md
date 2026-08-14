@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-08-14 — P1.10-A1 一日强度（条件通过，允许本地提交）
+
+- **范围**：`window=1` 市场雷达、排行历史、板块详情、前端当日强弱视图及多日空态回退；不含 provider 历史回补或真实资金流。
+- **语义证据**：只读最新 `CLOSE + VALID` 原始批次；`publicationBatchId`、run ID、持续性字段均为空；`sourceBatchId/currentRank` 分别使用原始批次与 `rank_no`；每个板块明确 `rotationAvailable=false`、`INSUFFICIENT_DATA` 和一日原因码。`POST window=1` 返回 400，发布表行数保持 0。
+- **自动化**：后端 `./mvnw test` **520/0/0/1**，定向 `MarketResearchControllerTest` **6/6**；前端 typecheck、lint、**51 files / 400 tests**、build，相关 2 files / 6 tests 与两仓 `git diff --check` 全部 PASS。
+- **页面证据**：mock 桌面与 390px 无水平溢出；默认一日强度、强弱梯队、源排名、无轮动重算入口，从板块进入每日强度历史成功，时间轴按日期升序。
+- **独立核验**：首轮发现持续性伪值、源排名、时间轴和 mock 语义问题；修复后又发现并关闭详情页头使用旧快照问题。最终全新只读核验者对冻结候选给出 `FUNCTIONAL=PASS / CODE_ARCHITECTURE=PASS / CONDITIONALLY_ACCEPTED`，无 P0-P2。
+- **未执行**：Docker/MySQL、真实 provider CLOSE 样本、remote/服务器浏览器与部署 smoke。完整 CONTROL/角色机器回执未补造，作为治理偏差保留。
+- **结论**：允许本地提交；部署后通过真实一日 radar/history/detail smoke 前，不得标记 `DEPLOYED`。
+
 ## 2026-08-13 — P1.10-A 市场发现全栈候选（自动化与 mock 浏览器通过，真实运行时未验）
 
 - **范围**：稳定板块身份/source time、readiness、相对强弱、固定 5 日轮动、计算 run、原子发布、市场研究只读 API、CLOSE 后自动触发、市场雷达和板块详情。
