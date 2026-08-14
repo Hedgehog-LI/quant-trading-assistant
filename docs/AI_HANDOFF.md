@@ -15,7 +15,8 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 ## 当前状态（2026-08）
 
-- **QTA V2 产品与机构化市场研究设计已冻结（2026-08-15，未开始实现）**：冻结“市场研究 / 策略实验室 / 交易与复盘 / 数据中心 / 系统”一级信息架构，以及“趋势与风险 → 广度 → 流动性与交易活跃度 → 行业成交占比迁移 → Provider 资金事实 → 相对强弱与动量 → 板块下钻 → 候选”的研究证据链。V2 复用现有采集、P1.7 衍生引擎、P1.9 数据详情、P1.10-A 和交易闭环，不推倒重写；下一项实施必须先做 MR-0 数据/语义 PoC，不能直接用 mock 页面或排行样本宣称全市场能力。入口：`docs/features/QTA_V2_QUANT_RESEARCH_PLATFORM_PRD.md`、`docs/features/QTA_V2_INSTITUTIONAL_MARKET_RESEARCH_DESIGN.md`、ADR-0014。
+- **QTA V2 MR-0 数据与语义 PoC 已完成并独立验收（2026-08-15，VERIFIED/ACCEPTED）**：冻结指标数据字典（23 指标×13 属性）、Provider 能力矩阵（TENCENT/SINA/SOHU 公共源 VERIFIED 真实探针；TUSHARE NOT_VERIFIED 无凭据；LONGBRIDGE VERIFIED(历史)/NOT_RETESTED）、九类现状盘点。V23 三张 `mr0_` PoC 事实表 + `marketdata.poc` 包（公共源只读客户端、幂等导入、分析/质量引擎、REST 入口）+ `scripts/run-mr0-poc.sh`。2026-07 完整交易月真实 PoC：tradingDays=23、Top150∪基准样本、双分析哈希一致、二次导入四表 inserted=0；质量引擎真实检出既有 LONGPORT 脏数据（8 行 volume 未×100）、SINA 行业成分缺口（49/150）、market_calendar CN 空、时点穿越显式假设。治理流程完整（TEST_DESIGNER→4 切片→2 轮 review→2 轮 repair→FINAL_VERIFIER 机器回执 9/9）；后端 538 tests + package。**MR-1 输入边界已冻结**（见 `docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md` §MR-1 输入边界）：可用=样本级公式引擎+公共源日K+幂等导入；阻断=全市场逐股历史/PIT 申万成分/官方资金流（凭据）；禁用=价量猜资金等伪指标。入口：契约/报告 `docs/development/tasks/QTA-V2-MR0-*`、三份 MR0 文档 `docs/features/MARKET_RESEARCH_MR0_*`。
+- **QTA V2 产品与机构化市场研究设计已冻结（2026-08-15）**：冻结“市场研究 / 策略实验室 / 交易与复盘 / 数据中心 / 系统”一级信息架构，以及“趋势与风险 → 广度 → 流动性与交易活跃度 → 行业成交占比迁移 → Provider 资金事实 → 相对强弱与动量 → 板块下钻 → 候选”的研究证据链。V2 复用现有采集、P1.7 衍生引擎、P1.9 数据详情、P1.10-A 和交易闭环，不推倒重写。入口：`docs/features/QTA_V2_QUANT_RESEARCH_PLATFORM_PRD.md`、`docs/features/QTA_V2_INSTITUTIONAL_MARKET_RESEARCH_DESIGN.md`、ADR-0014。
 
 - **P1.9-D 行情采集与资产查看闭环（2026-08-13，本地运行验证通过、待服务器部署）**：采集计划创建/修改/启用/执行和直接日 K 同步会幂等补齐最小 `stock_basic` 身份；新增真实已入库资产目录 API，前端 `/market-assets` 不再展示固定真实证券，而是展示实际存在日 K/分钟 K 的资产，并区分未登记、未采集、范围为空和系统错误。后端 **519 tests** + package、前端 **399 tests** + typecheck/lint/build 通过；Docker/MySQL 8.4 health 与资产目录/404 curl 通过，服务器部署待验。入口：`docs/development/tasks/MARKET-DATA-ASSET-INGESTION-LOOP-P19D-CONTRACT.md`。
 
@@ -56,11 +57,11 @@ Quant Trading Assistant：个人交易辅助系统（自选股 / 计划 / 交易
 
 P1.0 证券主数据和 CSV 日 K 基础已由 `marketdata` 模块实现（V5/V6）。P1.1 LongPort provider facade + V7-V9 migration + 9 API + 6 Tab 前端已实现；后端反射式 SDK adapter 已实现。**P1.1 单股票手动同步真实外联已于 2026-07-12 全流程验收通过**（SDK 安装 + 域名覆盖 + 凭据 + 单 symbol 落库）。
 
-P1.2 行情采集执行引擎、P1.6 板块双层自动采集和 P1.10-A 自动化候选均保留。V2 冻结后按以下顺序推进：
+P1.2 行情采集执行引擎、P1.6 板块双层自动采集和 P1.10-A 自动化候选均保留。**MR-0 已完成（见上）**，V2 后续顺序：
 
-1. 新建 MR-0 有界任务契约：冻结指标数据字典、Provider 候选、样本范围、覆盖率阈值、质量门禁和明确非目标。
-2. 用一个完整 A 股交易月完成全市场日频、point-in-time 行业成分、资金事实的低成本 PoC；PoC 结论另行冻结 ADR，不把未知权限写成既成事实。
-3. MR-0 通过后再拆 MR-1 市场全景 MVP；先交付基准走势、成交量、流动性/活跃度、市场广度和行业成交占比迁移，不一次承包全部 V2。
+1. ~~新建 MR-0 有界任务契约并用一个完整 A 股交易月完成低成本 PoC~~（已完成 2026-08-15，VERIFIED）。
+2. MR-1 市场全景 MVP：先交付基准走势、成交量、流动性/活跃度、市场广度和行业成交占比迁移，不一次承包全部 V2；输入边界以 MR-0 POC-REPORT 四要素为准（全市场历史/PIT 成分/官方资金流在凭据就绪前保持阻断）。
+3. MR-1 前置清理：本地 LONGPORT SH.600519 8 行 volume 手/股脏数据；Provider 选型 ADR（公共源仅 PoC 证据，非生产决策）。
 4. 现有 P1.10-A 仍需在 Docker/MySQL 真实 CLOSE 样本和 remote 页面完成部署验收，但该维护任务不得扩展旧页面规格。
 5. P1.8 OpenClaw 只读助手保留；港股、美股研究在各自交易日历、分类体系、币种和资金语义冻结前不开放。
 

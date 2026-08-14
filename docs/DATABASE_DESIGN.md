@@ -2,7 +2,7 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
-当前已发布 V1-V18，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+当前已发布 V1-V23，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
 
 ## 命名约定
 
@@ -509,6 +509,14 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 - `next_action`
 - `created_at`
 - `updated_at`
+
+### mr0_universe_snapshot / mr0_industry_membership / mr0_stock_money_flow_daily
+
+状态：已实现（V23 migration，MR-0 数据与语义 PoC）。用途：PoC 范围的证券池快照、时点行业成分（含 `as_of_date`+`fetched_at`）和个股日资金流事实；`provider_code` 区分 `SINA_PUBLIC` 等来源，行业分类 `taxonomy_code=SINA_INDUSTRY`（非申万，禁止混称）。均为 `mr0_` 前缀 PoC 事实表、可废弃，MR-1 正式表结构仍需 ADR 冻结。日 K 事实复用既有 `stock_daily_bar`（`data_source=TENCENT_PUBLIC`）。
+
+- `mr0_universe_snapshot`：唯一键 `(provider_code, canonical_symbol, as_of_date)`；市值/换手（小数）为当日快照事实。
+- `mr0_industry_membership`：唯一键 `(taxonomy_code, industry_code, canonical_symbol, as_of_date)`；成分按抓取日 as-of 断言，非 point-in-time 历史（时点穿越由质量检查族显式标记）。
+- `mr0_stock_money_flow_daily`：唯一键 `(canonical_symbol, trade_date, provider_code)`；主力净流入/超大单/行业净流入为 Provider 口径事实（元），QTA 不从价量推算。
 
 ### agent_api_audit_log
 

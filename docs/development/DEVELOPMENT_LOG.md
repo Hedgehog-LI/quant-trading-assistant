@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-08-15 — QTA V2 MR-0 数据与语义 PoC
+
+- **目标**：按 V2 冻结设计完成 MR-0：证明市场全景/流动性/资金/轮动所需数据真实可得、口径明确、可重算、质量可控；冻结指标数据字典、Provider 能力矩阵与 MR-1 输入边界。不开发 V2 前端、不做生产 Provider 选型。
+- **文档**：冻结三份权威文档——指标数据字典（23 指标 × 13 属性，A/D 线种子、20 日波动率 ddof=1 不年化、占比 ε=1e-6、覆盖域定义等 AMD-3 冻结值）、Provider 能力矩阵（LONGBRIDGE VERIFIED(历史)/NOT_RETESTED、TUSHARE NOT_VERIFIED（PRD IMPLEMENTATION_GATE 阻断）、TENCENT/SINA/SOHU PUBLIC VERIFIED 真实探针、EASTMONEY 本环境拒连、NETEASE 下线）、现状盘点（九类 I-01..I-09 已实现事实 vs 设计目标与 6 项关键缺口）。
+- **后端**：V23 新增 3 张 `mr0_` PoC 事实表（证券池快照/时点行业成分/个股日资金流）；`com.quant.trade.marketdata.poc` 包——公共无凭据只读客户端（腾讯日 K 含换手/成交额、新浪证券池/行业成分/资金流）、幂等导入（ODKU、单位冻结 amount=元/volume=股/换手=小数、最小身份回填）、分析引擎（市场广度、A/D 线、行业成交额与占比、20 日波动率、流动性代理、资金事实与 M-15 绝对偏差、字段白名单 analysisContentHash）、八族质量引擎（覆盖/缺口/重复/陈旧/时点穿越/Provider 混用/单位异常含 VWAP∈[low,high]/重算一致性）、REST 入口（ingest 受控默认关、analyze/report 只读零外联）与 `scripts/run-mr0-poc.sh` 一键编排（AMD-1 退出码语义、双分析哈希一致断言、二次导入幂等计数）。
+- **PoC 真实运行**（2026-07 完整交易月，公开无凭据源 + 本地 qta-mysql）：exit 0/SUCCESS/193s；证券池 5543 只（as-of 2026-08-15 快照）+Top150 流通市值样本∪基准；tradingDays=23（基准日 K 推导）；日 K 11199 行（预热自 2026-04-01）、资金流 3432 行、成分 101 只；双分析内容哈希一致；二次导入四表 inserted=0（幂等实证）。质量引擎真实检出：本地既有 LONGPORT SH.600519 8 行 volume 存"手"未×100（UNIT_ANOMALY FAIL，属既有脏数据）、SINA 行业缺 49 只大市值样本成分（COVERAGE WARN 0.673）、market_calendar CN 空表（STALENESS WARN）、当前成分聚合历史的时点穿越（显式假设标记）。
+- **验证**：治理流程 TEST_DESIGNER(3 AMD)→4 切片 IMPLEMENTER→两轮 CODE_REVIEW（G1 12 发现/修复轮 1 CR-1..10；G2 双 PASS）→修复轮 2（台账 selector-源绑定）→G3 双 PASS→FINAL_VERIFIER 机器回执验收（9/9 门禁 exit 0、candidateUnchanged=true）。后端全量 **538 tests / 0 failures / 0 errors / 1 skipped** + package。终态 `VERIFIED`（候选 gen-3 `981cd47`，FUNCTIONAL/ARCHITECTURE 双 PASS，ACCEPTED）。
+- **MR-1 输入边界**（见 POC-REPORT）：可用=样本级广度/占比/波动/流动性公式引擎+公共源日 K 真实可得性+幂等导入链；阻断=全市场逐股历史（成本/稳定性）、PIT 申万成分（Tushare 无凭据）、官方口径资金流；禁用伪指标=价量猜资金、非互斥板块汇总 100%、跨 Provider 混算、无标签百分数。
+- **遗留**：MR-1 前需清理本地 LONGPORT 手/股脏数据；PoC 运行工件宜移出追踪路径；CR2-2 ingest tie-break、CR2-4 负例观测；生产 Provider 选型 ADR 待 MR-1 契约。
+- **关联**：`tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-{CONTRACT,TEST-DESIGN,SELF-CHECK*,REVIEW-G*,VERIFICATION*,POC-REPORT}.md`、`features/MARKET_RESEARCH_MR0_{METRIC_DICTIONARY,PROVIDER_MATRIX,DATA_INVENTORY}.md`、`api/MARKET_RESEARCH_API.md` §7、`DATABASE_DESIGN.md`（V23）。
+
 ## 2026-08-14 — P1.10-A1 市场雷达一日强度
 
 - **目标**：只有一个合格收盘排行批次时也能查看当天板块强弱，同时避免把单日横截面结果冒充多日轮动。

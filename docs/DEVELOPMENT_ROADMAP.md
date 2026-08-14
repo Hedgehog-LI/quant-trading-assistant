@@ -16,15 +16,16 @@
 
 ## 当前最高优先级
 
-### QTA V2 MR-0：数据与语义 PoC（设计冻结，尚未实施）
+### QTA V2 MR-1：市场全景 MVP（下一项；MR-0 已通过独立验收）
 
 产品基线：`features/QTA_V2_QUANT_RESEARCH_PLATFORM_PRD.md`、
 `features/QTA_V2_INSTITUTIONAL_MARKET_RESEARCH_DESIGN.md`、
 `decisions/ADR-0014-institutional-market-research-and-data-first-quant-workflow.md`。
 
-- V2-0 产品定位、一级信息架构、市场研究证据链、数据职责和阶段顺序已于 2026-08-15 冻结。
-- 下一项有界任务必须是 MR-0：冻结指标数据字典，验证全市场日频、point-in-time 行业成分和资金事实 Provider，并用一个完整交易月证明可重算与质量门禁。
-- MR-0 通过前不建设新的展示型大屏，不把排行样本、成交活跃度或价格相对强弱包装为全市场资金流。
+- **MR-0 数据与语义 PoC 已完成（2026-08-15，VERIFIED/ACCEPTED）**：指标数据字典/Provider 能力矩阵/现状盘点已冻结；V23 `mr0_` 事实表 + `marketdata.poc` 分析/质量引擎 + 一键 PoC 脚本；2026-07 完整交易月真实 PoC 证明样本级广度/行业占比/波动/流动性/资金口径可重算（双哈希一致+二次导入幂等）。入口：`features/MARKET_RESEARCH_MR0_*.md`、`development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md`。
+- MR-1 按冻结输入边界实施：先交付基准走势、成交量、流动性/活跃度、市场广度和行业成交占比迁移，不一次承包全部 V2；全市场逐股历史、point-in-time 申万成分、官方口径资金流在凭据/选型 ADR 就绪前保持阻断标注。
+- MR-1 前置清理：本地 LONGPORT SH.600519 8 行 volume 手/股脏数据；生产 Provider 选型 ADR（MR-0 公共源探针仅为 PoC 证据）。
+- 不建设脱离数据能力的新展示型大屏，不把排行样本、成交活跃度或价格相对强弱包装为全市场资金流。
 - 现有 P1.10-A、P1.7、P1.9 和行情采集能力继续维护和复用，不推倒重写。
 
 ## 已实现/待验证的并行基线

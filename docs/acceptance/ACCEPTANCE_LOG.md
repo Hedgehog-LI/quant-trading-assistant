@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-08-15 — QTA V2 MR-0 数据与语义 PoC（独立验收通过，VERIFIED）
+
+- **范围**：MR-0 指标数据字典/Provider 能力矩阵/现状盘点三文档；V23 三张 mr0_ PoC 事实表；公共无凭据源只读客户端+幂等导入+分析/质量引擎+REST 入口+一键 PoC 脚本；2026-07 完整 A 股交易月真实 PoC 与 MR-1 输入边界。不含 V2 前端、生产 Provider 选型、Docker 重建（DEPLOYMENT=NOT_REQUIRED）。
+- **自动化**：后端 `./mvnw test` **538/0/0/1（既有 skip）**+package；聚焦套件 Mr0PocIngestServiceTest 6/6、Mr0PocAnalysisServiceTest 7/7、Mr0PocQualityServiceTest 5/5（surefire XML 权威计数）。
+- **真实运行（RUNTIME）**：`bash scripts/run-mr0-poc.sh` 独立重跑（最终核验者一次性 worktree@981cd47）exit 0——真实公共源（腾讯/新浪）全链导入→分析→二次导入→复分析；`analysisHashRun1==analysisHashRun2`（sha256 字段白名单）；二次导入 universe/membership/dailyBar/moneyFlow 四表 `inserted=0`（幂等实证）；universeSize=151、tradingDays=23、0 外呼失败。实施者轮同口径 SUCCESS/193s，POC-EVIDENCE.json 全键齐（AMD-1）。
+- **质量发现（真实检出）**：本地既有 LONGPORT SH.600519 2026-07-01..10 共 8 行 volume 存"手"未×100 → UNIT_ANOMALY FAIL（PoC 指标未纳入该脏数据）；SINA 行业缺 49/150 只大市值样本成分 → COVERAGE WARN 0.673；market_calendar CN 空 → STALENESS WARN；当前成分聚合历史 → TIME_POINT_LOOKAHEAD WARN（显式假设）。以上为 PoC 价值证明而非实现缺陷。
+- **独立验收**：FINAL_VERIFIER（fresh，ROLE-RUN-FV-G2）经 `run-ai-evidence-command.mjs` 出具 9 张机器回执（STATIC 4 + AUTOMATION 4 + RUNTIME 1，全部 exit 0/PASS/candidateUnchanged=true，selector 与冻结台账逐字一致 9/9）；架构门禁 gen-3 PASS（0 errors，2 warnings 结构化处置）；CODE_REVIEW G1（12 发现→修复轮 1）→G2 双 PASS→修复轮 2→G3 双 PASS。结论 **ACCEPTED（FUNCTIONAL=PASS / ARCHITECTURE=PASS）**，候选 gen-3 `981cd47ff56e60a871a53c5c572f4fe484e306e8`。
+- **未验证**：DEPLOYMENT（NOT_REQUIRED）；Tushare/Longbridge 实时能力（无凭据/未重测，矩阵如实标注 NOT_VERIFIED/NOT_RETESTED）。
+- **结论**：MR-0 交付就绪；MR-1 前置=清理本地 LONGPORT 脏数据、Provider 选型 ADR、PIT 行业成分与官方资金流凭据决策。
+
 ## 2026-08-14 — P1.10-A1 一日强度（条件通过，允许本地提交）
 
 - **范围**：`window=1` 市场雷达、排行历史、板块详情、前端当日强弱视图及多日空态回退；不含 provider 历史回补或真实资金流。

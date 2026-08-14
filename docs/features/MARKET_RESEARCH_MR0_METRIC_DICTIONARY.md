@@ -51,6 +51,12 @@ vwap = amount(元) / volume(股)
 该自检同时约束成交额（M-03/M-11）与换手率（M-05）条目的单位口径：万元未乘 10000 或手未乘 100 时，
 vwap 通常落到 [low,high] 之外，可被检出。
 
+**指数行豁免（CR2-1 注记，2026-08-15 finalization 补记）**：本自检适用于**个股**日 K 行。基准指数行
+（如 SH.000001）的 low/high/收盘为指数点位（单位=点），与 vwap 的元/股不同量纲，恒不满足
+[low,high] 约束；因此指数行豁免个股 VWAP 自检，其单位异常由指数自身成交额/成交量比与跨源对比监测。
+实现位置：`Mr0PocIngestService`（`vwapSelfCheck=false` 传入）与 `Mr0PocQualityService`
+（UNIT_ANOMALY 跳过基准 symbol）。
+
 ## 4. 指标条目（M-01..M-23）
 
 ### M-01 基准收盘价

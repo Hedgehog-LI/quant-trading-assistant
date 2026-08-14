@@ -63,6 +63,7 @@ convert     # MapStruct 转换器
 | Position Snapshot | `portfolio` | `/api/v1/position-snapshots/*` | `portfolio_position_snapshot`, `portfolio_position_snapshot_item` |
 | Market Data | `marketdata` | `/api/v1/market-data/*` | 证券主数据、本地目录 CSV 导入、确定性搜索/详情、精确代码验证、日/分钟 K、采集计划/任务/水位、自定义分组、市场行业发现/关注/快照；V17 新增目录字段与 `stock_alias`；V18 新增 `security_directory_sync_state` 与 D3 目录同步（CSV 快照 provider、五阶段管线、复用 `market_data_sync_task` 的 `SECURITY_MASTER_SYNC`） |
 | Market Research | `marketdata.analysis` | `/api/v1/market-research/*` | 只读板块原始排行，计算相对强弱和固定 5 日轮动持续性；使用稳定板块身份、公式/参数/源批次身份和原子发布批次；查询端不调用 provider、不写原始事实 |
+| MR-0 Data Semantics PoC | `marketdata.poc` | `/api/v1/market-research/mr0-poc/*` | V2 MR-0 数据与语义 PoC（已独立验收）：公共无凭据源只读客户端（腾讯日 K/新浪证券池/行业成分/资金流）、幂等导入（V23 `mr0_` 三表+复用 `stock_daily_bar`）、分析引擎（广度/A-D/行业占比/波动率/流动性代理/资金偏差/字段白名单内容哈希）、八族质量引擎；ingest 受控写入口默认关闭，analyze/report 只读零外联；`scripts/run-mr0-poc.sh` 一键真实运行。不构成生产 Provider 选型 |
 | Agent Assistant | `agent` | `/api/v1/agent/**` | `agent_api_audit_log`（V16）。Spring Security Bearer Token 鉴权 + 限流 + 持久化脱敏审计 + TrustedAnswer 可信回答契约。8 个固定只读 GET 端点。OpenClaw Tool Plugin 在 `integrations/openclaw/qta-assistant/`。默认关闭。 |
 
 ## 4. 当前数据库迁移

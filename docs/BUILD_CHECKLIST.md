@@ -343,6 +343,15 @@
 - [ ] P1.10-C：个股决策台 + 真实交易点 + 持仓/计划/板块上下文。
 - [ ] P2：版本化策略候选点、回测证据、风险门禁和提醒推送。
 
+### QTA V2 MR-0 已完成并独立验收：数据与语义 PoC（2026-08-15，VERIFIED）
+
+- [x] MR-0 文档：指标数据字典（23 指标×13 属性+AMD-3 冻结值）、Provider 能力矩阵（真实探针+NOT_VERIFIED 如实标注）、九类现状盘点。
+- [x] MR-0 后端：V23 三张 `mr0_` 事实表、`marketdata.poc` 公共源只读客户端/幂等导入/分析引擎（广度、A/D、行业占比、波动率、流动性代理、资金偏差、内容哈希）/八族质量引擎/REST 入口（ingest 受控默认关）。
+- [x] MR-0 PoC 脚本与真实运行：`scripts/run-mr0-poc.sh`（AMD-1 退出码/双哈希/幂等断言）；2026-07 完整交易月 exit 0，tradingDays=23、universeSize=151、双分析哈希一致、二次导入四表 inserted=0。
+- [x] MR-1 输入边界冻结：可用/阻断/伪指标禁用/精确输入边界四要素（POC-REPORT §MR-1 输入边界）。
+- [x] MR-0 独立验收：FINAL_VERIFIER 机器回执 9/9（STATIC/AUTOMATION/RUNTIME 全 PASS）、架构门禁 PASS、CODE_REVIEW 三代（G1 12 发现→修复→G2/G3 双 PASS）；后端 538 tests + package。DEPLOYMENT NOT_REQUIRED。
+- [ ] MR-1 前置：清理本地 LONGPORT 手/股脏数据（8 行）；生产 Provider 选型 ADR。
+
 ## 8. 暂缓: 图片识别导入
 
 - [ ] 新增 AI import task 设计。
