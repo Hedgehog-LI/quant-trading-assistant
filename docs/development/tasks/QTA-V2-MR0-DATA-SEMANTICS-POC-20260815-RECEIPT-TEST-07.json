@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G1",
+  "sessionId": "ROLE-RUN-FV-G1",
+  "testId": "TEST-07",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+  "command": [
+    "bash",
+    "scripts/run-mr0-poc.sh"
+  ],
+  "startedAt": "2026-08-14T19:25:41.106Z",
+  "finishedAt": "2026-08-14T19:28:57.755Z",
+  "exitCode": 0,
+  "result": "FAIL",
+  "timedOut": false,
+  "stdoutSha256": "8b086319b325fb731150897ba79cf283f9d50766e425e97e09b35a7ddab17cca",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "bash scripts/run-mr0-poc.sh"
+  ],
+  "observedSelectors": [
+    "bash scripts/run-mr0-poc.sh"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "1915a10d92e11b7ac16090e86d0b89d6603af35d8ad6e5c944b90db8290e7961",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "ffc8fd8d22681c128879e1199b7721187a0c351dd7c6a986743f39ad81ae1530",
+    "diffSha256": "e1ea033cef08039a0048ee59a443a7d4b9fbaf227c5443f83cb6eb1826222c56"
+  },
+  "candidateUnchanged": false
+}

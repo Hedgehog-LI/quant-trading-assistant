@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G1",
+  "sessionId": "ROLE-RUN-FV-G1",
+  "testId": "TEST-03",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+  "command": [
+    "bash",
+    "-c",
+    "for T in 'I-01 证券主数据' 'I-02 日K' 'I-03 分钟K' 'I-04 板块目录' 'I-05 板块成分' 'I-06 排行' 'I-07 快照' 'I-08 资金字段' 'I-09 质量字段'; do grep -c \"^## ${T}\" docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md | grep -qv '^0$' || exit 1; done && test $(awk '/^## I-/{sec++;next} sec>0 && /V[0-9]+__|src\\/(main\\|test)\\/|实测行数/{c[sec]++} END{b=0;for(i=1;i<=sec;i++)if(!c[i])b++;print b}' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md) -eq 0"
+  ],
+  "startedAt": "2026-08-14T19:23:47.027Z",
+  "finishedAt": "2026-08-14T19:23:47.050Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "for T in 'I-01 证券主数据' 'I-02 日K' 'I-03 分钟K' 'I-04 板块目录' 'I-05 板块成分' 'I-06 排行' 'I-07 快照' 'I-08 资金字段' 'I-09 质量字段'; do grep -c \"^## ${T}\" docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md | grep -qv '^0$' || exit 1; done && test $(awk '/^## I-/{sec++;next} sec>0 && /V[0-9]+__|src\\/(main\\|test)\\/|实测行数/{c[sec]++} END{b=0;for(i=1;i<=sec;i++)if(!c[i])b++;print b}' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md) -eq 0"
+  ],
+  "observedSelectors": [
+    "for T in 'I-01 证券主数据' 'I-02 日K' 'I-03 分钟K' 'I-04 板块目录' 'I-05 板块成分' 'I-06 排行' 'I-07 快照' 'I-08 资金字段' 'I-09 质量字段'; do grep -c \"^## ${T}\" docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md | grep -qv '^0$' || exit 1; done && test $(awk '/^## I-/{sec++;next} sec>0 && /V[0-9]+__|src\\/(main\\|test)\\/|实测行数/{c[sec]++} END{b=0;for(i=1;i<=sec;i++)if(!c[i])b++;print b}' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md) -eq 0"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "434b9d573b0b706b2776b53aa1ba31191392cfed398e40d486e97056c2802fb5",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "434b9d573b0b706b2776b53aa1ba31191392cfed398e40d486e97056c2802fb5",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

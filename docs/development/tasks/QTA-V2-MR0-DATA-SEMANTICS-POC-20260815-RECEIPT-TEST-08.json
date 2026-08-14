@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G1",
+  "sessionId": "ROLE-RUN-FV-G1",
+  "testId": "TEST-08",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+  "command": [
+    "bash",
+    "-c",
+    "test $(grep -c '^## MR-1 输入边界' docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md) -ge 1 && for M in MR-1-BND-A MR-1-BND-B MR-1-BND-C MR-1-BND-D; do grep -c \"$M\" docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md | grep -qv '^0$' || exit 1; done"
+  ],
+  "startedAt": "2026-08-14T19:23:51.498Z",
+  "finishedAt": "2026-08-14T19:23:51.511Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "test $(grep -c '^## MR-1 输入边界' docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md) -ge 1 && for M in MR-1-BND-A MR-1-BND-B MR-1-BND-C MR-1-BND-D; do grep -c \"$M\" docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md | grep -qv '^0$' || exit 1; done"
+  ],
+  "observedSelectors": [
+    "test $(grep -c '^## MR-1 输入边界' docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md) -ge 1 && for M in MR-1-BND-A MR-1-BND-B MR-1-BND-C MR-1-BND-D; do grep -c \"$M\" docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md | grep -qv '^0$' || exit 1; done"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "b2b6eb091a1589421eb6e2facddb7f7c6dd002124c5df3e37157b154cbf836a5",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "b2b6eb091a1589421eb6e2facddb7f7c6dd002124c5df3e37157b154cbf836a5",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

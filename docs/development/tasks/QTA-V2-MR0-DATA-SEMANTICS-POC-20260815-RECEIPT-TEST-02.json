@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G1",
+  "sessionId": "ROLE-RUN-FV-G1",
+  "testId": "TEST-02",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+  "command": [
+    "bash",
+    "-c",
+    "for P in LONGBRIDGE TUSHARE TENCENT_PUBLIC SINA_PUBLIC SOHU_PUBLIC; do R=$(grep -E \"^\\|[^|]*${P}[^|]*\\|\" docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md | grep -cE 'VERIFIED|NOT_VERIFIED|NOT_RETESTED'); test \"$R\" -ge 1 || exit 1; done && grep -E '^\\|[^|]*TUSHARE[^|]*\\|' docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md | grep -c 'NOT_VERIFIED' | grep -qv '^0$' && test $(grep -cE 'proxy\\.finance\\.qq\\.com|getHQNodeData|newSinaHy|ssl_qsfx_zjlrqs|hisHq' docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md) -ge 4"
+  ],
+  "startedAt": "2026-08-14T19:23:41.699Z",
+  "finishedAt": "2026-08-14T19:23:41.719Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "for P in LONGBRIDGE TUSHARE TENCENT_PUBLIC SINA_PUBLIC SOHU_PUBLIC; do R=$(grep -E \"^\\|[^|]*${P}[^|]*\\|\" docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md | grep -cE 'VERIFIED|NOT_VERIFIED|NOT_RETESTED'); test \"$R\" -ge 1 || exit 1; done && grep -E '^\\|[^|]*TUSHARE[^|]*\\|' docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md | grep -c 'NOT_VERIFIED' | grep -qv '^0$' && test $(grep -cE 'proxy\\.finance\\.qq\\.com|getHQNodeData|newSinaHy|ssl_qsfx_zjlrqs|hisHq' docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md) -ge 4"
+  ],
+  "observedSelectors": [
+    "for P in LONGBRIDGE TUSHARE TENCENT_PUBLIC SINA_PUBLIC SOHU_PUBLIC; do R=$(grep -E \"^\\|[^|]*${P}[^|]*\\|\" docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md | grep -cE 'VERIFIED|NOT_VERIFIED|NOT_RETESTED'); test \"$R\" -ge 1 || exit 1; done && grep -E '^\\|[^|]*TUSHARE[^|]*\\|' docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md | grep -c 'NOT_VERIFIED' | grep -qv '^0$' && test $(grep -cE 'proxy\\.finance\\.qq\\.com|getHQNodeData|newSinaHy|ssl_qsfx_zjlrqs|hisHq' docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md) -ge 4"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "2b3068668c633f7c9d58f8d100260756a8c853d89b262853520df0a303c4da28",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "2b3068668c633f7c9d58f8d100260756a8c853d89b262853520df0a303c4da28",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

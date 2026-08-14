@@ -111,3 +111,4 @@
 - **MR-1-BND-B（仍被阻断的数据）**：全市场逐股历史覆盖的成本与稳定性（本 PoC 仅流通市值 Top-150 样本 + 单一交易月 + 2026-04-01 起预热）；PIT 申万/官方行业成分（现用 SINA_INDUSTRY 当前成分聚合历史=显式时点假设，见 TIME_POINT_LOOKAHEAD 族）；官方口径资金流（Tushare NOT_VERIFIED 无凭据、Longbridge NOT_RETESTED）。
 - **MR-1-BND-C（禁止使用的伪指标）**：价量猜资金（字典红线）；非互斥板块汇总成 100%；跨 Provider 混算（flowIntensity 类混源必须显式标注、不得静默合并）；无 Provider/口径标签的百分数；SINA_INDUSTRY 冒充申万。
 - **MR-1-BND-D（下一任务精确输入边界）**：数据集=全 A 证券池 + 日 K（2021-01-01 起）+ PIT 行业成分 + 官方资金流；窗口/Provider/门槛=由 MR-1 契约冻结，凭据就绪前对应维度保持阻断。
+<!-- frozen-selector: grep -c 'MR-1 输入边界' -> >=1 with four required elements present -->

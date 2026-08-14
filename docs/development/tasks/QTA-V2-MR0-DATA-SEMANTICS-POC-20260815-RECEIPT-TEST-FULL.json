@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
+  "roleRunId": "ROLE-RUN-FV-G1",
+  "sessionId": "ROLE-RUN-FV-G1",
+  "testId": "TEST-FULL",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+  "command": [
+    "bash",
+    "-c",
+    "./mvnw -q test && ./mvnw -q -DskipTests package"
+  ],
+  "startedAt": "2026-08-14T19:25:02.690Z",
+  "finishedAt": "2026-08-14T19:25:24.715Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "timedOut": false,
+  "stdoutSha256": "99b411f1e733156f1011a800fca11f47d317a97461e37dcd0c219de240960198",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "./mvnw -q test && ./mvnw -q -DskipTests package"
+  ],
+  "observedSelectors": [
+    "./mvnw -q test && ./mvnw -q -DskipTests package"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "04f1cd7e6a1494c5f8fcad94c05ff663839600c59ae9287bdd5e70005b0c5b8e",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "05eece11a8bbfa92c79341efac0a3f5ef818fc74",
+    "tree": "cfa223299ec26349895278e4e80d5483e36d089a",
+    "statusSha256": "04f1cd7e6a1494c5f8fcad94c05ff663839600c59ae9287bdd5e70005b0c5b8e",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}

@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * client 全部打桩（fixture 来自 F5 真实探针摘录，见 src/test/resources/mr0/mr0-public-probe-fixtures.json），
  * 零联网：桩只覆写 {@link PublicMarketDataClient#httpGet}，响应仍走真实解析器。
  * 每个用例事务内回滚，互不污染 H2 库。
+ * // frozen-selector: ./mvnw -q test -Dtest=Mr0PocIngestServiceTest (6 methods: ingestDailyBarsTwiceWritesNoDuplicates, ingestRowsCarryPublicProviderLabel, ingestPreservesExistingProviderRows, ingestConvertsUnitsPerFrozenDictionary, ingestMembershipAndMoneyFlowAreIdempotentWithPointInTimeColumns, ingestBackfillsMinimalStockBasicIdentityIdempotently)
  */
 @SpringBootTest
 @ActiveProfiles("test")
