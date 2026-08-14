@@ -11,8 +11,11 @@ public class SectorAnalyticsSourceItemDO {
     private Long batchId;
     private LocalDate tradeDate;
     private Long sectorIdentityId;
+    private Integer rankNo;
     private String sectorName;
     private String providerSectorId;
+    private String taxonomyVersion;
+    private String trackingSymbol;
     private BigDecimal changeRate;
     private String leadingName;
     private String leadingSymbol;

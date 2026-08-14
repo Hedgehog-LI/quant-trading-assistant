@@ -15,8 +15,8 @@ public final class MarketResearchVO {
                               int momentumWindowDays, String status, int sectorCount, boolean reused) {
     }
 
-    public record Radar(Long publicationBatchId, Long strengthCalculationRunId,
-                        Long momentumCalculationRunId, String market,
+    public record Radar(Long publicationBatchId, Long sourceBatchId, Long strengthCalculationRunId,
+                        Long momentumCalculationRunId, String analysisMode, boolean rotationAvailable, String market,
                         LocalDate asOfDate, int strengthWindowDays, int momentumWindowDays,
                         String scope, String scopeDescription,
                         String strengthFormulaCode, String momentumFormulaCode,
@@ -33,8 +33,8 @@ public final class MarketResearchVO {
                          BigDecimal relativeReturn, BigDecimal rsRankPercentile,
                          BigDecimal currentRank, BigDecimal previousRank,
                          BigDecimal meanRankPercentile, BigDecimal rankPercentileStdDev,
-                         BigDecimal topBucketOccupancyRate, int consecutiveLeadingDays,
-                         int consecutiveLaggingDays, BigDecimal rankPercentileChange,
+                         BigDecimal topBucketOccupancyRate, Integer consecutiveLeadingDays,
+                         Integer consecutiveLaggingDays, BigDecimal rankPercentileChange,
                          String rotationState, String leadingName, String leadingSymbol,
                          List<String> evidence, List<String> reasonCodes) {
     }
@@ -46,13 +46,14 @@ public final class MarketResearchVO {
     public record SectorHistory(Long sectorId, String sectorName, List<HistoryPoint> points) {
     }
 
-    public record HistoryPoint(LocalDate asOfDate, Long publicationBatchId,
+    public record HistoryPoint(LocalDate asOfDate, Long publicationBatchId, Long sourceBatchId,
                                BigDecimal rsRankPercentile, BigDecimal currentRank,
                                BigDecimal meanRankPercentile, String qualityStatus) {
     }
 
     public record SectorDetail(Long sectorId, String sectorName, String providerSectorId,
                                String taxonomyVersion, String market, int windowDays,
+                               String analysisMode, boolean rotationAvailable,
                                String scope, String scopeDescription, String leadingName,
                                String leadingSymbol, String trackingSymbol, List<HistoryPoint> history,
                                LocalDateTime sourceQuoteTime, int actualItemCount,

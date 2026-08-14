@@ -17,12 +17,14 @@ public final class SectorAnalyticsConstants {
     public static final String STATUS_PUBLISHED = "PUBLISHED";
     public static final int MINIMUM_COHORT_SIZE = 5;
     public static final int DEFAULT_WINDOW_DAYS = 20;
+    public static final int ONE_DAY_STRENGTH_WINDOW_DAYS = 1;
     public static final int RADAR_MOMENTUM_WINDOW_DAYS = 5;
     public static final int MAX_HISTORY_DAYS = 120;
     public static final BigDecimal ROTATION_STRENGTH_THRESHOLD = new BigDecimal("0.5");
     public static final BigDecimal ROTATION_MOMENTUM_THRESHOLD = BigDecimal.ZERO;
     public static final BigDecimal TOP_BUCKET_THRESHOLD = new BigDecimal("0.8");
     public static final Set<Integer> SUPPORTED_WINDOWS = Set.of(5, 10, 20, 50);
+    public static final Set<Integer> SUPPORTED_QUERY_WINDOWS = Set.of(1, 5, 10, 20, 50);
 
     private SectorAnalyticsConstants() {
     }
