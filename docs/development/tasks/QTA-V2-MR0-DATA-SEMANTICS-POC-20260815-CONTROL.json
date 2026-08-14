@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTROL.json",
   "startedAt": "2026-08-14T16:38:01Z",
   "lane": "L2",
-  "lifecycleState": "IMPLEMENTING",
+  "lifecycleState": "SELF_CHECKED",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-CONTRACT.md",
     "version": "1.0",
@@ -296,6 +296,14 @@
       "at": "2026-08-14T18:40:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "review G1 FAIL: findings CR-1..CR-12; repair round 1"
+    },
+    {
+      "sequence": 8,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-14T19:04:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "repair round 1 accepted; gen-2 ready for freeze"
     }
   ],
   "candidate": {
