@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTROL.json",
   "startedAt": "2026-08-15T15:52:00Z",
   "lane": "L2",
-  "lifecycleState": "CANDIDATE_FROZEN",
+  "lifecycleState": "BLOCKED",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTRACT.md",
     "version": "1.1",
@@ -376,6 +376,14 @@
       "at": "2026-08-15T18:22:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "gen-3 candidate 4736a6c frozen after repair round 2; architecture gate G3 PASS bound"
+    },
+    {
+      "sequence": 14,
+      "from": "CANDIDATE_FROZEN",
+      "to": "BLOCKED",
+      "at": "2026-08-15T18:35:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "review G3 PASS recorded; REVIEW_CLEAR transition impossible: new AC-05 temporal gate false-positives accepted gen-2 verifier ROLE-RUN-FV-G1 (dispatch 17:51:10Z legitimately after gen-2 REVIEW_CLEAR 17:50:00Z) by mapping it to the 2nd occurrence (gen-3 18:28:00Z) via occurrences[generation-1] indexing, which breaks when an early generation fails review; check is state-unconditional, history is hash-anchored, and the frozen 2-round repair budget (both used) makes a gen-4 candidate machine-inexpressible; evidence and R2 fix design in QTA-V2-MR0-CLOSEOUT-20260815-R1-BLOCKED-CLOSURE.md"
     }
   ],
   "candidate": {
@@ -717,21 +725,48 @@
       "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-SELF-CHECK-REPAIR-2.md",
       "artifactSha256": "635beae4baf1271ca4e86c33eb018ca80d97dc82e5de32d6cb6ba149844627b8"
+    },
+    {
+      "roleRunId": "ROLE-RUN-CR-G3",
+      "dispatchId": "QTA-V2-MR0-CLOSEOUT-20260815-R1-CR-G3-D1",
+      "sessionId": "agent_62966b62-e48b-4aab-ad13-4636966fac3f",
+      "startedAt": "2026-08-15T18:23:30Z",
+      "finishedAt": "2026-08-15T18:26:30Z",
+      "runtimeReceiptPath": "",
+      "role": "CODE_REVIEWER",
+      "generation": 3,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-code-reviewer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/44e1b7ae2b8049a707a128480261a9b8705522f62e07cbac82ba81703f355b14/ef463d681558a5f07b81f23351215ec26b7c8d625727b65817d96e8f2fe399d3.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only reviewer gen-3; gen-2/gen-3 frozen diff artifacts via Read tool; no Bash, no Git, no edits, no network",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-REVIEW-G3.md",
+      "artifactSha256": "f75b9b3115af4163a55a7f838df995dbe8ca2e92e984c3c32cd6f1d197a45f28"
     }
   ],
   "review": {
     "omitted": false,
     "omissionReason": "",
-    "generation": 2,
-    "candidateIdentity": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
+    "generation": 3,
+    "candidateIdentity": "4736a6c53d47c520e517e2df69fdf4ce39d20d37",
     "functionalVerdict": "PASS",
     "architectureVerdict": "PASS",
-    "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-REVIEW-G2.md",
-    "artifactSha256": "6845b9212dd5842d3e1ee17db93f210bf8e6493cbe45b3da8d90038ef9ab494d",
-    "architectureGateSha256": "9cb2a7c331070ce1339489ee2b690effa8c646526da6be352cdd121ffd751a26",
+    "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-REVIEW-G3.md",
+    "artifactSha256": "f75b9b3115af4163a55a7f838df995dbe8ca2e92e984c3c32cd6f1d197a45f28",
+    "architectureGateSha256": "ea3fccfa593df6a4b65642c0a93f3fcd7b64a0719aba987ab171ff02771871ed",
     "findingIds": [
-      "CR-G2-1",
-      "CR-G2-2"
+      "CR-G3-1",
+      "CR-G3-2",
+      "CR-G3-3"
     ]
   },
   "architectureGate": {
