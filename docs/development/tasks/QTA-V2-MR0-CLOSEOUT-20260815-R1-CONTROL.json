@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTROL.json",
   "startedAt": "2026-08-15T15:52:00Z",
   "lane": "L2",
-  "lifecycleState": "SELF_CHECKED",
+  "lifecycleState": "CANDIDATE_FROZEN",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTRACT.md",
     "version": "1.1",
@@ -231,20 +231,28 @@
       "at": "2026-08-15T17:22:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "all 5 frozen slices each have exactly one accepted generation-1 implementer; full suite 562/0/0 + package + one successful real PoC run recorded"
+    },
+    {
+      "sequence": 6,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-15T17:25:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "gen-1 cumulative candidate 8c260f3 frozen (30 files, +1823/-102); diff artifact + patch SHA bound"
     }
   ],
   "candidate": {
     "mode": "COMMIT",
     "generation": 1,
-    "identity": "",
-    "commit": "",
-    "treeHash": "",
-    "patchSha256": "",
+    "identity": "8c260f325747158a879e548f6902b2dbc42c7559",
+    "commit": "8c260f325747158a879e548f6902b2dbc42c7559",
+    "treeHash": "ed51868617ef4c2222658059095bb7a18478256c",
+    "patchSha256": "fd87f526ad218bd46ebe57318905e29ddd70be2853e503fef8e22113f77ddb33",
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
-    "diffArtifactPath": "",
-    "diffArtifactSha256": ""
+    "diffArtifactPath": ".qta-governance/candidates/QTA-V2-MR0-CLOSEOUT-20260815-R1/generation-1.patch",
+    "diffArtifactSha256": "fd87f526ad218bd46ebe57318905e29ddd70be2853e503fef8e22113f77ddb33"
   },
   "budget": {
     "contextPercent": null,
