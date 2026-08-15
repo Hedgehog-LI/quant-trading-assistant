@@ -32,7 +32,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * AC-04 聚焦测试（冻结六用例，TEST-04）。
+ * AC-04 聚焦测试（冻结六用例 + F-1 修复回归 1 例）。
  * <p>
  * client 全部打桩（fixture 来自 F5 真实探针摘录，见 src/test/resources/mr0/mr0-public-probe-fixtures.json），
  * 零联网：桩只覆写 {@link PublicMarketDataClient#httpGet}，响应仍走真实解析器。
@@ -227,6 +227,27 @@ class Mr0PocIngestServiceTest {
                         + " '2026-07-01' AND '2026-07-31'", Long.class)).isZero();
     }
 
+    // ==================== F-1 成分批内重复唯一键不得虚增 inserted ====================
+
+    @Test
+    void ingestMembershipDuplicateUniqueKeysInBatchReportNoFalseInserted() {
+        // 还原失败形态：SINA 成分源同批重复返回样本 symbol（verifier 真实重跑 102 条→101 唯一键）
+        fixtureClient.duplicateIndustryMember("new_blhy", "sh600519");
+
+        IngestResult first = service.ingest(command());
+        // 去重后写入数 == 全表计数口径：2 样本各 1 行成分，重复的 sh600519 不虚增 inserted
+        assertThat(first.getMembership().getInserted()).isEqualTo(2L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM mr0_industry_membership", Long.class)).isEqualTo(2L);
+
+        // 核心断言：修复前 written=3 > existing=2 → 误报 inserted=1（F-1 指纹 second-ingest-membership-false-inserted）
+        IngestResult second = service.ingest(command());
+        assertThat(second.getMembership().getInserted()).isZero();
+        assertThat(second.getMembership().getUpdated()).isEqualTo(2L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM mr0_industry_membership", Long.class)).isEqualTo(2L);
+    }
+
     // ==================== M6 最小身份幂等回填 ====================
 
     @Test
@@ -303,6 +324,7 @@ class Mr0PocIngestServiceTest {
     static class FixtureBackedPublicClient extends PublicMarketDataClient {
         private final JsonNode fixture;
         private final Map<String, String> amountOverrides = new HashMap<>();
+        private final Map<String, String> industryMemberDuplicates = new HashMap<>();
 
         FixtureBackedPublicClient(JsonNode fixture) {
             this.fixture = fixture;
@@ -311,6 +333,11 @@ class Mr0PocIngestServiceTest {
         /** M1 用：改写某日成交额（万元）证明 upsert 更新路径。 */
         void overrideDailyBarAmount(String tencentCode, String date, String newAmountTenThousand) {
             amountOverrides.put(tencentCode + "|" + date, newAmountTenThousand);
+        }
+
+        /** F-1 用：让某行业成分页末尾重复返回同一 sina symbol，构造批内重复唯一键。 */
+        void duplicateIndustryMember(String industryCode, String sinaSymbol) {
+            industryMemberDuplicates.put(industryCode, sinaSymbol);
         }
 
         @Override
@@ -323,7 +350,20 @@ class Mr0PocIngestServiceTest {
             }
             if (url.contains("node=")) {
                 String industryCode = url.substring(url.indexOf("node=") + "node=".length());
-                return pageOf(fixture.path("sinaIndustryMembers").path(industryCode), pageOf(url));
+                JsonNode members = fixture.path("sinaIndustryMembers").path(industryCode);
+                String duplicated = industryMemberDuplicates.get(industryCode);
+                if (duplicated != null) {
+                    ArrayNode extended = OBJECT_MAPPER.createArrayNode();
+                    members.forEach(extended::add);
+                    for (JsonNode member : members) {
+                        if (duplicated.equals(member.path("symbol").asText())) {
+                            extended.add(member);
+                            break;
+                        }
+                    }
+                    members = extended;
+                }
+                return pageOf(members, pageOf(url));
             }
             if (url.contains("newfqkline")) {
                 String code = url.substring(url.indexOf("param=") + "param=".length(), url.indexOf(','));

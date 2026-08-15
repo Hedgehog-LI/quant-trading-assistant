@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTROL.json",
   "startedAt": "2026-08-15T15:52:00Z",
   "lane": "L2",
-  "lifecycleState": "REVIEW_CLEAR",
+  "lifecycleState": "SELF_CHECKED",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTRACT.md",
     "version": "1.1",
@@ -352,6 +352,22 @@
       "at": "2026-08-15T17:50:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "review G2 FUNCTIONAL PASS + ARCHITECTURE PASS; CR-G1-1/2 verified resolved; P3 findings CR-G2-1 (metadata note) and CR-G2-2 (deferred pre-existing coverage nit) routed without candidate change"
+    },
+    {
+      "sequence": 11,
+      "from": "REVIEW_CLEAR",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-15T18:06:30Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "final verifier FV-G1 REJECTED (FUNCTIONAL FAIL / ARCHITECTURE PASS): F-1 membership false-inserted counting defect (second-ingest-membership-false-inserted, first occurrence); repair round 2"
+    },
+    {
+      "sequence": 12,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-15T18:19:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "repair round 2 accepted: F-1 resolved via batch-unique-key dedupe (ROLE-RUN-IMP-R2-G3); focused suites green (ingest 7, quality 5, analysis 7)"
     }
   ],
   "candidate": {
@@ -371,7 +387,7 @@
     "contextPercent": null,
     "contextMeasurement": "UNAVAILABLE",
     "compactionCount": 0,
-    "repairRound": 1,
+    "repairRound": 2,
     "maxRepairRounds": 2,
     "maxWaitCallsPerRole": 2,
     "maxShellPollsPerCommand": 3,
@@ -392,6 +408,19 @@
       ],
       "parentDisposition": "CR-G1-3 metadata note recorded in transition 7 reason (32 diff entries, no candidate defect); CR-G1-4 routed to future governance round (out of frozen scope); CR-G1-5 verifier-side annotation; CR-G1-6 comment fix bundled into repair (same test file); sequencing note: repair-window control cannot fully validate until the repair implementer run is accepted (machine gap also traversed by the superseded MR-0 task), validator rerun scheduled at implementer acceptance",
       "repairedAt": "2026-08-15T17:41:30Z"
+    },
+    {
+      "round": 2,
+      "failureFingerprint": "second-ingest-membership-false-inserted",
+      "fromGeneration": 2,
+      "toGeneration": 3,
+      "findingRoleRunId": "ROLE-RUN-FV-G1",
+      "implementerRoleRunId": "ROLE-RUN-IMP-R2-G3",
+      "findingIds": [
+        "F-1"
+      ],
+      "parentDisposition": "F-2/F-3 recorded as annotations; verifier worktree recycled after FAIL receipt preservation; repair window cannot fully validate until repair implementer accepted (same machine sequencing gap as round 1)",
+      "repairedAt": "2026-08-15T18:17:48Z"
     }
   ],
   "roleRuns": [
@@ -628,6 +657,58 @@
       "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-REVIEW-G2.md",
       "artifactSha256": "6845b9212dd5842d3e1ee17db93f210bf8e6493cbe45b3da8d90038ef9ab494d"
+    },
+    {
+      "roleRunId": "ROLE-RUN-FV-G1",
+      "dispatchId": "QTA-V2-MR0-CLOSEOUT-20260815-R1-FV-G1-D1",
+      "sessionId": "agent_bd1c12b3-fa6d-4939-a847-64aa792b2b79",
+      "startedAt": "2026-08-15T17:51:23Z",
+      "finishedAt": "2026-08-15T18:03:36Z",
+      "runtimeReceiptPath": "",
+      "role": "FINAL_VERIFIER",
+      "generation": 2,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-final-verifier.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "VERIFY_EXECUTE",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/44e1b7ae2b8049a707a128480261a9b8705522f62e07cbac82ba81703f355b14/aefa20b590c7e84516202a902d55c0d182cbb5358bf664b1289cf98f35d4f7a3.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "disposable worktree at frozen candidate; machine receipts; main repo read-only; read-only DB forensics",
+      "waitCalls": 1,
+      "maxShellPollsForOneCommand": 2,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-VERIFICATION-FV-G1.md",
+      "artifactSha256": "fee008f06f2142996685758e6e5e488c4327168a5f93551174196c061a391ddb"
+    },
+    {
+      "roleRunId": "ROLE-RUN-IMP-R2-G3",
+      "dispatchId": "QTA-V2-MR0-CLOSEOUT-20260815-R1-IMP-R2-G3-D1",
+      "sessionId": "agent_b158c366-20a2-44c5-a6aa-ad3c9ae1552e",
+      "startedAt": "2026-08-15T18:10:00Z",
+      "finishedAt": "2026-08-15T18:17:48Z",
+      "runtimeReceiptPath": "",
+      "role": "IMPLEMENTER",
+      "generation": 3,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "sliceId": "REPAIR-2",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_WRITE",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/44e1b7ae2b8049a707a128480261a9b8705522f62e07cbac82ba81703f355b14/c9137ba981c434b7acc7e05f94c320d57969c73b2336f30167c911f7f6c4c409.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "2-file repair allowlist (ingest service + its test); no Git, no network, no secrets",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-SELF-CHECK-REPAIR-2.md",
+      "artifactSha256": "635beae4baf1271ca4e86c33eb018ca80d97dc82e5de32d6cb6ba149844627b8"
     }
   ],
   "review": {

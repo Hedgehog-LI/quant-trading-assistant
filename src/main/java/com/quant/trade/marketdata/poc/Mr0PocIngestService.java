@@ -18,10 +18,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * MR-0 PoC 幂等导入服务（AC-04）。流程：证券池分页全量 → 流通市值降序前 sampleSize → 行业目录+全行业
@@ -32,7 +34,7 @@ import java.util.Set;
  * （不覆盖已有 name/list_date；基准不回填身份）。
  * 冻结口径：amount=万元×10000、volume=手×100、换手率 %/100 仅作用于 universe 快照（快照值不拼日频
  * 序列，字典 M-05）；资金净额原值元；腾讯换手率不写任何表（无归属列）。幂等靠 uk + ON DUPLICATE
- * KEY UPDATE（重跑 inserted=0）；单 symbol 失败记录后继续。失效场景：公共源结构变化按 symbol 抛错
+ * KEY UPDATE（重跑 inserted=0；批内重复唯一键先去重、后到覆盖，F-1）；单 symbol 失败记录后继续。失效场景：公共源结构变化按 symbol 抛错
  * 记录；NONE 复权除权日 VWAP 自检可能误报（字典 §3、D7）。
  */
 @Service
@@ -103,7 +105,8 @@ public class Mr0PocIngestService {
         @Builder.Default private List<String> sampleSymbols = new ArrayList<>();
     }
 
-    /** 单表写入计数（H2/MySQL ODKU 返回行数方言不一致，inserted/updated 由窗口预查计数推出）。 */
+    /** 单表写入计数（H2/MySQL ODKU 返回行数方言不一致，inserted/updated 由窗口预查计数推出；
+     * written 必须是批内按该表唯一键去重后的写入数，否则批内重复会被虚增成假 inserted，F-1）。 */
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class TableSummary {
         private long inserted, updated, skipped;
@@ -151,7 +154,11 @@ public class Mr0PocIngestService {
         result.setSampleSymbols(sample.stream().map(UniverseEntry::getCanonicalSymbol).toList());
         if (!command.isDryRun()) {
             upsertUniverse(universe, asOfDate, fetchedAt, result);
-            List<IndustryMembershipRow> memberships = fetchMemberships(sample, asOfDate, fetchedAt, result);
+            List<IndustryMembershipRow> memberships = dedupeByUniqueKey(
+                    fetchMemberships(sample, asOfDate, fetchedAt, result),
+                    // F-1：uk=taxonomy+industry_code+symbol+as_of（taxonomy/as_of 批内常量）；
+                    // 公共源可能同批重复返回同一 symbol+industry（真实重跑 102 条→101 键）。
+                    row -> Map.entry(row.getIndustryCode(), row.getCanonicalSymbol()));
             if (!memberships.isEmpty()) {
                 long existing = mr0PocMapper.countIndustryMembership(TAXONOMY_SINA_INDUSTRY, asOfDate,
                         memberships.stream().map(IndustryMembershipRow::getCanonicalSymbol).toList());
@@ -212,6 +219,8 @@ public class Mr0PocIngestService {
         rows.add(UniverseSnapshotRow.builder().providerCode(PROVIDER_SINA_PUBLIC)
                 .canonicalSymbol(BENCHMARK_CANONICAL).symbol("000001").name("上证指数").market("SH")
                 .asOfDate(asOfDate).fetchedAt(fetchedAt).build());
+        // F-1：uk=provider+symbol+as_of（provider/as_of 批内常量）→ 批内按 symbol 去重。
+        rows = dedupeByUniqueKey(rows, UniverseSnapshotRow::getCanonicalSymbol);
         long existing = mr0PocMapper.countUniverse(PROVIDER_SINA_PUBLIC, asOfDate,
                 rows.stream().map(UniverseSnapshotRow::getCanonicalSymbol).toList());
         mr0PocMapper.upsertUniverseSnapshotBatch(rows);
@@ -294,6 +303,8 @@ public class Mr0PocIngestService {
                 result.getDailyBar().addSkipped(1);
             }
         }
+        // F-1：uk=symbol+trade_date+data_source（symbol/data_source/adjust_type 批内常量）→ 按日期去重。
+        rows = dedupeByUniqueKey(rows, StockDailyBarDO::getTradeDate);
         if (command.isDryRun() || rows.isEmpty()) {
             return;
         }
@@ -318,6 +329,8 @@ public class Mr0PocIngestService {
                     .superNet(flow.getR0Net()).industryNetInflow(flow.getCateNa())
                     .fetchedAt(fetchedAt).build());
         }
+        // F-1：uk=symbol+trade_date+provider（symbol/provider 批内常量）→ 按日期去重。
+        rows = dedupeByUniqueKey(rows, MoneyFlowRow::getTradeDate);
         if (command.isDryRun() || rows.isEmpty()) {
             return;
         }
@@ -335,6 +348,19 @@ public class Mr0PocIngestService {
         }
         BigDecimal vwap = row.getAmount().divide(new BigDecimal(row.getVolume()), 6, RoundingMode.HALF_UP);
         return vwap.compareTo(row.getLowPrice()) >= 0 && vwap.compareTo(row.getHighPrice()) <= 0;
+    }
+
+    /**
+     * F-1：批内按该表唯一键去重，保留后到者（与 ODKU 逐条执行时后行覆盖先行的最终落库状态一致）。
+     * inserted 由「去重后写入数 − 预查存在行数」推导，公共源批内重复唯一键若不去重会被虚增成假
+     * inserted（二次导入误报 → 幂等门禁误判 exit 3）。批内常量列（provider/taxonomy/as_of 等）不进键。
+     */
+    private static <T> List<T> dedupeByUniqueKey(List<T> rows, Function<T, ?> uniqueKey) {
+        Map<Object, T> byKey = new LinkedHashMap<>(rows.size() * 2);
+        for (T row : rows) {
+            byKey.put(uniqueKey.apply(row), row);
+        }
+        return List.copyOf(byKey.values());
     }
 
     private static BigDecimal multiplyWan(BigDecimal tenThousand) {

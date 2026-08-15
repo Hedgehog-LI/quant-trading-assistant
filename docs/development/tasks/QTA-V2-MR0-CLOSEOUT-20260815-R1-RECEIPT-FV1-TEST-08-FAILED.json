@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/run-ai-evidence-command.mjs",
+  "taskId": "QTA-V2-MR0-CLOSEOUT-20260815-R1",
+  "roleRunId": "ROLE-RUN-FV-G1",
+  "sessionId": "ROLE-RUN-FV-G1",
+  "testId": "TEST-08",
+  "candidateMode": "COMMIT",
+  "candidateIdentity": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
+  "command": [
+    "bash",
+    "-c",
+    "cp docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-EVIDENCE.json /tmp/poc-ev.bak\ncp docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md /tmp/poc-rp.bak\nbash scripts/run-mr0-poc.sh; code=$?\ncp /tmp/poc-ev.bak docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-EVIDENCE.json\ncp /tmp/poc-rp.bak docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md\nexit $code"
+  ],
+  "startedAt": "2026-08-15T17:55:57.265Z",
+  "finishedAt": "2026-08-15T17:59:09.168Z",
+  "exitCode": 3,
+  "result": "FAIL",
+  "timedOut": false,
+  "stdoutSha256": "a933fa4f072ef6ca5a0319092bb2512e206c5a724f258e4c238166688b7f61bb",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reportFiles": [],
+  "expectedSelectors": [
+    "bash scripts/run-mr0-poc.sh"
+  ],
+  "observedSelectors": [
+    "bash scripts/run-mr0-poc.sh"
+  ],
+  "selectorError": "",
+  "candidateBefore": {
+    "head": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
+    "tree": "cf6b9354bab0f6e6dd3951e5ce6eb5948f0e90e3",
+    "statusSha256": "0f08229127bd23a8e9cdcfd130efd78e53383dc62b738afe46ad2ebff6dfc8d7",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateAfter": {
+    "head": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
+    "tree": "cf6b9354bab0f6e6dd3951e5ce6eb5948f0e90e3",
+    "statusSha256": "0f08229127bd23a8e9cdcfd130efd78e53383dc62b738afe46ad2ebff6dfc8d7",
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidateUnchanged": true
+}
