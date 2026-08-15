@@ -36,8 +36,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * analysisStart&lt;=analysisEnd、warmupStart&lt;=analysisStart、sampleSize∈[1,500]、跨度
  * analysisEnd−analysisStart&lt;=365 天（相差 365 天=含端点 366 个日历日，放行；相差 366 天拒绝）。
  * Controller 层（standalone MockMvc + 真实 GlobalExceptionHandler 验证 400 envelope）与
- * Service 直调两条路径均覆盖；畸形日期（2026-13-01）经 controller 局部 type-mismatch handler
- * 返回 400 VALIDATION_ERROR 非 500；非法参数时 PublicMarketDataClient 零交互。
+ * Service 直调两条路径均覆盖；畸形输入（GET query 类型不匹配、POST body 反序列化失败如
+ * 2026-13-01）经 controller 局部 handler 返回 400 VALIDATION_ERROR 非 500；非法参数时
+ * PublicMarketDataClient 零交互。
  */
 class Mr0PocParamBoundaryTest {
 
@@ -99,7 +100,8 @@ class Mr0PocParamBoundaryTest {
 
     @Test
     void analyzeAndReportRejectSpanBeyond365Days() throws Exception {
-        // 相差 366 天（2026-01-01..2027-01-02）拒绝；相差 365 天（2026-01-01..2026-12-31，含端点 366 个日历日）合法
+        // 相差 366 天（2026-01-01..2027-01-02）拒绝；2026-01-01..2026-12-31 为 2026 非闰年、
+        // 含端点 365 个日历日（跨度 diff 364）放行，跨度上限 diff 365 亦放行
         mockMvc().perform(get(ANALYZE_URL).param("start", "2026-01-01").param("end", "2027-01-02"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(ErrorCodeEnum.VALIDATION_ERROR.getCode()));
@@ -202,6 +204,22 @@ class Mr0PocParamBoundaryTest {
         verifyNoInteractions(analysisMapper, client, mr0PocMapper);
     }
 
+    @Test
+    void ingestMalformedBodyReturns400Not500() throws Exception {
+        mockMvc().perform(post(INGEST_URL).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"analysisStart\":\"2026-13-01\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value(ErrorCodeEnum.VALIDATION_ERROR.getCode()));
+        mockMvc().perform(post(INGEST_URL).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"analysisStart\":\"2026-07-01\",\"analysisEnd\":\"2026-07-31\","
+                                + "\"sampleSize\":\"not-a-number\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value(ErrorCodeEnum.VALIDATION_ERROR.getCode()));
+        verifyNoInteractions(analysisMapper, client, mr0PocMapper);
+    }
+
     // ==================== Service 直调层（防绕过 controller） ====================
 
     @Test
@@ -249,7 +267,8 @@ class Mr0PocParamBoundaryTest {
     @Test
     void serviceDirectIngestAcceptsFrozenBoundaryValues() {
         Mr0PocIngestService service = ingestService();
-        // 相差 365 天（含端点 366 个日历日）+ warmup 相等 + sampleSize 端点 1/500 全部放行
+        // 2026-01-01..2026-12-31（非闰年，含端点 365 个日历日，跨度 diff 364<=365 放行；上限 diff 365 放行）
+        // + warmup 相等 + sampleSize 端点 1/500 全部放行
         service.ingest(IngestCommand.builder()
                 .analysisStart(LocalDate.of(2026, 1, 1)).analysisEnd(LocalDate.of(2026, 12, 31))
                 .warmupStart(LocalDate.of(2026, 1, 1)).sampleSize(500).build());

@@ -694,6 +694,34 @@ test("selector binding stays enforced through receipts and observedSelectors", a
   }
 });
 
+test("frozen business cleanup targets exist and carry zero embedded frozen-selector markers", async () => {
+  const frozenCleanupPaths = [
+    "pom.xml",
+    "scripts/run-mr0-poc.sh",
+    "src/test/java/com/quant/trade/marketdata/poc/Mr0PocIngestServiceTest.java",
+    "src/test/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisServiceTest.java",
+    "src/test/java/com/quant/trade/marketdata/poc/Mr0PocQualityServiceTest.java",
+    "docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md",
+    "docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md",
+    "docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md",
+    "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md"
+  ];
+  assert.equal(frozenCleanupPaths.length, 9);
+  for (const relativePath of frozenCleanupPaths) {
+    let content;
+    try {
+      // TD-04-03: every frozen target must exist (deletion cannot bypass the scan); the
+      // POC-REPORT is a script-regenerated artifact, so whatever is on disk is scanned.
+      content = await readFile(relativePath, "utf8");
+    } catch (error) {
+      assert.fail(`frozen cleanup target must exist, deletion cannot bypass the scan: `
+        + `${relativePath} (${error.code})`);
+    }
+    const hits = content.split("frozen-selector").length - 1;
+    assert.equal(hits, 0, `${relativePath} still embeds ${hits} frozen-selector marker(s)`);
+  }
+});
+
 test("file validation rejects drift from a frozen SNAPSHOT manifest", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "qta-task-snapshot-"));
   try {

@@ -10,6 +10,7 @@ import com.quant.trade.marketdata.poc.Mr0PocIngestService.IngestResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,9 +27,10 @@ import java.time.LocalDate;
  * （AC-02 双门禁：qta.mr0-poc.ingest-enabled=true 且 active profiles 恰为 {"local"}，见
  * {@link Mr0PocIngestGate}；本地脚本经命令行开启）；analyze/report=只读库入口（不触碰
  * PublicMarketDataClient，零外联）。入参边界（AC-03，AMD-001）在 Controller 与 Service 双层校验：
- * analyze/report 应用窗口顺序+跨度上限，ingest 应用全部规则；畸形日期参数（如 2026-13-01）由本
- * controller 局部 handler 映射为 400 VALIDATION_ERROR（全局 handler 未覆盖类型不匹配，参照
- * MarketDataAssetController 的 controller 级 handler 先例，不改公共代码）。PoC 入口，不承诺
+ * analyze/report 应用窗口顺序+跨度上限，ingest 应用全部规则；畸形输入（GET query 类型不匹配、
+ * POST body 反序列化失败如 2026-13-01）由本 controller 局部 handler 映射为 400 VALIDATION_ERROR
+ * （全局 handler 未覆盖这两类，参照 MarketDataAssetController 的 controller 级 handler 先例，
+ * 不改公共代码）。PoC 入口，不承诺
  * MR-1 稳定契约。
  */
 @RestController
@@ -85,6 +87,16 @@ public class Mr0PocController {
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
         return ResponseEntity.badRequest().body(
                 ApiResponse.fail(ErrorCodeEnum.VALIDATION_ERROR, "参数类型不合法: " + exception.getName()));
+    }
+
+    /**
+     * POST body 反序列化失败（畸形日期 2026-13-01、字段文本类型不符等）→ 400 VALIDATION_ERROR
+     * envelope（非 500）；固定文案，不透出 Jackson 内部细节。
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(HttpMessageNotReadableException exception) {
+        return ResponseEntity.badRequest().body(
+                ApiResponse.fail(ErrorCodeEnum.VALIDATION_ERROR, "请求体不合法: 无法解析为合法参数"));
     }
 
     private AnalysisCommand command(LocalDate start, LocalDate end) {

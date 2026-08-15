@@ -4,26 +4,69 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTROL.json",
   "startedAt": "2026-08-15T15:52:00Z",
   "lane": "L2",
-  "lifecycleState": "CANDIDATE_FROZEN",
+  "lifecycleState": "SELF_CHECKED",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTRACT.md",
     "version": "1.1",
     "sha256": "de5736b8a05558d3b2347bcf98faa6b932a924d7ad1e0263517f89f56c6b6ab7",
     "acceptanceCriteria": [
-      {"id": "AC-01", "requiredEvidence": ["AUTOMATION"]},
-      {"id": "AC-02", "requiredEvidence": ["AUTOMATION"]},
-      {"id": "AC-03", "requiredEvidence": ["AUTOMATION"]},
-      {"id": "AC-04", "requiredEvidence": ["AUTOMATION"]},
-      {"id": "AC-05", "requiredEvidence": ["AUTOMATION"]},
-      {"id": "AC-06", "requiredEvidence": ["AUTOMATION", "RUNTIME"]},
-      {"id": "AC-07", "requiredEvidence": ["RUNTIME"]},
-      {"id": "AC-08", "requiredEvidence": ["STATIC"]}
+      {
+        "id": "AC-01",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-02",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-03",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-04",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-05",
+        "requiredEvidence": [
+          "AUTOMATION"
+        ]
+      },
+      {
+        "id": "AC-06",
+        "requiredEvidence": [
+          "AUTOMATION",
+          "RUNTIME"
+        ]
+      },
+      {
+        "id": "AC-07",
+        "requiredEvidence": [
+          "RUNTIME"
+        ]
+      },
+      {
+        "id": "AC-08",
+        "requiredEvidence": [
+          "STATIC"
+        ]
+      }
     ],
     "implementationSlices": [
       {
         "id": "SLICE-01",
         "description": "Mr0PocAnalysisMapper annotation SQL full migration to MyBatis XML plus architecture regression test",
-        "acIds": ["AC-01"],
+        "acIds": [
+          "AC-01"
+        ],
         "allowedWritePaths": [
           "src/main/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisMapper.java",
           "src/main/resources/mapper/Mr0PocAnalysisMapper.xml",
@@ -35,7 +78,10 @@
       {
         "id": "SLICE-02",
         "description": "Ingest local-profile gate plus analyze/ingest parameter boundary defense at controller and service layers",
-        "acIds": ["AC-02", "AC-03"],
+        "acIds": [
+          "AC-02",
+          "AC-03"
+        ],
         "allowedWritePaths": [
           "src/main/java/com/quant/trade/marketdata/poc/",
           "src/test/java/com/quant/trade/marketdata/poc/"
@@ -46,7 +92,9 @@
       {
         "id": "SLICE-03",
         "description": "F-005 validator selector-binding fix with regression test plus removal of frozen-selector comments from pom/script/test sources",
-        "acIds": ["AC-04"],
+        "acIds": [
+          "AC-04"
+        ],
         "allowedWritePaths": [
           "scripts/check-ai-task-control.mjs",
           "scripts/tests/ai-governance.test.mjs",
@@ -60,7 +108,9 @@
       {
         "id": "SLICE-04",
         "description": "Reviewer-to-verifier temporal ordering gate with three deterministic tests plus removal of selector comments from feature docs and PoC report",
-        "acIds": ["AC-05"],
+        "acIds": [
+          "AC-05"
+        ],
         "allowedWritePaths": [
           "scripts/check-ai-task-control.mjs",
           "scripts/tests/ai-governance.test.mjs",
@@ -76,7 +126,11 @@
       {
         "id": "SLICE-05",
         "description": "Integration regression execution (focused, full suite, package, one real PoC run) plus closeout report",
-        "acIds": ["AC-06", "AC-07", "AC-08"],
+        "acIds": [
+          "AC-06",
+          "AC-07",
+          "AC-08"
+        ],
         "allowedWritePaths": [
           "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CLOSEOUT-REPORT.md",
           "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-EVIDENCE.json",
@@ -89,7 +143,9 @@
     "testInventory": [
       {
         "testId": "TEST-01",
-        "acIds": ["AC-01"],
+        "acIds": [
+          "AC-01"
+        ],
         "kind": "AUTOMATION",
         "required": true,
         "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocMapperXmlArchitectureTest.java",
@@ -97,7 +153,9 @@
       },
       {
         "testId": "TEST-02",
-        "acIds": ["AC-01"],
+        "acIds": [
+          "AC-01"
+        ],
         "kind": "AUTOMATION",
         "required": true,
         "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisServiceTest.java",
@@ -105,7 +163,9 @@
       },
       {
         "testId": "TEST-03",
-        "acIds": ["AC-02"],
+        "acIds": [
+          "AC-02"
+        ],
         "kind": "AUTOMATION",
         "required": true,
         "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocIngestGateTest.java",
@@ -113,7 +173,9 @@
       },
       {
         "testId": "TEST-04",
-        "acIds": ["AC-03"],
+        "acIds": [
+          "AC-03"
+        ],
         "kind": "AUTOMATION",
         "required": true,
         "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocParamBoundaryTest.java",
@@ -121,7 +183,9 @@
       },
       {
         "testId": "TEST-05",
-        "acIds": ["AC-04"],
+        "acIds": [
+          "AC-04"
+        ],
         "kind": "AUTOMATION",
         "required": true,
         "sourcePath": "scripts/tests/ai-governance.test.mjs",
@@ -129,7 +193,9 @@
       },
       {
         "testId": "TEST-06",
-        "acIds": ["AC-05"],
+        "acIds": [
+          "AC-05"
+        ],
         "kind": "AUTOMATION",
         "required": true,
         "sourcePath": "scripts/tests/qta-role-ordering.test.mjs",
@@ -137,7 +203,9 @@
       },
       {
         "testId": "TEST-07",
-        "acIds": ["AC-06"],
+        "acIds": [
+          "AC-06"
+        ],
         "kind": "AUTOMATION",
         "required": true,
         "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocIngestServiceTest.java",
@@ -145,7 +213,9 @@
       },
       {
         "testId": "TEST-08",
-        "acIds": ["AC-07"],
+        "acIds": [
+          "AC-07"
+        ],
         "kind": "RUNTIME",
         "required": true,
         "sourcePath": "scripts/run-mr0-poc.sh",
@@ -153,7 +223,9 @@
       },
       {
         "testId": "TEST-09",
-        "acIds": ["AC-08"],
+        "acIds": [
+          "AC-08"
+        ],
         "kind": "STATIC",
         "required": true,
         "sourcePath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CLOSEOUT-REPORT.md",
@@ -161,7 +233,16 @@
       },
       {
         "testId": "TEST-FULL",
-        "acIds": ["AC-01", "AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-08"],
+        "acIds": [
+          "AC-01",
+          "AC-02",
+          "AC-03",
+          "AC-04",
+          "AC-05",
+          "AC-06",
+          "AC-07",
+          "AC-08"
+        ],
         "kind": "AUTOMATION",
         "required": true,
         "sourcePath": "pom.xml",
@@ -239,6 +320,22 @@
       "at": "2026-08-15T17:25:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "gen-1 cumulative candidate 8c260f3 frozen (30 files, +1823/-102); diff artifact + patch SHA bound"
+    },
+    {
+      "sequence": 7,
+      "from": "CANDIDATE_FROZEN",
+      "to": "IMPLEMENTING",
+      "at": "2026-08-15T17:33:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "review G1 FUNCTIONAL FAIL (ARCHITECTURE PASS): findings CR-G1-1 (P1, ingest malformed-date 500) and CR-G1-2 (P2, missing 9-file fs-scan assertion); repair round 1; CR-G1-3 metadata note: frozen diff actually contains 32 diff entries (commit stat counted 30 changed paths), no candidate defect"
+    },
+    {
+      "sequence": 8,
+      "from": "IMPLEMENTING",
+      "to": "SELF_CHECKED",
+      "at": "2026-08-15T17:42:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "repair round 1 accepted: CR-G1-1/CR-G1-2/CR-G1-6 resolved (ROLE-RUN-IMP-R1-G2); focused suites green (boundary 14, governance 74)"
     }
   ],
   "candidate": {
@@ -258,14 +355,29 @@
     "contextPercent": null,
     "contextMeasurement": "UNAVAILABLE",
     "compactionCount": 0,
-    "repairRound": 0,
+    "repairRound": 1,
     "maxRepairRounds": 2,
     "maxWaitCallsPerRole": 2,
     "maxShellPollsPerCommand": 3,
     "rawTokens": null,
     "weeklyAllowancePercent": null
   },
-  "repairHistory": [],
+  "repairHistory": [
+    {
+      "round": 1,
+      "failureFingerprint": "REVIEW-G1-CR-G1-1-CR-G1-2",
+      "fromGeneration": 1,
+      "toGeneration": 2,
+      "findingRoleRunId": "ROLE-RUN-CR-G1",
+      "implementerRoleRunId": "ROLE-RUN-IMP-R1-G2",
+      "findingIds": [
+        "CR-G1-1",
+        "CR-G1-2"
+      ],
+      "parentDisposition": "CR-G1-3 metadata note recorded in transition 7 reason (32 diff entries, no candidate defect); CR-G1-4 routed to future governance round (out of frozen scope); CR-G1-5 verifier-side annotation; CR-G1-6 comment fix bundled into repair (same test file); sequencing note: repair-window control cannot fully validate until the repair implementer run is accepted (machine gap also traversed by the superseded MR-0 task), validator rerun scheduled at implementer acceptance",
+      "repairedAt": "2026-08-15T17:41:30Z"
+    }
+  ],
   "roleRuns": [
     {
       "roleRunId": "ROLE-RUN-TD-G1",
@@ -422,6 +534,58 @@
       "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-SELF-CHECK-SLICE-05.md",
       "artifactSha256": "1bf47a174f0969a3acaee96733f89029db319032f6aa9db115f65943ea1c5028"
+    },
+    {
+      "roleRunId": "ROLE-RUN-CR-G1",
+      "dispatchId": "QTA-V2-MR0-CLOSEOUT-20260815-R1-CR-G1-D1",
+      "sessionId": "agent_5ad61cab-2d80-4abc-a5ae-8e1c719ef60a",
+      "startedAt": "2026-08-15T17:30:00Z",
+      "finishedAt": "2026-08-15T17:31:45Z",
+      "runtimeReceiptPath": "",
+      "role": "CODE_REVIEWER",
+      "generation": 1,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-code-reviewer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/44e1b7ae2b8049a707a128480261a9b8705522f62e07cbac82ba81703f355b14/6a150010fccb70a76c55f4eb8a645ec1de2aec25da0508f65159ea93920ca109.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only reviewer; frozen diff artifact via Read tool; no Bash, no Git, no edits, no network",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-REVIEW-G1.md",
+      "artifactSha256": "7614bc7f448cd522fb3026ffe7f0f166982edf3c8f2f5aa3e80542bcaea67ff1"
+    },
+    {
+      "roleRunId": "ROLE-RUN-IMP-R1-G2",
+      "dispatchId": "QTA-V2-MR0-CLOSEOUT-20260815-R1-IMP-R1-G2-D1",
+      "sessionId": "agent_6822614b-745a-4060-a813-4e39c9e81379",
+      "startedAt": "2026-08-15T17:38:00Z",
+      "finishedAt": "2026-08-15T17:41:30Z",
+      "runtimeReceiptPath": "",
+      "role": "IMPLEMENTER",
+      "generation": 2,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-implementer.md",
+      "sliceId": "REPAIR-1",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_WRITE",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/44e1b7ae2b8049a707a128480261a9b8705522f62e07cbac82ba81703f355b14/88da497a8796bc6690e915d486d5bac6656e58398c1a80e8ea422b2f39600f89.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "3-file repair allowlist (controller, boundary test, governance test); no Git, no network, no secrets",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 1,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-SELF-CHECK-REPAIR-1.md",
+      "artifactSha256": "167168727362c4ec698fde6ebd5b2c13fcacad914050c7d07aaad039e3c86903"
     }
   ],
   "review": {
@@ -438,14 +602,23 @@
   },
   "architectureGate": {
     "required": true,
-    "candidateIdentity": "",
-    "status": "NOT_RUN",
-    "exitCode": -1,
+    "candidateIdentity": "8c260f325747158a879e548f6902b2dbc42c7559",
+    "status": "PASS",
+    "exitCode": 0,
     "errorCount": 0,
-    "warningCount": 0,
-    "warningDispositions": [],
-    "reportPath": "",
-    "reportSha256": "",
+    "warningCount": 1,
+    "warningDispositions": [
+      {
+        "warningId": "ARCH-W-001",
+        "warning": "Mr0PocIngestService direct dependencies 12 > 10",
+        "disposition": "ACCEPTED",
+        "rationale": "baseline was already 11 (disclosed exception in the superseded MR-0 task ARCH-W-001); the +1 is Mr0PocIngestGate injected to satisfy AC-02 dual-layer service-side profile/switch defense mandated by the frozen contract; splitting the orchestration service would add files without behavioral benefit",
+        "owner": "PARENT-RUN-1",
+        "dueDate": "2026-08-15"
+      }
+    ],
+    "reportPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-ARCH-GATE-G1.json",
+    "reportSha256": "626725c6b47c0828138136ce719af610ed4bcc8a5d8ba591dfe8bd0a5f2679cb",
     "generatedBy": "scripts/check-ai-architecture.mjs"
   },
   "verification": {
@@ -458,10 +631,22 @@
     "artifactSha256": "",
     "architectureGateSha256": "",
     "dimensions": {
-      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
-      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
-      "RUNTIME": {"required": true, "status": "NOT_VERIFIED"},
-      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+      "STATIC": {
+        "required": true,
+        "status": "NOT_VERIFIED"
+      },
+      "AUTOMATION": {
+        "required": true,
+        "status": "NOT_VERIFIED"
+      },
+      "RUNTIME": {
+        "required": true,
+        "status": "NOT_VERIFIED"
+      },
+      "DEPLOYMENT": {
+        "required": false,
+        "status": "NOT_REQUIRED"
+      }
     }
   },
   "testEvidence": [],
