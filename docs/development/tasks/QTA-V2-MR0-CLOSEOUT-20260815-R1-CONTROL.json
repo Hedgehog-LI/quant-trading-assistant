@@ -1,0 +1,323 @@
+{
+  "schemaVersion": 3,
+  "taskId": "QTA-V2-MR0-CLOSEOUT-20260815-R1",
+  "controlPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTROL.json",
+  "startedAt": "2026-08-15T15:52:00Z",
+  "lane": "L2",
+  "lifecycleState": "CONTRACT_FROZEN",
+  "contract": {
+    "path": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTRACT.md",
+    "version": "1.1",
+    "sha256": "de5736b8a05558d3b2347bcf98faa6b932a924d7ad1e0263517f89f56c6b6ab7",
+    "acceptanceCriteria": [
+      {"id": "AC-01", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-02", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-03", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-04", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-05", "requiredEvidence": ["AUTOMATION"]},
+      {"id": "AC-06", "requiredEvidence": ["AUTOMATION", "RUNTIME"]},
+      {"id": "AC-07", "requiredEvidence": ["RUNTIME"]},
+      {"id": "AC-08", "requiredEvidence": ["STATIC"]}
+    ],
+    "implementationSlices": [
+      {
+        "id": "SLICE-01",
+        "description": "Mr0PocAnalysisMapper annotation SQL full migration to MyBatis XML plus architecture regression test",
+        "acIds": ["AC-01"],
+        "allowedWritePaths": [
+          "src/main/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisMapper.java",
+          "src/main/resources/mapper/Mr0PocAnalysisMapper.xml",
+          "src/test/java/com/quant/trade/marketdata/poc/Mr0PocMapperXmlArchitectureTest.java"
+        ],
+        "maxExpectedFiles": 3,
+        "maxProductionLineDelta": 300
+      },
+      {
+        "id": "SLICE-02",
+        "description": "Ingest local-profile gate plus analyze/ingest parameter boundary defense at controller and service layers",
+        "acIds": ["AC-02", "AC-03"],
+        "allowedWritePaths": [
+          "src/main/java/com/quant/trade/marketdata/poc/",
+          "src/test/java/com/quant/trade/marketdata/poc/"
+        ],
+        "maxExpectedFiles": 8,
+        "maxProductionLineDelta": 400
+      },
+      {
+        "id": "SLICE-03",
+        "description": "F-005 validator selector-binding fix with regression test plus removal of frozen-selector comments from pom/script/test sources",
+        "acIds": ["AC-04"],
+        "allowedWritePaths": [
+          "scripts/check-ai-task-control.mjs",
+          "scripts/tests/ai-governance.test.mjs",
+          "pom.xml",
+          "scripts/run-mr0-poc.sh",
+          "src/test/java/com/quant/trade/marketdata/poc/"
+        ],
+        "maxExpectedFiles": 7,
+        "maxProductionLineDelta": 200
+      },
+      {
+        "id": "SLICE-04",
+        "description": "Reviewer-to-verifier temporal ordering gate with three deterministic tests plus removal of selector comments from feature docs and PoC report",
+        "acIds": ["AC-05"],
+        "allowedWritePaths": [
+          "scripts/check-ai-task-control.mjs",
+          "scripts/tests/ai-governance.test.mjs",
+          "scripts/tests/qta-role-ordering.test.mjs",
+          "docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md",
+          "docs/features/MARKET_RESEARCH_MR0_PROVIDER_MATRIX.md",
+          "docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md",
+          "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md"
+        ],
+        "maxExpectedFiles": 7,
+        "maxProductionLineDelta": 300
+      },
+      {
+        "id": "SLICE-05",
+        "description": "Integration regression execution (focused, full suite, package, one real PoC run) plus closeout report",
+        "acIds": ["AC-06", "AC-07", "AC-08"],
+        "allowedWritePaths": [
+          "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CLOSEOUT-REPORT.md",
+          "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-EVIDENCE.json",
+          "docs/development/tasks/QTA-V2-MR0-DATA-SEMANTICS-POC-20260815-POC-REPORT.md"
+        ],
+        "maxExpectedFiles": 5,
+        "maxProductionLineDelta": 150
+      }
+    ],
+    "testInventory": [
+      {
+        "testId": "TEST-01",
+        "acIds": ["AC-01"],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocMapperXmlArchitectureTest.java",
+        "selector": "./mvnw -q test -Dtest=Mr0PocMapperXmlArchitectureTest"
+      },
+      {
+        "testId": "TEST-02",
+        "acIds": ["AC-01"],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisServiceTest.java",
+        "selector": "./mvnw -q test -Dtest=Mr0PocAnalysisServiceTest"
+      },
+      {
+        "testId": "TEST-03",
+        "acIds": ["AC-02"],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocIngestGateTest.java",
+        "selector": "./mvnw -q test -Dtest=Mr0PocIngestGateTest"
+      },
+      {
+        "testId": "TEST-04",
+        "acIds": ["AC-03"],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocParamBoundaryTest.java",
+        "selector": "./mvnw -q test -Dtest=Mr0PocParamBoundaryTest"
+      },
+      {
+        "testId": "TEST-05",
+        "acIds": ["AC-04"],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "scripts/tests/ai-governance.test.mjs",
+        "selector": "node --test scripts/tests/ai-governance.test.mjs"
+      },
+      {
+        "testId": "TEST-06",
+        "acIds": ["AC-05"],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "scripts/tests/qta-role-ordering.test.mjs",
+        "selector": "node --test scripts/tests/qta-role-ordering.test.mjs"
+      },
+      {
+        "testId": "TEST-07",
+        "acIds": ["AC-06"],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "src/test/java/com/quant/trade/marketdata/poc/Mr0PocIngestServiceTest.java",
+        "selector": "./mvnw -q test -Dtest=Mr0PocIngestServiceTest,Mr0PocQualityServiceTest,Mr0PocAnalysisServiceTest"
+      },
+      {
+        "testId": "TEST-08",
+        "acIds": ["AC-07"],
+        "kind": "RUNTIME",
+        "required": true,
+        "sourcePath": "scripts/run-mr0-poc.sh",
+        "selector": "bash scripts/run-mr0-poc.sh"
+      },
+      {
+        "testId": "TEST-09",
+        "acIds": ["AC-08"],
+        "kind": "STATIC",
+        "required": true,
+        "sourcePath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CLOSEOUT-REPORT.md",
+        "selector": "grep -c 'superseded by QTA-V2-MR0-CLOSEOUT-20260815-R1' docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CLOSEOUT-REPORT.md && grep -c '19:53:16' docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CLOSEOUT-REPORT.md && grep -c 'data quality boundary' docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CLOSEOUT-REPORT.md && grep -c 'MR-0 PoC is not MR-1' docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CLOSEOUT-REPORT.md"
+      },
+      {
+        "testId": "TEST-FULL",
+        "acIds": ["AC-01", "AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-08"],
+        "kind": "AUTOMATION",
+        "required": true,
+        "sourcePath": "pom.xml",
+        "selector": "./mvnw -q test && ./mvnw -q -DskipTests package"
+      }
+    ],
+    "blockingAmendments": [
+      {
+        "id": "AMD-001",
+        "verdict": "ACCEPTED",
+        "summary": "AC-03 frozen numeric boundaries: sampleSize in [1,500]; warmupStart<=analysisStart; analysisStart<=analysisEnd; span<=365 days; equal endpoints legal; dual-layer 400 VALIDATION_ERROR; zero outreach on rejection"
+      },
+      {
+        "id": "AMD-002",
+        "verdict": "ACCEPTED",
+        "summary": "AC-05 temporal gate anchored to observable artifacts only (control + dispatch .json receipts): verifier.startedAt>=reviewer.finishedAt same generation; dispatch observedAt>=REVIEW_CLEAR transition at; overlap fails; outcome-receipt cross-check degrades to warning when absent; existing assertions must be preserved"
+      },
+      {
+        "id": "AMD-003",
+        "verdict": "ACCEPTED",
+        "summary": "AC-06/TEST-08 run-count semantics: exactly one successful implementation-phase run plus one verifier re-run with artifact-restore (backup evidence/report, run bare command, byte-restore, candidateUnchanged=true); exit-2 public-source failure allows one retry each"
+      }
+    ]
+  },
+  "git": {
+    "automation": "COMMIT_AND_CHECKPOINT_PUSH",
+    "branch": "codex/qta-v2-mr0-closeout-r1",
+    "baselineCommit": "2a7b45188d537a4136e8b6ab19878e54b35bf58e",
+    "preExistingDirtyPaths": []
+  },
+  "transitionHistory": [
+    {
+      "sequence": 1,
+      "from": "CONTEXT_READY",
+      "to": "CONTRACT_DRAFTED",
+      "at": "2026-08-15T15:58:00Z",
+      "actor": "PARENT-RUN-1"
+    },
+    {
+      "sequence": 2,
+      "from": "CONTRACT_DRAFTED",
+      "to": "TEST_DESIGN_READY",
+      "at": "2026-08-15T16:00:25Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "fresh TEST_DESIGNER dispatched (ROLE-RUN-TD-G1)"
+    },
+    {
+      "sequence": 3,
+      "from": "TEST_DESIGN_READY",
+      "to": "CONTRACT_FROZEN",
+      "at": "2026-08-15T16:10:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "AMD-001/002/003 ACCEPTED and merged into contract v1.1; recommendations REC-01..08 adopted"
+    }
+  ],
+  "candidate": {
+    "mode": "COMMIT",
+    "generation": 1,
+    "identity": "",
+    "commit": "",
+    "treeHash": "",
+    "patchSha256": "",
+    "manifestPath": "",
+    "manifestSha256": "",
+    "entrySetSha256": "",
+    "diffArtifactPath": "",
+    "diffArtifactSha256": ""
+  },
+  "budget": {
+    "contextPercent": null,
+    "contextMeasurement": "UNAVAILABLE",
+    "compactionCount": 0,
+    "repairRound": 0,
+    "maxRepairRounds": 2,
+    "maxWaitCallsPerRole": 2,
+    "maxShellPollsPerCommand": 3,
+    "rawTokens": null,
+    "weeklyAllowancePercent": null
+  },
+  "repairHistory": [],
+  "roleRuns": [
+    {
+      "roleRunId": "ROLE-RUN-TD-G1",
+      "sessionId": "agent_50450baa-e8d5-444f-986c-636879cc12ba",
+      "startedAt": "2026-08-15T16:00:30Z",
+      "finishedAt": "2026-08-15T16:07:30Z",
+      "runtimeReceiptPath": "",
+      "role": "TEST_DESIGNER",
+      "generation": 0,
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only qta-test-designer; no edits, no Git, no shell, no network; parent persists returned artifact",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-TEST-DESIGN.md",
+      "artifactSha256": "6fea00c7c48dd77ecaac8cb24af0afc7cb1162f49fbdf24e970cac383ae151b7",
+      "dispatchId": "QTA-V2-MR0-CLOSEOUT-20260815-R1-TD-G1-D1",
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-test-designer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/44e1b7ae2b8049a707a128480261a9b8705522f62e07cbac82ba81703f355b14/052e7c499b33972e54d6d8dc27b028b80e37f2da5b0cfeb735375d076091872c.json"
+    }
+  ],
+  "review": {
+    "omitted": false,
+    "omissionReason": "",
+    "generation": 0,
+    "candidateIdentity": "",
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "findingIds": []
+  },
+  "architectureGate": {
+    "required": true,
+    "candidateIdentity": "",
+    "status": "NOT_RUN",
+    "exitCode": -1,
+    "errorCount": 0,
+    "warningCount": 0,
+    "warningDispositions": [],
+    "reportPath": "",
+    "reportSha256": "",
+    "generatedBy": "scripts/check-ai-architecture.mjs"
+  },
+  "verification": {
+    "candidateIdentity": "",
+    "verdict": "NOT_VERIFIED",
+    "deliveryPermitted": false,
+    "functionalVerdict": "NOT_VERIFIED",
+    "architectureVerdict": "NOT_VERIFIED",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "architectureGateSha256": "",
+    "dimensions": {
+      "STATIC": {"required": true, "status": "NOT_VERIFIED"},
+      "AUTOMATION": {"required": true, "status": "NOT_VERIFIED"},
+      "RUNTIME": {"required": true, "status": "NOT_VERIFIED"},
+      "DEPLOYMENT": {"required": false, "status": "NOT_REQUIRED"}
+    }
+  },
+  "testEvidence": [],
+  "finalization": {
+    "status": "NOT_STARTED",
+    "candidateIdentity": "",
+    "artifactPath": "",
+    "artifactSha256": "",
+    "completedAt": "",
+    "changedPaths": []
+  },
+  "evidence": []
+}
