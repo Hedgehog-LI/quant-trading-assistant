@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTROL.json",
   "startedAt": "2026-08-15T15:52:00Z",
   "lane": "L2",
-  "lifecycleState": "CANDIDATE_FROZEN",
+  "lifecycleState": "REVIEW_CLEAR",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTRACT.md",
     "version": "1.1",
@@ -344,6 +344,14 @@
       "at": "2026-08-15T17:45:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "gen-2 candidate 84094bb frozen after repair round 1; architecture gate G2 PASS bound"
+    },
+    {
+      "sequence": 10,
+      "from": "CANDIDATE_FROZEN",
+      "to": "REVIEW_CLEAR",
+      "at": "2026-08-15T17:50:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "review G2 FUNCTIONAL PASS + ARCHITECTURE PASS; CR-G1-1/2 verified resolved; P3 findings CR-G2-1 (metadata note) and CR-G2-2 (deferred pre-existing coverage nit) routed without candidate change"
     }
   ],
   "candidate": {
@@ -594,19 +602,48 @@
       "artifactAccepted": true,
       "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-SELF-CHECK-REPAIR-1.md",
       "artifactSha256": "167168727362c4ec698fde6ebd5b2c13fcacad914050c7d07aaad039e3c86903"
+    },
+    {
+      "roleRunId": "ROLE-RUN-CR-G2",
+      "dispatchId": "QTA-V2-MR0-CLOSEOUT-20260815-R1-CR-G2-D1",
+      "sessionId": "agent_8a453bae-ea4c-44bb-beb1-588882f7c390",
+      "startedAt": "2026-08-15T17:42:50Z",
+      "finishedAt": "2026-08-15T17:48:15Z",
+      "runtimeReceiptPath": "",
+      "role": "CODE_REVIEWER",
+      "generation": 2,
+      "executorType": "SUBAGENT",
+      "agentDefinition": ".zcode/agents/qta-code-reviewer.md",
+      "sliceId": "",
+      "executionOutcome": "COMPLETED",
+      "capability": "READ_ONLY",
+      "dispatchReceiptPath": ".git/qta-governance/dispatches/44e1b7ae2b8049a707a128480261a9b8705522f62e07cbac82ba81703f355b14/58e1051a6b588e5465749dc83268a002b6e39d64726f6a95cfd4296744904561.json",
+      "contextMode": "FRESH",
+      "enforcement": "ADVISORY",
+      "compensatingIsolation": "read-only reviewer gen-2; both frozen diff artifacts via Read tool; no Bash, no Git, no edits, no network",
+      "waitCalls": 0,
+      "maxShellPollsForOneCommand": 0,
+      "compactionCount": 0,
+      "status": "CLOSED",
+      "artifactAccepted": true,
+      "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-REVIEW-G2.md",
+      "artifactSha256": "6845b9212dd5842d3e1ee17db93f210bf8e6493cbe45b3da8d90038ef9ab494d"
     }
   ],
   "review": {
     "omitted": false,
     "omissionReason": "",
-    "generation": 0,
-    "candidateIdentity": "",
-    "functionalVerdict": "NOT_VERIFIED",
-    "architectureVerdict": "NOT_VERIFIED",
-    "artifactPath": "",
-    "artifactSha256": "",
-    "architectureGateSha256": "",
-    "findingIds": []
+    "generation": 2,
+    "candidateIdentity": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
+    "functionalVerdict": "PASS",
+    "architectureVerdict": "PASS",
+    "artifactPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-REVIEW-G2.md",
+    "artifactSha256": "6845b9212dd5842d3e1ee17db93f210bf8e6493cbe45b3da8d90038ef9ab494d",
+    "architectureGateSha256": "9cb2a7c331070ce1339489ee2b690effa8c646526da6be352cdd121ffd751a26",
+    "findingIds": [
+      "CR-G2-1",
+      "CR-G2-2"
+    ]
   },
   "architectureGate": {
     "required": true,
