@@ -4,7 +4,7 @@
   "controlPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTROL.json",
   "startedAt": "2026-08-15T15:52:00Z",
   "lane": "L2",
-  "lifecycleState": "SELF_CHECKED",
+  "lifecycleState": "CANDIDATE_FROZEN",
   "contract": {
     "path": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-CONTRACT.md",
     "version": "1.1",
@@ -368,20 +368,28 @@
       "at": "2026-08-15T18:19:00Z",
       "actor": "PARENT-RUN-1",
       "reason": "repair round 2 accepted: F-1 resolved via batch-unique-key dedupe (ROLE-RUN-IMP-R2-G3); focused suites green (ingest 7, quality 5, analysis 7)"
+    },
+    {
+      "sequence": 13,
+      "from": "SELF_CHECKED",
+      "to": "CANDIDATE_FROZEN",
+      "at": "2026-08-15T18:22:00Z",
+      "actor": "PARENT-RUN-1",
+      "reason": "gen-3 candidate 4736a6c frozen after repair round 2; architecture gate G3 PASS bound"
     }
   ],
   "candidate": {
     "mode": "COMMIT",
-    "generation": 2,
-    "identity": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
-    "commit": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
-    "treeHash": "cf6b9354bab0f6e6dd3951e5ce6eb5948f0e90e3",
-    "patchSha256": "6e44860fd1b1e07af2012436cbc8c0a7318788607af9c8fc3e255e1178ef3d03",
+    "generation": 3,
+    "identity": "4736a6c53d47c520e517e2df69fdf4ce39d20d37",
+    "commit": "4736a6c53d47c520e517e2df69fdf4ce39d20d37",
+    "treeHash": "bd7dab34106a5820f37432a94c983d12cc51ea84",
+    "patchSha256": "080276ae7c5d9f1859bcbbafe8010e17506e43bda672493adf6d7f42050399b0",
     "manifestPath": "",
     "manifestSha256": "",
     "entrySetSha256": "",
-    "diffArtifactPath": ".qta-governance/candidates/QTA-V2-MR0-CLOSEOUT-20260815-R1/generation-2.patch",
-    "diffArtifactSha256": "6e44860fd1b1e07af2012436cbc8c0a7318788607af9c8fc3e255e1178ef3d03"
+    "diffArtifactPath": ".qta-governance/candidates/QTA-V2-MR0-CLOSEOUT-20260815-R1/generation-3.patch",
+    "diffArtifactSha256": "080276ae7c5d9f1859bcbbafe8010e17506e43bda672493adf6d7f42050399b0"
   },
   "budget": {
     "contextPercent": null,
@@ -728,7 +736,7 @@
   },
   "architectureGate": {
     "required": true,
-    "candidateIdentity": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
+    "candidateIdentity": "4736a6c53d47c520e517e2df69fdf4ce39d20d37",
     "status": "PASS",
     "exitCode": 0,
     "errorCount": 0,
@@ -738,13 +746,13 @@
         "warningId": "ARCH-W-001",
         "warning": "Mr0PocIngestService direct dependencies 12 > 10",
         "disposition": "ACCEPTED",
-        "rationale": "baseline 11 (+1 Mr0PocIngestGate for AC-02 dual-layer service-side defense mandated by frozen contract); unchanged from gen-1 disposition",
+        "rationale": "baseline 11 (+1 Mr0PocIngestGate for AC-02 dual-layer service-side defense mandated by frozen contract); unchanged from gen-1/gen-2 disposition",
         "owner": "PARENT-RUN-1",
         "dueDate": "2026-08-15"
       }
     ],
-    "reportPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-ARCH-GATE-G2.json",
-    "reportSha256": "9cb2a7c331070ce1339489ee2b690effa8c646526da6be352cdd121ffd751a26",
+    "reportPath": "docs/development/tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-ARCH-GATE-G3.json",
+    "reportSha256": "ea3fccfa593df6a4b65642c0a93f3fcd7b64a0719aba987ab171ff02771871ed",
     "generatedBy": "scripts/check-ai-architecture.mjs"
   },
   "verification": {
