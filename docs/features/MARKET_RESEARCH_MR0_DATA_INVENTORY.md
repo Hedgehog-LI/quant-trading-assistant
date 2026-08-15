@@ -144,4 +144,3 @@
 4. `market_calendar` CN 空表（I-09）。
 5. 资金字段仅 Longbridge 关注板块口径，且当前 `NOT_RETESTED`（I-08）。
 6. V19-V22 衍生引擎覆盖 RANKED_UNIVERSE 而非全市场（I-06）。
-<!-- frozen-selector: grep -c '^## I-' docs/features/MARKET_RESEARCH_MR0_DATA_INVENTORY.md -> >=9 -->

@@ -37,7 +37,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * client 全部打桩（fixture 来自 F5 真实探针摘录，见 src/test/resources/mr0/mr0-public-probe-fixtures.json），
  * 零联网：桩只覆写 {@link PublicMarketDataClient#httpGet}，响应仍走真实解析器。
  * 每个用例事务内回滚，互不污染 H2 库。
- * // frozen-selector: ./mvnw -q test -Dtest=Mr0PocIngestServiceTest (6 methods: ingestDailyBarsTwiceWritesNoDuplicates, ingestRowsCarryPublicProviderLabel, ingestPreservesExistingProviderRows, ingestConvertsUnitsPerFrozenDictionary, ingestMembershipAndMoneyFlowAreIdempotentWithPointInTimeColumns, ingestBackfillsMinimalStockBasicIdentityIdempotently)
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -284,6 +283,20 @@ class Mr0PocIngestServiceTest {
         @Primary
         public FixtureBackedPublicClient fixtureBackedPublicClient() {
             return new FixtureBackedPublicClient(FIXTURE);
+        }
+
+        /**
+         * AC-02 使 ingest 服务入口新增 local 门禁；本测试类专注导入语义（fixture 桩），以 @Primary
+         * 桩固定放行（MockEnvironment 恰 local + 开关 true）。门禁自身行为由 Mr0PocIngestGateTest
+         * 独立覆盖；生产装配不受影响。
+         */
+        @Bean
+        @Primary
+        public Mr0PocIngestGate fixtureIngestGate() {
+            org.springframework.mock.env.MockEnvironment environment =
+                    new org.springframework.mock.env.MockEnvironment();
+            environment.setActiveProfiles(Mr0PocIngestGate.LOCAL_PROFILE);
+            return new Mr0PocIngestGate(environment, true);
         }
     }
 

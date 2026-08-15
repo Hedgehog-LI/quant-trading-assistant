@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    MR-0 PoC 只读分析查询（AC-01：自 Mr0PocAnalysisMapper 注解 SQL 全量迁移，SQL 语义逐字保持）。
+    仅 SELECT；幂等写 SQL 见 Mr0PocMapper.xml。statement id 与接口方法名一一对应（恰 6 条）。
+    行类为接口嵌套 row 类（二进制名 $ 引用），列名映射依赖 map-underscore-to-camel-case。
+    比较符统一 XML 实体转义（&gt;= / &lt;=），与原注解语义一致。
+-->
+<mapper namespace="com.quant.trade.marketdata.poc.Mr0PocAnalysisMapper">
+
+    <select id="selectDailyBars" resultType="com.quant.trade.marketdata.poc.Mr0PocAnalysisMapper$BarRow">
+        SELECT canonical_symbol, trade_date, open_price, high_price, low_price, close_price,
+               volume, amount, data_source, adjust_type, fetched_at
+        FROM stock_daily_bar
+        WHERE trade_date &gt;= #{start} AND trade_date &lt;= #{end}
+        <if test="providerCode != null">AND data_source = #{providerCode}</if>
+        ORDER BY canonical_symbol, trade_date
+    </select>
+
+    <select id="selectUniverseSnapshots" resultType="com.quant.trade.marketdata.poc.Mr0PocAnalysisMapper$UniverseRow">
+        SELECT canonical_symbol, name, market, turnover_rate, circulating_market_cap, provider_code, as_of_date
+        FROM mr0_universe_snapshot
+        WHERE provider_code = #{providerCode}
+        <if test="asOfDate != null">AND as_of_date &lt;= #{asOfDate}</if>
+        ORDER BY as_of_date DESC, canonical_symbol
+    </select>
+
+    <select id="selectIndustryMemberships" resultType="com.quant.trade.marketdata.poc.Mr0PocAnalysisMapper$MembershipRow">
+        SELECT industry_code, industry_name, canonical_symbol, as_of_date, fetched_at
+        FROM mr0_industry_membership
+        WHERE taxonomy_code = #{taxonomyCode}
+        <if test="asOfDate != null">AND as_of_date &lt;= #{asOfDate}</if>
+        ORDER BY canonical_symbol, as_of_date DESC
+    </select>
+
+    <select id="selectMoneyFlows" resultType="com.quant.trade.marketdata.poc.Mr0PocAnalysisMapper$MoneyFlowRow">
+        SELECT canonical_symbol, trade_date, provider_code, main_net_inflow, industry_code,
+               industry_net_inflow, fetched_at
+        FROM mr0_stock_money_flow_daily
+        WHERE provider_code = #{providerCode} AND trade_date &gt;= #{start} AND trade_date &lt;= #{end}
+        ORDER BY canonical_symbol, trade_date
+    </select>
+
+    <select id="countDailyBarsByProvider" resultType="com.quant.trade.marketdata.poc.Mr0PocAnalysisMapper$ProviderCountRow">
+        SELECT data_source, COUNT(1) AS bar_count FROM stock_daily_bar
+        WHERE trade_date &gt;= #{start} AND trade_date &lt;= #{end}
+        GROUP BY data_source ORDER BY data_source
+    </select>
+
+    <select id="countMarketCalendar" resultType="long">
+        SELECT COUNT(1) FROM market_calendar WHERE market_code = #{marketCode}
+    </select>
+</mapper>

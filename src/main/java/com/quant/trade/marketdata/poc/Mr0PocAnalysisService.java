@@ -83,8 +83,13 @@ public class Mr0PocAnalysisService {
     @Data @Builder public static class FlowIntensity { private List<String> providers; private String window, status; private BigDecimal windowNetInflow, windowTurnover, value; }
     @Data @Builder public static class MetricAttribution { private String metric, caliber; private List<String> providers; }
 
-    /** 执行一次只读分析（每次调用重读存储，无缓存）。 */
+    /** 执行一次只读分析（每次调用重读存储，无缓存）；入口应用 AMD-001 入参边界（防绕过 controller 直调）。 */
     public AnalysisResult analyze(AnalysisCommand command) {
+        if (command == null) {
+            command = AnalysisCommand.builder().build();
+        }
+        Mr0PocParamValidator.validateAnalysisWindow(command.getAnalysisStart(), command.getAnalysisEnd());
+        Mr0PocParamValidator.validateSampleSize(command.getSampleSize());
         long started = System.currentTimeMillis();
         LocalDate start = command.getAnalysisStart(), end = command.getAnalysisEnd();
         Map<String, TreeMap<LocalDate, BigDecimal>> closes = new TreeMap<>(), amounts = new TreeMap<>();

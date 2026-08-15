@@ -2,15 +2,15 @@
   "task": "QTA-V2-MR0-DATA-SEMANTICS-POC-20260815",
   "slice": "SLICE-04",
   "generatedBy": "scripts/run-mr0-poc.sh",
-  "generatedAt": "2026-08-14T18:56:03Z",
+  "generatedAt": "2026-08-15T17:18:11Z",
   "status": "SUCCESS",
   "exitCode": 0,
   "diagnostic": "",
-  "startedAt": "2026-08-15T02:52:50+0800",
-  "durationSeconds": 193,
+  "startedAt": "2026-08-16T01:15:09+0800",
+  "durationSeconds": 182,
   "timezone": "CST",
-  "analysisHashRun1": "4a0a73c8048e8a0104f38f72bf6c9ccbad36b2a5074c2e575439e36b7a31564d",
-  "analysisHashRun2": "4a0a73c8048e8a0104f38f72bf6c9ccbad36b2a5074c2e575439e36b7a31564d",
+  "analysisHashRun1": "1cb27099b8728b8ae029038886330bde6bd6ec33a47f07301cf078df86ca7e2a",
+  "analysisHashRun2": "1cb27099b8728b8ae029038886330bde6bd6ec33a47f07301cf078df86ca7e2a",
   "hashAlgorithm": "sha256",
   "hashFieldWhitelist": [
     "analysisStart",
@@ -41,7 +41,7 @@
       "updated": 3432
     }
   },
-  "universeAsOfDate": "2026-08-15",
+  "universeAsOfDate": "2026-08-16",
   "universeSize": 151,
   "universeSymbolsSha256": "e8ea955c474fcffd207e53326328c7bb12d558e032f19b568e9c8b725c1144d3",
   "realRowCounts": {

@@ -31,12 +31,16 @@ function role(role, generation, id) {
     CODE_REVIEWER: "READ_ONLY",
     FINAL_VERIFIER: "VERIFY_EXECUTE"
   };
+  // AC-05 ordering gate: every role shares a [00:00:00, 00:00:30] window except the final
+  // verifier, which may only start once the same-generation reviewer has finished (equality
+  // is the legal boundary), so its window starts at the shared reviewer finish time.
+  const verifierWindow = role === "FINAL_VERIFIER";
   return {
     roleRunId: id,
     dispatchId: `dispatch-${id}`,
     sessionId: `session-${id}`,
-    startedAt: "2026-08-01T00:00:00Z",
-    finishedAt: "2026-08-01T00:00:30Z",
+    startedAt: verifierWindow ? "2026-08-01T00:00:30Z" : "2026-08-01T00:00:00Z",
+    finishedAt: verifierWindow ? "2026-08-01T00:01:00Z" : "2026-08-01T00:00:30Z",
     runtimeReceiptPath: `.git/qta-governance/sessions/${id}.json`,
     dispatchReceiptPath: `.git/qta-governance/dispatches/task/${id}.json`,
     role,
@@ -596,6 +600,98 @@ test("file validation rejects fabricated contract, candidate, role, and evidence
   const errors = await validateTaskControlFiles(validVerifiedControl(), process.cwd());
   assert.ok(errors.length >= 4);
   assert.match(errors.join("\n"), /contract is unavailable/);
+});
+
+async function writeSelectorBindingFixture(directory, options = {}) {
+  const selector = "node --test scripts/tests/example-frozen-suite.test.mjs";
+  const sourceRel = "src/test/javascript/ExampleFrozenSuite.test.mjs";
+  if (options.writeSource !== false) {
+    await mkdir(path.join(directory, path.dirname(sourceRel)), { recursive: true });
+    await writeFile(path.join(directory, sourceRel), "example suite without any governance marker\n");
+  }
+  const receipt = `${JSON.stringify({
+    schemaVersion: 1,
+    generatedBy: "scripts/run-ai-evidence-command.mjs",
+    taskId: "SELECTOR-BINDING-SMOKE",
+    roleRunId: "verify-selector-1",
+    sessionId: "session-verify-selector-1",
+    testId: "TEST-SELECTOR-01",
+    candidateMode: "COMMIT",
+    candidateIdentity: "candidate-selector-1",
+    command: ["node", "--test", "scripts/tests/example-frozen-suite.test.mjs"],
+    observedSelectors: options.receiptSelectors ?? [selector],
+    exitCode: 0,
+    result: "PASS",
+    candidateUnchanged: true,
+    startedAt: "2026-08-01T00:00:21Z",
+    finishedAt: "2026-08-01T00:00:22Z"
+  }, null, 2)}\n`;
+  await mkdir(path.join(directory, "artifacts"), { recursive: true });
+  await writeFile(path.join(directory, "artifacts", "receipt-selector-01.json"), receipt);
+  return {
+    taskId: "SELECTOR-BINDING-SMOKE",
+    lane: "L2",
+    lifecycleState: "VERIFIED",
+    contract: {
+      testInventory: [{
+        testId: "TEST-SELECTOR-01", acIds: ["AC-01"], kind: "AUTOMATION", required: true,
+        sourcePath: sourceRel, selector
+      }]
+    },
+    candidate: { mode: "COMMIT" },
+    roleRuns: [{
+      roleRunId: "verify-selector-1", sessionId: "session-verify-selector-1",
+      startedAt: "2026-08-01T00:00:20Z", finishedAt: "2026-08-01T00:00:25Z",
+      artifactAccepted: false, runtimeReceiptPath: "", dispatchReceiptPath: ""
+    }],
+    review: {},
+    verification: {},
+    testEvidence: [{
+      testId: "TEST-SELECTOR-01", candidateIdentity: "candidate-selector-1",
+      executedByRoleRunId: "verify-selector-1", result: "PASS", exitCode: 0,
+      receiptPath: "artifacts/receipt-selector-01.json",
+      receiptSha256: createHash("sha256").update(receipt).digest("hex"),
+      observedSelectors: [selector]
+    }],
+    evidence: []
+  };
+}
+
+test("file validation accepts a verified test source that omits the frozen selector string", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-selector-binding-"));
+  try {
+    const control = await writeSelectorBindingFixture(directory);
+    assert.deepEqual(await validateTaskControlFiles(control, directory), []);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("file validation still requires every frozen test source file to exist", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-selector-missing-"));
+  try {
+    const control = await writeSelectorBindingFixture(directory, { writeSource: false });
+    const errors = await validateTaskControlFiles(control, directory);
+    assert.match(errors.join("\n"), /TEST-SELECTOR-01 frozen test source is unavailable/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("selector binding stays enforced through receipts and observedSelectors", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "qta-selector-receipt-"));
+  try {
+    const control = await writeSelectorBindingFixture(directory, { receiptSelectors: ["unrelated-selector"] });
+    assert.match((await validateTaskControlFiles(control, directory)).join("\n"),
+      /receipt command\/selectors do not match the control ledger/);
+
+    const ledger = validVerifiedControl();
+    ledger.testEvidence[0].observedSelectors = ["unrelated-selector"];
+    assert.match(validateTaskControl(ledger).errors.join("\n"),
+      /TEST-STATIC-01.*missing passing machine receipt/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("file validation rejects drift from a frozen SNAPSHOT manifest", async () => {

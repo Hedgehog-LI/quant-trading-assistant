@@ -32,7 +32,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * AC-06 聚焦测试（冻结五用例，TEST-06）。八检查族结构化断言（REC-8）、VWAP 单位异常、
  * 跨源重复与 Provider 混用 FAIL、时点穿越标记、以及嵌套 MockMvc 证明 analyze/report 零外联
  * （PublicMarketDataClient 为 fail-if-invoked 桩）。零联网，事务回滚。
- * // frozen-selector: ./mvnw -q test -Dtest=Mr0PocQualityServiceTest (5 methods incl. nested analyzeAndReportDoNotInvokePublicClient)
  */
 @SpringBootTest
 @AutoConfigureMockMvc

@@ -81,4 +81,3 @@
 - MR-1 生产 Provider 选型（覆盖率、稳定性、授权、口径四维比较）须在 MR-1 前另立 ADR 决定；实现者不得把腾讯/新浪/搜狐或任何其他口径静默混用（PRD §18 IMPLEMENTATION_GATE L566）。
 - Tushare `NOT_VERIFIED` 与 Longbridge `NOT_RETESTED` 的维度在 MR-1 输入边界中按阻断处理（见任务 AC-08 交付物）。
 - 禁止事项继承契约：不打印任何密钥或 `.env` 内容；不凭文档描述冒充真实探针结果。
-<!-- frozen-selector: grep status markers and TUSHARE/LONGBRIDGE/TENCENT_PUBLIC/SINA_PUBLIC/SOHU_PUBLIC rows -> >=5 each -->

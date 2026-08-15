@@ -28,7 +28,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * AC-05 聚焦测试（冻结七用例，TEST-05）。数据经直接 SQL 构造（H2，事务回滚），零联网；
  * Mr0PocAnalysisService 仅依赖只读 mapper，PublicMarketDataClient 零参与。窗口与公式断言
  * 全部对照 docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md 冻结值（AMD-3）。
- * // frozen-selector: ./mvnw -q test -Dtest=Mr0PocAnalysisServiceTest (7 methods: marketBreadthMatchesDictionaryFormulas, industryTurnoverShareSumsWithinCoverage, moneyFlowIndustryDeviationIsReported, analysisBlocksWhenWarmupInsufficient, volatilityAndLiquidityProxyMatchDictionaryFormulas, everyAnalysisMetricCarriesSingleProviderAttribution, analysisRereadsStorageEachCall)
  */
 @SpringBootTest
 @ActiveProfiles("test")

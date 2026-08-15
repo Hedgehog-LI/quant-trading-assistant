@@ -451,4 +451,3 @@ vwap 通常落到 [low,high] 之外，可被检出。
 | 价格冲击代理分位 | M-21 |
 | 数据覆盖率 | M-22（含 coverageGap 冻结口径） |
 | 陈旧度 | M-23 |
-<!-- frozen-selector: grep -c '^### M-' docs/features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md -> >=15 -->

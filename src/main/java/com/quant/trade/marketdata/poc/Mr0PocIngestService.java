@@ -52,6 +52,7 @@ public class Mr0PocIngestService {
     private final PublicMarketDataClient client;
     private final Mr0PocMapper mr0PocMapper;
     private final StockBasicRegistrationManager stockBasicRegistrationManager;
+    private final Mr0PocIngestGate ingestGate;
 
     /** mr0_universe_snapshot 写入行（换算后单位：市值元、换手率小数）。 */
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
@@ -127,8 +128,18 @@ public class Mr0PocIngestService {
         private String canonicalSymbol, stage, reason;
     }
 
-    /** 执行一次完整导入并返回汇总（单 symbol 失败记录后继续）。 */
+    /**
+     * 执行一次完整导入并返回汇总（单 symbol 失败记录后继续）。入口双层防御（AC-02/AC-03）：
+     * 先经 {@link Mr0PocIngestGate} 再校验开关+恰 local profile（防绕过 controller 直调），
+     * 再应用 AMD-001 入参边界；任一拒绝发生在任何 client 交互之前。
+     */
     public IngestResult ingest(IngestCommand command) {
+        ingestGate.checkIngestAllowed();
+        if (command == null) {
+            command = IngestCommand.builder().build();
+        }
+        Mr0PocParamValidator.validateIngestCommand(command.getWarmupStart(), command.getAnalysisStart(),
+                command.getAnalysisEnd(), command.getSampleSize());
         LocalDate asOfDate = command.getAsOfDate() != null ? command.getAsOfDate() : LocalDate.now();
         LocalDateTime fetchedAt = command.getFetchedAt() != null ? command.getFetchedAt() : LocalDateTime.now();
         IngestResult result = IngestResult.builder().build();

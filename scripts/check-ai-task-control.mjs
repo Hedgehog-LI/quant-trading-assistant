@@ -440,6 +440,23 @@ export function validateTaskControl(control) {
     }
   });
 
+  // AC-05 / AMD-002: reviewer→verifier strict temporal ordering, anchored only to control
+  // fields. Equal timestamps are legal (verifier may start the second the reviewer finishes).
+  // Comparison is scoped to the same candidate generation so multi-generation repairs never
+  // cross-compare; a missing same-generation reviewer is already rejected by the REVIEW_CLEAR
+  // rules above and is not duplicated here (L0 omits review by design).
+  for (const verifierRun of roleRuns.filter((run) => run?.role === "FINAL_VERIFIER" && roleRunAccepted(run))) {
+    const verifierStartedAt = parsedTimestamp(verifierRun.startedAt);
+    for (const reviewerRun of roleRuns.filter((run) => run?.role === "CODE_REVIEWER"
+      && run?.generation === verifierRun?.generation && roleRunAccepted(run))) {
+      const reviewerFinishedAt = parsedTimestamp(reviewerRun.finishedAt);
+      if (Number.isFinite(verifierStartedAt) && Number.isFinite(reviewerFinishedAt)
+          && verifierStartedAt < reviewerFinishedAt) {
+        errors.push(`final verifier ${verifierRun.roleRunId} started before same-generation reviewer ${reviewerRun.roleRunId} finished`);
+      }
+    }
+  }
+
   const candidate = control?.candidate ?? {};
   const expectedGeneration = (budget.repairRound ?? 0) + 1;
   const candidateMustRemainEmpty = [
@@ -771,8 +788,63 @@ async function validateDispatchReceipt(root, control, run, errors) {
   }
 }
 
-export async function validateTaskControlFiles(control, root = process.cwd()) {
+// AC-05 / AMD-002: the g-th REVIEW_CLEAR formation precedes the generation-g verifier.
+// Indexing by generation keeps gen-1 verifiers from being compared against a later
+// generation's REVIEW_CLEAR transition in multi-repair histories.
+function reviewClearTransitionAt(control, generation) {
+  if (!Number.isInteger(generation) || generation < 1) return null;
+  const occurrences = (Array.isArray(control?.transitionHistory) ? control.transitionHistory : [])
+    .filter((transition) => transition?.to === "REVIEW_CLEAR");
+  const parsed = parsedTimestamp(occurrences[generation - 1]?.at);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+// AC-05 / AMD-002: verifier dispatch receipts must not predate REVIEW_CLEAR formation, and
+// must not predate the same-generation reviewer's outcome receipt when that outcome carries
+// an observedAt. Missing/untimestamped reviewer outcomes degrade to a warning because the
+// Hook-managed outcome file is outside this validator's write scope.
+async function validateVerifierDispatchOrdering(root, control, errors, warnings) {
+  const notify = Array.isArray(warnings) ? (message) => warnings.push(message) : () => {};
+  const roleRuns = Array.isArray(control?.roleRuns) ? control.roleRuns : [];
+  for (const verifierRun of roleRuns) {
+    if (verifierRun?.role !== "FINAL_VERIFIER" || !roleRunAccepted(verifierRun)
+        || !present(verifierRun.dispatchReceiptPath)) continue;
+    let receipt;
+    try {
+      receipt = JSON.parse(await readFile(governanceReceiptPath(root, verifierRun.dispatchReceiptPath), "utf8"));
+    } catch {
+      continue; // receipt availability and identity are already enforced per role run
+    }
+    const dispatchObservedAt = parsedTimestamp(receipt?.observedAt);
+    if (!Number.isFinite(dispatchObservedAt)) continue;
+    const reviewClearAt = reviewClearTransitionAt(control, verifierRun.generation);
+    if (reviewClearAt !== null && dispatchObservedAt < reviewClearAt) {
+      errors.push(`final verifier ${verifierRun.roleRunId} dispatch precedes REVIEW_CLEAR formation`);
+    }
+    for (const reviewerRun of roleRuns.filter((run) => run?.role === "CODE_REVIEWER"
+      && run?.generation === verifierRun?.generation && roleRunAccepted(run)
+      && present(run?.dispatchReceiptPath))) {
+      const outcomeRel = reviewerRun.dispatchReceiptPath.replaceAll("\\", "/").replace(/\.json$/, ".outcome.json");
+      let outcome = null;
+      try {
+        outcome = JSON.parse(await readFile(governanceReceiptPath(root, outcomeRel), "utf8"));
+      } catch {
+        // fall through: a missing outcome receipt degrades to a warning below
+      }
+      const outcomeObservedAt = parsedTimestamp(outcome?.observedAt);
+      if (!Number.isFinite(outcomeObservedAt)) {
+        notify(`reviewer ${reviewerRun.roleRunId} outcome receipt is missing or untimestamped; `
+          + `cross-check against final verifier ${verifierRun.roleRunId} dispatch degraded to advisory`);
+      } else if (dispatchObservedAt < outcomeObservedAt) {
+        errors.push(`final verifier ${verifierRun.roleRunId} dispatch precedes reviewer ${reviewerRun.roleRunId} outcome receipt`);
+      }
+    }
+  }
+}
+
+export async function validateTaskControlFiles(control, root = process.cwd(), warnings = null) {
   const errors = [];
+  const fileWarnings = Array.isArray(warnings) ? warnings : null;
   await validateArtifact(root, control.contract?.path, control.contract?.sha256, "contract", errors);
   if (atLeast(control.lifecycleState, "CANDIDATE_FROZEN")) {
     await validateArtifact(root, control.candidate?.diffArtifactPath,
@@ -835,6 +907,7 @@ export async function validateTaskControlFiles(control, root = process.cwd()) {
     await validateRuntimeReceipt(root, control, run, errors);
     await validateDispatchReceipt(root, control, run, errors);
   }
+  await validateVerifierDispatchOrdering(root, control, errors, fileWarnings);
   if (atLeast(control.lifecycleState, "REVIEW_CLEAR")) {
     await validateArtifact(root, control.architectureGate?.reportPath,
       control.architectureGate?.reportSha256, "architecture gate report", errors);
@@ -871,11 +944,12 @@ export async function validateTaskControlFiles(control, root = process.cwd()) {
       await validateArtifact(root, item.receiptPath, item.receiptSha256, `test receipt ${item.testId}`, errors);
       const testCase = inventoryById.get(item.testId);
       if (testCase) {
+        // F-005 fix: a frozen selector binds the control ledger to verifier receipts
+        // (observedSelectors) and to the receipt command itself, not to business/test source
+        // content. Only the existence of the declared sourcePath is checked here; requiring
+        // the selector string to be embedded in sources forced governance-noise comments.
         try {
-          const source = await readFile(path.resolve(root, testCase.sourcePath), "utf8");
-          if (!source.includes(testCase.selector)) {
-            errors.push(`${item.testId} selector is absent from frozen test source: ${testCase.selector}`);
-          }
+          await readFile(path.resolve(root, testCase.sourcePath), "utf8");
         } catch (error) {
           errors.push(`${item.testId} frozen test source is unavailable (${error.code ?? error.message})`);
         }
@@ -1120,7 +1194,7 @@ async function main() {
   const schema = JSON.parse(await readFile(path.join(root, ".agents", "schemas", "qta-task-control.schema.json"), "utf8"));
   const result = validateTaskControl(control);
   result.errors.unshift(...validateJsonSchema(control, schema));
-  result.errors.push(...await validateTaskControlFiles(control, root));
+  result.errors.push(...await validateTaskControlFiles(control, root, result.warnings));
   result.errors.push(...await validateControlAnchor(control, root));
   for (const warning of result.warnings) console.warn(`WARN: ${warning}`);
   if (result.errors.length > 0) {
