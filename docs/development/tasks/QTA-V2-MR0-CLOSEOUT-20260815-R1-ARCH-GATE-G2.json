@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/check-ai-architecture.mjs",
+  "generatedAt": "2026-08-15T17:42:19.780Z",
+  "candidateIdentity": "84094bbe02d0c76fcb9f8f1d02b03a7e9eb013e8",
+  "base": "2a7b45188d537a4136e8b6ab19878e54b35bf58e",
+  "manifestPath": "",
+  "architectureReviewCount": 2,
+  "files": [
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisMapper.java",
+      "lines": 37,
+      "methods": 0,
+      "longestMethod": 0,
+      "methodLengths": [],
+      "dependencies": 5,
+      "responsibilities": [
+        "persistence",
+        "provider"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocAnalysisService.java",
+      "lines": 363,
+      "methods": 16,
+      "longestMethod": 60,
+      "methodLengths": [
+        {
+          "name": "analyze",
+          "lines": 60
+        },
+        {
+          "name": "breadth",
+          "lines": 32
+        },
+        {
+          "name": "industryTurnover",
+          "lines": 39
+        },
+        {
+          "name": "volatility",
+          "lines": 20
+        },
+        {
+          "name": "liquidity",
+          "lines": 27
+        },
+        {
+          "name": "moneyFacts",
+          "lines": 54
+        },
+        {
+          "name": "computeContentHash",
+          "lines": 11
+        },
+        {
+          "name": "canonicalize",
+          "lines": 15
+        },
+        {
+          "name": "attributions",
+          "lines": 10
+        },
+        {
+          "name": "realizedVol20",
+          "lines": 8
+        },
+        {
+          "name": "ratio",
+          "lines": 1
+        },
+        {
+          "name": "percentile",
+          "lines": 7
+        },
+        {
+          "name": "modeOf",
+          "lines": 5
+        },
+        {
+          "name": "setScale",
+          "lines": 1
+        },
+        {
+          "name": "setScale10",
+          "lines": 1
+        },
+        {
+          "name": "sha256",
+          "lines": 4
+        }
+      ],
+      "dependencies": 7,
+      "responsibilities": [
+        "persistence",
+        "search-scoring"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocController.java",
+      "lines": 73,
+      "methods": 6,
+      "longestMethod": 10,
+      "methodLengths": [
+        {
+          "name": "ingest",
+          "lines": 7
+        },
+        {
+          "name": "analyze",
+          "lines": 5
+        },
+        {
+          "name": "report",
+          "lines": 10
+        },
+        {
+          "name": "handleTypeMismatch",
+          "lines": 4
+        },
+        {
+          "name": "handleMessageNotReadable",
+          "lines": 4
+        },
+        {
+          "name": "command",
+          "lines": 4
+        }
+      ],
+      "dependencies": 4,
+      "responsibilities": [
+        "http",
+        "provider"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocIngestGate.java",
+      "lines": 30,
+      "methods": 3,
+      "longestMethod": 9,
+      "methodLengths": [
+        {
+          "name": "Mr0PocIngestGate",
+          "lines": 4
+        },
+        {
+          "name": "checkIngestAllowed",
+          "lines": 9
+        },
+        {
+          "name": "isExactlyLocalProfile",
+          "lines": 4
+        }
+      ],
+      "dependencies": 1,
+      "responsibilities": [
+        "provider"
+      ],
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocIngestService.java",
+      "lines": 292,
+      "methods": 13,
+      "longestMethod": 51,
+      "methodLengths": [
+        {
+          "name": "accumulate",
+          "lines": 8
+        },
+        {
+          "name": "addSkipped",
+          "lines": 3
+        },
+        {
+          "name": "ingest",
+          "lines": 51
+        },
+        {
+          "name": "fetchUniverseAll",
+          "lines": 11
+        },
+        {
+          "name": "upsertUniverse",
+          "lines": 18
+        },
+        {
+          "name": "fetchMemberships",
+          "lines": 39
+        },
+        {
+          "name": "ingestDailyBars",
+          "lines": 3
+        },
+        {
+          "name": "ingestDailyBars",
+          "lines": 31
+        },
+        {
+          "name": "ingestMoneyFlow",
+          "lines": 21
+        },
+        {
+          "name": "vwapWithinRange",
+          "lines": 8
+        },
+        {
+          "name": "multiplyWan",
+          "lines": 3
+        },
+        {
+          "name": "percentToDecimal",
+          "lines": 3
+        },
+        {
+          "name": "reason",
+          "lines": 4
+        }
+      ],
+      "dependencies": 12,
+      "responsibilities": [
+        "persistence",
+        "provider",
+        "search-scoring"
+      ],
+      "warnings": [
+        "direct dependencies 12 > 10"
+      ],
+      "errors": []
+    },
+    {
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocParamValidator.java",
+      "lines": 44,
+      "methods": 5,
+      "longestMethod": 12,
+      "methodLengths": [
+        {
+          "name": "Mr0PocParamValidator",
+          "lines": 2
+        },
+        {
+          "name": "validateAnalysisWindow",
+          "lines": 12
+        },
+        {
+          "name": "validateSampleSize",
+          "lines": 6
+        },
+        {
+          "name": "validateIngestCommand",
+          "lines": 8
+        },
+        {
+          "name": "requireNonNull",
+          "lines": 5
+        }
+      ],
+      "dependencies": 0,
+      "responsibilities": [
+        "provider"
+      ],
+      "warnings": [],
+      "errors": []
+    }
+  ],
+  "additions": 191,
+  "warnings": [
+    {
+      "id": "ARCH-W-001",
+      "file": "src/main/java/com/quant/trade/marketdata/poc/Mr0PocIngestService.java",
+      "message": "direct dependencies 12 > 10"
+    }
+  ],
+  "errorCount": 0,
+  "errors": [],
+  "status": "PASS",
+  "exitCode": 0
+}
