@@ -397,6 +397,20 @@
 - [ ] 全量真实回补执行（2021 起全 A；本轮仅证明执行能力）；公共源生产化需另立 ADR。
 - [ ] 服务器部署验收：NOT_DEPLOYED。
 
+### QTA V2-1 修复收口 R1 已完成（2026-08-16，SELF_CHECKED 待独立验收）
+
+- [x] Repair Addendum R1 冻结（`QTA-V2-DATA-FOUNDATION-V21-REPAIR-R1-ADDENDUM.md`）；V24 未改动，数据库修复全部入 V25。
+- [x] 二维分片：`mdf_backfill_task_symbol`（uk task+symbol）承载全 A 范围（≥6000 可创建，上限 10000 输入保护）；Provider 安全窗（腾讯 365 天防 640 截断）；chunk=证券组×日期窗、start/end=实际区间；5000+ 证券×2021 至今纯 stub 分片测试。
+- [x] QUEUED 持久化后台执行：POST run 状态转换快速返回（Docker 实测 0.106s）；worker @Scheduled+可配线程池；claimQueued 条件认领双 worker 单胜；逐证券暂停检查；QUEUED/RUNNING 均可暂停；终态/计数从 chunk 事实确定性汇总（残留 RUNNING chunk→重入队不判 SUCCEEDED）。
+- [x] 崩溃恢复：启动+定时；claim 超时 RUNNING→QUEUED、RUNNING chunk→PENDING（attempts 保留、RECOVERED_STALE_RUNNING 可追溯）；重复恢复幂等；fresh claim 不误伤。
+- [x] 严格质量门禁：阈值 0.90（`qta.data-foundation.publish-coverage-threshold`）；16 族 manifest 域检查；总体覆盖/首末边界低于阈值 FAIL（六年不完整、尾部截断、无日历必拒）；期望=日历交易日×范围证券（stock_basic 上市日缺失显式假设、DELISTED 剔除）。
+- [x] Provider 混用修复：质量只检版本 manifest 域；腾讯/Longbridge/CSV 同窗合法共存不 FAIL；版本内混入才 FAIL（测试覆盖）。
+- [x] 版本血缘：V25 manifest（双 uk+row_hash 冻结公式+来源追溯）；发布前冻结 content hash；漂移检测→DRIFTED 阻断发布；released/VO 返回 contentHash/manifestRowCount/lineageStatus；不新建权威日 K 表。
+- [x] CSV×版本打通：imports 增 datasetVersionId；DAILY_BAR 必绑导入类版本（口径不符拒绝、市场前缀校验）；导入行入 manifest；重复文件幂等不变。
+- [x] 默认数据集与兼容：启动幂等初始化 CN_DAILY_BAR（Docker 实证）；接口路径不变；BackfillTaskVO 兼容 QUEUED；DatasetVersionVO 血缘字段向后兼容；GET task/chunks 供轮询。
+- [x] 验证：后端 **644 tests / 0 failures / 0 errors / 1 skipped** + package + `git diff --check` + 架构门禁 errors=0；Docker：Flyway 25、默认数据集自初始化、两窗真实回补 485 行无截断、QUEUED 快返→SUCCEEDED 轮询、暂停/继续各一次（`RUNTIME-VERIFICATION-R1.md`）。
+- [ ] Codex 独立验收（本会话只写 SELF_CHECKED）；全市场真实回补未执行；服务器 NOT_DEPLOYED。
+
 ## 8. 暂缓: 图片识别导入
 
 - [ ] 新增 AI import task 设计。

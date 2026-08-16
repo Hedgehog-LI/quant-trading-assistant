@@ -27,7 +27,7 @@ class FoundationArchitectureTest {
     private static final Path MAIN_JAVA = Paths.get("src/main/java/com/quant/trade/marketdata/foundation");
     private static final Path MIGRATIONS = Paths.get("src/main/resources/db/migration");
 
-    /** 冻结的 migration 文件清单（只允许新增 V25+，不得改名/删除既有文件）。 */
+    /** 冻结的 migration 文件清单（R1 已新增 V25；此后只允许新增 V26+，不得改名/删除既有文件）。 */
     private static final Set<String> FROZEN_MIGRATIONS = Set.of(
             "V1__init_schema.sql",
             "V2__create_today_mvp_tables.sql",
@@ -52,7 +52,8 @@ class FoundationArchitectureTest {
             "V21__add_sector_relative_strength_and_rotation.sql",
             "V22__strengthen_sector_analytics_publication_scope.sql",
             "V23__add_mr0_poc_tables.sql",
-            "V24__add_data_foundation_tables.sql");
+            "V24__add_data_foundation_tables.sql",
+            "V25__data_foundation_backfill_scale_and_lineage.sql");
 
     private static String readSource(Path path) {
         try {

@@ -21,6 +21,9 @@ public class StubHistoricalBarProvider implements HistoricalBarProvider {
 
     public static final String PROVIDER_CODE = "STUB_TEST";
 
+    /** 测试桩安全窗（与腾讯一致的 365 天，供分片规划断言引用）。 */
+    public static final int INSTANCE_SAFE_WINDOW = 365;
+
     private final AtomicInteger fetchCount = new AtomicInteger();
     private final Map<String, List<ProviderDailyBar>> barsBySymbol = new ConcurrentHashMap<>();
     private final Set<String> failingSymbols = ConcurrentHashMap.newKeySet();
@@ -33,6 +36,11 @@ public class StubHistoricalBarProvider implements HistoricalBarProvider {
     @Override
     public String supportedAdjustType() {
         return "NONE";
+    }
+
+    @Override
+    public int safeRequestWindowDays() {
+        return INSTANCE_SAFE_WINDOW;
     }
 
     @Override

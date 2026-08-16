@@ -14,7 +14,9 @@ final class FoundationTestTables {
 
     static void cleanAll(JdbcTemplate jdbcTemplate) {
         jdbcTemplate.update("DELETE FROM mdf_backfill_chunk");
+        jdbcTemplate.update("DELETE FROM mdf_backfill_task_symbol");
         jdbcTemplate.update("DELETE FROM mdf_backfill_task");
+        jdbcTemplate.update("DELETE FROM mdf_dataset_version_manifest");
         jdbcTemplate.update("DELETE FROM mdf_coverage_watermark");
         jdbcTemplate.update("DELETE FROM mdf_quality_result");
         jdbcTemplate.update("DELETE FROM mdf_dataset_version");

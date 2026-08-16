@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-08-16 — QTA V2-1 修复收口 R1（二维分片/QUEUED 后台执行/崩溃恢复/严格门禁/血缘，SELF_CHECKED）
+
+- **目标**：对 V2-1 候选做定点修复（Repair Addendum R1）：全 A 长窗口二维分片、持久化后台执行与崩溃恢复、严格质量门禁、Provider 混用误判修复、版本血缘与内容身份、CSV×版本打通、默认数据集初始化。保留 V24/解析器/Provider/Controller 与既有测试可复用部分；不改前端、不改 V24。
+- **数据模型（V25）**：`mdf_backfill_task_symbol`（uk task+symbol）+ `mdf_dataset_version_manifest`（bar_id/业务键双 uk、row_hash、来源 task/batch）+ dataset_version 血缘三列（content_hash/manifest_row_count/lineage_status，updateLineage null-COALESCE 保冻结身份）+ import_batch.dataset_version_id + backfill_task.queued_at。
+- **引擎**：二维分片（DataBackfillService.splitWindows×证券组；Provider.safeRequestWindowDays，腾讯 365）；run→markQueued 快返；BackfillWorkerService（claimQueued 条件认领、逐证券暂停检查、事实落库→VersionLineageService.recordBars 入 manifest、终态 chunk 事实汇总、非终态残留重入队）；BackfillRecoveryService（stale RUNNING 回队 + QUEUED 残留 RUNNING 分片复位，幂等）；DataFoundationBackgroundRunner（启动初始化默认数据集+定时轮询/恢复，测试经属性关闭）；FoundationWorkerConfig（可配线程池）。
+- **质量/发布**：16 族全部 manifest 域（新增 OVERALL_COVERAGE_GATE/BOUNDARY_COVERAGE/LINEAGE_DRIFT）；期望=日历交易日×范围证券（上市日缺失显式假设）；阈值 0.90 可配；发布前 freeze、已冻结版本漂移校验→DRIFTED 拒发；released/VO 暴露血缘字段。
+- **验证**：后端全量 **644 tests / 0/0/1**（foundation 56：新增 BackfillScaleChunkingTest 2、QueuedExecutionAndRecoveryTest 8、StrictGateCoexistAndLineageTest 6，既有测试适配 QUEUED/版本绑定）+ package + `git diff --check` + 架构门禁 errors=0（review-count 2=G1+R1 边界自检，如实记录）；Docker 真库：Flyway 25、CN_DAILY_BAR 启动自初始化、SH.600519×2021-2022 两窗真实回补 485 行（243+242，无 640 截断）、POST run 0.106s 返回 QUEUED、轮询至 SUCCEEDED、暂停/继续各一次。
+- **遗留**：SELF_CHECKED 待 Codex 独立验收；全市场真实回补未执行；服务器 NOT_DEPLOYED；DataQualityService 395 行/36 方法等 WARN 技术债留档。
+- **关联**：`tasks/QTA-V2-DATA-FOUNDATION-V21-{REPAIR-R1-ADDENDUM,RUNTIME-VERIFICATION-R1}.md`、`api/MARKET_DATA_API.md` §7（R1 更新）、`DATABASE_DESIGN.md` V25 节。
+
 ## 2026-08-16 — QTA V2-1 A 股历史数据底座（完整候选，AUTOMATION+RUNTIME 本地验证通过，待独立验收）
 
 - **目标**：为 MR-2 建设可持续使用的 A 股历史数据底座：正式数据模型、历史回补闭环、无凭据 CSV 导入、质量与发布门禁、REST API、前端数据中心操作闭环。不开发 MR-2 页面、不重写采集引擎、不建资金流正式表（凭据阻断）。

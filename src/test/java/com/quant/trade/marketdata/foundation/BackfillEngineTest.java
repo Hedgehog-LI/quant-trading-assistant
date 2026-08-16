@@ -5,7 +5,9 @@ import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.foundation.dao.MdfBackfillTaskMapper;
 import com.quant.trade.marketdata.foundation.model.MdfBackfillChunkDO;
+import com.quant.trade.marketdata.foundation.model.MdfBackfillTaskDO;
 import com.quant.trade.marketdata.foundation.model.MdfDatasetDO;
+import com.quant.trade.marketdata.foundation.service.BackfillWorkerService;
 import com.quant.trade.marketdata.foundation.service.DataBackfillService;
 import com.quant.trade.marketdata.foundation.service.DataFoundationDatasetService;
 import org.junit.jupiter.api.AfterEach;
@@ -19,7 +21,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -29,9 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * T03/T04/T05/T06：回补引擎（契约 AC-02）。
- * chunk 拆分边界与创建校验、完整执行计数、幂等重跑（ODKU）、断点续跑（终态分片跳过）、
- * 失败分片重试（SUCCEEDED 分片不重跑）、claim 并发防重与同 scope 防重。
+ * T03/T04/T05/T06（R1 异步版）：回补引擎。
+ * POST run → QUEUED 快速返回，worker 认领执行；chunk 拆分边界与创建校验、完整执行计数、
+ * 幂等重跑（ODKU）、断点续跑（终态分片跳过）、失败分片重试（SUCCEEDED 分片不重跑）、
+ * 同 scope 防重与状态机守卫。
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -45,6 +47,8 @@ class BackfillEngineTest {
     private DataFoundationDatasetService datasetService;
     @Autowired
     private DataBackfillService backfillService;
+    @Autowired
+    private BackfillWorkerService workerService;
     @Autowired
     private MdfBackfillTaskMapper taskMapper;
     @Autowired
@@ -72,7 +76,8 @@ class BackfillEngineTest {
 
     private List<String> chunkSymbols(MdfBackfillChunkDO chunk) {
         try {
-            return objectMapper.readValue(chunk.getSymbolsJson(), new com.fasterxml.jackson.core.type.TypeReference<List<String>>() { });
+            return objectMapper.readValue(chunk.getSymbolsJson(),
+                    new com.fasterxml.jackson.core.type.TypeReference<List<String>>() { });
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
         }
@@ -89,13 +94,22 @@ class BackfillEngineTest {
         return assertThrows(BusinessException.class, runnable::run).getErrorCode().getCode();
     }
 
+    /** R1 异步链路：run 快速返回 QUEUED（或已认领 RUNNING）→ 驱动 worker 至终态。 */
+    private MdfBackfillTaskDO runAsync(long taskId) {
+        MdfBackfillTaskDO queued = backfillService.run(taskId);
+        assertTrue("QUEUED".equals(queued.getStatus()) || "RUNNING".equals(queued.getStatus()),
+                "POST run 必须快速返回 QUEUED/RUNNING，实际=" + queued.getStatus());
+        workerService.claimAndExecuteOne();
+        return taskMapper.selectById(taskId);
+    }
+
     // ---------------------------------------------------------------- T03 chunk 拆分与创建校验
 
     @Test
     void chunkBoundariesAndCreateValidation() {
         createStubDataset();
 
-        // 7 symbols / chunkSize=3 → 3/3/1
+        // 7 symbols / chunkSize=3 → 3/3/1（窗口 5 天 < stub 安全窗 365 → 单日期窗）
         var task = backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                 "1D", "NONE", START, END, symbols(7), 3);
         List<MdfBackfillChunkDO> chunks = backfillService.listChunks(task.getId());
@@ -116,7 +130,7 @@ class BackfillEngineTest {
         assertEquals(ErrorCodeEnum.VALIDATION_ERROR.getCode(),
                 errorCode(() -> backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                         "1D", "NONE", START, END, symbols(7), 501)));
-        List<String> tooMany = symbols(2001);
+        List<String> tooMany = symbols(10_001);
         assertEquals(ErrorCodeEnum.VALIDATION_ERROR.getCode(),
                 errorCode(() -> backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                         "1D", "NONE", START, END, tooMany, 50)));
@@ -164,7 +178,7 @@ class BackfillEngineTest {
 
         var task = backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                 "1D", "NONE", START, END, List.of("SH.600519", "SZ.000001"), 50);
-        var done = backfillService.run(task.getId());
+        var done = runAsync(task.getId());
 
         assertEquals("SUCCEEDED", done.getStatus());
         assertEquals(2, done.getPlannedCount());
@@ -176,6 +190,9 @@ class BackfillEngineTest {
         assertEquals(6L, barRows());
         assertEquals(2, stubProvider.fetchCount());
         assertNull(done.getLastErrorCode());
+        assertEquals(6L, jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM mdf_dataset_version_manifest WHERE dataset_version_id = ?",
+                Long.class, task.getDatasetVersionId()), "回补事实已入版本 manifest（血缘）");
     }
 
     @Test
@@ -185,12 +202,12 @@ class BackfillEngineTest {
 
         var first = backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                 "1D", "NONE", START, END, List.of("SH.600519"), 50);
-        assertEquals("SUCCEEDED", backfillService.run(first.getId()).getStatus());
+        assertEquals("SUCCEEDED", runAsync(first.getId()).getStatus());
 
         // 首任务终态后允许同 scope 再建任务（防重只针对活跃任务）
         var second = backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                 "1D", "NONE", START, END, List.of("SH.600519"), 50);
-        var rerun = backfillService.run(second.getId());
+        var rerun = runAsync(second.getId());
 
         assertEquals("SUCCEEDED", rerun.getStatus());
         assertEquals(0L, rerun.getInsertedCount(), "ODKU 幂等：重复执行不得新增行");
@@ -214,7 +231,7 @@ class BackfillEngineTest {
                         + "WHERE task_id = ? AND chunk_index = 0", task.getId());
         jdbcTemplate.update("UPDATE mdf_backfill_task SET status = 'PAUSED' WHERE id = ?", task.getId());
 
-        var resumed = backfillService.run(task.getId());
+        var resumed = runAsync(task.getId());
 
         assertEquals("SUCCEEDED", resumed.getStatus());
         assertEquals(1, stubProvider.fetchCount(), "只执行 PENDING 分片（SUCCEEDED 分片不重拉）");
@@ -241,7 +258,7 @@ class BackfillEngineTest {
 
         var task = backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                 "1D", "NONE", START, END, three, 2);
-        var partial = backfillService.run(task.getId());
+        var partial = runAsync(task.getId());
 
         assertEquals("PARTIAL_FAILED", partial.getStatus());
         assertEquals(1, partial.getFailCount());
@@ -256,7 +273,9 @@ class BackfillEngineTest {
         assertEquals("MARKET_DATA_PROVIDER_TIMEOUT", chunks.get(1).getLastErrorCode());
 
         stubProvider.clearFailing();
-        var retried = backfillService.retryFailedChunks(task.getId());
+        var queued = backfillService.retryFailedChunks(task.getId());
+        assertEquals("QUEUED", queued.getStatus(), "R1：重试=FAILED→PENDING 后入队，立即返回");
+        var retried = runAsync(task.getId());
 
         assertEquals("SUCCEEDED", retried.getStatus());
         assertEquals(3, retried.getSuccessCount());
@@ -271,7 +290,7 @@ class BackfillEngineTest {
         assertEquals("SUCCEEDED", afterRetry.get(1).getStatus());
     }
 
-    // ---------------------------------------------------------------- T05 并发防重与状态机
+    // ---------------------------------------------------------------- T05 同 scope 防重与状态机守卫
 
     @Test
     void claimGuardsDuplicateRunAndScope() {
@@ -286,12 +305,14 @@ class BackfillEngineTest {
                 errorCode(() -> backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                         "1D", "NONE", START, END, List.of("SH.600519"), 50)));
 
-        // 他人持有 claim（有效未超时）→ run 拒绝
+        // 他人持有 claim（有效未超时）：run 幂等返回 RUNNING（不重复入队、不误报错误；双 worker 互斥见 RecoveryTest）
         LocalDateTime now = LocalDateTime.now();
         assertEquals(1, taskMapper.tryClaim(task.getId(), "holder-token", now, now.minusHours(1)));
         assertEquals("RUNNING", taskMapper.selectById(task.getId()).getStatus());
-        assertEquals(ErrorCodeEnum.DATA_FOUNDATION_BACKFILL_RUNNING.getCode(),
-                errorCode(() -> backfillService.run(task.getId())));
+        assertEquals("RUNNING", backfillService.run(task.getId()).getStatus());
+        // 持有者不释放 claim 时可暂停（QUEUED/RUNNING 均可暂停）
+        backfillService.pause(task.getId());
+        assertEquals("PAUSED", taskMapper.selectById(task.getId()).getStatus());
     }
 
     @Test
@@ -305,9 +326,9 @@ class BackfillEngineTest {
         assertEquals(ErrorCodeEnum.DATA_FOUNDATION_BACKFILL_STATE_INVALID.getCode(),
                 errorCode(() -> backfillService.pause(pending.getId())));
 
-        // 终态任务不允许直接 run / retry（须新建任务走幂等）
-        assertEquals("SUCCEEDED", backfillService.run(pending.getId()).getStatus());
-        assertEquals(ErrorCodeEnum.DATA_FOUNDATION_BACKFILL_RUNNING.getCode(),
+        // 终态任务不允许直接 run / retry / pause
+        assertEquals("SUCCEEDED", runAsync(pending.getId()).getStatus());
+        assertEquals(ErrorCodeEnum.DATA_FOUNDATION_BACKFILL_STATE_INVALID.getCode(),
                 errorCode(() -> backfillService.run(pending.getId())));
         assertEquals(ErrorCodeEnum.DATA_FOUNDATION_BACKFILL_STATE_INVALID.getCode(),
                 errorCode(() -> backfillService.retryFailedChunks(pending.getId())));
@@ -329,7 +350,7 @@ class BackfillEngineTest {
         // 未配置任何日 K：窗口内无数据 → skipped（provider 语义：无数据≠失败）
         var task = backfillService.createTask("STUB_DS", "CN", StubHistoricalBarProvider.PROVIDER_CODE,
                 "1D", "NONE", START, END, List.of("SH.600519"), 50);
-        var done = backfillService.run(task.getId());
+        var done = runAsync(task.getId());
 
         assertEquals("SUCCEEDED", done.getStatus());
         assertEquals(1, done.getSkipCount());

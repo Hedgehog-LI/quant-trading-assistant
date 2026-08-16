@@ -2,7 +2,7 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
-当前已发布 V1-V24，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+当前已发布 V1-V25，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
 
 ## 命名约定
 
@@ -532,6 +532,16 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 - `mdf_backfill_chunk`：分片，`uk(task_id, chunk_index)`；断点=按 chunk 状态续跑（终态跳过）；attempts 保留重试计数；FK→mdf_backfill_task。
 - `mdf_import_batch`：导入批次，`uk(import_kind, file_hash)`=同内容幂等；error_report_json 行级错误（≤50 条）。
 - `mdf_quality_result`：13 族质量检查结果，`uk(dataset_version_id, check_code)`；FAIL 或空数据阻断发布；FK→mdf_dataset_version。
+
+### mdf_* R1 增量（V25，修复收口）
+
+状态：已实现（V25 migration，Repair Addendum R1）。用途：全 A 二维分片范围表 + 版本血缘 manifest + QUEUED 状态支撑 + 导入批次版本关联。
+
+- `mdf_backfill_task_symbol`：任务证券范围规范化，`uk(task_id, canonical_symbol)`（全 A ≥6000 不再塞 task.symbols_json）；FK→mdf_backfill_task。
+- `mdf_dataset_version_manifest`：不可变版本血缘，`uk(dataset_version_id, bar_id)` 与业务键 `uk(dataset_version_id, canonical_symbol, trade_date)` 双保险；`row_hash`=Java 冻结公式 sha256(symbol|date|o|h|l|c|v|a|source|adjust)；`source_type`∈BACKFILL_TASK/IMPORT_BATCH + `source_id` 来源追溯。质量检查基于 manifest 域（同窗其他 Provider 合法共存不参与判定）。
+- `mdf_dataset_version` 新增列：`content_hash`（发布前冻结的内容身份）/ `manifest_row_count` / `lineage_status`（FROZEN/DRIFTED；漂移阻断发布与复现声明，`updateLineage` 对 null 字段 COALESCE 保底不清除冻结身份）。
+- `mdf_import_batch` 新增列：`dataset_version_id`（DAILY_BAR 必绑导入类版本；其余 kind 可空留血缘）。
+- `mdf_backfill_task` 新增列：`queued_at`（状态机增加 QUEUED：PENDING/PAUSED/PARTIAL_FAILED/FAILED→QUEUED→RUNNING；claimQueued 条件认领、claim 超时由 BackfillRecoveryService 回队）。
 
 ### agent_api_audit_log
 

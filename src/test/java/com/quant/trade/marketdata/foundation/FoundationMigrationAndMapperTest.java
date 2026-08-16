@@ -69,15 +69,24 @@ class FoundationMigrationAndMapperTest {
     @Autowired
     private MdfQualityResultMapper qualityResultMapper;
 
+    @org.junit.jupiter.api.BeforeEach
+    @org.junit.jupiter.api.AfterEach
+    void cleanFoundationTables() {
+        // 启动 runner 会幂等初始化默认数据集 CN_DAILY_BAR（R1 §八.1），逐用例清场保证计数断言独立
+        FoundationTestTables.cleanAll(jdbcTemplate);
+    }
+
     @Test
-    void flywayMigratesEmptyDatabaseToV24() {
+    void flywayMigratesEmptyDatabaseToV25() {
         Double maxApplied = jdbcTemplate.queryForObject(
                 "SELECT MAX(CAST(version AS DOUBLE)) FROM flyway_schema_history WHERE success = TRUE", Double.class);
-        assertEquals(24.0, maxApplied, "空库必须迁移到 V24");
+        assertEquals(25.0, maxApplied, "空库必须迁移到 V25");
         // D1：日 K/证券/日历事实复用既有表，不得出现 mdf_ 复制表
         assertEquals(0L, countTable("mdf_daily_bar"), "不得复制 stock_daily_bar 事实（D1）");
-        assertEquals(1L, countTable("mdf_dataset"), "V24 mdf_dataset 必须存在（同时证明 information_schema 检查有效）");
+        assertEquals(1L, countTable("mdf_dataset"), "mdf_dataset 必须存在（同时证明 information_schema 检查有效）");
         assertEquals(1L, countTable("mdf_quality_result"));
+        assertEquals(1L, countTable("mdf_backfill_task_symbol"), "V25 任务证券范围表必须存在");
+        assertEquals(1L, countTable("mdf_dataset_version_manifest"), "V25 版本血缘 manifest 必须存在");
     }
 
     private Long countTable(String table) {

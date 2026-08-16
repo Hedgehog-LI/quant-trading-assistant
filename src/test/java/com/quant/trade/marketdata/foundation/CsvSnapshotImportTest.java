@@ -6,6 +6,7 @@ import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.foundation.dao.MdfIndustryMembershipMapper;
 import com.quant.trade.marketdata.foundation.model.MdfImportBatchDO;
+import com.quant.trade.marketdata.foundation.service.DataFoundationDatasetService;
 import com.quant.trade.marketdata.foundation.service.SnapshotImportService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,6 +38,8 @@ class CsvSnapshotImportTest {
     @Autowired
     private SnapshotImportService importService;
     @Autowired
+    private DataFoundationDatasetService datasetService;
+    @Autowired
     private MdfIndustryMembershipMapper membershipMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -48,6 +52,12 @@ class CsvSnapshotImportTest {
         FoundationTestTables.cleanAll(jdbcTemplate);
     }
 
+    /** R1 §七：DAILY_BAR 导入必绑导入类版本。 */
+    private Long newDailyVersion(String code) {
+        datasetService.createDataset(code, code + " 名称", "CN", "DAILY", "1D", "IMPORT_CSV_DAILY", "NONE", "测试");
+        return datasetService.createVersion(code, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31)).getId();
+    }
+
     private byte[] bytes(String csv) {
         return csv.getBytes(StandardCharsets.UTF_8);
     }
@@ -57,16 +67,16 @@ class CsvSnapshotImportTest {
         return rows == null ? 0 : rows;
     }
 
-    private String errorCode(String kind, String fileName, String csv) {
+    private String errorCode(String kind, Long versionId, String fileName, String csv) {
         return assertThrows(BusinessException.class,
-                () -> importService.importSnapshot(kind, fileName, bytes(csv))).getErrorCode().getCode();
+                () -> importService.importSnapshot(kind, versionId, fileName, bytes(csv))).getErrorCode().getCode();
     }
 
     // ---------------------------------------------------------------- T08 五类合法样例
 
     @Test
     void fiveKindValidSamplesImportCleanly() {
-        MdfImportBatchDO universe = importService.importSnapshot("UNIVERSE_SNAPSHOT", "universe.csv", bytes("""
+        MdfImportBatchDO universe = importService.importSnapshot("UNIVERSE_SNAPSHOT", null, "universe.csv", bytes("""
                 symbol,name,market,total_market_cap,circulating_market_cap,turnover_rate,as_of_date
                 SH.600519,贵州茅台,SH,2000000000000,1000000000000,0.0034,2026-07-01
                 SZ.000001,平安银行,SZ,300000000000,250000000000,0.0052,2026-07-01
@@ -77,7 +87,7 @@ class CsvSnapshotImportTest {
         assertEquals("IMPORT_CSV_UNIVERSE", universe.getProviderCode());
         assertEquals(2, count("stock_basic"), "证券身份登记复用 stock_basic");
 
-        MdfImportBatchDO calendar = importService.importSnapshot("TRADING_CALENDAR", "calendar.csv", bytes("""
+        MdfImportBatchDO calendar = importService.importSnapshot("TRADING_CALENDAR", null, "calendar.csv", bytes("""
                 market_code,trade_date,is_trading_day
                 CN,2026-07-01,true
                 CN,2026-07-04,false
@@ -86,7 +96,8 @@ class CsvSnapshotImportTest {
         assertNull(calendar.getErrorReportJson());
         assertEquals(2, count("market_calendar"), "交易日历复用 market_calendar（不建新表）");
 
-        MdfImportBatchDO bars = importService.importSnapshot("DAILY_BAR", "bars.csv", bytes("""
+        Long barsVersion = newDailyVersion("IMP_CSV_X1");
+        MdfImportBatchDO bars = importService.importSnapshot("DAILY_BAR", barsVersion, "bars.csv", bytes("""
                 symbol,trade_date,open,high,low,close,volume,amount
                 SH.600519,2026-07-01,1700.00,1750.00,1690.00,1720.50,2500000,4290125000.00
                 SH.600519,2026-07-02,1720.50,1730.00,1701.00,1715.25,1800000,3087450000.00
@@ -98,7 +109,7 @@ class CsvSnapshotImportTest {
                 "SELECT amount FROM stock_daily_bar WHERE trade_date = '2026-07-01'", BigDecimal.class);
         assertEquals(0, amount.compareTo(new BigDecimal("4290125000.00")), "单位冻结：amount=元，不做万元换算");
 
-        MdfImportBatchDO taxonomy = importService.importSnapshot("INDUSTRY_TAXONOMY", "taxonomy.csv", bytes("""
+        MdfImportBatchDO taxonomy = importService.importSnapshot("INDUSTRY_TAXONOMY", null, "taxonomy.csv", bytes("""
                 taxonomy_code,taxonomy_name,provider_code,note
                 SINA_INDUSTRY,新浪行业,IMPORT_CSV_TAXONOMY,非申万
                 """));
@@ -106,7 +117,7 @@ class CsvSnapshotImportTest {
         assertNull(taxonomy.getErrorReportJson());
         assertEquals(1, count("mdf_industry_taxonomy"));
 
-        MdfImportBatchDO membership = importService.importSnapshot("INDUSTRY_MEMBERSHIP_PIT", "membership.csv", bytes("""
+        MdfImportBatchDO membership = importService.importSnapshot("INDUSTRY_MEMBERSHIP_PIT", null, "membership.csv", bytes("""
                 taxonomy_code,industry_code,industry_name,symbol,effective_from,effective_to
                 SINA_INDUSTRY,new_blhy,玻璃行业,SH.600519,2021-01-01,2023-06-30
                 SINA_INDUSTRY,new_blhy,玻璃行业,SH.600519,2023-07-01,
@@ -123,7 +134,7 @@ class CsvSnapshotImportTest {
 
     @Test
     void rowLevelErrorsAreRejectedWithParseableReport() throws Exception {
-        MdfImportBatchDO batch = importService.importSnapshot("DAILY_BAR", "bad-rows.csv", bytes("""
+        MdfImportBatchDO batch = importService.importSnapshot("DAILY_BAR", newDailyVersion("IMP_CSV_X2"), "bad-rows.csv", bytes("""
                 symbol,trade_date,open,high,low,close,volume,amount
                 ,2026-07-01,10,11,9,10,100,1000
                 SH.600519,2026/07/01,10,11,9,10,100,1000
@@ -148,7 +159,7 @@ class CsvSnapshotImportTest {
 
     @Test
     void membershipInvalidPeriodRowsAreRejected() throws Exception {
-        MdfImportBatchDO batch = importService.importSnapshot("INDUSTRY_MEMBERSHIP_PIT", "bad-membership.csv", bytes("""
+        MdfImportBatchDO batch = importService.importSnapshot("INDUSTRY_MEMBERSHIP_PIT", null, "bad-membership.csv", bytes("""
                 taxonomy_code,industry_code,industry_name,symbol,effective_from,effective_to
                 SINA_INDUSTRY,new_jg,机械行业,SH.600519,2021-01-01,2021-01-01
                 SINA_INDUSTRY,new_jg,机械行业,SZ.000001,2021-01-01,2020-12-31
@@ -165,7 +176,7 @@ class CsvSnapshotImportTest {
 
     @Test
     void inFileDuplicateUniqueKeysCountAsSkipped() {
-        MdfImportBatchDO batch = importService.importSnapshot("DAILY_BAR", "dup.csv", bytes("""
+        MdfImportBatchDO batch = importService.importSnapshot("DAILY_BAR", newDailyVersion("IMP_CSV_X3"), "dup.csv", bytes("""
                 symbol,trade_date,open,high,low,close,volume,amount
                 SH.600519,2026-07-01,10,11,9,10,100,1000
                 SH.600519,2026-07-01,10,11,9,10,100,1000
@@ -175,7 +186,7 @@ class CsvSnapshotImportTest {
         assertEquals(1, batch.getSkippedCount());
         assertEquals(2, count("stock_daily_bar"));
 
-        MdfImportBatchDO membership = importService.importSnapshot("INDUSTRY_MEMBERSHIP_PIT", "dup-m.csv", bytes("""
+        MdfImportBatchDO membership = importService.importSnapshot("INDUSTRY_MEMBERSHIP_PIT", null, "dup-m.csv", bytes("""
                 taxonomy_code,industry_code,industry_name,symbol,effective_from,effective_to
                 SINA_INDUSTRY,new_blhy,玻璃行业,SH.600519,2021-01-01,2022-01-01
                 SINA_INDUSTRY,new_blhy,玻璃行业,SH.600519,2021-01-01,2023-01-01
@@ -189,20 +200,20 @@ class CsvSnapshotImportTest {
     @Test
     void wrongOrUnparseableHeaderRejectsWholeFile() {
         assertEquals(ErrorCodeEnum.DATA_FOUNDATION_IMPORT_FILE_INVALID.getCode(),
-                errorCode("DAILY_BAR", "wrong-header.csv", """
+                errorCode("DAILY_BAR", newDailyVersion("IMP_CSV_X4"), "wrong-header.csv", """
                         ticker,date,open,high,low,close,volume,amount
                         SH.600519,2026-07-01,10,11,9,10,100,1000
                         """));
         assertEquals(0, count("stock_daily_bar"));
 
         assertEquals(ErrorCodeEnum.DATA_FOUNDATION_IMPORT_FILE_INVALID.getCode(),
-                errorCode("DAILY_BAR", "unterminated-quote.csv", """
+                errorCode("DAILY_BAR", newDailyVersion("IMP_CSV_X5"), "unterminated-quote.csv", """
                         symbol,trade_date,open,high,low,close,volume,amount
                         "SH.600519,2026-07-01,10,11,9,10,100,1000
                         """));
 
         assertEquals(ErrorCodeEnum.DATA_FOUNDATION_IMPORT_KIND_INVALID.getCode(),
-                errorCode("NOT_A_KIND", "x.csv", """
+                errorCode("NOT_A_KIND", null, "x.csv", """
                         symbol,trade_date,open,high,low,close,volume,amount
                         SH.600519,2026-07-01,10,11,9,10,100,1000
                         """));
@@ -217,8 +228,10 @@ class CsvSnapshotImportTest {
                 SH.600519,2026-07-01,10,11,9,10,100,1000
                 SH.600519,2026-07-02,10,11,9,10,100,1000
                 """;
-        MdfImportBatchDO first = importService.importSnapshot("DAILY_BAR", "bars.csv", bytes(csv));
-        MdfImportBatchDO second = importService.importSnapshot("DAILY_BAR", "bars-again.csv", bytes(csv));
+        MdfImportBatchDO first = importService.importSnapshot("DAILY_BAR",
+                newDailyVersion("IMP_CSV_X6"), "bars.csv", bytes(csv));
+        MdfImportBatchDO second = importService.importSnapshot("DAILY_BAR",
+                first.getDatasetVersionId(), "bars-again.csv", bytes(csv));
 
         assertEquals(first.getId(), second.getId(), "同 kind+file_hash 返回既有批次");
         assertEquals(first.getInsertedCount(), second.getInsertedCount());
@@ -228,13 +241,13 @@ class CsvSnapshotImportTest {
 
     @Test
     void calendarReimportWithDifferentBytesKeepsRowSetStable() {
-        importService.importSnapshot("TRADING_CALENDAR", "cal-a.csv", bytes("""
+        importService.importSnapshot("TRADING_CALENDAR", null, "cal-a.csv", bytes("""
                 market_code,trade_date,is_trading_day
                 CN,2026-07-01,true
                 CN,2026-07-02,true
                 """));
         // 不同字节（顺序不同 → hash 不同）：更新既有行，不产生重复
-        MdfImportBatchDO second = importService.importSnapshot("TRADING_CALENDAR", "cal-b.csv", bytes("""
+        MdfImportBatchDO second = importService.importSnapshot("TRADING_CALENDAR", null, "cal-b.csv", bytes("""
                 market_code,trade_date,is_trading_day
                 CN,2026-07-02,true
                 CN,2026-07-01,true
@@ -247,7 +260,7 @@ class CsvSnapshotImportTest {
 
     @Test
     void membershipPitOverlapGuardedInsideFile() throws Exception {
-        MdfImportBatchDO batch = importService.importSnapshot("INDUSTRY_MEMBERSHIP_PIT", "overlap.csv", bytes("""
+        MdfImportBatchDO batch = importService.importSnapshot("INDUSTRY_MEMBERSHIP_PIT", null, "overlap.csv", bytes("""
                 taxonomy_code,industry_code,industry_name,symbol,effective_from,effective_to
                 SINA_INDUSTRY,new_blhy,玻璃行业,SH.600519,2021-01-01,2022-01-01
                 SINA_INDUSTRY,new_blhy,玻璃行业,SH.600519,2022-01-01,

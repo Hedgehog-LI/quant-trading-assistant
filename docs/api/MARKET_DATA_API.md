@@ -904,9 +904,9 @@ GET /api/v1/market-data/alerts?severity=&resolved=&subjectType=SECTOR&sectorId=&
 - `MARKET_DATA_ASSET_COMBINATION_NOT_FOUND`：证券存在但所选 interval/source/adjust 组合不存在；页面应先查 availability 避免正常触发。
 - 其他格式/日期错误复用 `VALIDATION_ERROR`，证券不存在复用 `STOCK_NOT_FOUND`。
 
-## 7. 数据底座接口（QTA V2-1，已实现，ADR-0015）
+## 7. 数据底座接口（QTA V2-1，已实现，ADR-0015；R1 修复收口后）
 
-> 前缀 `/api/v1/market-data/data-foundation`。语义：数据集定义与版本、历史回补任务（chunk 断点续跑/claim 防并发/ODKU 幂等）、CSV/快照导入（kind+file_hash 幂等）、13 族质量检查与发布门禁（QUALIFIED 才可发布，旧 RELEASED→RETIRED）。日 K/证券/日历事实复用 `stock_daily_bar`/`stock_basic`/`market_calendar`，不复制。单位冻结：价格=元、volume=股、amount=元、换手率=小数。公共源 TENCENT_PUBLIC 为实验性来源（节流 300ms+指数退避+401/403 不重试）。运行时证据见 `docs/development/tasks/QTA-V2-DATA-FOUNDATION-V21-RUNTIME-VERIFICATION.md`。
+> 前缀 `/api/v1/market-data/data-foundation`。语义：数据集定义与版本、历史回补任务（**R1：二维分片=证券组×Provider 安全日期窗（腾讯 365 天，防 640 截断）；QUEUED 状态机+后台 worker 持久化执行；claim 崩溃恢复**）、CSV/快照导入（kind+file_hash 幂等；**R1：DAILY_BAR 必绑 datasetVersionId 且行入版本 manifest**）、质量检查与发布门禁（**R1：16 族检查基于版本 manifest 域，总体覆盖/首末边界低于 0.90 阈值 FAIL（`qta.data-foundation.publish-coverage-threshold` 可配），血缘漂移阻断发布**）。日 K/证券/日历事实复用既有表，不复制。单位冻结：价格=元、volume=股、amount=元、换手率=小数。运行时证据：`docs/development/tasks/QTA-V2-DATA-FOUNDATION-V21-RUNTIME-VERIFICATION{-R1}.md`。
 
 ### 7.1 数据集与版本
 
@@ -932,28 +932,28 @@ POST /api/v1/market-data/data-foundation/datasets
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/backfill-tasks` | 创建（body：datasetCode/marketCode/providerCode/frequency/adjustType 须与数据集定义完全一致；startDate ≥ 2021-01-01；endDate ≤ 今天；symbols ≤ 2000，空=最新池全量；chunkSize 1-500 默认 50）。自动按证券拆 chunk 并创建 DRAFT 版本；同 scope 存在 PENDING/RUNNING/PAUSED 任务时拒绝重复创建 |
+| POST | `/backfill-tasks` | 创建（body：datasetCode/marketCode/providerCode/frequency/adjustType 须与数据集定义完全一致；startDate ≥ 2021-01-01；endDate ≤ 今天；symbols ≤ 10000（R1：容纳全 A 股票池），空=最新池全量；chunkSize 1-500 默认 50）。**R1：二维分片=证券组×日期窗（Provider.safeRequestWindowDays，腾讯 365 自然日），chunk.start/end=实际请求区间，分片总数 ≤ 40000**；证券范围写 mdf_backfill_task_symbol（不塞 symbols_json）；同 scope 存在 PENDING/QUEUED/RUNNING/PAUSED 任务时拒绝重复创建 |
 | GET | `/backfill-tasks?status=&page=&pageSize=` | 分页列表（PageResultVO） |
-| GET | `/backfill-tasks/{id}` | 详情：planned/success/fail/skip（标的数）+ inserted/updated（行数）+ totalChunks/succeededChunks/failedChunks + lastError |
-| GET | `/backfill-tasks/{id}/chunks` | 分片明细（chunkIndex/status/attempts/各计数/lastErrorCode/lastErrorMessage） |
-| POST | `/backfill-tasks/{id}/run` | 启动或继续（断点续跑：跳过终态分片，从首个 PENDING 继续；claim token 防并发） |
-| POST | `/backfill-tasks/{id}/pause` | 暂停（RUNNING→PAUSED，释放 claim；执行循环逐片检查状态后停止） |
-| POST | `/backfill-tasks/{id}/chunks/retry` | 重试失败分片（FAILED→PENDING 保留 attempts，随后续跑；仅 PARTIAL_FAILED/FAILED 可调用） |
+| GET | `/backfill-tasks/{id}` | 详情：planned/success/fail/skip（标的数）+ inserted/updated（行数）+ totalChunks/succeededChunks/failedChunks + lastError；**symbols 仅在 ≤50 时返回（全 A 任务避免巨列表，plannedCount 恒可见）** |
+| GET | `/backfill-tasks/{id}/chunks` | 分片明细（chunkIndex/status/attempts/各计数/lastErrorCode/lastErrorMessage/实际日期窗）；供前端轮询 |
+| POST | `/backfill-tasks/{id}/run` | **R1：异步——仅做状态转换（PENDING/PAUSED/PARTIAL_FAILED/FAILED→QUEUED）快速返回 BackfillTaskVO（QUEUED 或已被 worker 认领的 RUNNING），不等待执行**；后台 worker（可配轮询 `qta.data-foundation.worker.poll-ms`/并发 `worker.concurrency`）条件认领执行，断点续跑跳过终态分片 |
+| POST | `/backfill-tasks/{id}/pause` | 暂停（**QUEUED/RUNNING 均可**；释放 claim，worker 逐证券检查后停止） |
+| POST | `/backfill-tasks/{id}/chunks/retry` | 重试失败分片（FAILED→PENDING 保留 attempts，随后**入队**返回 QUEUED；仅 PARTIAL_FAILED/FAILED 可调用）。容器重启/claim 超时的 RUNNING 任务由启动+定时恢复自动回队（chunk RUNNING→PENDING，错误置 RECOVERED_STALE_RUNNING 可追溯） |
 
 ### 7.3 质量与发布
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/dataset-versions/{id}/quality-check` | 运行 13 族检查并落结果+覆盖水位，版本转 QUALIFIED/REJECTED。检查族：EMPTY_DATASET / DATE_RANGE_COVERAGE / UNIVERSE_COVERAGE / DAILY_BAR_GAP / DUPLICATE_ROWS / OHLC_VALIDITY / UNIT_ANOMALY / NON_TRADING_DAY_ANOMALY / INDUSTRY_MEMBERSHIP_OVERLAP / INDUSTRY_MEMBERSHIP_INVALID_PERIOD / UNMAPPED_INDUSTRY_SYMBOL / PROVIDER_ADJUST_MIXING / DATA_STALENESS（FAIL 族：空数据/重复/OHLC/单位/非交易日/成分重叠/无效区间/口径混用；WARN 族：日历缺失/池覆盖/缺口/未映射/陈旧） |
+| POST | `/dataset-versions/{id}/quality-check` | **R1：16 族检查全部基于版本 manifest 域**（版本归属行；同窗其他 Provider 合法共存不参与判定）并落结果+覆盖水位，版本转 QUALIFIED/REJECTED。检查族：EMPTY_DATASET / DATE_RANGE_COVERAGE / UNIVERSE_COVERAGE / DAILY_BAR_GAP / DUPLICATE_ROWS / OHLC_VALIDITY / UNIT_ANOMALY / NON_TRADING_DAY_ANOMALY / INDUSTRY_MEMBERSHIP_OVERLAP / INDUSTRY_MEMBERSHIP_INVALID_PERIOD / UNMAPPED_INDUSTRY_SYMBOL / PROVIDER_ADJUST_MIXING / DATA_STALENESS + **OVERALL_COVERAGE_GATE / BOUNDARY_COVERAGE / LINEAGE_DRIFT**（R1 新增：总体覆盖=manifest 行/期望行（日历交易日×范围证券，上市日缺失假设窗口起点、DELISTED 剔除）；首末交易日边界覆盖；冻结版本底层事实漂移检测）。**FAIL 族扩大：总体覆盖/边界覆盖低于阈值（默认 0.90）必 FAIL（截断与严重不完整不得发布）** |
 | GET | `/dataset-versions/{id}/quality` | 质量结果列表（checkCode/status(OK/WARN/FAIL)/affectedCount/detailJson/checkedAt） |
 | GET | `/dataset-versions/{id}/coverage` | 覆盖水位（canonicalSymbol/firstDate/lastDate/rowCount/expectedDays/coveredDays/coverageRatio） |
-| POST | `/dataset-versions/{id}/publish` | 发布（仅 QUALIFIED 且无 FAIL；事务内同数据集旧 RELEASED→RETIRED、current_version_id 指针切换；失败版本保留可查但永不成为默认版本） |
+| POST | `/dataset-versions/{id}/publish` | 发布（仅 QUALIFIED 且无 FAIL；**R1：发布前冻结 manifest/content hash；已冻结版本先做漂移校验，漂移→DRIFTED+拒绝**；事务内同数据集旧 RELEASED→RETIRED、current_version_id 指针切换）。`GET /datasets/{code}/released` 与版本 VO 返回 `contentHash/manifestRowCount/lineageStatus`（FROZEN 可复现声明；DRIFTED 不得声称可复现） |
 
 ### 7.4 CSV/快照导入
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/imports?kind=` | multipart 字段 `file`（≤50MB、≤20 万行）；kind ∈ UNIVERSE_SNAPSHOT / TRADING_CALENDAR / DAILY_BAR / INDUSTRY_TAXONOMY / INDUSTRY_MEMBERSHIP_PIT；表头不匹配整批 400；同内容重复导入幂等返回既有批次（不重复处理） |
+| POST | `/imports?kind=&datasetVersionId=` | multipart 字段 `file`（≤50MB、≤20 万行）；kind ∈ UNIVERSE_SNAPSHOT / TRADING_CALENDAR / DAILY_BAR / INDUSTRY_TAXONOMY / INDUSTRY_MEMBERSHIP_PIT；表头不匹配整批 400；同内容重复导入幂等返回既有批次。**R1：DAILY_BAR 必须提供导入类 datasetVersionId（provider/adjust/market 与目标版本不一致拒绝），导入行归属该版本 manifest（来源=IMPORT_BATCH+批次 id）；其余 kind 的 datasetVersionId 可选（仅留批次血缘）** |
 | GET | `/imports?kind=&page=&pageSize=` | 批次列表 |
 | GET | `/imports/{id}` | 批次详情（inserted/updated/skipped/rejected + errorReportJson：行级错误数组 [{recordNumber, reason, raw}]，上限 50 条） |
 

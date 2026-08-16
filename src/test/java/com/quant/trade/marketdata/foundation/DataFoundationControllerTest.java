@@ -140,11 +140,10 @@ class DataFoundationControllerTest {
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].status").value("PENDING"));
 
+        // R1 §二：POST run 快速返回 QUEUED（执行由后台 worker；此处只验证状态转换契约）
         mockMvc.perform(post(BASE + "/backfill-tasks/" + taskId + "/run"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("SUCCEEDED"))
-                .andExpect(jsonPath("$.data.insertedCount").value(3))
-                .andExpect(jsonPath("$.data.successCount").value(1));
+                .andExpect(jsonPath("$.data.status").value("QUEUED"));
 
         mockMvc.perform(post(BASE + "/backfill-tasks/999999/run"))
                 .andExpect(status().isBadRequest())
@@ -154,11 +153,12 @@ class DataFoundationControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
 
-        // 终态任务不允许 retry / pause
-        mockMvc.perform(post(BASE + "/backfill-tasks/" + taskId + "/chunks/retry"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("DATA_FOUNDATION_BACKFILL_STATE_INVALID"));
+        // QUEUED 允许暂停（R1 §二.6）
         mockMvc.perform(post(BASE + "/backfill-tasks/" + taskId + "/pause"))
+                .andExpect(status().isOk());
+
+        // PAUSED 终止后 retry 守卫（无 FAILED 分片也须状态合法：PAUSED 不允许 retry）
+        mockMvc.perform(post(BASE + "/backfill-tasks/" + taskId + "/chunks/retry"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("DATA_FOUNDATION_BACKFILL_STATE_INVALID"));
     }
@@ -167,6 +167,19 @@ class DataFoundationControllerTest {
 
     @Test
     void importEndpointsHappyPathAndInvalidKind() throws Exception {
+        // R1 §七：先建导入数据集与版本，DAILY_BAR 导入绑定 datasetVersionId
+        mockMvc.perform(post(BASE + "/datasets").contentType("application/json").content("""
+                        {"datasetCode":"API_IMP_BARS","datasetName":"导入数据集","marketCode":"CN","barType":"DAILY",
+                         "frequency":"1D","providerCode":"IMPORT_CSV_DAILY","adjustType":"NONE"}
+                        """))
+                .andExpect(status().isOk());
+        MvcResult versionCreated = mockMvc.perform(post(BASE + "/datasets/API_IMP_BARS/versions")
+                        .contentType("application/json")
+                        .content("{\"startDate\":\"2026-07-01\",\"endDate\":\"2026-07-31\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        int versionId = com.jayway.jsonpath.JsonPath.read(versionCreated.getResponse().getContentAsString(), "$.data.id");
+
         MockMultipartFile file = new MockMultipartFile("file", "bars.csv", "text/csv",
                 """
                 symbol,trade_date,open,high,low,close,volume,amount
@@ -179,12 +192,19 @@ class DataFoundationControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("DATA_FOUNDATION_IMPORT_KIND_INVALID"));
 
-        MvcResult imported = mockMvc.perform(multipart(BASE + "/imports?kind=DAILY_BAR").file(file))
+        // R1 §七：DAILY_BAR 未绑版本 → VALIDATION_ERROR
+        mockMvc.perform(multipart(BASE + "/imports?kind=DAILY_BAR").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        MvcResult imported = mockMvc.perform(
+                        multipart(BASE + "/imports?kind=DAILY_BAR&datasetVersionId=" + versionId).file(file))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.insertedCount").value(2))
                 .andExpect(jsonPath("$.data.rejectedCount").value(0))
                 .andExpect(jsonPath("$.data.providerCode").value("IMPORT_CSV_DAILY"))
+                .andExpect(jsonPath("$.data.datasetVersionId").value(versionId))
                 .andReturn();
         int batchId = com.jayway.jsonpath.JsonPath.read(imported.getResponse().getContentAsString(), "$.data.id");
 
@@ -232,16 +252,16 @@ class DataFoundationControllerTest {
                 .andReturn();
         int versionId = com.jayway.jsonpath.JsonPath.read(versionCreated.getResponse().getContentAsString(), "$.data.id");
 
-        // 空版本质量检查：13 族全部返回且 EMPTY_DATASET FAIL
+        // 空版本质量检查：R1 16 族全部返回且 EMPTY_DATASET FAIL
         mockMvc.perform(post(BASE + "/dataset-versions/" + versionId + "/quality-check"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data", hasSize(13)))
+                .andExpect(jsonPath("$.data", hasSize(16)))
                 .andExpect(jsonPath("$.data[?(@.checkCode == 'EMPTY_DATASET')].status")
                         .value(org.hamcrest.Matchers.hasItem("FAIL")));
 
         mockMvc.perform(get(BASE + "/dataset-versions/" + versionId + "/quality"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data", hasSize(13)));
+                .andExpect(jsonPath("$.data", hasSize(16)));
 
         mockMvc.perform(get(BASE + "/dataset-versions/" + versionId + "/coverage"))
                 .andExpect(status().isOk())
