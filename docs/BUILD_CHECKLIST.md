@@ -374,9 +374,10 @@
 ### QTA V2 MR-1B 市场全景前端已完成产品交付候选（2026-08-16，本地验收通过，待独立验收）
 
 - [x] `/market-research` 重写为市场全景研究终端（前端分支 `codex/qta-v2-market-overview-complete`）：研究上下文栏 + 基准趋势与回撤 + 流动性与交易活跃度 + 市场广度 + 行业成交占比迁移 Top-8+OTHER（自研 SVG 堆叠面积）+ 数据质量面板五区块。
-- [x] 全状态处理：loading/error/NO_DATA/DEGRADED/INSUFFICIENT_WARMUP/LOW_*_COVERAGE/INDUSTRY_MIGRATION_BLOCKED/OFFICIAL_MONEY_FLOW=UNAVAILABLE/null 断点；null 不当 0；remote 失败不回退 mock；mock 仅虚构数据并标注。
+- [x] 全状态处理：loading/error/NO_DATA/DEGRADED/INSUFFICIENT_WARMUP/LOW_*_COVERAGE/INDUSTRY_MIGRATION_BLOCKED/OFFICIAL_MONEY_FLOW=UNAVAILABLE/null 断点；null 不当 0；remote 失败不回退任何假数据。
+- [x] 定点修复（2026-08-16 第二轮，验收发现）：删除 mock 正弦合成演示数据（demoOverview/DEMO_INDUSTRIES/demoTradingDates）；市场全景仅消费真实后端数据——apiMode=mock 时查询禁用（不自动调用 remote），页面仅提示"市场全景需要后端数据模式，请在设置中切换为后端模式。"，不渲染任何模拟行情；新增测试证明 mock 不返回合成数据/不出图/不调接口、remote 成功正常渲染、remote 失败不回退假数据。仍为候选，未独立验收、未部署。
 - [x] 口径展示：金额 万/亿、比值百分比、illiquidity 科学计数、tooltip 精确值、null 显示 `--`；1440×900 / 1280×800 / 390×844 响应式。
-- [x] 自动化：前端 typecheck / lint / test（419 tests）/ build 全绿；`git diff --check` 双仓干净。
+- [x] 自动化：前端 typecheck / lint / test（421 tests）/ build 全绿；`git diff --check` 双仓干净。
 - [x] 真实联调：qta-mysql+qta-server Docker + Vite proxy；curl 三态（DEGRADED/NO_DATA/400）与页面数值逐位一致；五区块浏览器截图存前端仓库 `docs/development/screenshots/`。
 - [ ] 独立验收与合并：候选 commit 未 push，双仓任务分支待 Codex 独立验收后合并 main。
 - [ ] 服务器部署验收：NOT_DEPLOYED（生产 Nginx 同源 `/api/v1` 反代 + 后端合并 main 为前置）。
