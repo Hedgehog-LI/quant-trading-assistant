@@ -788,21 +788,31 @@ async function validateDispatchReceipt(root, control, run, errors) {
   }
 }
 
-// AC-05 / AMD-002: the g-th REVIEW_CLEAR formation precedes the generation-g verifier.
-// Indexing by generation keeps gen-1 verifiers from being compared against a later
-// generation's REVIEW_CLEAR transition in multi-repair histories.
+// AC-05 / AMD-002: the generation-g REVIEW_CLEAR formation precedes the generation-g
+// verifier. Each CANDIDATE_FROZEN transition forms one candidate generation, and a
+// REVIEW_CLEAR binds to the generation current at that point in the history. A
+// generation whose review failed never forms a REVIEW_CLEAR and must not shift later
+// generations' bindings (occurrence indexing by generation breaks on such histories).
 function reviewClearTransitionAt(control, generation) {
   if (!Number.isInteger(generation) || generation < 1) return null;
-  const occurrences = (Array.isArray(control?.transitionHistory) ? control.transitionHistory : [])
-    .filter((transition) => transition?.to === "REVIEW_CLEAR");
-  const parsed = parsedTimestamp(occurrences[generation - 1]?.at);
-  return Number.isFinite(parsed) ? parsed : null;
+  const transitions = Array.isArray(control?.transitionHistory) ? control.transitionHistory : [];
+  let currentGeneration = 0;
+  for (const transition of transitions) {
+    if (transition?.to === "CANDIDATE_FROZEN") currentGeneration += 1;
+    else if (transition?.to === "REVIEW_CLEAR" && currentGeneration === generation) {
+      const parsed = parsedTimestamp(transition?.at);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+  return null;
 }
 
-// AC-05 / AMD-002: verifier dispatch receipts must not predate REVIEW_CLEAR formation, and
-// must not predate the same-generation reviewer's outcome receipt when that outcome carries
-// an observedAt. Missing/untimestamped reviewer outcomes degrade to a warning because the
-// Hook-managed outcome file is outside this validator's write scope.
+// AC-05 / AMD-002: verifier dispatch receipts must not predate the same-generation
+// REVIEW_CLEAR formation, and must not predate the same-generation reviewer's outcome
+// receipt when that outcome carries an observedAt. A verifier whose generation has no
+// REVIEW_CLEAR formation is rejected explicitly, never silently skipped. Missing or
+// untimestamped reviewer outcomes degrade to a warning because the Hook-managed
+// outcome file is outside this validator's write scope.
 async function validateVerifierDispatchOrdering(root, control, errors, warnings) {
   const notify = Array.isArray(warnings) ? (message) => warnings.push(message) : () => {};
   const roleRuns = Array.isArray(control?.roleRuns) ? control.roleRuns : [];
@@ -818,7 +828,9 @@ async function validateVerifierDispatchOrdering(root, control, errors, warnings)
     const dispatchObservedAt = parsedTimestamp(receipt?.observedAt);
     if (!Number.isFinite(dispatchObservedAt)) continue;
     const reviewClearAt = reviewClearTransitionAt(control, verifierRun.generation);
-    if (reviewClearAt !== null && dispatchObservedAt < reviewClearAt) {
+    if (reviewClearAt === null) {
+      errors.push(`final verifier ${verifierRun.roleRunId} has no REVIEW_CLEAR formation for generation ${verifierRun.generation}`);
+    } else if (dispatchObservedAt < reviewClearAt) {
       errors.push(`final verifier ${verifierRun.roleRunId} dispatch precedes REVIEW_CLEAR formation`);
     }
     for (const reviewerRun of roleRuns.filter((run) => run?.role === "CODE_REVIEWER"

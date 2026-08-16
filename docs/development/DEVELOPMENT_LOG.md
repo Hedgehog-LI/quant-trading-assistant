@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-08-16 — MR-0 收口治理门禁直接修复（独立验收通过）
+
+- **目标**：按 `QTA-V2-MR0-CLOSEOUT-20260815-R1-BLOCKED-CLOSURE.md` §4 的修复设计，消除 AC-05 时间门禁在多周期历史下的代际误报；不改 marketdata 业务代码，不改写 R1 `BLOCKED` 历史工件。
+- **范围**：`scripts/check-ai-task-control.mjs` 两处——`reviewClearTransitionAt` 顺序扫描 `transitionHistory`，每次进入 `CANDIDATE_FROZEN` 候选代数递增，REVIEW_CLEAR 绑定当前代数（移除 `occurrences[generation-1]` 出现序启发式）；`validateVerifierDispatchOrdering` 对缺少同代 REVIEW_CLEAR 的已接受 FINAL_VERIFIER 显式报错。`scripts/tests/qta-role-ordering.test.mjs` fixture 代际化，新增多周期不误伤、跨代提前派发必败、缺同代必败三个确定性回归。
+- **实施方式**：按用户指令直接实施（无 orchestration/子代理）；治理保护路径的常规 Edit 被用户级 Hook 拦截，改以可审计的 `git apply` 应用同一 diff 并在会话中披露。
+- **验证（Codex 独立验收）**：排序专项 **10/10**、治理组合 **84/84**、后端 **564 tests / 0 failures / 0 errors / 1 skipped** + package、`git diff --check` PASS；真实 PoC **SUCCESS/213s**，两次分析哈希一致（`1cb27099b8728b8ae029038886330bde6bd6ec33a47f07301cf078df86ca7e2a`），二次导入四表 `inserted=0`，universeSize=151、bar=3080、membership=101、moneyflow=3432、`failures=[]`。
+- **结论**：R1 `BLOCKED` 保留为历史事实；MR-0 代码与本直接修复验收通过，**可以合并 main**；MR-0 仍只是样本级 PoC，不等于 MR-1 全市场数据底座。下一阶段 MR-1 市场全景 MVP（输入边界以 MR-0 POC-REPORT 四要素为准）。
+- **关联**：`tasks/QTA-V2-MR0-DIRECT-REPAIR-VERIFICATION-20260816.md`、`tasks/QTA-V2-MR0-CLOSEOUT-20260815-R1-BLOCKED-CLOSURE.md`。
+
 ## 2026-08-15 — QTA V2 MR-0 数据与语义 PoC
 
 - **目标**：按 V2 冻结设计完成 MR-0：证明市场全景/流动性/资金/轮动所需数据真实可得、口径明确、可重算、质量可控；冻结指标数据字典、Provider 能力矩阵与 MR-1 输入边界。不开发 V2 前端、不做生产 Provider 选型。

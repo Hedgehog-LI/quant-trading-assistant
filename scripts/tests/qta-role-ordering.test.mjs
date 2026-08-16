@@ -180,13 +180,16 @@ function verifiedOrderingControl({ reviewer, verifier } = {}) {
 // File-stage fixture: accepted reviewer + verifier runs with real dispatch
 // receipts (and optional reviewer outcome receipts) under the deterministic
 // .git/qta-governance/dispatches/<sha(taskId)>/<sha(dispatchId)>.json layout.
+// cycles records one CANDIDATE_FROZEN per candidate generation plus an optional
+// REVIEW_CLEAR formation; reviewClearAt: null replays a review FAIL that never
+// cleared, so generations and REVIEW_CLEAR occurrences do not map 1:1.
 // ---------------------------------------------------------------------------
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-async function writeOrderingFiles(directory, taskId, runSpecs, reviewClearTimes) {
+async function writeOrderingFiles(directory, taskId, runSpecs, cycles) {
   const projectRootSha256 = sha256(path.resolve(directory));
   const taskHash = sha256(taskId);
   const dispatchDirectory = path.join(directory, ".git", "qta-governance", "dispatches", taskHash);
@@ -229,10 +232,17 @@ async function writeOrderingFiles(directory, taskId, runSpecs, reviewClearTimes)
   }
   const transitionHistory = [];
   let sequence = 0;
-  for (const at of reviewClearTimes) {
+  for (const cycle of cycles) {
     transitionHistory.push({
-      sequence: (sequence += 1), from: "CANDIDATE_FROZEN", to: "REVIEW_CLEAR", at, actor: "parent-1"
+      sequence: (sequence += 1), from: "SELF_CHECKED", to: "CANDIDATE_FROZEN",
+      at: cycle.frozenAt, actor: "parent-1"
     });
+    if (cycle.reviewClearAt !== null) {
+      transitionHistory.push({
+        sequence: (sequence += 1), from: "CANDIDATE_FROZEN", to: "REVIEW_CLEAR",
+        at: cycle.reviewClearAt, actor: "parent-1"
+      });
+    }
   }
   return {
     taskId,
@@ -277,7 +287,7 @@ test("verifier dispatch observed before REVIEW_CLEAR formation is rejected", asy
       { role: "FINAL_VERIFIER", generation: 1, id: "verify-1",
         startedAt: "2026-08-14T19:50:05Z", finishedAt: "2026-08-14T20:10:00Z",
         dispatchObservedAt: "2026-08-14T19:50:00Z" }
-    ], ["2026-08-14T19:55:00Z"]);
+    ], [{ frozenAt: "2026-08-14T19:49:00Z", reviewClearAt: "2026-08-14T19:55:00Z" }]);
     const warnings = [];
     const errors = await validateTaskControlFiles(control, directory, warnings);
     assert.deepEqual(errors, ["final verifier verify-1 dispatch precedes REVIEW_CLEAR formation"]);
@@ -298,7 +308,7 @@ test("serial reviewer -> REVIEW_CLEAR -> dispatch -> verifier chain passes", asy
       { role: "FINAL_VERIFIER", generation: 1, id: "verify-1",
         startedAt: "2026-08-14T20:05:00Z", finishedAt: "2026-08-14T20:25:00Z",
         dispatchObservedAt: "2026-08-14T19:58:00Z" }
-    ], ["2026-08-14T19:57:00Z"]);
+    ], [{ frozenAt: "2026-08-14T19:49:00Z", reviewClearAt: "2026-08-14T19:57:00Z" }]);
     const warnings = [];
     assert.deepEqual(await validateTaskControlFiles(fileControl, directory, warnings), []);
     assert.deepEqual(warnings, []);
@@ -374,7 +384,10 @@ test("multi-generation repairs compare reviewer and verifier pairs per generatio
       { role: "FINAL_VERIFIER", generation: 2, id: "verify-2",
         startedAt: "2026-08-14T19:44:30Z", finishedAt: "2026-08-14T19:45:00Z",
         dispatchObservedAt: "2026-08-14T19:44:28Z" }
-    ], ["2026-08-14T19:42:26Z", "2026-08-14T19:44:26Z"]);
+    ], [
+      { frozenAt: "2026-08-14T19:42:20Z", reviewClearAt: "2026-08-14T19:42:26Z" },
+      { frozenAt: "2026-08-14T19:44:20Z", reviewClearAt: "2026-08-14T19:44:26Z" }
+    ]);
     const warnings = [];
     assert.deepEqual(await validateTaskControlFiles(fileControl, directory, warnings), []);
     assert.deepEqual(warnings, []);
@@ -393,7 +406,7 @@ test("reviewer outcome observed after the verifier dispatch fails; a missing out
       { role: "FINAL_VERIFIER", generation: 1, id: "verify-1",
         startedAt: "2026-08-14T20:00:00Z", finishedAt: "2026-08-14T20:10:00Z",
         dispatchObservedAt: "2026-08-14T19:58:00Z" }
-    ], ["2026-08-14T19:57:00Z"]);
+    ], [{ frozenAt: "2026-08-14T19:49:00Z", reviewClearAt: "2026-08-14T19:57:00Z" }]);
 
     const control = await build();
     const warnings = [];
@@ -409,6 +422,88 @@ test("reviewer outcome observed after the verifier dispatch fails; a missing out
     assert.deepEqual(degradedErrors, []);
     assert.match(degradedWarnings.join("\n"),
       /review-1 outcome receipt is missing or untimestamped; cross-check against final verifier verify-1 dispatch degraded to advisory/);
+  });
+});
+
+// TD-05-08: replays the BLOCKED-closure timeline (QTA-V2-MR0-CLOSEOUT-20260815-R1 §1).
+// gen-1 review FAILs and never forms a REVIEW_CLEAR; repair to gen-2, which clears at
+// 17:50:00 and dispatches its verifier legally at 17:51:10; repair to gen-3, which
+// clears later at 18:28:00. The gen-2 verifier must stay bound to the gen-2 formation —
+// occurrences[generation - 1] indexing mis-bound it to gen-3's REVIEW_CLEAR.
+test("gen-2 verifier stays bound to gen-2 REVIEW_CLEAR when gen-1 failed review and gen-3 clears later", async () => {
+  await withOrderingDirectory(async (directory) => {
+    const control = await writeOrderingFiles(directory, "ORDERING-MULTICYCLE", [
+      { role: "CODE_REVIEWER", generation: 1, id: "review-1",
+        startedAt: "2026-08-15T17:30:00Z", finishedAt: "2026-08-15T17:35:00Z",
+        dispatchObservedAt: "2026-08-15T17:29:55Z", outcomeObservedAt: "2026-08-15T17:35:30Z" },
+      { role: "CODE_REVIEWER", generation: 2, id: "review-2",
+        startedAt: "2026-08-15T17:44:00Z", finishedAt: "2026-08-15T17:48:15Z",
+        dispatchObservedAt: "2026-08-15T17:43:55Z", outcomeObservedAt: "2026-08-15T17:48:37Z" },
+      { role: "FINAL_VERIFIER", generation: 2, id: "verify-2",
+        startedAt: "2026-08-15T17:51:23Z", finishedAt: "2026-08-15T18:10:00Z",
+        dispatchObservedAt: "2026-08-15T17:51:10Z" }
+    ], [
+      { frozenAt: "2026-08-15T17:20:00Z", reviewClearAt: null },
+      { frozenAt: "2026-08-15T17:45:00Z", reviewClearAt: "2026-08-15T17:50:00Z" },
+      { frozenAt: "2026-08-15T18:20:00Z", reviewClearAt: "2026-08-15T18:28:00Z" }
+    ]);
+    const warnings = [];
+    assert.deepEqual(await validateTaskControlFiles(control, directory, warnings), []);
+    assert.deepEqual(warnings, []);
+  });
+});
+
+// TD-05-09: a gen-3 verifier dispatched before the gen-3 REVIEW_CLEAR must fail even
+// though the gen-2 REVIEW_CLEAR already exists; the legal gen-2 verifier in the same
+// history stays clean.
+test("verifier dispatched before its own generation's REVIEW_CLEAR fails despite an earlier generation's clear", async () => {
+  await withOrderingDirectory(async (directory) => {
+    const control = await writeOrderingFiles(directory, "ORDERING-EARLY-G3", [
+      { role: "CODE_REVIEWER", generation: 2, id: "review-2",
+        startedAt: "2026-08-15T17:44:00Z", finishedAt: "2026-08-15T17:48:15Z",
+        dispatchObservedAt: "2026-08-15T17:43:55Z", outcomeObservedAt: "2026-08-15T17:48:37Z" },
+      { role: "FINAL_VERIFIER", generation: 2, id: "verify-2",
+        startedAt: "2026-08-15T17:51:23Z", finishedAt: "2026-08-15T18:10:00Z",
+        dispatchObservedAt: "2026-08-15T17:51:10Z" },
+      { role: "CODE_REVIEWER", generation: 3, id: "review-3",
+        startedAt: "2026-08-15T18:21:00Z", finishedAt: "2026-08-15T18:24:00Z",
+        dispatchObservedAt: "2026-08-15T18:20:55Z", outcomeObservedAt: "2026-08-15T18:24:30Z" },
+      { role: "FINAL_VERIFIER", generation: 3, id: "verify-3",
+        startedAt: "2026-08-15T18:26:00Z", finishedAt: "2026-08-15T18:40:00Z",
+        dispatchObservedAt: "2026-08-15T18:25:00Z" }
+    ], [
+      { frozenAt: "2026-08-15T17:20:00Z", reviewClearAt: null },
+      { frozenAt: "2026-08-15T17:45:00Z", reviewClearAt: "2026-08-15T17:50:00Z" },
+      { frozenAt: "2026-08-15T18:20:00Z", reviewClearAt: "2026-08-15T18:28:00Z" }
+    ]);
+    const warnings = [];
+    const errors = await validateTaskControlFiles(control, directory, warnings);
+    assert.deepEqual(errors, ["final verifier verify-3 dispatch precedes REVIEW_CLEAR formation"]);
+    assert.deepEqual(warnings, []);
+  });
+});
+
+// TD-05-10: an accepted verifier whose generation never formed a REVIEW_CLEAR
+// (dispatched while its generation's review is still pending) must fail explicitly;
+// the old validator silently skipped the temporal gate in this shape.
+test("accepted verifier without a same-generation REVIEW_CLEAR formation is rejected", async () => {
+  await withOrderingDirectory(async (directory) => {
+    const control = await writeOrderingFiles(directory, "ORDERING-NO-CLEAR", [
+      { role: "CODE_REVIEWER", generation: 1, id: "review-1",
+        startedAt: "2026-08-14T19:50:00Z", finishedAt: "2026-08-14T19:56:00Z",
+        dispatchObservedAt: "2026-08-14T19:49:55Z", outcomeObservedAt: "2026-08-14T19:56:30Z" },
+      { role: "FINAL_VERIFIER", generation: 2, id: "verify-2",
+        startedAt: "2026-08-14T20:05:00Z", finishedAt: "2026-08-14T20:25:00Z",
+        dispatchObservedAt: "2026-08-14T20:00:00Z" }
+    ], [
+      { frozenAt: "2026-08-14T19:49:00Z", reviewClearAt: "2026-08-14T19:57:00Z" },
+      { frozenAt: "2026-08-14T19:58:00Z", reviewClearAt: null }
+    ]);
+    const warnings = [];
+    const errors = await validateTaskControlFiles(control, directory, warnings);
+    assert.deepEqual(errors,
+      ["final verifier verify-2 has no REVIEW_CLEAR formation for generation 2"]);
+    assert.deepEqual(warnings, []);
   });
 });
 

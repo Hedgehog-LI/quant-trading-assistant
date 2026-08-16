@@ -4,6 +4,13 @@
 
 ---
 
+## 2026-08-16 — MR-0 收口治理修复（直接实施，Codex 独立验收通过）
+
+- **范围**：`scripts/check-ai-task-control.mjs` REVIEW_CLEAR 代际绑定 + 缺同代显式拒绝；`scripts/tests/qta-role-ordering.test.mjs` 多周期/跨代提前派发/缺同代三个回归。无生产代码、API、DB 变更；R1 `BLOCKED` control 与 BLOCKED-CLOSURE 工件原样保留为历史事实。
+- **自动化**：排序专项 `node --test scripts/tests/qta-role-ordering.test.mjs` **10/10**；治理组合 **84/84**；后端 `./mvnw test` **564/0/0/1（既有 skip）**；`./mvnw -DskipTests package` PASS；`git diff --check` PASS。
+- **真实运行（RUNTIME）**：`scripts/run-mr0-poc.sh` **SUCCESS / 213s**；两次分析哈希一致 `1cb27099b8728b8ae029038886330bde6bd6ec33a47f07301cf078df86ca7e2a`；二次导入 universe/membership/dailyBar/moneyFlow `inserted=0`；universeSize=151、bar=3080、membership=101、moneyflow=3432；`failures=[]`。
+- **结论**：MR-0 代码与本修复**验收通过，可以合并 main**；MR-0 仍只是样本级 PoC，不等于 MR-1 全市场数据底座。下一阶段 MR-1 市场全景 MVP。
+
 ## 2026-08-15 — QTA V2 MR-0 数据与语义 PoC（独立验收通过，VERIFIED）
 
 - **范围**：MR-0 指标数据字典/Provider 能力矩阵/现状盘点三文档；V23 三张 mr0_ PoC 事实表；公共无凭据源只读客户端+幂等导入+分析/质量引擎+REST 入口+一键 PoC 脚本；2026-07 完整 A 股交易月真实 PoC 与 MR-1 输入边界。不含 V2 前端、生产 Provider 选型、Docker 重建（DEPLOYMENT=NOT_REQUIRED）。

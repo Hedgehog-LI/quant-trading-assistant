@@ -352,6 +352,13 @@
 - [x] MR-0 独立验收：FINAL_VERIFIER 机器回执 9/9（STATIC/AUTOMATION/RUNTIME 全 PASS）、架构门禁 PASS、CODE_REVIEW 三代（G1 12 发现→修复→G2/G3 双 PASS）；后端 538 tests + package。DEPLOYMENT NOT_REQUIRED。
 - [ ] MR-1 前置：清理本地 LONGPORT 手/股脏数据（8 行）；生产 Provider 选型 ADR。
 
+### MR-0 收口直接修复已完成并独立验收（2026-08-16）
+
+- [x] R1 收口任务 `QTA-V2-MR0-CLOSEOUT-20260815-R1` 以 `BLOCKED` 终结，CONTROL 与 BLOCKED-CLOSURE 工件保留为历史事实，不改写。
+- [x] 时间门禁直接修复（`scripts/check-ai-task-control.mjs`）：REVIEW_CLEAR 正确绑定 `CANDIDATE_FROZEN` 代数；已接受 FINAL_VERIFIER 缺少同代 REVIEW_CLEAR 显式拒绝；新增多周期、跨代提前派发、缺同代三个确定性回归。
+- [x] 独立验收：排序专项 **10/10**、治理组合 **84/84**、后端 **564/0/0/1** + package、`git diff --check` PASS、真实 PoC **SUCCESS/213s**（两次分析哈希一致 `1cb27099b8728b8ae029038886330bde6bd6ec33a47f07301cf078df86ca7e2a`、二次导入四表 `inserted=0`、universeSize=151/bar=3080/membership=101/moneyflow=3432、`failures=[]`）。
+- [x] 结论：MR-0 代码与本修复验收通过，**可以合并 main**；MR-0 仍只是样本级 PoC，不等于 MR-1 全市场数据底座。下一阶段 MR-1 市场全景 MVP。入口：`docs/development/tasks/QTA-V2-MR0-DIRECT-REPAIR-VERIFICATION-20260816.md`。
+
 ## 8. 暂缓: 图片识别导入
 
 - [ ] 新增 AI import task 设计。
