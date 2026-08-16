@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfBackfillTaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfBackfillTaskDO">
+        <id column="id" property="id"/>
+        <result column="dataset_code" property="datasetCode"/>
+        <result column="dataset_version_id" property="datasetVersionId"/>
+        <result column="market_code" property="marketCode"/>
+        <result column="provider_code" property="providerCode"/>
+        <result column="frequency" property="frequency"/>
+        <result column="adjust_type" property="adjustType"/>
+        <result column="start_date" property="startDate"/>
+        <result column="end_date" property="endDate"/>
+        <result column="symbols_json" property="symbolsJson"/>
+        <result column="symbols_hash" property="symbolsHash"/>
+        <result column="chunk_size" property="chunkSize"/>
+        <result column="status" property="status"/>
+        <result column="planned_count" property="plannedCount"/>
+        <result column="success_count" property="successCount"/>
+        <result column="fail_count" property="failCount"/>
+        <result column="skip_count" property="skipCount"/>
+        <result column="inserted_count" property="insertedCount"/>
+        <result column="updated_count" property="updatedCount"/>
+        <result column="claim_token" property="claimToken"/>
+        <result column="claimed_at" property="claimedAt"/>
+        <result column="last_error_code" property="lastErrorCode"/>
+        <result column="last_error_message" property="lastErrorMessage"/>
+        <result column="started_at" property="startedAt"/>
+        <result column="finished_at" property="finishedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mdf_backfill_task (dataset_code, dataset_version_id, market_code, provider_code, frequency,
+            adjust_type, start_date, end_date, symbols_json, symbols_hash, chunk_size, status,
+            planned_count, success_count, fail_count, skip_count, inserted_count, updated_count)
+        VALUES (#{datasetCode}, #{datasetVersionId}, #{marketCode}, #{providerCode}, #{frequency},
+            #{adjustType}, #{startDate}, #{endDate}, #{symbolsJson}, #{symbolsHash}, #{chunkSize}, #{status},
+            #{plannedCount}, #{successCount}, #{failCount}, #{skipCount}, #{insertedCount}, #{updatedCount})
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM mdf_backfill_task WHERE id = #{id}
+    </select>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT * FROM mdf_backfill_task
+        <where>
+            <if test="status != null and status != ''">AND status = #{status}</if>
+        </where>
+        ORDER BY id DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1) FROM mdf_backfill_task
+        <where>
+            <if test="status != null and status != ''">AND status = #{status}</if>
+        </where>
+    </select>
+
+    <!-- 认领：状态可进入 RUNNING 且 claim 为空/本人/超时；首次认领补 started_at -->
+    <update id="tryClaim">
+        UPDATE mdf_backfill_task
+        SET claim_token = #{token}, claimed_at = #{now}, status = 'RUNNING',
+            started_at = COALESCE(started_at, #{now})
+        WHERE id = #{id}
+          AND status IN ('PENDING', 'PAUSED', 'PARTIAL_FAILED', 'FAILED')
+          AND (claim_token IS NULL OR claim_token = #{token} OR claimed_at &lt; #{staleBefore})
+    </update>
+
+    <update id="releaseClaim">
+        UPDATE mdf_backfill_task SET claim_token = NULL WHERE id = #{id} AND claim_token = #{token}
+    </update>
+
+    <update id="pauseIfRunning">
+        UPDATE mdf_backfill_task SET status = 'PAUSED', claim_token = NULL,
+            finished_at = NULL, updated_at = #{now}
+        WHERE id = #{id} AND status = 'RUNNING'
+    </update>
+
+    <update id="updateById" parameterType="com.quant.trade.marketdata.foundation.model.MdfBackfillTaskDO">
+        UPDATE mdf_backfill_task
+        SET dataset_version_id = #{datasetVersionId}, status = #{status},
+            planned_count = #{plannedCount}, success_count = #{successCount}, fail_count = #{failCount},
+            skip_count = #{skipCount}, inserted_count = #{insertedCount}, updated_count = #{updatedCount},
+            last_error_code = #{lastErrorCode}, last_error_message = #{lastErrorMessage},
+            started_at = #{startedAt}, finished_at = #{finishedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="countActiveByScope" resultType="long">
+        SELECT COUNT(1) FROM mdf_backfill_task
+        WHERE dataset_code = #{datasetCode} AND provider_code = #{providerCode}
+          AND adjust_type = #{adjustType} AND start_date = #{startDate} AND end_date = #{endDate}
+          AND symbols_hash = #{symbolsHash}
+          AND status IN ('PENDING', 'RUNNING', 'PAUSED')
+    </select>
+</mapper>

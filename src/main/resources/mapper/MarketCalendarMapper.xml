@@ -59,4 +59,10 @@
     <select id="countByMarket" resultType="int">
         SELECT COUNT(*) FROM market_calendar WHERE market_code = #{marketCode}
     </select>
+
+    <!-- 数据底座日历导入幂等更新（uk market_code+trade_date 命中时刷新 is_trading_day） -->
+    <update id="updateTradingDay">
+        UPDATE market_calendar SET is_trading_day = #{isTradingDay}
+        WHERE market_code = #{marketCode} AND trade_date = #{tradeDate}
+    </update>
 </mapper>

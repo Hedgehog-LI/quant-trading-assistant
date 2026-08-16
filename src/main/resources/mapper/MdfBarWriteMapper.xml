@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 数据底座日 K ODKU 幂等写入（写既有 stock_daily_bar；uk 含 data_source，不覆盖其他来源行）。 -->
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfBarWriteMapper">
+
+    <insert id="upsertBatch">
+        INSERT INTO stock_daily_bar (canonical_symbol, trade_date, adjust_type, data_source,
+            open_price, high_price, low_price, close_price, volume, amount, fetched_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.canonicalSymbol}, #{item.tradeDate}, #{item.adjustType}, #{item.dataSource},
+             #{item.openPrice}, #{item.highPrice}, #{item.lowPrice}, #{item.closePrice},
+             #{item.volume}, #{item.amount}, #{item.fetchedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE open_price = VALUES(open_price), high_price = VALUES(high_price),
+            low_price = VALUES(low_price), close_price = VALUES(close_price), volume = VALUES(volume),
+            amount = VALUES(amount), fetched_at = VALUES(fetched_at)
+    </insert>
+</mapper>

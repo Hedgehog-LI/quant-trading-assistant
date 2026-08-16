@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfDatasetVersionMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfDatasetVersionDO">
+        <id column="id" property="id"/>
+        <result column="dataset_id" property="datasetId"/>
+        <result column="version_code" property="versionCode"/>
+        <result column="status" property="status"/>
+        <result column="start_date" property="startDate"/>
+        <result column="end_date" property="endDate"/>
+        <result column="source_provider" property="sourceProvider"/>
+        <result column="source_note" property="sourceNote"/>
+        <result column="row_count" property="rowCount"/>
+        <result column="qualified_at" property="qualifiedAt"/>
+        <result column="released_at" property="releasedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mdf_dataset_version (dataset_id, version_code, status, start_date, end_date,
+            source_provider, source_note, row_count)
+        VALUES (#{datasetId}, #{versionCode}, #{status}, #{startDate}, #{endDate},
+            #{sourceProvider}, #{sourceNote}, #{rowCount})
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM mdf_dataset_version WHERE id = #{id}
+    </select>
+
+    <select id="selectByDatasetId" resultMap="BaseResultMap">
+        SELECT * FROM mdf_dataset_version WHERE dataset_id = #{datasetId}
+        ORDER BY id DESC
+    </select>
+
+    <select id="selectMaxVersionSeq" resultType="int">
+        SELECT COALESCE(MAX(CAST(SUBSTRING(version_code, 2) AS INT)), 0)
+        FROM mdf_dataset_version WHERE dataset_id = #{datasetId}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE mdf_dataset_version
+        SET status = #{status},
+            qualified_at = COALESCE(#{qualifiedAt}, qualified_at),
+            released_at = COALESCE(#{releasedAt}, released_at),
+            source_note = COALESCE(#{sourceNote}, source_note)
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateRowCount">
+        UPDATE mdf_dataset_version SET row_count = #{rowCount} WHERE id = #{id}
+    </update>
+</mapper>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfDatasetMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfDatasetDO">
+        <id column="id" property="id"/>
+        <result column="dataset_code" property="datasetCode"/>
+        <result column="dataset_name" property="datasetName"/>
+        <result column="market_code" property="marketCode"/>
+        <result column="bar_type" property="barType"/>
+        <result column="frequency" property="frequency"/>
+        <result column="provider_code" property="providerCode"/>
+        <result column="adjust_type" property="adjustType"/>
+        <result column="unit_caliber" property="unitCaliber"/>
+        <result column="description" property="description"/>
+        <result column="current_version_id" property="currentVersionId"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mdf_dataset (dataset_code, dataset_name, market_code, bar_type, frequency,
+            provider_code, adjust_type, unit_caliber, description)
+        VALUES (#{datasetCode}, #{datasetName}, #{marketCode}, #{barType}, #{frequency},
+            #{providerCode}, #{adjustType}, #{unitCaliber}, #{description})
+    </insert>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT * FROM mdf_dataset WHERE dataset_code = #{datasetCode}
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM mdf_dataset WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM mdf_dataset ORDER BY dataset_code
+    </select>
+
+    <update id="updateCurrentVersion">
+        UPDATE mdf_dataset SET current_version_id = #{currentVersionId} WHERE id = #{id}
+    </update>
+</mapper>

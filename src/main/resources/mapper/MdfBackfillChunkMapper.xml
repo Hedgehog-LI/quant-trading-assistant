@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfBackfillChunkMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfBackfillChunkDO">
+        <id column="id" property="id"/>
+        <result column="task_id" property="taskId"/>
+        <result column="chunk_index" property="chunkIndex"/>
+        <result column="symbols_json" property="symbolsJson"/>
+        <result column="start_date" property="startDate"/>
+        <result column="end_date" property="endDate"/>
+        <result column="status" property="status"/>
+        <result column="attempts" property="attempts"/>
+        <result column="inserted_count" property="insertedCount"/>
+        <result column="updated_count" property="updatedCount"/>
+        <result column="skipped_count" property="skippedCount"/>
+        <result column="failed_count" property="failedCount"/>
+        <result column="last_error_code" property="lastErrorCode"/>
+        <result column="last_error_message" property="lastErrorMessage"/>
+        <result column="started_at" property="startedAt"/>
+        <result column="finished_at" property="finishedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO mdf_backfill_chunk (task_id, chunk_index, symbols_json, start_date, end_date, status,
+            attempts, inserted_count, updated_count, skipped_count, failed_count) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.taskId}, #{item.chunkIndex}, #{item.symbolsJson}, #{item.startDate}, #{item.endDate},
+             #{item.status}, #{item.attempts}, #{item.insertedCount}, #{item.updatedCount},
+             #{item.skippedCount}, #{item.failedCount})
+        </foreach>
+    </insert>
+
+    <select id="selectByTaskId" resultMap="BaseResultMap">
+        SELECT * FROM mdf_backfill_chunk WHERE task_id = #{taskId} ORDER BY chunk_index
+    </select>
+
+    <select id="countByTaskAndStatus" resultType="long">
+        SELECT COUNT(1) FROM mdf_backfill_chunk WHERE task_id = #{taskId} AND status = #{status}
+    </select>
+
+    <update id="updateById" parameterType="com.quant.trade.marketdata.foundation.model.MdfBackfillChunkDO">
+        UPDATE mdf_backfill_chunk
+        SET status = #{status}, attempts = #{attempts}, inserted_count = #{insertedCount},
+            updated_count = #{updatedCount}, skipped_count = #{skippedCount}, failed_count = #{failedCount},
+            last_error_code = #{lastErrorCode}, last_error_message = #{lastErrorMessage},
+            started_at = COALESCE(started_at, #{startedAt}), finished_at = #{finishedAt}
+        WHERE id = #{id}
+    </update>
+
+    <update id="resetFailedToPending">
+        UPDATE mdf_backfill_chunk
+        SET status = 'PENDING', last_error_code = NULL, last_error_message = NULL
+        WHERE task_id = #{taskId} AND status = 'FAILED'
+    </update>
+</mapper>

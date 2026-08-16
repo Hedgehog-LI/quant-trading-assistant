@@ -22,4 +22,8 @@ public interface MarketCalendarMapper {
     MarketCalendarDO selectLatestTradingDayOnOrBefore(@Param("marketCode") String marketCode,
                                                       @Param("tradeDate") LocalDate tradeDate);
     int countByMarket(@Param("marketCode") String marketCode);
+
+    /** 数据底座日历导入幂等更新（唯一键 market_code+trade_date 命中时刷新 is_trading_day）。 */
+    int updateTradingDay(@Param("marketCode") String marketCode, @Param("tradeDate") LocalDate tradeDate,
+                         @Param("isTradingDay") boolean isTradingDay);
 }

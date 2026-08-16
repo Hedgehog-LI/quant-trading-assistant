@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfQualityResultMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfQualityResultDO">
+        <id column="id" property="id"/>
+        <result column="dataset_version_id" property="datasetVersionId"/>
+        <result column="check_code" property="checkCode"/>
+        <result column="status" property="status"/>
+        <result column="affected_count" property="affectedCount"/>
+        <result column="detail_json" property="detailJson"/>
+        <result column="checked_at" property="checkedAt"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <delete id="deleteByVersion">
+        DELETE FROM mdf_quality_result WHERE dataset_version_id = #{datasetVersionId}
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO mdf_quality_result (dataset_version_id, check_code, status, affected_count, detail_json, checked_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.datasetVersionId}, #{item.checkCode}, #{item.status}, #{item.affectedCount},
+             #{item.detailJson}, #{item.checkedAt})
+        </foreach>
+    </insert>
+
+    <select id="selectByVersion" resultMap="BaseResultMap">
+        SELECT * FROM mdf_quality_result WHERE dataset_version_id = #{datasetVersionId} ORDER BY check_code
+    </select>
+
+    <select id="countFailByVersion" resultType="long">
+        SELECT COUNT(1) FROM mdf_quality_result
+        WHERE dataset_version_id = #{datasetVersionId} AND status = 'FAIL'
+    </select>
+</mapper>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfIndustryTaxonomyMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfIndustryTaxonomyDO">
+        <id column="id" property="id"/>
+        <result column="taxonomy_code" property="taxonomyCode"/>
+        <result column="taxonomy_name" property="taxonomyName"/>
+        <result column="provider_code" property="providerCode"/>
+        <result column="is_mutually_exclusive" property="isMutuallyExclusive"/>
+        <result column="note" property="note"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="upsert">
+        INSERT INTO mdf_industry_taxonomy (taxonomy_code, taxonomy_name, provider_code, is_mutually_exclusive, note)
+        VALUES (#{taxonomyCode}, #{taxonomyName}, #{providerCode}, #{isMutuallyExclusive}, #{note})
+        ON DUPLICATE KEY UPDATE taxonomy_name = VALUES(taxonomy_name), provider_code = VALUES(provider_code),
+            is_mutually_exclusive = VALUES(is_mutually_exclusive), note = VALUES(note)
+    </insert>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT * FROM mdf_industry_taxonomy WHERE taxonomy_code = #{taxonomyCode}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM mdf_industry_taxonomy ORDER BY taxonomy_code
+    </select>
+</mapper>

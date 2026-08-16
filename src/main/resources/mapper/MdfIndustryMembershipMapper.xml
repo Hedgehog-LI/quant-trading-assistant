@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfIndustryMembershipMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfIndustryMembershipDO">
+        <id column="id" property="id"/>
+        <result column="taxonomy_code" property="taxonomyCode"/>
+        <result column="industry_code" property="industryCode"/>
+        <result column="industry_name" property="industryName"/>
+        <result column="canonical_symbol" property="canonicalSymbol"/>
+        <result column="effective_from" property="effectiveFrom"/>
+        <result column="effective_to" property="effectiveTo"/>
+        <result column="source_provider" property="sourceProvider"/>
+        <result column="fetched_at" property="fetchedAt"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="upsertBatch">
+        INSERT INTO mdf_industry_membership (taxonomy_code, industry_code, industry_name, canonical_symbol,
+            effective_from, effective_to, source_provider, fetched_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.taxonomyCode}, #{item.industryCode}, #{item.industryName}, #{item.canonicalSymbol},
+             #{item.effectiveFrom}, #{item.effectiveTo}, #{item.sourceProvider}, #{item.fetchedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE industry_name = VALUES(industry_name), effective_to = VALUES(effective_to),
+            source_provider = VALUES(source_provider), fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <!-- 同 symbol 区间重叠对（半开区间交叉判定；to=NULL 视为 9999-12-31） -->
+    <select id="countOverlapPairs" resultType="long">
+        SELECT COUNT(1) FROM mdf_industry_membership m1
+        JOIN mdf_industry_membership m2
+          ON m1.taxonomy_code = m2.taxonomy_code
+         AND m1.canonical_symbol = m2.canonical_symbol
+         AND m1.id &lt; m2.id
+        WHERE m1.taxonomy_code = #{taxonomyCode}
+          AND m1.effective_from &lt; COALESCE(m2.effective_to, '9999-12-31')
+          AND m2.effective_from &lt; COALESCE(m1.effective_to, '9999-12-31')
+    </select>
+
+    <select id="countInvalidPeriods" resultType="long">
+        SELECT COUNT(1) FROM mdf_industry_membership
+        WHERE taxonomy_code = #{taxonomyCode}
+          AND effective_to IS NOT NULL AND effective_to &lt;= effective_from
+    </select>
+
+    <select id="countByTaxonomy" resultType="long">
+        SELECT COUNT(1) FROM mdf_industry_membership WHERE taxonomy_code = #{taxonomyCode}
+    </select>
+
+    <select id="countDistinctSymbols" resultType="long">
+        SELECT COUNT(DISTINCT canonical_symbol) FROM mdf_industry_membership WHERE taxonomy_code = #{taxonomyCode}
+    </select>
+</mapper>

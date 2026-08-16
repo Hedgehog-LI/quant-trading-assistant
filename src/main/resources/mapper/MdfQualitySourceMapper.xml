@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    质量检查只读聚合（stock_daily_bar / market_calendar / mdf_industry_membership）。
+    symbols 为可选过滤；H2 MODE=MySQL 兼容（COALESCE/NULLIF/DAYOFWEEK 子查询）。
+-->
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfQualitySourceMapper">
+
+    <sql id="Bar_Filter">
+        <where>
+            <if test="dataSource != null and dataSource != ''">AND data_source = #{dataSource}</if>
+            <if test="adjustType != null and adjustType != ''">AND adjust_type = #{adjustType}</if>
+            AND trade_date &gt;= #{startDate} AND trade_date &lt;= #{endDate}
+            <if test="symbols != null and symbols.size() > 0">
+                AND canonical_symbol IN
+                <foreach collection="symbols" item="symbol" open="(" separator="," close=")">#{symbol}</foreach>
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectSymbolStats" resultType="com.quant.trade.marketdata.foundation.model.MdfSymbolBarStatDO">
+        SELECT canonical_symbol AS canonicalSymbol, COUNT(1) AS rowCount,
+               MIN(trade_date) AS firstDate, MAX(trade_date) AS lastDate
+        FROM stock_daily_bar
+        <include refid="Bar_Filter"/>
+        GROUP BY canonical_symbol
+        ORDER BY canonical_symbol
+    </select>
+
+    <select id="countOhlcViolations" resultType="long">
+        SELECT COUNT(1) FROM stock_daily_bar
+        <include refid="Bar_Filter"/>
+          AND (high_price &lt; low_price OR high_price &lt; open_price OR high_price &lt; close_price
+               OR low_price &gt; open_price OR low_price &gt; close_price
+               OR open_price &lt;= 0 OR high_price &lt;= 0 OR low_price &lt;= 0 OR close_price &lt;= 0)
+    </select>
+
+    <select id="countUnitAnomalies" resultType="long">
+        SELECT COUNT(1) FROM stock_daily_bar
+        <include refid="Bar_Filter"/>
+          AND (volume &lt; 0 OR amount &lt; 0
+               OR (volume &gt; 0 AND (amount / volume &lt; low_price OR amount / volume &gt; high_price)))
+    </select>
+
+    <!-- 周末（DAYOFWEEK: 1=周日 7=周六）；日历非空时同时要求命中 is_trading_day=TRUE -->
+    <select id="countNonTradingDayRows" resultType="long">
+        SELECT COUNT(1) FROM stock_daily_bar b
+        <where>
+            <if test="dataSource != null and dataSource != ''">AND b.data_source = #{dataSource}</if>
+            <if test="adjustType != null and adjustType != ''">AND b.adjust_type = #{adjustType}</if>
+            AND b.trade_date &gt;= #{startDate} AND b.trade_date &lt;= #{endDate}
+            <if test="symbols != null and symbols.size() > 0">
+                AND b.canonical_symbol IN
+                <foreach collection="symbols" item="symbol" open="(" separator="," close=")">#{symbol}</foreach>
+            </if>
+            <choose>
+                <when test="calendarDays > 0">
+                    AND (DAYOFWEEK(b.trade_date) IN (1, 7) OR NOT EXISTS (
+                        SELECT 1 FROM market_calendar c
+                        WHERE c.market_code = #{marketCode} AND c.trade_date = b.trade_date AND c.is_trading_day = TRUE))
+                </when>
+                <otherwise>
+                    AND DAYOFWEEK(b.trade_date) IN (1, 7)
+                </otherwise>
+            </choose>
+        </where>
+    </select>
+
+    <select id="countDuplicateSymbolDateRows" resultType="long">
+        SELECT COUNT(1) FROM (
+            SELECT canonical_symbol, trade_date FROM stock_daily_bar
+            <include refid="Bar_Filter"/>
+            GROUP BY canonical_symbol, trade_date HAVING COUNT(1) &gt; 1
+        ) duplicated
+    </select>
+
+    <select id="countProviderAdjustMixingRows" resultType="long">
+        SELECT COUNT(1) FROM stock_daily_bar
+        WHERE trade_date &gt;= #{startDate} AND trade_date &lt;= #{endDate}
+          AND (adjust_type != #{expectedAdjustType} OR data_source != #{expectedDataSource})
+          <if test="symbols != null and symbols.size() > 0">
+            AND canonical_symbol IN
+            <foreach collection="symbols" item="symbol" open="(" separator="," close=")">#{symbol}</foreach>
+          </if>
+    </select>
+
+    <select id="countCalendarDays" resultType="long">
+        SELECT COUNT(1) FROM market_calendar
+        WHERE market_code = #{marketCode} AND is_trading_day = TRUE
+          AND trade_date &gt;= #{startDate} AND trade_date &lt;= #{endDate}
+    </select>
+
+    <select id="selectMaxFetchedAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(fetched_at) FROM stock_daily_bar
+        <include refid="Bar_Filter"/>
+    </select>
+</mapper>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfUniverseSnapshotMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfUniverseSnapshotDO">
+        <id column="id" property="id"/>
+        <result column="provider_code" property="providerCode"/>
+        <result column="canonical_symbol" property="canonicalSymbol"/>
+        <result column="symbol" property="symbol"/>
+        <result column="name" property="name"/>
+        <result column="market" property="market"/>
+        <result column="total_market_cap" property="totalMarketCap"/>
+        <result column="circulating_market_cap" property="circulatingMarketCap"/>
+        <result column="turnover_rate" property="turnoverRate"/>
+        <result column="as_of_date" property="asOfDate"/>
+        <result column="fetched_at" property="fetchedAt"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="upsertBatch">
+        INSERT INTO mdf_universe_snapshot (provider_code, canonical_symbol, symbol, name, market,
+            total_market_cap, circulating_market_cap, turnover_rate, as_of_date, fetched_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.providerCode}, #{item.canonicalSymbol}, #{item.symbol}, #{item.name}, #{item.market},
+             #{item.totalMarketCap}, #{item.circulatingMarketCap}, #{item.turnoverRate}, #{item.asOfDate}, #{item.fetchedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE symbol = VALUES(symbol), name = VALUES(name), market = VALUES(market),
+            total_market_cap = VALUES(total_market_cap), circulating_market_cap = VALUES(circulating_market_cap),
+            turnover_rate = VALUES(turnover_rate), fetched_at = VALUES(fetched_at)
+    </insert>
+
+    <select id="selectLatestAsOfDate" resultType="java.time.LocalDate">
+        SELECT MAX(as_of_date) FROM mdf_universe_snapshot
+    </select>
+
+    <select id="selectSymbolsByAsOf" resultType="string">
+        SELECT canonical_symbol FROM mdf_universe_snapshot WHERE as_of_date = #{asOfDate} ORDER BY canonical_symbol
+    </select>
+
+    <select id="countByAsOf" resultType="long">
+        SELECT COUNT(1) FROM mdf_universe_snapshot WHERE as_of_date = #{asOfDate}
+    </select>
+</mapper>
