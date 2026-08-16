@@ -55,6 +55,16 @@ public interface MdfQualitySourceMapper {
     long countCalendarDays(@Param("marketCode") String marketCode,
                            @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
+    /** R1 §四：日历交易日列表（覆盖期望计算）。 */
+    List<LocalDate> selectCalendarDates(@Param("marketCode") String marketCode,
+                                        @Param("startDate") LocalDate startDate,
+                                        @Param("endDate") LocalDate endDate);
+
+    /** R1 §四：范围证券的 stock_basic 上市日（LISTED/UNKNOWN；list_date 缺失由调用方显式假设）。 */
+    List<com.quant.trade.marketdata.foundation.model.MdfSymbolExpectationDO> selectListedSymbols(
+            @Param("marketCode") String marketCode,
+            @Param("symbols") List<String> symbols);
+
     /** 事实行最大 fetched_at（陈旧度；无行返回 NULL）。 */
     LocalDateTime selectMaxFetchedAt(@Param("dataSource") String dataSource, @Param("adjustType") String adjustType,
                                      @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate,

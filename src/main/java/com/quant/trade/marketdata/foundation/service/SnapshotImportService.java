@@ -49,6 +49,7 @@ public class SnapshotImportService {
 
     public static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
     private static final int WRITE_BATCH = 500;
+    private static final int BAR_SELECT_LIMIT = 1_000;
     private static final String ADJUST_NONE = "NONE";
 
     private final MdfImportBatchMapper importBatchMapper;
@@ -56,14 +57,18 @@ public class SnapshotImportService {
     private final MdfIndustryTaxonomyMapper taxonomyMapper;
     private final MdfIndustryMembershipMapper membershipMapper;
     private final MdfBarWriteMapper barWriteMapper;
-    private final MarketCalendarMapper marketCalendarMapper;
+    private final com.quant.trade.marketdata.dao.MarketCalendarMapper marketCalendarMapper;
+    private final com.quant.trade.marketdata.foundation.dao.MdfDatasetMapper datasetMapper;
+    private final com.quant.trade.marketdata.foundation.dao.MdfDatasetVersionMapper versionMapper;
+    private final com.quant.trade.marketdata.dao.StockDailyBarMapper stockDailyBarMapper;
+    private final VersionLineageService lineageService;
     private final StockBasicRegistrationManager registrationManager;
     private final TransactionTemplate txRequiresNew;
     private final ObjectMapper objectMapper;
     private final Clock marketDataClock;
     private final SnapshotFileParser parser;
 
-    public MdfImportBatchDO importSnapshot(String importKind, String fileName, byte[] content) {
+    public MdfImportBatchDO importSnapshot(String importKind, Long datasetVersionId, String fileName, byte[] content) {
         String kind = importKind == null ? "" : importKind.trim();
         if (content == null || content.length == 0) {
             throw new BusinessException(ErrorCodeEnum.CSV_EMPTY_FILE, "导入文件为空");
@@ -77,16 +82,74 @@ public class SnapshotImportService {
             // 同内容重复导入：幂等返回既有批次，不重复处理（契约 AC-04）。
             return existing;
         }
+        // R1 §七：版本绑定校验（DAILY_BAR 必绑导入类版本；其余 kind 可选仅留批次血缘）
+        VersionBinding binding = resolveBinding(kind, datasetVersionId);
+        // R1 §六/七：批次先建档取得 id（manifest 血缘来源），处理完成后回填计数
+        MdfImportBatchDO batch = MdfImportBatchDO.builder()
+                .importKind(kind).providerCode(providerCodeOf(kind)).fileName(safeFileName(fileName))
+                .fileHash(fileHash).insertedCount(0).updatedCount(0).skippedCount(0).rejectedCount(0)
+                .status("COMPLETED").datasetVersionId(binding.versionId())
+                .build();
+        txRequiresNew.executeWithoutResult(status -> {
+            try {
+                importBatchMapper.insert(batch);
+            } catch (Exception duplicate) {
+                MdfImportBatchDO raced = importBatchMapper.selectByKindAndHash(kind, fileHash);
+                if (raced != null) {
+                    batch.setId(raced.getId());
+                } else {
+                    throw duplicate;
+                }
+            }
+        });
+        if (batch.getId() == null || batch.getId() == 0) {
+            return batch;
+        }
         SnapshotFileParser.ParsedRows<?> parsed = switch (kind) {
             case FoundationConstants.IMPORT_KIND_UNIVERSE -> importUniverse(content);
             case FoundationConstants.IMPORT_KIND_CALENDAR -> importCalendar(content);
-            case FoundationConstants.IMPORT_KIND_DAILY_BAR -> importDailyBar(content);
+            case FoundationConstants.IMPORT_KIND_DAILY_BAR -> importDailyBar(content, binding, batch.getId());
             case FoundationConstants.IMPORT_KIND_TAXONOMY -> importTaxonomy(content);
             case FoundationConstants.IMPORT_KIND_MEMBERSHIP_PIT -> importMembershipPit(content);
             default -> throw new BusinessException(ErrorCodeEnum.DATA_FOUNDATION_IMPORT_KIND_INVALID,
                     "导入类型不合法: " + kind);
         };
-        return recordBatch(kind, fileName, fileHash, parsed);
+        importBatchMapper.updateCounts(batch.getId(), parsed.rows().size(), 0,
+                parsed.skipped(), parsed.rejected(), toErrorReportJson(parsed.errors()));
+        log.info("导入完成: kind={}, versionId={}, inserted={}, skipped={}, rejected={}",
+                kind, binding.versionId(), parsed.rows().size(), parsed.skipped(), parsed.rejected());
+        return importBatchMapper.selectById(batch.getId());
+    }
+
+    /** R1 §七：DAILY_BAR 必须绑定导入类版本且口径一致；其他 kind 传入时仅校验存在并留血缘。 */
+    private VersionBinding resolveBinding(String kind, Long datasetVersionId) {
+        if (FoundationConstants.IMPORT_KIND_DAILY_BAR.equals(kind)) {
+            if (datasetVersionId == null) {
+                throw new BusinessException(ErrorCodeEnum.VALIDATION_ERROR,
+                        "DAILY_BAR 导入必须提供 datasetVersionId（导入类数据集版本）");
+            }
+            var version = versionMapper.selectById(datasetVersionId);
+            if (version == null) {
+                throw new BusinessException(ErrorCodeEnum.DATA_FOUNDATION_VERSION_NOT_FOUND, "目标版本不存在");
+            }
+            var dataset = datasetMapper.selectById(version.getDatasetId());
+            if (dataset == null || !FoundationConstants.IMPORT_SOURCE_DAILY_BAR.equals(dataset.getProviderCode())) {
+                throw new BusinessException(ErrorCodeEnum.DATA_FOUNDATION_DATASET_CONFLICT,
+                        "目标版本必须属于导入类日 K 数据集（provider=IMPORT_CSV_DAILY）");
+            }
+            if (!"NONE".equals(dataset.getAdjustType()) || !"CN".equals(dataset.getMarketCode())) {
+                throw new BusinessException(ErrorCodeEnum.DATA_FOUNDATION_DATASET_CONFLICT,
+                        "目标版本口径不一致（首期仅 CN/NONE）");
+            }
+            return new VersionBinding(datasetVersionId, dataset.getProviderCode(), dataset.getAdjustType());
+        }
+        if (datasetVersionId != null && versionMapper.selectById(datasetVersionId) == null) {
+            throw new BusinessException(ErrorCodeEnum.DATA_FOUNDATION_VERSION_NOT_FOUND, "目标版本不存在");
+        }
+        return new VersionBinding(datasetVersionId, null, null);
+    }
+
+    private record VersionBinding(Long versionId, String expectedProvider, String expectedAdjust) {
     }
 
     public MdfImportBatchDO getBatch(long id) {
@@ -109,6 +172,7 @@ public class SnapshotImportService {
                 .insertedCount(batch.getInsertedCount()).updatedCount(batch.getUpdatedCount())
                 .skippedCount(batch.getSkippedCount()).rejectedCount(batch.getRejectedCount())
                 .status(batch.getStatus()).errorReportJson(batch.getErrorReportJson())
+                .datasetVersionId(batch.getDatasetVersionId())
                 .createdAt(batch.getCreatedAt())
                 .build();
     }
@@ -145,8 +209,17 @@ public class SnapshotImportService {
         return rewrap(parsed, rows);
     }
 
-    private SnapshotFileParser.ParsedRows<StockDailyBarDO> importDailyBar(byte[] content) {
+    private SnapshotFileParser.ParsedRows<StockDailyBarDO> importDailyBar(byte[] content, VersionBinding binding,
+                                                                          long batchId) {
         SnapshotFileParser.ParsedRows<SnapshotFileParser.DailyBarRow> parsed = parser.parseDailyBar(content);
+        // R1 §七：市场口径校验（目标版本 CN → 证券前缀须为 SH/SZ/BJ），不一致整批拒绝
+        for (SnapshotFileParser.DailyBarRow row : parsed.rows()) {
+            String prefix = row.canonicalSymbol().substring(0, 2);
+            if (!"SH".equals(prefix) && !"SZ".equals(prefix) && !"BJ".equals(prefix)) {
+                throw new BusinessException(ErrorCodeEnum.DATA_FOUNDATION_DATASET_CONFLICT,
+                        "证券市场与目标版本不一致: " + row.canonicalSymbol());
+            }
+        }
         LocalDateTime fetchedAt = now();
         List<StockDailyBarDO> rows = parsed.rows().stream()
                 .map(row -> StockDailyBarDO.builder()
@@ -160,6 +233,20 @@ public class SnapshotImportService {
                 .map(StockDailyBarDO::getCanonicalSymbol).distinct().toList());
         txRequiresNew.executeWithoutResult(status -> batchWrite(rows.size(),
                 (from, to) -> barWriteMapper.upsertBatch(rows.subList(from, to))));
+        // R1 §六/七：导入行归属版本 manifest（血缘=IMPORT_BATCH+批次 id）；按 symbol 各自 min/max 日期回读
+        List<StockDailyBarDO> persisted = new ArrayList<>();
+        java.util.Map<String, java.util.List<StockDailyBarDO>> bySymbol = new java.util.LinkedHashMap<>();
+        rows.forEach(bar -> bySymbol.computeIfAbsent(bar.getCanonicalSymbol(), k -> new ArrayList<>()).add(bar));
+        for (java.util.Map.Entry<String, java.util.List<StockDailyBarDO>> entry : bySymbol.entrySet()) {
+            LocalDate symbolMin = entry.getValue().stream().map(StockDailyBarDO::getTradeDate)
+                    .min(LocalDate::compareTo).orElseThrow();
+            LocalDate symbolMax = entry.getValue().stream().map(StockDailyBarDO::getTradeDate)
+                    .max(LocalDate::compareTo).orElseThrow();
+            persisted.addAll(stockDailyBarMapper.selectByFilter(entry.getKey(), symbolMin, symbolMax,
+                    ADJUST_NONE, FoundationConstants.IMPORT_SOURCE_DAILY_BAR, BAR_SELECT_LIMIT, 0));
+        }
+        lineageService.recordBars(binding.versionId(), persisted,
+                FoundationConstants.LINEAGE_SOURCE_IMPORT, batchId);
         return rewrap(parsed, rows);
     }
 
@@ -218,33 +305,6 @@ public class SnapshotImportService {
                         .isTradingDay(tradingDay).isHalfDay(false).build());
             }
         }
-    }
-
-    private MdfImportBatchDO recordBatch(String kind, String fileName, String fileHash,
-                                         SnapshotFileParser.ParsedRows<?> parsed) {
-        MdfImportBatchDO batch = MdfImportBatchDO.builder()
-                .importKind(kind).providerCode(providerCodeOf(kind)).fileName(safeFileName(fileName))
-                .fileHash(fileHash)
-                .insertedCount(parsed.rows().size()).updatedCount(0)
-                .skippedCount(parsed.skipped()).rejectedCount(parsed.rejected())
-                .status("COMPLETED").errorReportJson(toErrorReportJson(parsed.errors()))
-                .build();
-        txRequiresNew.executeWithoutResult(status -> {
-            try {
-                importBatchMapper.insert(batch);
-            } catch (Exception duplicate) {
-                // 并发同内容导入：唯一键兜底，返回既有批次。
-                MdfImportBatchDO raced = importBatchMapper.selectByKindAndHash(kind, fileHash);
-                if (raced != null) {
-                    batch.setId(raced.getId());
-                    return;
-                }
-                throw duplicate;
-            }
-        });
-        log.info("导入完成: kind={}, inserted={}, skipped={}, rejected={}",
-                kind, batch.getInsertedCount(), batch.getSkippedCount(), batch.getRejectedCount());
-        return batch.getId() == null ? batch : importBatchMapper.selectById(batch.getId());
     }
 
     private <T, R> SnapshotFileParser.ParsedRows<R> rewrap(SnapshotFileParser.ParsedRows<T> parsed, List<R> rows) {

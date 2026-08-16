@@ -90,6 +90,24 @@
           AND trade_date &gt;= #{startDate} AND trade_date &lt;= #{endDate}
     </select>
 
+    <select id="selectCalendarDates" resultType="java.time.LocalDate">
+        SELECT trade_date FROM market_calendar
+        WHERE market_code = #{marketCode} AND is_trading_day = TRUE
+          AND trade_date &gt;= #{startDate} AND trade_date &lt;= #{endDate}
+        ORDER BY trade_date
+    </select>
+
+    <!-- R1 §四：范围证券上市日（scope 已由 symbols 限定；LISTED/UNKNOWN 视为在市，DELISTED 剔除避免虚增期望） -->
+    <select id="selectListedSymbols" resultType="com.quant.trade.marketdata.foundation.model.MdfSymbolExpectationDO">
+        SELECT canonical_symbol AS canonicalSymbol, list_date AS listDate
+        FROM stock_basic
+        WHERE (list_status IS NULL OR list_status IN ('LISTED', 'UNKNOWN'))
+          <if test="symbols != null and symbols.size() > 0">
+            AND canonical_symbol IN
+            <foreach collection="symbols" item="symbol" open="(" separator="," close=")">#{symbol}</foreach>
+          </if>
+    </select>
+
     <select id="selectMaxFetchedAt" resultType="java.time.LocalDateTime">
         SELECT MAX(fetched_at) FROM stock_daily_bar
         <include refid="Bar_Filter"/>

@@ -153,6 +153,8 @@ public class DataFoundationDatasetService {
                 .sourceProvider(version.getSourceProvider()).sourceNote(version.getSourceNote())
                 .rowCount(version.getRowCount()).qualifiedAt(version.getQualifiedAt())
                 .releasedAt(version.getReleasedAt()).createdAt(version.getCreatedAt())
+                .contentHash(version.getContentHash()).manifestRowCount(version.getManifestRowCount())
+                .lineageStatus(version.getLineageStatus())
                 .isCurrentReleased(dataset.getCurrentVersionId() != null
                         && dataset.getCurrentVersionId().equals(version.getId()))
                 .build();

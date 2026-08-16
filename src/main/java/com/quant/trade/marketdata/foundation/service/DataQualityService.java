@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quant.trade.common.exception.BusinessException;
 import com.quant.trade.common.exception.ErrorCodeEnum;
 import com.quant.trade.marketdata.constant.FoundationConstants;
+import com.quant.trade.marketdata.foundation.dao.MdfBackfillTaskMapper;
+import com.quant.trade.marketdata.foundation.dao.MdfBackfillTaskSymbolMapper;
 import com.quant.trade.marketdata.foundation.dao.MdfCoverageWatermarkMapper;
 import com.quant.trade.marketdata.foundation.dao.MdfDatasetMapper;
 import com.quant.trade.marketdata.foundation.dao.MdfDatasetVersionMapper;
@@ -11,15 +13,18 @@ import com.quant.trade.marketdata.foundation.dao.MdfIndustryMembershipMapper;
 import com.quant.trade.marketdata.foundation.dao.MdfQualityResultMapper;
 import com.quant.trade.marketdata.foundation.dao.MdfQualitySourceMapper;
 import com.quant.trade.marketdata.foundation.dao.MdfUniverseSnapshotMapper;
+import com.quant.trade.marketdata.foundation.dao.MdfVersionManifestMapper;
 import com.quant.trade.marketdata.foundation.model.MdfCoverageWatermarkDO;
 import com.quant.trade.marketdata.foundation.model.MdfDatasetDO;
 import com.quant.trade.marketdata.foundation.model.MdfDatasetVersionDO;
 import com.quant.trade.marketdata.foundation.model.MdfQualityResultDO;
 import com.quant.trade.marketdata.foundation.model.MdfSymbolBarStatDO;
+import com.quant.trade.marketdata.foundation.model.MdfSymbolExpectationDO;
 import com.quant.trade.marketdata.foundation.vo.CoverageWatermarkVO;
 import com.quant.trade.marketdata.foundation.vo.QualityResultVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -30,15 +35,19 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 数据质量门禁（契约 AC-05，13 检查族）+ 覆盖水位计算 + 版本资格判定。
+ * 数据质量门禁（Repair R1 §四/§五：manifest 域 + 严格发布门槛）。
  *
- * 门禁规则：任一 FAIL 或空数据（row_count=0）→ REJECTED；否则 QUALIFIED（WARN 保留为降级提示）。
- * 只有 QUALIFIED 版本可发布（DatasetPublicationService）。
+ * - 全部数据检查基于版本 manifest（版本归属行），同窗口其他 Provider 的合法行情不参与判定（§五）。
+ * - 发布门槛（可配 qta.data-foundation.publish-coverage-threshold，默认 0.90 沿用 MR-1）：
+ *   空数据 FAIL；日期覆盖/总体覆盖/首末边界覆盖 低于阈值 FAIL；版本内 source/adjust 混入 FAIL。
+ * - 期望行基于日历交易日 + stock_basic 上市日（list_date 缺失=假设窗口起点；DELISTED 剔除——显式假设）。
+ * - 已冻结版本执行漂移检测（LINEAGE_DRIFT），漂移 FAIL 并标记 DRIFTED（阻断发布/复现声明）。
  */
 @Slf4j
 @Service
@@ -52,14 +61,21 @@ public class DataQualityService {
     private final MdfDatasetMapper datasetMapper;
     private final MdfQualityResultMapper qualityResultMapper;
     private final MdfQualitySourceMapper qualitySourceMapper;
+    private final MdfVersionManifestMapper manifestMapper;
     private final MdfCoverageWatermarkMapper coverageMapper;
     private final MdfUniverseSnapshotMapper universeMapper;
     private final MdfIndustryMembershipMapper membershipMapper;
+    private final MdfBackfillTaskMapper taskMapper;
+    private final MdfBackfillTaskSymbolMapper taskSymbolMapper;
+    private final VersionLineageService lineageService;
     private final TransactionTemplate txRequiresNew;
     private final ObjectMapper objectMapper;
     private final Clock marketDataClock;
 
-    /** 运行 13 族检查 → 覆盖水位 → 版本状态（QUALIFIED/REJECTED）。编排见各私有检查方法。 */
+    @Value("${qta.data-foundation.publish-coverage-threshold:0.90}")
+    private double coverageThreshold;
+
+    /** 运行检查族 → 覆盖水位 → 版本状态（QUALIFIED/REJECTED）。 */
     public List<MdfQualityResultDO> runChecks(long versionId) {
         MdfDatasetVersionDO version = versionMapper.selectById(versionId);
         if (version == null) {
@@ -80,46 +96,134 @@ public class DataQualityService {
         results.add(checkUnmappedIndustry(ctx));
         results.add(checkProviderAdjustMixing(ctx));
         results.add(checkStaleness(ctx));
+        results.add(checkOverallCoverageGate(ctx));
+        results.add(checkBoundaryCoverage(ctx));
+        results.add(checkLineageDrift(ctx));
         persist(ctx, results);
-        log.info("质量检查完成: versionId={}, rows={}, 非 OK 项={}", versionId, ctx.totalRows(),
+        log.info("质量检查完成: versionId={}, manifestRows={}, 非 OK 项={}", versionId, ctx.manifestRows(),
                 results.stream().filter(r -> !"OK".equals(r.getStatus())).count());
         return qualityResultMapper.selectByVersion(versionId);
     }
 
-    /** 检查上下文：一次查询聚合，13 族检查复用（避免重复查库）。 */
-    private record QualityContext(MdfDatasetVersionDO version, String source, String adjust,
-                                  LocalDateTime now, long totalRows, long calendarDays,
-                                  Map<String, MdfSymbolBarStatDO> statBySymbol,
+    public List<MdfQualityResultDO> listResults(long versionId) {
+        return qualityResultMapper.selectByVersion(versionId);
+    }
+
+    public long countFail(long versionId) {
+        return qualityResultMapper.countFailByVersion(versionId);
+    }
+
+    public List<MdfCoverageWatermarkDO> listCoverage(long versionId) {
+        return coverageMapper.selectByVersion(versionId);
+    }
+
+    // ---------------------------------------------------------------- VO 装配
+
+    public QualityResultVO toQualityVO(MdfQualityResultDO result) {
+        return QualityResultVO.builder()
+                .datasetVersionId(result.getDatasetVersionId()).checkCode(result.getCheckCode())
+                .status(result.getStatus()).affectedCount(result.getAffectedCount())
+                .detailJson(result.getDetailJson()).checkedAt(result.getCheckedAt())
+                .build();
+    }
+
+    public CoverageWatermarkVO toCoverageVO(MdfCoverageWatermarkDO row) {
+        return CoverageWatermarkVO.builder()
+                .datasetVersionId(row.getDatasetVersionId()).canonicalSymbol(row.getCanonicalSymbol())
+                .firstDate(row.getFirstDate()).lastDate(row.getLastDate()).rowCount(row.getRowCount())
+                .expectedDays(row.getExpectedDays()).coveredDays(row.getCoveredDays())
+                .coverageRatio(row.getCoverageRatio()).calculatedAt(row.getCalculatedAt())
+                .build();
+    }
+
+    // ---------------------------------------------------------------- 上下文
+
+    private record QualityContext(MdfDatasetVersionDO version, MdfDatasetDO dataset,
+                                  String expectedSource, String expectedAdjust,
+                                  LocalDateTime now, long manifestRows, long calendarDays,
+                                  List<LocalDate> tradingDates,
+                                  Map<String, MdfSymbolBarStatDO> manifestStats,
                                   List<String> universeSymbols,
+                                  long expectedRows,
+                                  Map<String, LocalDate> symbolListDates,
                                   List<MdfCoverageWatermarkDO> coverageRows) {
     }
 
     private QualityContext buildContext(MdfDatasetVersionDO version) {
-        String source = version.getSourceProvider();
-        String adjust = resolveAdjustType(version);
-        List<MdfSymbolBarStatDO> stats = qualitySourceMapper.selectSymbolStats(
-                source, adjust, version.getStartDate(), version.getEndDate(), null);
-        long totalRows = stats.stream().mapToLong(s -> s.getRowCount() == null ? 0 : s.getRowCount()).sum();
-        long calendarDays = qualitySourceMapper.countCalendarDays("CN", version.getStartDate(), version.getEndDate());
-        Map<String, MdfSymbolBarStatDO> statBySymbol = new LinkedHashMap<>();
-        stats.forEach(stat -> statBySymbol.put(stat.getCanonicalSymbol(), stat));
+        MdfDatasetDO dataset = datasetMapper.selectById(version.getDatasetId());
+        LocalDateTime now = LocalDateTime.now(marketDataClock);
+        long manifestRows = manifestMapper.countByVersion(version.getId());
+        List<MdfSymbolBarStatDO> stats = manifestMapper.selectSymbolStats(version.getId());
+        Map<String, MdfSymbolBarStatDO> manifestStats = new LinkedHashMap<>();
+        stats.forEach(stat -> manifestStats.put(stat.getCanonicalSymbol(), stat));
+        long calendarDays = qualitySourceMapper.countCalendarDays(dataset.getMarketCode(),
+                version.getStartDate(), version.getEndDate());
+        List<LocalDate> tradingDates = calendarDays == 0 ? List.of()
+                : qualitySourceMapper.selectCalendarDates(dataset.getMarketCode(),
+                        version.getStartDate(), version.getEndDate());
         LocalDate latestAsOf = universeMapper.selectLatestAsOfDate();
         List<String> universeSymbols = latestAsOf == null ? List.of()
                 : universeMapper.selectSymbolsByAsOf(latestAsOf);
-        return new QualityContext(version, source, adjust, LocalDateTime.now(marketDataClock),
-                totalRows, calendarDays, statBySymbol, universeSymbols,
-                buildCoverageRows(version.getId(), calendarDays, statBySymbol, LocalDateTime.now(marketDataClock)));
+
+        // 版本 scope：回补版本=任务证券范围；导入版本=manifest 证券本身
+        List<String> scopeSymbols = resolveScopeSymbols(version.getId(), stats);
+        Map<String, LocalDate> listDates = loadListDates(dataset.getMarketCode(), scopeSymbols);
+        long expectedRows = computeExpectedRows(scopeSymbols, listDates, tradingDates);
+
+        return new QualityContext(version, dataset,
+                dataset.getProviderCode(), dataset.getAdjustType(),
+                now, manifestRows, calendarDays, tradingDates, manifestStats, universeSymbols,
+                expectedRows, listDates,
+                buildCoverageRows(version.getId(), stats, calendarDays, now));
     }
 
-    private List<MdfCoverageWatermarkDO> buildCoverageRows(long versionId, long calendarDays,
-                                                           Map<String, MdfSymbolBarStatDO> statBySymbol,
-                                                           LocalDateTime now) {
+    private List<String> resolveScopeSymbols(long versionId, List<MdfSymbolBarStatDO> manifestStats) {
+        var task = taskMapper.selectByDatasetVersionId(versionId);
+        if (task != null) {
+            return taskSymbolMapper.selectByTask(task.getId());
+        }
+        return manifestStats.stream().map(MdfSymbolBarStatDO::getCanonicalSymbol).toList();
+    }
+
+    private Map<String, LocalDate> loadListDates(String marketCode, List<String> scopeSymbols) {
+        Map<String, LocalDate> listDates = new HashMap<>();
+        for (int from = 0; from < scopeSymbols.size(); from += 500) {
+            qualitySourceMapper.selectListedSymbols(marketCode,
+                    scopeSymbols.subList(from, Math.min(from + 500, scopeSymbols.size())))
+                    .forEach(row -> listDates.put(row.getCanonicalSymbol(), row.getListDate()));
+        }
+        return listDates;
+    }
+
+    /** 期望行 = Σ 证券 × [max(窗口起点, 上市日), 窗口终点] 内交易日；上市日缺失=窗口起点（显式假设）。 */
+    private long computeExpectedRows(List<String> scopeSymbols, Map<String, LocalDate> listDates,
+                                     List<LocalDate> tradingDates) {
+        if (tradingDates.isEmpty() || scopeSymbols.isEmpty()) {
+            return 0;
+        }
+        LocalDate windowStart = tradingDates.get(0);
+        long expected = 0;
+        for (String symbol : scopeSymbols) {
+            LocalDate effectiveStart = listDates.getOrDefault(symbol, windowStart);
+            if (effectiveStart == null || effectiveStart.isBefore(windowStart)) {
+                effectiveStart = windowStart;
+            }
+            for (LocalDate date : tradingDates) {
+                if (!date.isBefore(effectiveStart)) {
+                    expected++;
+                }
+            }
+        }
+        return expected;
+    }
+
+    private List<MdfCoverageWatermarkDO> buildCoverageRows(long versionId, List<MdfSymbolBarStatDO> stats,
+                                                           long calendarDays, LocalDateTime now) {
         List<MdfCoverageWatermarkDO> rows = new ArrayList<>();
-        for (Map.Entry<String, MdfSymbolBarStatDO> entry : statBySymbol.entrySet()) {
-            MdfSymbolBarStatDO stat = entry.getValue();
+        for (MdfSymbolBarStatDO stat : stats) {
             long covered = stat.getRowCount() == null ? 0 : stat.getRowCount();
             rows.add(MdfCoverageWatermarkDO.builder()
-                    .datasetVersionId(versionId).canonicalSymbol(entry.getKey())
+                    .datasetVersionId(versionId).canonicalSymbol(stat.getCanonicalSymbol())
                     .firstDate(stat.getFirstDate()).lastDate(stat.getLastDate())
                     .rowCount(covered).expectedDays(calendarDays).coveredDays(covered)
                     .coverageRatio(calendarDays <= 0 ? null
@@ -139,188 +243,207 @@ public class DataQualityService {
             if (!ctx.coverageRows().isEmpty()) {
                 coverageMapper.upsertBatch(ctx.coverageRows());
             }
-            versionMapper.updateRowCount(versionId, ctx.totalRows());
+            versionMapper.updateRowCount(versionId, ctx.manifestRows());
             boolean fail = results.stream().anyMatch(r -> FoundationConstants.QUALITY_FAIL.equals(r.getStatus()));
-            String nextStatus = fail || ctx.totalRows() == 0
+            String nextStatus = fail || ctx.manifestRows() == 0
                     ? FoundationConstants.VERSION_REJECTED : FoundationConstants.VERSION_QUALIFIED;
             versionMapper.updateStatus(versionId, nextStatus, ctx.now(), null, null);
         });
     }
 
-    // ---------------------------------------------------------------- 13 检查族（每族一个方法，语义冻结）
+    // ---------------------------------------------------------------- 检查族（数据族全部 manifest 域）
 
-    /** 1) 空数据（FAIL，直接阻断发布）。 */
+    /** 1) 空数据（FAIL）。 */
     private MdfQualityResultDO checkEmptyDataset(QualityContext ctx) {
-        boolean empty = ctx.totalRows() == 0;
-        return build(ctx.version().getId(), FoundationConstants.CHECK_EMPTY_DATASET,
-                empty ? FoundationConstants.QUALITY_FAIL : FoundationConstants.QUALITY_OK,
-                empty ? 1L : 0L, detail("totalRows", ctx.totalRows()), ctx.now());
+        boolean empty = ctx.manifestRows() == 0;
+        return build(ctx, FoundationConstants.CHECK_EMPTY_DATASET,
+                empty ? FAIL() : OK(), empty ? 1L : 0L, detail("manifestRows", ctx.manifestRows()));
     }
 
-    /** 2) 日期范围覆盖（无日历基准时 WARN）。 */
+    /** 2) 日期范围覆盖（无日历基准=无法证明→FAIL；有日历时低于阈值 FAIL）。 */
     private MdfQualityResultDO checkDateRangeCoverage(QualityContext ctx) {
-        return build(ctx.version().getId(), FoundationConstants.CHECK_DATE_RANGE_COVERAGE,
-                ctx.calendarDays() <= 0 ? FoundationConstants.QUALITY_WARN : FoundationConstants.QUALITY_OK,
-                ctx.calendarDays(), detail("calendarTradingDays", ctx.calendarDays()), ctx.now());
+        if (ctx.calendarDays() <= 0) {
+            return build(ctx, FoundationConstants.CHECK_DATE_RANGE_COVERAGE, FAIL(), 0L,
+                    detail("reason", "CALENDAR_MISSING", "calendarTradingDays", 0));
+        }
+        long coveredDates = manifestMapper.countDistinctDates(ctx.version().getId());
+        double ratio = coveredDates / (double) ctx.calendarDays();
+        return build(ctx, FoundationConstants.CHECK_DATE_RANGE_COVERAGE,
+                ratio < coverageThreshold ? FAIL() : OK(), coveredDates,
+                detail("coveredDates", coveredDates, "calendarTradingDays", ctx.calendarDays(),
+                        "ratio", round(ratio)));
     }
 
-    /** 3) 证券池覆盖（事实 symbol / 最新池 symbol；无池快照或存在缺口 WARN）。 */
+    /** 3) 股票池覆盖（信息项 WARN；发布阻断由总体覆盖门禁承担）。 */
     private MdfQualityResultDO checkUniverseCoverage(QualityContext ctx) {
         long affected = 0;
-        String status = FoundationConstants.QUALITY_OK;
-        if (ctx.universeSymbols().isEmpty()) {
-            status = FoundationConstants.QUALITY_WARN;
-        } else {
-            affected = ctx.universeSymbols().stream().filter(s -> !ctx.statBySymbol().containsKey(s)).count();
-            if (affected > 0) {
-                status = FoundationConstants.QUALITY_WARN;
-            }
+        String status = WARN();
+        if (!ctx.universeSymbols().isEmpty()) {
+            affected = ctx.universeSymbols().stream().filter(s -> !ctx.manifestStats().containsKey(s)).count();
         }
-        return build(ctx.version().getId(), FoundationConstants.CHECK_UNIVERSE_COVERAGE, status,
-                affected, detail("universeSize", ctx.universeSymbols().size()), ctx.now());
+        return build(ctx, FoundationConstants.CHECK_UNIVERSE_COVERAGE, affected > 0 || ctx.universeSymbols().isEmpty() ? WARN() : OK(),
+                affected, detail("universeSize", ctx.universeSymbols().size()));
     }
 
-    /** 4) 日 K 缺口（expected>0 且 covered<expected 的证券数；WARN）。 */
+    /** 4) 日 K 缺口（信息项 WARN：正常停牌/上市差异不断言 FAIL，期望假设见总体门禁）。 */
     private MdfQualityResultDO checkDailyBarGap(QualityContext ctx) {
         long gapSymbols = ctx.coverageRows().stream()
                 .filter(row -> row.getExpectedDays() != null && row.getExpectedDays() > 0
                         && row.getCoveredDays() < row.getExpectedDays())
                 .count();
-        return build(ctx.version().getId(), FoundationConstants.CHECK_DAILY_BAR_GAP,
-                gapSymbols > 0 ? FoundationConstants.QUALITY_WARN : FoundationConstants.QUALITY_OK,
-                gapSymbols, detail("gapSymbols", gapSymbols), ctx.now());
+        return build(ctx, FoundationConstants.CHECK_DAILY_BAR_GAP,
+                gapSymbols > 0 ? WARN() : OK(), gapSymbols, detail("gapSymbols", gapSymbols));
     }
 
-    /** 5) 重复数据（同 symbol+同日多行=跨源共存；FAIL）。 */
+    /** 5) 重复数据（manifest 业务键重复=防线破坏；FAIL）。 */
     private MdfQualityResultDO checkDuplicates(QualityContext ctx) {
-        long duplicates = qualitySourceMapper.countDuplicateSymbolDateRows(
-                ctx.source(), ctx.adjust(), ctx.version().getStartDate(), ctx.version().getEndDate(), null);
-        return build(ctx.version().getId(), FoundationConstants.CHECK_DUPLICATE_ROWS,
-                duplicates > 0 ? FoundationConstants.QUALITY_FAIL : FoundationConstants.QUALITY_OK,
-                duplicates, detail("duplicateSymbolDatePairs", duplicates), ctx.now());
+        long duplicates = manifestMapper.countDuplicatedKeys(ctx.version().getId());
+        return build(ctx, FoundationConstants.CHECK_DUPLICATE_ROWS,
+                duplicates > 0 ? FAIL() : OK(), duplicates, detail("duplicateKeys", duplicates));
     }
 
-    /** 6) OHLC 合法性（FAIL）。 */
+    /** 6) OHLC 合法性（manifest 域；FAIL）。 */
     private MdfQualityResultDO checkOhlcValidity(QualityContext ctx) {
-        long violations = qualitySourceMapper.countOhlcViolations(
-                ctx.source(), ctx.adjust(), ctx.version().getStartDate(), ctx.version().getEndDate(), null);
-        return build(ctx.version().getId(), FoundationConstants.CHECK_OHLC_VALIDITY,
-                violations > 0 ? FoundationConstants.QUALITY_FAIL : FoundationConstants.QUALITY_OK,
-                violations, detail("violationRows", violations), ctx.now());
+        long violations = manifestMapper.countOhlcViolations(ctx.version().getId());
+        return build(ctx, FoundationConstants.CHECK_OHLC_VALIDITY,
+                violations > 0 ? FAIL() : OK(), violations, detail("violationRows", violations));
     }
 
-    /** 7) 成交量/成交额单位异常（VWAP 出界 / 负值；FAIL）。 */
+    /** 7) 单位异常（manifest 域 VWAP/负值；FAIL）。 */
     private MdfQualityResultDO checkUnitAnomaly(QualityContext ctx) {
-        long anomalies = qualitySourceMapper.countUnitAnomalies(
-                ctx.source(), ctx.adjust(), ctx.version().getStartDate(), ctx.version().getEndDate(), null);
-        return build(ctx.version().getId(), FoundationConstants.CHECK_UNIT_ANOMALY,
-                anomalies > 0 ? FoundationConstants.QUALITY_FAIL : FoundationConstants.QUALITY_OK,
-                anomalies, detail("anomalyRows", anomalies), ctx.now());
+        long anomalies = manifestMapper.countUnitAnomalies(ctx.version().getId());
+        return build(ctx, FoundationConstants.CHECK_UNIT_ANOMALY,
+                anomalies > 0 ? FAIL() : OK(), anomalies, detail("anomalyRows", anomalies));
     }
 
-    /** 8) 周末/非交易日异常（FAIL：日历存在时含日历外日期）。 */
+    /** 8) 周末/非交易日（manifest 域；FAIL）。 */
     private MdfQualityResultDO checkNonTradingDay(QualityContext ctx) {
-        long rows = qualitySourceMapper.countNonTradingDayRows("CN", ctx.source(), ctx.adjust(),
-                ctx.version().getStartDate(), ctx.version().getEndDate(), null, ctx.calendarDays());
-        return build(ctx.version().getId(), FoundationConstants.CHECK_NON_TRADING_DAY,
-                rows > 0 ? FoundationConstants.QUALITY_FAIL : FoundationConstants.QUALITY_OK,
-                rows, detail("nonTradingRows", rows), ctx.now());
+        long rows = manifestMapper.countNonTradingDayRows(ctx.version().getId(),
+                ctx.dataset().getMarketCode(), ctx.calendarDays());
+        return build(ctx, FoundationConstants.CHECK_NON_TRADING_DAY,
+                rows > 0 ? FAIL() : OK(), rows, detail("nonTradingRows", rows));
     }
 
     /** 9) 行业成员重叠（FAIL）。 */
     private MdfQualityResultDO checkMembershipOverlap(QualityContext ctx) {
         long overlaps = membershipMapper.countOverlapPairs("SINA_INDUSTRY");
-        return build(ctx.version().getId(), FoundationConstants.CHECK_MEMBERSHIP_OVERLAP,
-                overlaps > 0 ? FoundationConstants.QUALITY_FAIL : FoundationConstants.QUALITY_OK,
-                overlaps, detail("overlapPairs", overlaps), ctx.now());
+        return build(ctx, FoundationConstants.CHECK_MEMBERSHIP_OVERLAP,
+                overlaps > 0 ? FAIL() : OK(), overlaps, detail("overlapPairs", overlaps));
     }
 
     /** 10) 行业成员无效有效期（FAIL）。 */
     private MdfQualityResultDO checkMembershipInvalidPeriod(QualityContext ctx) {
         long invalid = membershipMapper.countInvalidPeriods("SINA_INDUSTRY");
-        return build(ctx.version().getId(), FoundationConstants.CHECK_MEMBERSHIP_INVALID_PERIOD,
-                invalid > 0 ? FoundationConstants.QUALITY_FAIL : FoundationConstants.QUALITY_OK,
-                invalid, detail("invalidPeriodRows", invalid), ctx.now());
+        return build(ctx, FoundationConstants.CHECK_MEMBERSHIP_INVALID_PERIOD,
+                invalid > 0 ? FAIL() : OK(), invalid, detail("invalidPeriodRows", invalid));
     }
 
-    /** 11) 证券未映射行业（WARN）。 */
+    /** 11) 证券未映射行业（信息项 WARN）。 */
     private MdfQualityResultDO checkUnmappedIndustry(QualityContext ctx) {
         long unmapped = 0;
-        String status = FoundationConstants.QUALITY_OK;
+        String status = OK();
         if (!ctx.universeSymbols().isEmpty()) {
             long mapped = membershipMapper.countDistinctSymbols("SINA_INDUSTRY");
             unmapped = Math.max(0, ctx.universeSymbols().size() - mapped);
             if (unmapped > 0) {
-                status = FoundationConstants.QUALITY_WARN;
+                status = WARN();
             }
         }
-        return build(ctx.version().getId(), FoundationConstants.CHECK_UNMAPPED_INDUSTRY, status,
-                unmapped, detail("unmappedSymbols", unmapped), ctx.now());
+        return build(ctx, FoundationConstants.CHECK_UNMAPPED_INDUSTRY, status,
+                unmapped, detail("unmappedSymbols", unmapped));
     }
 
-    /** 12) Provider/复权口径混用（窗口内出现声明口径之外来源/复权行；FAIL）。 */
+    /** 12) Provider/复权混用（仅版本 manifest 域；同窗其他 Provider 合法共存不参与，R1 §五；FAIL）。 */
     private MdfQualityResultDO checkProviderAdjustMixing(QualityContext ctx) {
-        long mixing = qualitySourceMapper.countProviderAdjustMixingRows(
-                ctx.source(), ctx.adjust(), ctx.version().getStartDate(), ctx.version().getEndDate(), null);
-        return build(ctx.version().getId(), FoundationConstants.CHECK_PROVIDER_ADJUST_MIXING,
-                mixing > 0 ? FoundationConstants.QUALITY_FAIL : FoundationConstants.QUALITY_OK,
-                mixing, detail("foreignRows", mixing), ctx.now());
+        long mixing = manifestMapper.countForeignRows(ctx.version().getId(),
+                ctx.expectedSource(), ctx.expectedAdjust());
+        return build(ctx, FoundationConstants.CHECK_PROVIDER_ADJUST_MIXING,
+                mixing > 0 ? FAIL() : OK(), mixing, detail("foreignRows", mixing,
+                        "expectedSource", ctx.expectedSource(), "expectedAdjust", ctx.expectedAdjust()));
     }
 
-    /** 13) 数据陈旧度（WARN）。 */
+    /** 13) 数据陈旧度（manifest 域；WARN）。 */
     private MdfQualityResultDO checkStaleness(QualityContext ctx) {
-        LocalDateTime maxFetchedAt = qualitySourceMapper.selectMaxFetchedAt(
-                ctx.source(), ctx.adjust(), ctx.version().getStartDate(), ctx.version().getEndDate(), null);
+        LocalDateTime maxFetchedAt = manifestMapper.selectMaxFetchedAt(ctx.version().getId());
         long staleDays = maxFetchedAt == null ? Long.MAX_VALUE
                 : Duration.between(maxFetchedAt, ctx.now()).toDays();
-        return build(ctx.version().getId(), FoundationConstants.CHECK_DATA_STALENESS,
-                staleDays > STALENESS_WARN_DAYS ? FoundationConstants.QUALITY_WARN : FoundationConstants.QUALITY_OK,
+        return build(ctx, FoundationConstants.CHECK_DATA_STALENESS,
+                staleDays > STALENESS_WARN_DAYS ? WARN() : OK(),
                 maxFetchedAt == null ? 1L : 0L,
-                detail("maxFetchedAt", maxFetchedAt == null ? null : maxFetchedAt.toString()), ctx.now());
+                detail("maxFetchedAt", maxFetchedAt == null ? null : maxFetchedAt.toString()));
     }
 
-    public List<MdfQualityResultDO> listResults(long versionId) {
-        return qualityResultMapper.selectByVersion(versionId);
+    /** 14) 总体覆盖门禁（manifestRows/expectedRows < 阈值 FAIL；R1 §四.4）。 */
+    private MdfQualityResultDO checkOverallCoverageGate(QualityContext ctx) {
+        if (ctx.expectedRows() <= 0) {
+            return build(ctx, FoundationConstants.COVERAGE_GATE_CHECK, FAIL(), 0L,
+                    detail("reason", "EXPECTED_ROWS_UNAVAILABLE", "threshold", coverageThreshold,
+                            "assumption", "日历缺失或范围证券为空，无法证明覆盖"));
+        }
+        double ratio = ctx.manifestRows() / (double) ctx.expectedRows();
+        String detail = detail("manifestRows", ctx.manifestRows(), "expectedRows", ctx.expectedRows(),
+                "ratio", round(ratio), "threshold", coverageThreshold,
+                "assumption", "期望=日历交易日×范围证券（上市日缺失假设窗口起点；DELISTED 剔除）");
+        return build(ctx, FoundationConstants.COVERAGE_GATE_CHECK,
+                ratio + 1e-9 < coverageThreshold ? FAIL() : OK(),
+                ctx.manifestRows(), detail);
     }
 
-    public long countFail(long versionId) {
-        return qualityResultMapper.countFailByVersion(versionId);
+    /** 15) 首末边界覆盖（首/最后交易日在市证券覆盖比 < 阈值 FAIL：截断/严重边界缺失必拒，R1 §四.5/6）。 */
+    private MdfQualityResultDO checkBoundaryCoverage(QualityContext ctx) {
+        if (ctx.tradingDates().isEmpty()) {
+            return build(ctx, FoundationConstants.BOUNDARY_COVERAGE_CHECK, FAIL(), 0L,
+                    detail("reason", "CALENDAR_MISSING"));
+        }
+        LocalDate first = ctx.tradingDates().get(0);
+        LocalDate last = ctx.tradingDates().get(ctx.tradingDates().size() - 1);
+        long firstCovered = manifestMapper.countSymbolsOnDate(ctx.version().getId(), first);
+        long lastCovered = manifestMapper.countSymbolsOnDate(ctx.version().getId(), last);
+        long firstExpected = activeSymbolsAt(ctx, first);
+        long lastExpected = activeSymbolsAt(ctx, last);
+        double firstRatio = firstExpected <= 0 ? 1.0 : firstCovered / (double) firstExpected;
+        double lastRatio = lastExpected <= 0 ? 1.0 : lastCovered / (double) lastExpected;
+        boolean fail = firstRatio + 1e-9 < coverageThreshold || lastRatio + 1e-9 < coverageThreshold;
+        return build(ctx, FoundationConstants.BOUNDARY_COVERAGE_CHECK, fail ? FAIL() : OK(),
+                fail ? Math.max(firstExpected - firstCovered, lastExpected - lastCovered) : 0L,
+                detail("firstDate", first.toString(), "firstRatio", round(firstRatio),
+                        "lastDate", last.toString(), "lastRatio", round(lastRatio),
+                        "threshold", coverageThreshold));
     }
 
-    public List<MdfCoverageWatermarkDO> listCoverage(long versionId) {
-        return coverageMapper.selectByVersion(versionId);
+    /** 16) 血缘漂移（已冻结版本重算比对；漂移 FAIL 并标记 DRIFTED，R1 §六）。 */
+    private MdfQualityResultDO checkLineageDrift(QualityContext ctx) {
+        MdfDatasetVersionDO version = ctx.version();
+        if (version.getContentHash() == null) {
+            return build(ctx, FoundationConstants.LINEAGE_DRIFT_CHECK, OK(), 0L,
+                    detail("reason", "NOT_FROZEN", "note", "发布前冻结内容哈希"));
+        }
+        long drifted = lineageService.countDrifted(version.getId());
+        if (drifted > 0) {
+            lineageService.markDrifted(version.getId());
+        }
+        return build(ctx, FoundationConstants.LINEAGE_DRIFT_CHECK,
+                drifted > 0 ? FAIL() : OK(), drifted, detail("driftedRows", drifted,
+                        "contentHash", version.getContentHash()));
     }
 
-    // ---------------------------------------------------------------- VO 装配（controller 不接触持久化模型）
-
-    public QualityResultVO toQualityVO(MdfQualityResultDO result) {
-        return QualityResultVO.builder()
-                .datasetVersionId(result.getDatasetVersionId()).checkCode(result.getCheckCode())
-                .status(result.getStatus()).affectedCount(result.getAffectedCount())
-                .detailJson(result.getDetailJson()).checkedAt(result.getCheckedAt())
-                .build();
+    /** 首末日在市证券数（上市日缺失=窗口起点假设）。 */
+    private long activeSymbolsAt(QualityContext ctx, LocalDate date) {
+        return ctx.symbolListDates().keySet().stream()
+                .filter(symbol -> {
+                    LocalDate listDate = ctx.symbolListDates().get(symbol);
+                    return listDate == null || !listDate.isAfter(date);
+                })
+                .count();
     }
 
-    public CoverageWatermarkVO toCoverageVO(MdfCoverageWatermarkDO row) {
-        return CoverageWatermarkVO.builder()
-                .datasetVersionId(row.getDatasetVersionId()).canonicalSymbol(row.getCanonicalSymbol())
-                .firstDate(row.getFirstDate()).lastDate(row.getLastDate()).rowCount(row.getRowCount())
-                .expectedDays(row.getExpectedDays()).coveredDays(row.getCoveredDays())
-                .coverageRatio(row.getCoverageRatio()).calculatedAt(row.getCalculatedAt())
-                .build();
-    }
+    // ---------------------------------------------------------------- 工具
 
-    private String resolveAdjustType(MdfDatasetVersionDO version) {
-        // 版本事实行的 adjust_type 即数据集声明口径（首期冻结 NONE，D4）。
-        MdfDatasetDO dataset = datasetMapper.selectById(version.getDatasetId());
-        return dataset == null ? "NONE" : dataset.getAdjustType();
-    }
-
-    private MdfQualityResultDO build(long versionId, String checkCode, String status,
-                                     long affectedCount, String detailJson, LocalDateTime checkedAt) {
+    private MdfQualityResultDO build(QualityContext ctx, String checkCode, String status,
+                                     long affectedCount, String detailJson) {
         return MdfQualityResultDO.builder()
-                .datasetVersionId(versionId).checkCode(checkCode).status(status)
-                .affectedCount(affectedCount).detailJson(detailJson).checkedAt(checkedAt)
+                .datasetVersionId(ctx.version().getId()).checkCode(checkCode).status(status)
+                .affectedCount(affectedCount).detailJson(detailJson).checkedAt(ctx.now())
                 .build();
     }
 
@@ -334,5 +457,21 @@ public class DataQualityService {
         } catch (Exception exception) {
             return "{}";
         }
+    }
+
+    private static String OK() {
+        return FoundationConstants.QUALITY_OK;
+    }
+
+    private static String WARN() {
+        return FoundationConstants.QUALITY_WARN;
+    }
+
+    private static String FAIL() {
+        return FoundationConstants.QUALITY_FAIL;
+    }
+
+    private static double round(double value) {
+        return BigDecimal.valueOf(value).setScale(6, RoundingMode.HALF_UP).doubleValue();
     }
 }

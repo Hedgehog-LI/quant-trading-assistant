@@ -88,7 +88,7 @@ public class DataFoundationController {
                 datasetService.createVersion(datasetCode, start, end), dataset));
     }
 
-    /** 当前已发布版本（无发布返回 data=null，前端显示未发布）。 */
+    /** 当前已发布版本（无发布返回 data=null，前端显示未发布；R1 含血缘字段）。 */
     @GetMapping("/datasets/{datasetCode}/released")
     public ApiResponse<DatasetVersionVO> currentReleased(@PathVariable String datasetCode) {
         DatasetPublicationService.MdfDatasetVersionDTO released = publicationService.currentReleased(datasetCode);
@@ -96,6 +96,8 @@ public class DataFoundationController {
                 .id(released.id()).datasetCode(released.datasetCode()).versionCode(released.versionCode())
                 .status(released.status()).startDate(released.startDate()).endDate(released.endDate())
                 .sourceProvider(released.sourceProvider()).rowCount(released.rowCount())
+                .contentHash(released.contentHash()).manifestRowCount(released.manifestRowCount())
+                .lineageStatus(released.lineageStatus())
                 .isCurrentReleased(Boolean.TRUE).build());
     }
 
@@ -130,7 +132,7 @@ public class DataFoundationController {
                 .map(backfillService::toChunkVO).toList());
     }
 
-    /** 启动或继续（断点续跑：跳过终态分片）。 */
+    /** 启动或继续（R1：→QUEUED 立即返回，执行由后台 worker；断点续跑跳过终态分片）。 */
     @PostMapping("/backfill-tasks/{id}/run")
     public ApiResponse<BackfillTaskVO> runBackfillTask(@PathVariable long id) {
         return ApiResponse.ok(backfillService.toTaskVO(backfillService.run(id)));
@@ -142,7 +144,7 @@ public class DataFoundationController {
         return ApiResponse.ok(null);
     }
 
-    /** 重试失败分片（FAILED→PENDING 后继续执行）。 */
+    /** 重试失败分片（FAILED→PENDING 后入队）。 */
     @PostMapping("/backfill-tasks/{id}/chunks/retry")
     public ApiResponse<BackfillTaskVO> retryFailedChunks(@PathVariable long id) {
         return ApiResponse.ok(backfillService.toTaskVO(backfillService.retryFailedChunks(id)));
@@ -176,9 +178,10 @@ public class DataFoundationController {
 
     @PostMapping("/imports")
     public ApiResponse<ImportBatchVO> importSnapshot(@RequestParam String kind,
+                                                     @RequestParam(required = false) Long datasetVersionId,
                                                      @RequestPart("file") MultipartFile file) throws IOException {
         return ApiResponse.ok(importService.toImportVO(
-                importService.importSnapshot(kind, file.getOriginalFilename(), file.getBytes())));
+                importService.importSnapshot(kind, datasetVersionId, file.getOriginalFilename(), file.getBytes())));
     }
 
     @GetMapping("/imports")

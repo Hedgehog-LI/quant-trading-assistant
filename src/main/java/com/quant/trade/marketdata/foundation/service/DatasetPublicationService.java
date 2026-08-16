@@ -30,10 +30,14 @@ public class DatasetPublicationService {
     private final MdfDatasetMapper datasetMapper;
     private final MdfDatasetVersionMapper versionMapper;
     private final DataQualityService qualityService;
+    private final VersionLineageService lineageService;
     private final TransactionTemplate txRequiresNew;
     private final Clock marketDataClock;
 
-    /** 发布：必须已 QUALIFIED（未跑质量先拒绝，不隐式放行）。 */
+    /**
+     * 发布：必须已 QUALIFIED（未跑质量先拒绝）；R1 §六——已冻结版本先做漂移校验
+     * （漂移→DRIFTED+拒绝），未冻结版本先冻结 manifest/content hash，再事务内原子切换指针。
+     */
     public MdfDatasetVersionDO publish(long versionId) {
         MdfDatasetVersionDO version = versionMapper.selectById(versionId);
         if (version == null) {
@@ -46,6 +50,16 @@ public class DatasetPublicationService {
         if (qualityService.countFail(versionId) > 0) {
             throw new BusinessException(ErrorCodeEnum.DATA_FOUNDATION_QUALITY_GATE_FAILED,
                     "存在 FAIL 质量结果，禁止发布");
+        }
+        if (version.getContentHash() != null) {
+            long drifted = lineageService.countDrifted(versionId);
+            if (drifted > 0) {
+                lineageService.markDrifted(versionId);
+                throw new BusinessException(ErrorCodeEnum.DATA_FOUNDATION_QUALITY_GATE_FAILED,
+                        "版本底层事实已漂移（" + drifted + " 行不一致），禁止发布；如需发布请以新事实重建版本");
+            }
+        } else {
+            lineageService.freeze(versionId);
         }
         LocalDateTime now = LocalDateTime.now(marketDataClock);
         txRequiresNew.executeWithoutResult(status -> {
@@ -88,14 +102,16 @@ public class DatasetPublicationService {
                 .toList();
     }
 
-    /** 版本 + 所属数据集只读 DTO（前端展示用）。 */
+    /** 版本 + 所属数据集只读 DTO（前端展示用；R1 含血缘字段）。 */
     public record MdfDatasetVersionDTO(Long id, String datasetCode, String datasetName, String versionCode,
                                        String status, java.time.LocalDate startDate, java.time.LocalDate endDate,
-                                       String sourceProvider, Long rowCount, Long currentVersionId) {
+                                       String sourceProvider, Long rowCount, Long currentVersionId,
+                                       String contentHash, Long manifestRowCount, String lineageStatus) {
         public MdfDatasetVersionDTO(MdfDatasetVersionDO version, MdfDatasetDO dataset) {
             this(version.getId(), dataset.getDatasetCode(), dataset.getDatasetName(), version.getVersionCode(),
                     version.getStatus(), version.getStartDate(), version.getEndDate(),
-                    version.getSourceProvider(), version.getRowCount(), dataset.getCurrentVersionId());
+                    version.getSourceProvider(), version.getRowCount(), dataset.getCurrentVersionId(),
+                    version.getContentHash(), version.getManifestRowCount(), version.getLineageStatus());
         }
     }
 }

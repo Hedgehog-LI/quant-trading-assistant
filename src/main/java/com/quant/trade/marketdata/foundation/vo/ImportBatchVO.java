@@ -24,5 +24,7 @@ public class ImportBatchVO {
     private Integer rejectedCount;
     private String status;
     private String errorReportJson;
+    /** R1：批次血缘关联版本（DAILY_BAR 必填；其余 kind 可空）。 */
+    private Long datasetVersionId;
     private LocalDateTime createdAt;
 }

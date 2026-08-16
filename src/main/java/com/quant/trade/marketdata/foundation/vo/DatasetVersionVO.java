@@ -26,6 +26,12 @@ public class DatasetVersionVO {
     private Long rowCount;
     private LocalDateTime qualifiedAt;
     private LocalDateTime releasedAt;
+    /** R1 血缘：内容哈希（发布冻结后非空）。 */
+    private String contentHash;
+    /** R1 血缘：manifest 行数（发布冻结后非空）。 */
+    private Long manifestRowCount;
+    /** R1 血缘：FROZEN / DRIFTED（漂移阻断复现声明）。 */
+    private String lineageStatus;
     private LocalDateTime createdAt;
     private Boolean isCurrentReleased;
 }
