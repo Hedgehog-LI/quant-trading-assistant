@@ -368,8 +368,18 @@
 - [x] 公式复用与兼容：`MarketDerivedCalculators` 唯一实现，`Mr0PocAnalysisService` 委托重构，`/mr0-poc/**` 与 analysisContentHash 逐位兼容（PoC 回归 7/7）。
 - [x] 文档：`docs/api/MARKET_RESEARCH_API.md` §8 + `API_INDEX.md`（含补录 mr0-poc 条目）+ `docs/development/MARKET_RESEARCH_MR1A_BACKEND_IMPLEMENTATION.md`。
 - [x] 自动化：聚焦 31/31（MarketOverview 24 + PoC 回归 7）；全量 588 tests / 0 failures / 0 errors / 1 skipped；package 与 `git diff --check` 通过。
-- [ ] 运行时（NOT_VERIFIED）：Docker/MySQL 真实数据 curl（本地 2026-07 PoC 数据未执行真实请求）与 remote 验收；不标记 DEPLOYED。
-- [ ] 前端 MR-1B：市场全景页面消费 overview API（尚未开发；后端分支合并 main 前为前置阻断）。
+- [x] 运行时（MR-1B 轮补齐）：Docker/MySQL 真实数据 curl（2026-07 窗口 200 DEGRADED、2025 窗口 200 NO_DATA、market=US 400）与 remote 浏览器验收通过；服务器部署仍 NOT_DEPLOYED。
+- [x] 前端 MR-1B：市场全景页面消费 overview API（候选已完成，见下节；待独立验收合并）。
+
+### QTA V2 MR-1B 市场全景前端已完成产品交付候选（2026-08-16，本地验收通过，待独立验收）
+
+- [x] `/market-research` 重写为市场全景研究终端（前端分支 `codex/qta-v2-market-overview-complete`）：研究上下文栏 + 基准趋势与回撤 + 流动性与交易活跃度 + 市场广度 + 行业成交占比迁移 Top-8+OTHER（自研 SVG 堆叠面积）+ 数据质量面板五区块。
+- [x] 全状态处理：loading/error/NO_DATA/DEGRADED/INSUFFICIENT_WARMUP/LOW_*_COVERAGE/INDUSTRY_MIGRATION_BLOCKED/OFFICIAL_MONEY_FLOW=UNAVAILABLE/null 断点；null 不当 0；remote 失败不回退 mock；mock 仅虚构数据并标注。
+- [x] 口径展示：金额 万/亿、比值百分比、illiquidity 科学计数、tooltip 精确值、null 显示 `--`；1440×900 / 1280×800 / 390×844 响应式。
+- [x] 自动化：前端 typecheck / lint / test（419 tests）/ build 全绿；`git diff --check` 双仓干净。
+- [x] 真实联调：qta-mysql+qta-server Docker + Vite proxy；curl 三态（DEGRADED/NO_DATA/400）与页面数值逐位一致；五区块浏览器截图存前端仓库 `docs/development/screenshots/`。
+- [ ] 独立验收与合并：候选 commit 未 push，双仓任务分支待 Codex 独立验收后合并 main。
+- [ ] 服务器部署验收：NOT_DEPLOYED（生产 Nginx 同源 `/api/v1` 反代 + 后端合并 main 为前置）。
 
 ## 8. 暂缓: 图片识别导入
 
