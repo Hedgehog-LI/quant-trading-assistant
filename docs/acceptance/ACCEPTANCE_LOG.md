@@ -775,3 +775,13 @@
 - 静态边界：无新 migration、无远程失败回退 mock、无固定真实证券合成入口；资产目录只认真实日 K/分钟 K 行。
 - **本地运行**：`docker compose up -d --build` 成功，MySQL 8.4 healthy、后端 health UP；`GET /api/v1/market-data/assets` 和 `market=CN` 均 200，从本地 MySQL 聚合出 7 只实际已入库资产；未知证券 availability 返回 404 + `STOCK_NOT_FOUND`。浏览器验证 mock 资产目录与全局布局无固定真实证券、无大水印、无全局重复风险提示。
 - **未执行**：服务器部署与服务器 remote 浏览器验收；当前结论为本地 `RUNTIME_VERIFIED`，不标记 `DEPLOYED`。
+
+## 2026-08-16 — QTA V2 MR-1A 市场全景后端（独立验收通过，RUNTIME/DEPLOYMENT NOT_VERIFIED）
+
+- **范围**：正式只读 API `GET /api/v1/market-research/overview?market=CN&start=&end=`（首期仅 CN）；五类核心证据 + M-22 覆盖门禁 + 预热门禁 + 质量块；不接入新 Provider、不回补历史、不新增表、不改前端。实现说明见 `../development/MARKET_RESEARCH_MR1A_BACKEND_IMPLEMENTATION.md`。
+- **独立验收**：通过（维护者指令记录，2026-08-16）。验收后业务代码零改动（finalization 仅同步文档）。
+- **静态**：`git diff --check` PASS；分析层无 provider 依赖（`SectorAnalyticsArchitectureGuardTest` 在全量内通过）；无新 migration、无外部网络调用、`/mr0-poc/**` 行为与 `analysisContentHash` 兼容（`Mr0PocAnalysisServiceTest` 回归 7/7）。
+- **自动化**：聚焦 **31/31**（MarketOverview 24 = `MarketOverviewCalculationManagerTest` 13 + `MarketOverviewServiceTest` 7 + `MarketOverviewControllerTest` 4，期望值按冻结公式手工推导）；全量 `./mvnw test` **588 tests / 0 failures / 0 errors / 1 skipped**（1 skipped 为既有基线项）；`./mvnw -DskipTests package` 通过。
+- **门禁回归**：M-22 五档（1.0/0.90 边界/0.80/0.40 阻断/全缺失）、真实 101/150=0.673333 不返回 OK、预热门禁四档（19/30/90/120 真实合格交易日，测试日历跳过周末）、合格日定义（基准 120 天空样本=0、样本仅 40 天=40、覆盖恰 0.90×120 天通过）、coverageGap 不入占比分母（Σshare=1±1e-6）、8 类参数异常全部 400 `VALIDATION_ERROR`。
+- **NOT_VERIFIED**：Docker/MySQL 真实数据 curl、remote 运行时与服务器部署（本地库 2026-07 PoC 数据未执行真实请求验证）；能力状态 `VERIFIED`，不标记 `DEPLOYED`。
+- **遗留**：前端 MR-1B 市场全景页面尚未开发；冻结阈值（覆盖 0.90/0.50、预热 120）已在文档声明，建议后续部署验收时复核。

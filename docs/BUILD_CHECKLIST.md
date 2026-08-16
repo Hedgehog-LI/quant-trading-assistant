@@ -359,6 +359,18 @@
 - [x] 独立验收：排序专项 **10/10**、治理组合 **84/84**、后端 **564/0/0/1** + package、`git diff --check` PASS、真实 PoC **SUCCESS/213s**（两次分析哈希一致 `1cb27099b8728b8ae029038886330bde6bd6ec33a47f07301cf078df86ca7e2a`、二次导入四表 `inserted=0`、universeSize=151/bar=3080/membership=101/moneyflow=3432、`failures=[]`）。
 - [x] 结论：MR-0 代码与本修复验收通过，**可以合并 main**；MR-0 仍只是样本级 PoC，不等于 MR-1 全市场数据底座。下一阶段 MR-1 市场全景 MVP。入口：`docs/development/tasks/QTA-V2-MR0-DIRECT-REPAIR-VERIFICATION-20260816.md`。
 
+### QTA V2 MR-1A 市场全景后端已完成并独立验收（2026-08-16，VERIFIED）
+
+- [x] 正式只读 API `GET /api/v1/market-research/overview?market=CN&start=&end=`（首期仅 CN；参数异常 400，数据不足 NO_DATA/DEGRADED 业务状态，禁止 500）。
+- [x] 五类核心证据：基准趋势与回撤（MA20/MA60 预热、drawdown）、成交活跃度（M-03/M-04/M-13）、市场广度（M-06..M-09）、日频流动性代理（M-20/M-21）、行业成交占比迁移 Top8+OTHER（M-11/M-12 覆盖域口径）。
+- [x] M-22 覆盖门禁：barCoverage/membershipCoverage 明确输出；<0.90 WARN→DEGRADED；membership <0.50 行业迁移阻断为空；真实 101/150 水平不返回 OK（专项测试锁定）。
+- [x] 预热门禁：真实合格日（当日有基准且样本覆盖≥0.90，空样本=0）<120 记 INSUFFICIENT_WARMUP；预热回看 300 自然日；MA60/60 日基线不足保持 null。
+- [x] 公式复用与兼容：`MarketDerivedCalculators` 唯一实现，`Mr0PocAnalysisService` 委托重构，`/mr0-poc/**` 与 analysisContentHash 逐位兼容（PoC 回归 7/7）。
+- [x] 文档：`docs/api/MARKET_RESEARCH_API.md` §8 + `API_INDEX.md`（含补录 mr0-poc 条目）+ `docs/development/MARKET_RESEARCH_MR1A_BACKEND_IMPLEMENTATION.md`。
+- [x] 自动化：聚焦 31/31（MarketOverview 24 + PoC 回归 7）；全量 588 tests / 0 failures / 0 errors / 1 skipped；package 与 `git diff --check` 通过。
+- [ ] 运行时（NOT_VERIFIED）：Docker/MySQL 真实数据 curl（本地 2026-07 PoC 数据未执行真实请求）与 remote 验收；不标记 DEPLOYED。
+- [ ] 前端 MR-1B：市场全景页面消费 overview API（尚未开发；后端分支合并 main 前为前置阻断）。
+
 ## 8. 暂缓: 图片识别导入
 
 - [ ] 新增 AI import task 设计。

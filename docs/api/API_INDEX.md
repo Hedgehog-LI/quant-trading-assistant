@@ -68,10 +68,12 @@
 | Market Data | POST | `/api/v1/market-data/sector-catalog/ranking-configs/{market}/run` | 已实现（立即采集全市场榜单） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/sector-catalog/ranking-history[/{batchId}/items]` | 已实现（历史榜单批次和明细） | `MARKET_DATA_API.md` |
 | Market Research | GET | `/api/v1/market-research/readiness?market=` | 已实现（P1.10-A 数据门禁；无衍生数据返回可解释空态） | `MARKET_RESEARCH_API.md` |
+| Market Research | GET | `/api/v1/market-research/overview?market=CN&start=&end=` | 已实现（MR-1A 市场全景只读后端；首期仅 CN，dataScope=SAMPLE，资金流 UNAVAILABLE；前端尚未接入） | `MARKET_RESEARCH_API.md` §8 |
 | Market Research | POST | `/api/v1/market-research/calculations?market=&asOfDate=&window=` | 已实现（相对强弱 + 固定 5 日轮动，原子发布） | `MARKET_RESEARCH_API.md` |
 | Market Research | GET | `/api/v1/market-research/radar?market=&window=` | 已实现（只读最新发布批次，不调用 provider） | `MARKET_RESEARCH_API.md` |
 | Market Research | GET | `/api/v1/market-research/sectors/ranking-history?market=&window=&days=` | 已实现（最多 120 个发布交易日） | `MARKET_RESEARCH_API.md` |
 | Market Research | GET | `/api/v1/market-research/sectors/{sectorId}?market=&window=&days=` | 已实现（稳定板块身份详情） | `MARKET_RESEARCH_API.md` |
+| Market Research | POST / GET | `/api/v1/market-research/mr0-poc/ingest`、`/analyze`、`/report` | 已实现（MR-0 PoC 入口，ingest 受控默认关；不承诺 MR-1 稳定契约） | `MARKET_RESEARCH_API.md` §7 |
 | Agent | GET | `/api/v1/agent/capabilities` | 已实现（P1.8 Agent 能力查询，Bearer Token 鉴权） | `AGENT_ASSISTANT_API.md` |
 | Agent | GET | `/api/v1/agent/system/health` | 已实现（系统健康摘要） | `AGENT_ASSISTANT_API.md` |
 | Agent | GET | `/api/v1/agent/trading/today?date=` | 已实现（今日待办概览） | `AGENT_ASSISTANT_API.md` |

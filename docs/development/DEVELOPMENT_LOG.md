@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-08-16 — QTA V2 MR-1A 市场全景后端（正式只读 API，独立验收通过）
+
+- **目标**：实现 V2 市场全景 MVP 的正式后端只读能力 `GET /api/v1/market-research/overview?market=CN&start=&end=`（首期仅 CN），交付基准趋势与回撤、市场成交活跃度、市场广度、日频流动性代理、行业成交占比迁移五类核心证据与覆盖率/Provider/质量/不可用指标；不接入新 Provider、不回补全市场历史、不新增表、不开发前端。
+- **范围（后端 `marketdata.analysis` 包 + poc 重构）**：`MarketOverviewController/Service/CalculationManager`、只读 `MarketOverviewMapper`+XML（3 条 SELECT）、正式契约 `MarketOverviewVO`（record，不暴露 PoC 类型）；抽取 `MarketDerivedCalculators` 为 MR-0 冻结公式唯一实现（样本派生/广度计数/行业覆盖域聚合/占比/收益率/illiquidity/线性插值分位），`Mr0PocAnalysisService` 重构为委托且数值行为逐位不变（`/mr0-poc/**` 与 analysisContentHash 兼容）。
+- **口径与门禁**：dataScope 固定 SAMPLE（最新快照流通市值 Top-150 ∪ 基准）；M-22 覆盖门禁冻结阈值 `BAR_COVERAGE_WARN=0.90`、`MEMBERSHIP_COVERAGE_WARN=0.90`（低于记 WARN→DEGRADED）、`MEMBERSHIP_COVERAGE_BLOCK=0.50`（行业迁移阻断为空）；预热门禁 `MID_TERM_MIN_QUALIFIED_TRADING_DAYS=120`，合格日=当日有基准日 K 且当日样本覆盖率≥0.90（空样本恒 0），预热读取窗口前 300 自然日（明确冗余）；官方口径资金流 `OFFICIAL_MONEY_FLOW=UNAVAILABLE` 双声明，响应零推算资金流字段；coverageGap 不入占比分母；null 一律表示不可计算不填 0。
+- **验证**：聚焦 31/31（MarketOverview 24 = Manager 13 + Service 7 + Controller 4，含覆盖门禁五档、真实 101/150 不返回 OK、预热门禁四档 19/30/90/120 与合格日定义；`Mr0PocAnalysisServiceTest` 回归 7）；全量 **588 tests / 0 failures / 0 errors / 1 skipped**；`./mvnw -DskipTests package`、`git diff --check` 通过。独立验收通过（维护者指令记录）；Docker/MySQL 真实数据 curl 与 remote 运行时 NOT_VERIFIED。
+- **遗留**：前端 MR-1B 市场全景页面尚未开发（本接口暂无可视消费方）；阈值取值（0.90/0.50/120）建议独立验收时复核确认；`market_calendar` 回填后 qualifiedTradingDays 口径需复核。
+- **关联**：`features/QTA_V2_INSTITUTIONAL_MARKET_RESEARCH_DESIGN.md` §11、`features/MARKET_RESEARCH_MR0_METRIC_DICTIONARY.md`、`api/MARKET_RESEARCH_API.md` §8、`development/MARKET_RESEARCH_MR1A_BACKEND_IMPLEMENTATION.md`。
+
 ## 2026-08-16 — MR-0 收口治理门禁直接修复（独立验收通过）
 
 - **目标**：按 `QTA-V2-MR0-CLOSEOUT-20260815-R1-BLOCKED-CLOSURE.md` §4 的修复设计，消除 AC-05 时间门禁在多周期历史下的代际误报；不改 marketdata 业务代码，不改写 R1 `BLOCKED` 历史工件。

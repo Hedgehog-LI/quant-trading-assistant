@@ -3,6 +3,7 @@ package com.quant.trade.marketdata.poc;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.quant.trade.marketdata.analysis.derived.MarketDerivedCalculators;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -104,18 +105,24 @@ public class Mr0PocAnalysisService {
                 : universeRows.stream().filter(row -> universeAsOf.equals(row.getAsOfDate())).toList();
         // CR-3：样本=最新档快照流通市值降序 Top-N（排除基准与 null 市值；全池快照行仅作事实保留），
         // coverageGap/excludedForWarmup/COVERAGE/GAPS 全部以该 Top-N 样本为分母口径。
-        List<String> sampleSymbols = latestSnapshot.stream()
-                .filter(row -> !BENCHMARK.equals(row.getCanonicalSymbol()))
-                .filter(row -> row.getCirculatingMarketCap() != null)
-                .sorted(Comparator.comparing(Mr0PocAnalysisMapper.UniverseRow::getCirculatingMarketCap).reversed()
-                        .thenComparing(Mr0PocAnalysisMapper.UniverseRow::getCanonicalSymbol))
-                .limit(Math.max(command.getSampleSize(), 0))
-                .map(Mr0PocAnalysisMapper.UniverseRow::getCanonicalSymbol).distinct().sorted().toList();
+        List<String> sampleSymbols = MarketDerivedCalculators.deriveSampleSymbols(
+                latestSnapshot.stream()
+                        .map(row -> new MarketDerivedCalculators.SymbolMarketCap(
+                                row.getCanonicalSymbol(), row.getCirculatingMarketCap()))
+                        .toList(),
+                BENCHMARK, command.getSampleSize());
         List<String> hashSymbols = new ArrayList<>(sampleSymbols);
         hashSymbols.add(BENCHMARK);  // 哈希=Top-N ∪ 基准（排序后），检测样本漂移
         Collections.sort(hashSymbols);
-        Map<String, Mr0PocAnalysisMapper.MembershipRow> membership = new LinkedHashMap<>();
-        for (Mr0PocAnalysisMapper.MembershipRow row : mapper.selectIndustryMemberships(null, TAXONOMY_SINA_INDUSTRY)) { membership.putIfAbsent(row.getCanonicalSymbol(), row); }
+        Map<String, Mr0PocAnalysisMapper.MembershipRow> membershipRows = new LinkedHashMap<>();
+        for (Mr0PocAnalysisMapper.MembershipRow row : mapper.selectIndustryMemberships(null, TAXONOMY_SINA_INDUSTRY)) { membershipRows.putIfAbsent(row.getCanonicalSymbol(), row); }
+        Map<String, MarketDerivedCalculators.IndustryRef> industryMembership = new LinkedHashMap<>();
+        Map<String, String> industryNames = new TreeMap<>();
+        for (Map.Entry<String, Mr0PocAnalysisMapper.MembershipRow> entry : membershipRows.entrySet()) {
+            industryMembership.put(entry.getKey(), new MarketDerivedCalculators.IndustryRef(
+                    entry.getValue().getIndustryCode(), entry.getValue().getAsOfDate()));
+            industryNames.putIfAbsent(entry.getValue().getIndustryCode(), entry.getValue().getIndustryName());
+        }
         List<LocalDate> benchmarkDays = new ArrayList<>(closes.getOrDefault(BENCHMARK, new TreeMap<>()).keySet());
         Map<LocalDate, LocalDate> prevDay = new HashMap<>();
         for (int i = 1; i < benchmarkDays.size(); i++) { prevDay.put(benchmarkDays.get(i), benchmarkDays.get(i - 1)); }
@@ -135,10 +142,10 @@ public class Mr0PocAnalysisService {
                 .tradingDays(TradingDaysBlock.builder().calendar(CALENDAR).dates(tradingDays.stream().map(LocalDate::toString).toList())
                         .count(tradingDays.size()).providers(List.of(PROVIDER_TENCENT_PUBLIC)).build())
                 .breadth(breadth(tradingDays, prevDay, closes, sampleSymbols))
-                .industryTurnover(industryTurnover(tradingDays, amounts, sampleSymbols, membership))
+                .industryTurnover(industryTurnover(tradingDays, amounts, sampleSymbols, industryMembership, industryNames))
                 .volatility(volatility(tradingDays.isEmpty() ? null : tradingDays.get(tradingDays.size() - 1), closes, sampleSymbols))
                 .liquidityProxy(liquidity(tradingDays, prevDay, closes, amounts, sampleSymbols))
-                .moneyFacts(moneyFacts(tradingDays, flows, membership, sampleSymbols, amounts))
+                .moneyFacts(moneyFacts(tradingDays, flows, membershipRows, sampleSymbols, amounts))
                 .metricAttributions(attributions()).mixedMetrics(List.of("flowIntensity")).build();
         result.setAnalysisContentHash(computeContentHash(result));
         result.setDurationMs(System.currentTimeMillis() - started);
@@ -151,18 +158,11 @@ public class Mr0PocAnalysisService {
         Long adLine = null;
         boolean broken = false;
         for (LocalDate day : tradingDays) {
-            long adv = 0, dec = 0, flat = 0, valid = 0;
             LocalDate prev = prevDay.get(day);
-            if (prev != null) {
-                for (String symbol : sampleSymbols) {
-                    TreeMap<LocalDate, BigDecimal> series = closes.getOrDefault(symbol, new TreeMap<>());
-                    BigDecimal close = series.get(day), previous = series.get(prev);
-                    if (close == null || previous == null) continue;
-                    valid++;
-                    int cmp = close.compareTo(previous);
-                    if (cmp > 0) adv++; else if (cmp < 0) dec++; else flat++;
-                }
-            }
+            MarketDerivedCalculators.AdvanceDeclineCounts counts = prev == null
+                    ? new MarketDerivedCalculators.AdvanceDeclineCounts(0, 0, 0, 0)
+                    : MarketDerivedCalculators.advanceDeclineCounts(closes, day, prev, sampleSymbols);
+            long adv = counts.advancing(), dec = counts.declining(), flat = counts.flat(), valid = counts.validStocks();
             DailyBreadth row = DailyBreadth.builder().date(day.toString()).advancing(adv).declining(dec).flat(flat)
                     .validStocks(valid).status(valid == 0 ? STATUS_EMPTY : "OK").build();
             if (valid == 0) {
@@ -182,36 +182,27 @@ public class Mr0PocAnalysisService {
     private IndustryTurnoverBlock industryTurnover(List<LocalDate> tradingDays,
                                                    Map<String, TreeMap<LocalDate, BigDecimal>> amounts,
                                                    List<String> sampleSymbols,
-                                                   Map<String, Mr0PocAnalysisMapper.MembershipRow> membership) {
-        Map<String, String> industryNames = new TreeMap<>();
-        sampleSymbols.stream().map(membership::get).filter(Objects::nonNull)
-                .forEach(m -> industryNames.putIfAbsent(m.getIndustryCode(), m.getIndustryName()));
+                                                   Map<String, MarketDerivedCalculators.IndustryRef> membership,
+                                                   Map<String, String> industryNames) {
         Map<String, IndustryTurnover> byIndustryMap = new LinkedHashMap<>();
         List<DailyMarketTurnover> dailyMarket = new ArrayList<>();
         for (LocalDate day : tradingDays) {
-            Map<String, BigDecimal> sectorSum = new TreeMap<>();
-            BigDecimal market = BigDecimal.ZERO;
-            boolean lookahead = false;
-            for (String symbol : sampleSymbols) {
-                Mr0PocAnalysisMapper.MembershipRow m = membership.get(symbol);
-                if (m == null) continue;  // 无成分股票不入分母，计入 coverageGap
-                BigDecimal amount = amounts.getOrDefault(symbol, new TreeMap<>()).get(day);
-                if (amount == null) continue;
-                sectorSum.merge(m.getIndustryCode(), amount, BigDecimal::add);
-                market = market.add(amount);
-                lookahead = lookahead || m.getAsOfDate().isAfter(day);
-            }
+            MarketDerivedCalculators.IndustryDayAggregate aggregate =
+                    MarketDerivedCalculators.aggregateIndustryDay(membership, amounts, sampleSymbols, day);
+            Map<String, BigDecimal> sectorSum = aggregate.sectorTurnovers();  // 无成分股票不入分母，计入 coverageGap
+            BigDecimal market = aggregate.marketTurnover();
+            boolean lookahead = aggregate.membershipLookahead();
             BigDecimal sumShare = BigDecimal.ZERO;
-            for (BigDecimal sector : sectorSum.values()) { sumShare = sumShare.add(sector.divide(market, 10, RoundingMode.HALF_UP)); }
+            for (BigDecimal sector : sectorSum.values()) { sumShare = sumShare.add(MarketDerivedCalculators.turnoverShare(sector, market)); }
             if (!sectorSum.isEmpty()) {
                 dailyMarket.add(DailyMarketTurnover.builder().date(day.toString()).marketTurnover(setScale(market))
                         .sumShare(setScale10(sumShare)).build());  // CR-10：占比输出 10 位小数
             }
             for (Map.Entry<String, BigDecimal> sector : sectorSum.entrySet()) {
                 byIndustryMap.computeIfAbsent(sector.getKey(), code -> IndustryTurnover.builder().industryCode(code)
-                        .industryName(industryNames.getOrDefault(code, code)).days(new ArrayList<>()).build())
+                                .industryName(industryNames.getOrDefault(code, code)).days(new ArrayList<>()).build())
                         .getDays().add(IndustryDay.builder().date(day.toString()).sectorTurnover(setScale(sector.getValue()))
-                                .share(setScale10(sector.getValue().divide(market, 10, RoundingMode.HALF_UP)))  // CR-10
+                                .share(setScale10(MarketDerivedCalculators.turnoverShare(sector.getValue(), market)))  // CR-10
                                 .lookaheadAffected(lookahead).build());
             }
         }
@@ -238,7 +229,8 @@ public class Mr0PocAnalysisService {
         boolean blocked = vols.isEmpty();  // 合格股票数=0 → 整块阻断，无任何部分数值
         return VolatilityBlock.builder().asOfDate(blocked ? null : asOf.toString()).annualized(false)
                 .qualifiedStocks(vols.size()).excludedForWarmup(excluded)
-                .marketMedian(blocked ? null : percentile(vols, 0.5)).marketP90(blocked ? null : percentile(vols, 0.9))
+                .marketMedian(blocked ? null : MarketDerivedCalculators.percentile(vols, 0.5))
+                .marketP90(blocked ? null : MarketDerivedCalculators.percentile(vols, 0.9))
                 .status(blocked ? STATUS_WARMUP : "OK")
                 .caliber("20 日实现波动率=最近 21 根收盘的 20 个简单收益率样本标准差(ddof=1)，未年化")
                 .providers(List.of(PROVIDER_TENCENT_PUBLIC)).build();
@@ -261,7 +253,7 @@ public class Mr0PocAnalysisService {
                 BigDecimal amount = amounts.getOrDefault(symbol, new TreeMap<>()).get(day);
                 if (close == null || previous == null) continue;
                 if (amount == null || amount.signum() <= 0) { zeroRows++; continue; }  // amount=0 跳过并计数（除零守卫）
-                sum = sum.add(ratio(close, previous).abs().divide(amount, 20, RoundingMode.HALF_UP));
+                sum = sum.add(MarketDerivedCalculators.illiquidityValue(close, previous, amount));
                 observations++;
             }
             if (observations > 0) { means.add(sum.divide(BigDecimal.valueOf(observations), 12, RoundingMode.HALF_UP)); }
@@ -269,7 +261,8 @@ public class Mr0PocAnalysisService {
         means.sort(BigDecimal::compareTo);
         boolean empty = means.isEmpty();
         return LiquidityProxyBlock.builder().unit("1/元").zeroAmountRows(zeroRows).qualifiedStocks(means.size())
-                .marketMedian(empty ? null : percentile(means, 0.5)).marketP90(empty ? null : percentile(means, 0.9))
+                .marketMedian(empty ? null : MarketDerivedCalculators.percentile(means, 0.5))
+                .marketP90(empty ? null : MarketDerivedCalculators.percentile(means, 0.9))
                 .status(empty ? STATUS_EMPTY : "OK")
                 .caliber("illiquidity(i,t)=|close(t)/close(t-1)−1|/amount(t)，逐股窗口均值，市场中位数+P90")
                 .providers(List.of(PROVIDER_TENCENT_PUBLIC)).build();
@@ -377,22 +370,11 @@ public class Mr0PocAnalysisService {
 
     private BigDecimal realizedVol20(List<BigDecimal> closes21) {
         List<BigDecimal> returns = new ArrayList<>();
-        for (int i = 1; i < closes21.size(); i++) { returns.add(ratio(closes21.get(i), closes21.get(i - 1))); }
+        for (int i = 1; i < closes21.size(); i++) { returns.add(MarketDerivedCalculators.priceRatio(closes21.get(i), closes21.get(i - 1))); }
         BigDecimal mean = returns.stream().reduce(BigDecimal.ZERO, BigDecimal::add).divide(BigDecimal.valueOf(returns.size()), 20, RoundingMode.HALF_UP);
         BigDecimal variance = returns.stream().map(value -> value.subtract(mean).pow(2)).reduce(BigDecimal.ZERO, BigDecimal::add)
                 .divide(BigDecimal.valueOf(returns.size() - 1L), 20, RoundingMode.HALF_UP);
         return BigDecimal.valueOf(Math.sqrt(variance.doubleValue())).setScale(12, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal ratio(BigDecimal close, BigDecimal previous) { return close.divide(previous, 20, RoundingMode.HALF_UP).subtract(BigDecimal.ONE); }
-
-    /** 线性插值分位（字典 M-21 冻结方法）。 */
-    private BigDecimal percentile(List<BigDecimal> sorted, double quantile) {
-        double index = quantile * (sorted.size() - 1);
-        int lower = (int) Math.floor(index);
-        int upper = Math.min(lower + 1, sorted.size() - 1);
-        return sorted.get(lower).add(sorted.get(upper).subtract(sorted.get(lower))
-                .multiply(BigDecimal.valueOf(index - lower))).setScale(12, RoundingMode.HALF_UP);
     }
 
     /** 众数（并列取较小值，TreeMap+max 首遇确定性）。 */

@@ -1,6 +1,6 @@
 # Market Research API
 
-> 实现状态：P1.10-A/A1 前后端候选已实现（2026-08-14）；`1/5/10/20/50` 查询窗口的自动化与 mock 浏览器通过，真实数据 remote 运行时待验。
+> 实现状态：P1.10-A/A1 前后端候选已实现（2026-08-14）；`1/5/10/20/50` 查询窗口的自动化与 mock 浏览器通过，真实数据 remote 运行时待验。MR-1A 市场全景只读后端 API 已实现（2026-08-16，见 §8；前端尚未接入）。
 
 ## 1. 能力边界
 
@@ -274,3 +274,121 @@ GET /api/v1/market-research/mr0-poc/report?start=2026-07-01&end=2026-07-31&forma
 `universe.sampleSymbolList`，排除基准与非样本符号，与广度分母同口径），`COVERAGE`/`GAPS` 同以
 该样本清单为分母口径；基准 SH.000001 指数行免字典 §3 个股 VWAP 单位自检；跨进程重算一致性由
 PoC 脚本两次运行（TEST-07）与"每次调用重读存储"用例证明。
+
+## 8. MR-1A 市场全景（正式只读 API，2026-08-16）
+
+`GET /api/v1/market-research/overview?market=CN&start=YYYY-MM-DD&end=YYYY-MM-DD`。首期仅支持
+`CN`；三个参数全部必填；`start<=end` 且跨度 ≤365 天，否则 400 `VALIDATION_ERROR`（畸形日期同样
+400）。只读已落库事实（TENCENT_PUBLIC 日 K + SINA_PUBLIC 证券池快照/行业成分），零外联、零写库、
+不读取资金流。数据不足（窗口无基准、空样本、行业映射缺失）返回 200 + `metadata.qualityStatus`
+（`NO_DATA`/`DEGRADED`）+ `quality.qualityFindings`，不抛 500。
+
+数据边界（`metadata` 固定声明，前端必须展示）：`dataScope=SAMPLE`（最新快照流通市值 Top-150
+样本，不是全市场）；行业分类 `SINA_INDUSTRY` 不是 PIT 申万；当前成分聚合历史存在时点穿越假设；
+不提供官方口径全市场资金流（`unavailableMetrics=["OFFICIAL_MONEY_FLOW"]`，禁止由价量推算）。
+
+覆盖与预热门禁（M-22，冻结阈值）：
+
+- `barCoverage` = 窗口样本日 K 覆盖率（有效收盘对数 / 窗口交易日×样本数）；低于 **0.90** 记
+  `LOW_BAR_COVERAGE` WARN。
+- `membershipCoverage` = 有行业成分映射的样本证券占比；低于 **0.90** 记 `LOW_MEMBERSHIP_COVERAGE`
+  WARN（整体 `qualityStatus=DEGRADED`）；低于 **0.50** 视为严重不足，追加
+  `INDUSTRY_MIGRATION_BLOCKED` WARN 并将 `industryTurnoverMigration` 阻断为空——不得按极少数
+  映射股票输出误导性行业图；全部缺失记 `INDUSTRY_MAPPING_MISSING` WARN。
+- 预热门禁（设计 §9.2）：市场全景中期结论至少需要 **120** 个合格交易日；不足记
+  `INSUFFICIENT_WARMUP` WARN 并整体 `DEGRADED`。短期可计算序列照常返回；`MA60`、60 日成交额
+  中位数等预热不足指标保持 `null`，不得填 0。
+  `metadata.qualifiedTradingDays` = 真实合格交易日数（含预热），**合格日 = 当日存在基准日 K 且
+  当日样本日 K 覆盖率 ≥ 0.90**；空样本恒为 0，不得以基准 K 线数量冒充样本市场合格。预热读取为
+  窗口前 300 个自然日（A 股最坏日历比约 1.5 自然日/交易日，120 交易日 ≤ 约 185 自然日；300 日
+  提供明确冗余，最坏仍可覆盖 ≥190 个交易日）。
+- 任何 WARN 发现使 `qualityStatus=DEGRADED`；窗口无基准交易日为 `NO_DATA`。真实 PoC 数据
+  （barCoverage≈0.89、membershipCoverage≈0.67）必须返回 `DEGRADED`，不得返回 `OK`。
+
+五类核心证据（公式冻结于 MR-0 指标字典 M-01..M-13/M-20/M-21）：
+
+- `benchmarkSeries`：基准收盘、`dailyReturn`、成交额、`ma20`/`ma60`（读窗口前最多 180 自然日
+  预热，观测不足为 null）、`drawdown`（相对窗口内累计峰值，≤0）。
+- `activitySeries`：样本域成交额（M-03，非全市场）、20/60 日成交额中位数（含 t；观测不足为
+  null）、`activityRatio=marketTurnover/turnoverMedian20`（M-04）、`activeStockRatio` 成交扩散
+  （M-13：当日成交额严格大于自身前 20 个交易日中位数的证券占比）。只称"成交活跃度"，不称完整
+  市场流动性。
+- `breadthSeries`：adv/dec/flat/valid（M-06）、`advanceRatio`（M-07）、`adLine`（M-08 首日种子
+  adv−dec，空有效池后中断）、`aboveMa20Stocks`/`aboveMa20Ratio`（M-09：历史不足 20 个收盘观测
+  的证券不入分母）。
+- `liquidityProxySeries`：`unit="1/元"`，逐日横截面 `medianIlliquidity`/`p90Illiquidity`（M-20
+  `|r|/amount`，M-21 线性插值分位，12 位小数）、`qualifiedStocks`、`zeroAmountRows`（除零守卫）。
+  只是日频价格冲击代理，不冒充买卖价差、盘口深度或真实交易冲击成本。
+- `industryTurnoverMigration`：每日成交额降序前 8 行业单独返回，其余合并 `OTHER`（rank=null）；
+  `turnoverShare` 分母仅为覆盖域（有行业映射的样本股，M-12），未映射证券数量与成交额只进
+  `quality.coverageGap` 不入分母；`previousDayShareChange`=实体自身占比前值变化（OTHER 用其自身
+  序列）、`median20Share(Change)`=近 20 个交易日（含 t）占比观测中位数及其偏差；占比是"交易
+  注意力"，不得命名为资金流入。
+
+`quality` 另含 `providerAttribution`（benchmarkDailyBar/sampleDailyBar=TENCENT_PUBLIC，
+sampleUniverseSnapshot/industryMembership=SINA_PUBLIC）、`assumptions`（INDEX_KLINE_DERIVED
+日历、时点穿越、NONE 复权除权失真、样本口径）与 `qualityFindings`（`BENCHMARK_DATA_MISSING`/
+`EMPTY_SAMPLE`/`LOW_BAR_COVERAGE`/`LOW_MEMBERSHIP_COVERAGE`/`INDUSTRY_MIGRATION_BLOCKED`/
+`INSUFFICIENT_WARMUP`/`EMPTY_VALID_TRADING_DAY`/`INDUSTRY_MAPPING_MISSING`/
+`PARTIAL_INDUSTRY_MAPPING`；WARN 使整体状态降为 DEGRADED）。
+
+请求与响应示例：
+
+```http
+GET /api/v1/market-research/overview?market=CN&start=2026-07-01&end=2026-07-31
+```
+
+```json
+{ "success": true, "code": "SUCCESS", "data": {
+  "metadata": { "market": "CN", "startDate": "2026-07-01", "endDate": "2026-07-31",
+    "dataAsOf": "2026-07-31", "dataScope": "SAMPLE", "sampleSize": 150,
+    "benchmarkSymbol": "SH.000001", "providerCodes": ["SINA_PUBLIC", "TENCENT_PUBLIC"],
+    "taxonomyCode": "SINA_INDUSTRY", "barCoverage": 0.893333, "membershipCoverage": 0.673333,
+    "qualifiedTradingDays": 131, "qualityStatus": "DEGRADED",
+    "limitations": [
+      "当前为 Top-N 样本（最新快照流通市值前 150 只），不是全市场",
+      "行业分类为 SINA_INDUSTRY 快照，不是 PIT 申万行业",
+      "行业成分按抓取日快照聚合历史，存在时点穿越假设",
+      "不提供官方口径全市场资金流（OFFICIAL_MONEY_FLOW=UNAVAILABLE）"],
+    "unavailableMetrics": ["OFFICIAL_MONEY_FLOW"] },
+  "benchmarkSeries": [ { "tradeDate": "2026-07-01", "closePrice": 3050.00,
+    "dailyReturn": 0.0012345678, "amount": 300000.00, "ma20": 3011.500000, "ma60": 2980.250000,
+    "drawdown": 0.0000000000 } ],
+  "activitySeries": [ { "tradeDate": "2026-07-01", "marketTurnover": 3958000000.00,
+    "turnoverMedian20": 3900000000.00, "turnoverMedian60": 3880000000.00, "activityRatio": 1.0148717949,
+    "activeStockRatio": 0.4000000000, "validStocks": 150 } ],
+  "breadthSeries": [ { "tradeDate": "2026-07-01", "advancingStocks": 78, "decliningStocks": 61,
+    "flatStocks": 11, "validStocks": 150, "advanceRatio": 0.5200000000, "adLine": 17,
+    "aboveMa20Stocks": 60, "aboveMa20Ratio": 0.4000000000 } ],
+  "liquidityProxySeries": { "unit": "1/元",
+    "caliber": "日频价格冲击代理 illiquidity=|close(t)/close(t−1)−1|/amount(t)……",
+    "days": [ { "tradeDate": "2026-07-01", "medianIlliquidity": 0.000000031234,
+      "p90Illiquidity": 0.000000112345, "qualifiedStocks": 150, "zeroAmountRows": 0 } ] },
+  "industryTurnoverMigration": [ { "tradeDate": "2026-07-01", "industryCode": "new_blhy",
+    "industryName": "玻璃行业", "turnover": 123456789.00, "turnoverShare": 0.0312000000,
+    "previousDayShareChange": 0.0005000000, "median20Share": 0.030000000000,
+    "median20ShareChange": 0.0012000000, "rank": 3, "coveredStocks": 8 } ],
+  "quality": {
+    "coverageGap": { "uncoveredSampleStocks": 49, "uncoveredTurnoverAmount": 1234567.00,
+      "symbols": ["BJ.920099"] },
+    "providerAttribution": [
+      { "dataset": "benchmarkDailyBar", "providers": ["TENCENT_PUBLIC"] },
+      { "dataset": "sampleDailyBar", "providers": ["TENCENT_PUBLIC"] },
+      { "dataset": "sampleUniverseSnapshot", "providers": ["SINA_PUBLIC"] },
+      { "dataset": "industryMembership", "providers": ["SINA_PUBLIC"] }],
+    "qualityFindings": [ { "code": "LOW_BAR_COVERAGE", "severity": "WARN",
+      "message": "窗口样本日 K 覆盖率 0.893333（存在单日覆盖低于 0.90 的交易日）", "affectedCount": 23 },
+      { "code": "LOW_MEMBERSHIP_COVERAGE", "severity": "WARN",
+      "message": "行业映射覆盖率 0.673333 低于告警阈值 0.90（未映射 49/150 只）", "affectedCount": 49 } ],
+    "assumptions": [
+      "交易日集合由基准指数日 K 推导（INDEX_KLINE_DERIVED）；market_calendar CN 为空表未回填",
+      "证券池与行业成分取分析时点可见最新档快照（as_of 无上界），当前成分聚合历史为显式时点穿越假设",
+      "全部价格事实为 NONE 复权（adjust_type=NONE），除权日收益率失真是已知失效条件（字典 D7）",
+      "样本域成交额为 Top-N 样本股合计（字典 M-03），不可宣称为全市场成交额"],
+    "unavailableMetrics": ["OFFICIAL_MONEY_FLOW"] } }, "timestamp": "2026-08-16T12:00:00" }
+```
+
+（示例为真实 PoC 覆盖水平口径演示：`barCoverage=0.893333`、`membershipCoverage=0.673333` 均低于
+0.90 告警阈值，故 `qualityStatus=DEGRADED` 且携带两条 WARN 发现——该覆盖水平绝不返回 `OK`。
+`ma60`/`turnoverMedian60` 在预热不足（合格交易日 &lt;60）时为 null，`adLine` 为窗口内累计值。
+响应所有 `null` 表示"该日该指标不可计算"，前端不得以 0 展示。）

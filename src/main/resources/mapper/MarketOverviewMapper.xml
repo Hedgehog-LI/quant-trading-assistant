@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    MR-1A 市场全景只读查询（衍生只读边界：仅 SELECT，不写任何事实表）。数据复用 MR-0 PoC
+    已落库事实（stock_daily_bar / mr0_universe_snapshot / mr0_industry_membership），
+    不外联 provider。statement id 与 MarketOverviewMapper 接口方法名一一对应（恰 3 条）；
+    比较符统一 XML 实体转义；列名映射依赖 map-underscore-to-camel-case。
+-->
+<mapper namespace="com.quant.trade.marketdata.analysis.dao.MarketOverviewMapper">
+
+    <select id="selectDailyBars" resultType="com.quant.trade.marketdata.analysis.dao.MarketOverviewMapper$DailyBarRow">
+        SELECT canonical_symbol, trade_date, open_price, high_price, low_price, close_price,
+               volume, amount, data_source, adjust_type, fetched_at
+        FROM stock_daily_bar
+        WHERE data_source = #{providerCode}
+          AND trade_date &gt;= #{startDate} AND trade_date &lt;= #{endDate}
+        ORDER BY canonical_symbol, trade_date
+    </select>
+
+    <select id="selectUniverseSnapshots" resultType="com.quant.trade.marketdata.analysis.dao.MarketOverviewMapper$UniverseSnapshotRow">
+        SELECT canonical_symbol, name, market, turnover_rate, circulating_market_cap, provider_code, as_of_date
+        FROM mr0_universe_snapshot
+        WHERE provider_code = #{providerCode}
+        ORDER BY as_of_date DESC, canonical_symbol
+    </select>
+
+    <select id="selectIndustryMemberships" resultType="com.quant.trade.marketdata.analysis.dao.MarketOverviewMapper$MembershipRow">
+        SELECT industry_code, industry_name, canonical_symbol, provider_code, as_of_date
+        FROM mr0_industry_membership
+        WHERE taxonomy_code = #{taxonomyCode}
+        ORDER BY canonical_symbol, as_of_date DESC
+    </select>
+</mapper>
