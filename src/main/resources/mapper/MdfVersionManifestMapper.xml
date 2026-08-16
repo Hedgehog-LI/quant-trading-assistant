@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    版本血缘 manifest（V25）。行哈希在 Java 侧计算并冻结（H2/MySQL 均无 SHA2 方言差异）：
+    sha256(concat_ws('|', canonical_symbol, trade_date, open, high, low, close, volume, amount, data_source, adjust_type))
+    数值列以数据库字符串化文本参与哈希（decimal 原值、volume bigint）。
+-->
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfVersionManifestMapper">
+
+    <resultMap id="BaseResultMap" type="com.quant.trade.marketdata.foundation.model.MdfVersionManifestDO">
+        <id column="id" property="id"/>
+        <result column="dataset_version_id" property="datasetVersionId"/>
+        <result column="bar_id" property="barId"/>
+        <result column="canonical_symbol" property="canonicalSymbol"/>
+        <result column="trade_date" property="tradeDate"/>
+        <result column="row_hash" property="rowHash"/>
+        <result column="source_type" property="sourceType"/>
+        <result column="source_id" property="sourceId"/>
+        <result column="included_at" property="includedAt"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insertBatch">
+        INSERT INTO mdf_dataset_version_manifest (dataset_version_id, bar_id, canonical_symbol, trade_date,
+            row_hash, source_type, source_id, included_at) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.datasetVersionId}, #{item.barId}, #{item.canonicalSymbol}, #{item.tradeDate},
+             #{item.rowHash}, #{item.sourceType}, #{item.sourceId}, #{item.includedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE row_hash = VALUES(row_hash), source_type = VALUES(source_type),
+            source_id = VALUES(source_id), included_at = VALUES(included_at)
+    </insert>
+
+    <select id="countByVersion" resultType="long">
+        SELECT COUNT(1) FROM mdf_dataset_version_manifest WHERE dataset_version_id = #{datasetVersionId}
+    </select>
+
+    <!-- 流式读取（symbol,trade_date,row_hash）供内容哈希聚合（ResultHandler 避免整表驻内存） -->
+    <select id="streamOrderedRowHashes" resultType="com.quant.trade.marketdata.foundation.model.MdfManifestRowHashDO">
+        SELECT canonical_symbol AS canonicalSymbol, trade_date AS tradeDate, row_hash AS rowHash
+        FROM mdf_dataset_version_manifest
+        WHERE dataset_version_id = #{datasetVersionId}
+        ORDER BY canonical_symbol, trade_date
+    </select>
+
+    <!-- 漂移校验输入：manifest 冻结哈希 + bar 当前内容（Java 侧重算比对；bar 缺失/键漂移一并检出） -->
+    <select id="streamDriftPairs" resultType="com.quant.trade.marketdata.foundation.model.MdfManifestDriftPairDO">
+        SELECT m.row_hash AS frozenHash, m.canonical_symbol AS canonicalSymbol, m.trade_date AS tradeDate,
+               b.id AS barId, b.canonical_symbol AS barSymbol, b.trade_date AS barDate,
+               b.open_price AS openPrice, b.high_price AS highPrice, b.low_price AS lowPrice,
+               b.close_price AS closePrice, b.volume AS volume, b.amount AS amount,
+               b.data_source AS dataSource, b.adjust_type AS adjustType
+        FROM mdf_dataset_version_manifest m
+        LEFT JOIN stock_daily_bar b ON b.id = m.bar_id
+        WHERE m.dataset_version_id = #{datasetVersionId}
+        ORDER BY m.canonical_symbol, m.trade_date
+    </select>
+
+    <select id="countForeignRows" resultType="long">
+        SELECT COUNT(1) FROM mdf_dataset_version_manifest m
+        JOIN stock_daily_bar b ON b.id = m.bar_id
+        WHERE m.dataset_version_id = #{datasetVersionId}
+          AND (b.data_source != #{expectedDataSource} OR b.adjust_type != #{expectedAdjustType})
+    </select>
+
+    <select id="countDistinctDates" resultType="long">
+        SELECT COUNT(DISTINCT trade_date) FROM mdf_dataset_version_manifest
+        WHERE dataset_version_id = #{datasetVersionId}
+    </select>
+
+    <select id="countSymbolsOnDate" resultType="long">
+        SELECT COUNT(DISTINCT canonical_symbol) FROM mdf_dataset_version_manifest
+        WHERE dataset_version_id = #{datasetVersionId} AND trade_date = #{tradeDate}
+    </select>
+
+    <select id="selectSymbolStats" resultType="com.quant.trade.marketdata.foundation.model.MdfSymbolBarStatDO">
+        SELECT canonical_symbol AS canonicalSymbol, COUNT(1) AS rowCount,
+               MIN(trade_date) AS firstDate, MAX(trade_date) AS lastDate
+        FROM mdf_dataset_version_manifest
+        WHERE dataset_version_id = #{datasetVersionId}
+        GROUP BY canonical_symbol
+        ORDER BY canonical_symbol
+    </select>
+
+    <!-- ======== R1：manifest 域（版本归属行）质量聚合 ======== -->
+
+    <select id="countDuplicatedKeys" resultType="long">
+        SELECT COUNT(1) FROM (
+            SELECT canonical_symbol, trade_date FROM mdf_dataset_version_manifest
+            WHERE dataset_version_id = #{datasetVersionId}
+            GROUP BY canonical_symbol, trade_date HAVING COUNT(1) &gt; 1
+        ) duplicated
+    </select>
+
+    <select id="countOhlcViolations" resultType="long">
+        SELECT COUNT(1) FROM mdf_dataset_version_manifest m
+        JOIN stock_daily_bar b ON b.id = m.bar_id
+        WHERE m.dataset_version_id = #{datasetVersionId}
+          AND (b.high_price &lt; b.low_price OR b.high_price &lt; b.open_price OR b.high_price &lt; b.close_price
+               OR b.low_price &gt; b.open_price OR b.low_price &gt; b.close_price
+               OR b.open_price &lt;= 0 OR b.high_price &lt;= 0 OR b.low_price &lt;= 0 OR b.close_price &lt;= 0)
+    </select>
+
+    <select id="countUnitAnomalies" resultType="long">
+        SELECT COUNT(1) FROM mdf_dataset_version_manifest m
+        JOIN stock_daily_bar b ON b.id = m.bar_id
+        WHERE m.dataset_version_id = #{datasetVersionId}
+          AND (b.volume &lt; 0 OR b.amount &lt; 0
+               OR (b.volume &gt; 0 AND (b.amount / b.volume &lt; b.low_price OR b.amount / b.volume &gt; b.high_price)))
+    </select>
+
+    <!-- 周末（DAYOFWEEK 1=周日 7=周六）；日历非空时同时要求命中 is_trading_day=TRUE -->
+    <select id="countNonTradingDayRows" resultType="long">
+        SELECT COUNT(1) FROM mdf_dataset_version_manifest m
+        JOIN stock_daily_bar b ON b.id = m.bar_id
+        WHERE m.dataset_version_id = #{datasetVersionId}
+          <choose>
+              <when test="calendarDays > 0">
+                AND (DAYOFWEEK(m.trade_date) IN (1, 7) OR NOT EXISTS (
+                    SELECT 1 FROM market_calendar c
+                    WHERE c.market_code = #{marketCode} AND c.trade_date = m.trade_date AND c.is_trading_day = TRUE))
+              </when>
+              <otherwise>
+                AND DAYOFWEEK(m.trade_date) IN (1, 7)
+              </otherwise>
+          </choose>
+    </select>
+
+    <select id="selectMaxFetchedAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(b.fetched_at) FROM mdf_dataset_version_manifest m
+        JOIN stock_daily_bar b ON b.id = m.bar_id
+        WHERE m.dataset_version_id = #{datasetVersionId}
+    </select>
+</mapper>

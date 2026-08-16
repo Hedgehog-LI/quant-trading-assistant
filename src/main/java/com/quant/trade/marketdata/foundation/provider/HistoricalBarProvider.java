@@ -21,4 +21,10 @@ public interface HistoricalBarProvider {
      * 拉取单标的日 K（含边界）。窗口内无数据返回空列表（由调用方决定跳过/失败语义）。
      */
     List<ProviderDailyBar> getDailyBars(String canonicalSymbol, LocalDate start, LocalDate end);
+
+    /**
+     * 单次请求安全日期窗口（自然日）。Provider 必须保证窗口内交易日条数不超过其单次返回上限
+     * （R1：腾讯公共源单次约 640 条 → 365 自然日 ≈ 245 交易日，二维分片按此切窗防截断）。
+     */
+    int safeRequestWindowDays();
 }

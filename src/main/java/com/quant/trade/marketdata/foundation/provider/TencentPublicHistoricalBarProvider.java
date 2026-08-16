@@ -31,6 +31,9 @@ public class TencentPublicHistoricalBarProvider implements HistoricalBarProvider
 
     public static final String PROVIDER_CODE = "TENCENT_PUBLIC";
 
+    /** 单次请求安全日期窗口（自然日）：约 245 交易日 << 端点单次 640 条上限（R1 二维分片防截断）。 */
+    public static final int SAFE_REQUEST_WINDOW_DAYS = 365;
+
     private final PublicMarketDataClient client;
     private final long throttleMs;
     private final long backoffBaseMs;
@@ -77,6 +80,11 @@ public class TencentPublicHistoricalBarProvider implements HistoricalBarProvider
     @Override
     public String supportedAdjustType() {
         return "NONE";
+    }
+
+    @Override
+    public int safeRequestWindowDays() {
+        return SAFE_REQUEST_WINDOW_DAYS;
     }
 
     @Override

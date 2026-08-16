@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.quant.trade.marketdata.foundation.dao.MdfBackfillTaskSymbolMapper">
+
+    <insert id="insertBatch">
+        INSERT INTO mdf_backfill_task_symbol (task_id, canonical_symbol) VALUES
+        <foreach collection="symbols" item="symbol" separator=",">
+            (#{taskId}, #{symbol})
+        </foreach>
+        ON DUPLICATE KEY UPDATE task_id = VALUES(task_id)
+    </insert>
+
+    <select id="selectByTask" resultType="string">
+        SELECT canonical_symbol FROM mdf_backfill_task_symbol WHERE task_id = #{taskId} ORDER BY canonical_symbol
+    </select>
+
+    <select id="countByTask" resultType="long">
+        SELECT COUNT(1) FROM mdf_backfill_task_symbol WHERE task_id = #{taskId}
+    </select>
+</mapper>
