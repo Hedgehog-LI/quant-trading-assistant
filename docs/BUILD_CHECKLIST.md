@@ -382,6 +382,21 @@
 - [ ] 独立验收与合并：候选 commit 未 push，双仓任务分支待 Codex 独立验收后合并 main。
 - [ ] 服务器部署验收：NOT_DEPLOYED（生产 Nginx 同源 `/api/v1` 反代 + 后端合并 main 为前置）。
 
+### QTA V2-1 A 股历史数据底座已完成完整候选（2026-08-16，AUTOMATION+RUNTIME 本地验证通过，待独立验收）
+
+- [x] 契约与 ADR：`QTA-V2-DATA-FOUNDATION-V21-CONTRACT.md`（L2 主会话直实现+一次边界检查）+ ADR-0015（Provider 边界/单位冻结/资金流 BLOCKED/PIT 语义）。
+- [x] 正式数据模型 V24：`mdf_*` 10 表（dataset/version+发布指针、universe 快照、taxonomy、PIT membership 半开区间、coverage、backfill task/chunk、import batch、quality result）；事实复用 stock_daily_bar/stock_basic/market_calendar 不复制；mr0_* 不被正式能力依赖。
+- [x] 回补引擎：chunk 拆分边界、断点续跑、失败分片重试、暂停恢复、幂等重跑（ODKU inserted=0）、claim 防并发、计划/成功/失败/跳过/写入计数、节流+指数退避+401/403 不重试（TENCENT_PUBLIC 单位换算手×100/万元×10000/%÷100）。
+- [x] CSV 导入通道：五类 schema 表头冻结（表头不符整批 400）、行级错误报告、kind+file_hash 幂等、IMPORT_* 来源标记、PIT 区间文件内重叠拒绝。
+- [x] 质量门禁与发布：13 族检查（FAIL：空数据/重复/OHLC/单位/非交易日/成分重叠/无效区间/口径混用；WARN：日历缺失/池覆盖/缺口/未映射/陈旧）；QUALIFIED 才可发布；旧 RELEASED→RETIRED+指针原子切换；失败版本不成为默认。
+- [x] REST API：`/api/v1/market-data/data-foundation/*` 18 端点；DTO/Validation/ErrorCodeEnum/统一响应。
+- [x] 前端数据中心 `/data-foundation`：回补任务表单（2021 边界/chunkSize 1-500 校验）+列表+分片详情重试暂停、数据集版本+质量+覆盖率+发布、导入上传+批次+错误报告；loading/empty/error/partial；mock 模式提示切换后端不伪造；remote 失败不回退。
+- [x] 自动化：后端 **627 tests / 0 failures / 0 errors / 1 skipped**（含 foundation T01-T14 39 用例）+ package + 架构门禁 errors=0（REVIEW-G1 REVIEW_CLEAR，候选 2614 行经一次边界审查）；前端 typecheck/lint/**441 tests**/build + `git diff --check` 双仓干净。
+- [x] 运行时（Docker/MySQL 真库）：Flyway 到 V24；CSV 导入→幂等重放同批次；质量门禁真实检出跨源混用 409 行+LONGPORT 脏数据 1 行→REJECTED+发布拒绝；2021 干净窗口 QUALIFIED→RELEASED→released/coverage 查询；TENCENT_PUBLIC 极小真实回补（SH.600519×3 日 SUCCEEDED）；前端 remote 真实渲染+截图。运行时暴露并修复 MySQL 方言缺陷（CAST AS SIGNED）。证据：`QTA-V2-DATA-FOUNDATION-V21-RUNTIME-VERIFICATION.md`。
+- [ ] Codex 独立验收 → 合并 main（双仓分支未 push 未合并）。
+- [ ] 全量真实回补执行（2021 起全 A；本轮仅证明执行能力）；公共源生产化需另立 ADR。
+- [ ] 服务器部署验收：NOT_DEPLOYED。
+
 ## 8. 暂缓: 图片识别导入
 
 - [ ] 新增 AI import task 设计。

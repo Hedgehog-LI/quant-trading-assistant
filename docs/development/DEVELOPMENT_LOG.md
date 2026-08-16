@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-08-16 — QTA V2-1 A 股历史数据底座（完整候选，AUTOMATION+RUNTIME 本地验证通过，待独立验收）
+
+- **目标**：为 MR-2 建设可持续使用的 A 股历史数据底座：正式数据模型、历史回补闭环、无凭据 CSV 导入、质量与发布门禁、REST API、前端数据中心操作闭环。不开发 MR-2 页面、不重写采集引擎、不建资金流正式表（凭据阻断）。
+- **契约/ADR**：`tasks/QTA-V2-DATA-FOUNDATION-V21-CONTRACT.md`（L2，主会话直实现+两个一次性实施子代理+一次边界审查 G1，按用户指令不跑多代编排）；ADR-0015 冻结 Provider 边界——全 A 池/日 K=SINA/TENCENT 公共源（EXPERIMENTAL）、日历+PIT 成分=CSV 导入、官方资金流=BLOCKED（TUSHARE 无凭据）、SINA_INDUSTRY 非申万、单位冻结元/股/小数、首期仅 NONE 复权。
+- **数据模型（V24，mdf_* 10 表）**：dataset/version+current_version_id 发布指针、universe 快照、taxonomy、PIT membership（半开区间，to NULL=至今）、coverage、backfill task（claim token，scope 普通索引+服务层活跃防重）/chunk（断点=按状态续跑）、import batch（kind+file_hash 幂等）、quality result。日 K/证券/日历事实复用既有表不复制。
+- **后端（marketdata.foundation 包）**：回补引擎（createTask 校验与数据集定义一致+2021 边界+chunkSize 1-500+symbols≤2000；run 断点续跑；pause 释放 claim；retryFailed；任务计数从分片表确定性重算；日 K ODKU 幂等；TencentPublicHistoricalBarProvider 节流 300ms+指数退避 500ms×2^n×3 次+401/403 不重试+单位换算）；SnapshotFileParser/CsvSnapshotParser 纯解析+SnapshotImportService 编排（五类 schema、表头显式校验、行级错误报告≤50 条、PIT 区间重叠拒绝）；DataQualityService 13 族检查→QUALIFIED/REJECTED；DatasetPublicationService 发布原子切换；DataFoundationController 18 端点。
+- **前端（data-foundation feature + /data-foundation 页面）**：三 Tab（回补任务/数据集与版本/导入），全状态纪律（null→--、mock 模式提示切换后端不伪造、remote 失败不回退、发布按钮按版本状态禁用）。
+- **验证**：后端 **627 tests / 0/0/1**（foundation T01-T14 39 用例：空库 V24 迁移、XML 读写、chunk 边界、断点/幂等/并发/重试、节流退避、CSV 校验/幂等/PIT、13 族质量、发布门禁、Controller 错误码、架构防回归）+ package + 架构门禁 errors=0（REVIEW-G1：0 BLOCKER/0 MAJOR/6 NOTE，含"候选 2614 行经一次审查"）；前端 typecheck/lint/**441 tests**/build 全绿。**Docker/MySQL 真库运行时全链路**：health UP、Flyway 24、CSV 导入→同文件幂等重放（同批次 id）、质量门禁真实检出既有跨源混用 409 行+LONGPORT 手/股脏数据 1 行→REJECTED+发布拒绝、2021 干净窗口 13 族通过→QUALIFIED→RELEASED→released/coverage 查询、TENCENT_PUBLIC 极小真实回补 SH.600519×3 日 SUCCEEDED（updated=3=既有行 ODKU 刷新）、前端 remote 真实渲染+截图。**运行时暴露并修复 MySQL 方言缺陷**（selectMaxVersionSeq CAST AS INT→SIGNED，H2 全绿但真库报错——运行时验证价值实证）。
+- **实施方式记录**：主会话（模型/Mapper/引擎/质量/发布/API）+一次性子代理 A（后端测试 T01-T14+7 处生产缺陷修复）+一次性子代理 B（前端数据中心）+主会话架构修复（解析器接口隔离/检查族拆分）与边界审查。
+- **遗留**：候选未 push 待 Codex 独立验收；全量真实回补未执行（仅证明执行能力）；TUSHARE/LONGBRIDGE NOT_VERIFIED、资金流正式表 BLOCKED；服务器 NOT_DEPLOYED；WARN 技术债（DataBackfillService 426 行/22 方法等，见 REVIEW-G1）。
+- **关联**：`tasks/QTA-V2-DATA-FOUNDATION-V21-{CONTRACT,REVIEW-G1,RUNTIME-VERIFICATION}.md`、ADR-0015、`api/MARKET_DATA_API.md` §7、`DATABASE_DESIGN.md` mdf_* 节、前端仓库 `docs/development/DATA_FOUNDATION_FRONTEND_IMPLEMENTATION.md`。
+
 ## 2026-08-16 — QTA V2 MR-1B 市场全景前端（完整产品交付候选，本地测试+真实后端浏览器验收通过）
 
 - **目标**：将前端 `/market-research` 重写为 V2 市场全景研究终端，正式消费 MR-1A `GET /api/v1/market-research/overview?market=CN&start=&end=`；后端本轮只读核对，未改代码（本仓库仅文档同步）。

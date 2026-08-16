@@ -2,7 +2,7 @@
 
 数据库使用 MySQL 8.4，迁移工具使用 Flyway。所有表结构变更都应通过 `src/main/resources/db/migration/` 下的新 migration 文件完成。
 
-当前已发布 V1-V23，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
+当前已发布 V1-V24，实际表结构以 migration 和 `docs/CURRENT_ARCHITECTURE_AND_MODULES.md` 为准。本文件同时记录后续规划；标记为“规划”的表不得被 AI 误认为已经存在。
 
 ## 命名约定
 
@@ -518,6 +518,21 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 - `mr0_industry_membership`：唯一键 `(taxonomy_code, industry_code, canonical_symbol, as_of_date)`；成分按抓取日 as-of 断言，非 point-in-time 历史（时点穿越由质量检查族显式标记）。
 - `mr0_stock_money_flow_daily`：唯一键 `(canonical_symbol, trade_date, provider_code)`；主力净流入/超大单/行业净流入为 Provider 口径事实（元），QTA 不从价量推算。
 
+### mdf_* 数据底座表族（V24，QTA V2-1，ADR-0015）
+
+状态：已实现（V24 migration）。用途：A 股历史数据底座正式语义表——数据集/版本/发布、股票池快照、行业分类与 PIT 成分、覆盖水位、回补任务/分片、导入批次、质量结果。**日 K/证券/日历事实复用 `stock_daily_bar`/`stock_basic`/`market_calendar`，本表族不复制事实数据**；`mr0_*` PoC 表不被本表族或正式页面直接依赖。单位冻结：价格=元、volume=股、amount=元、换手率=小数、市值=元。
+
+- `mdf_dataset`：数据集定义，`uk_mdf_dataset_code(dataset_code)`；`current_version_id` 为发布指针（发布事务内切换）。
+- `mdf_dataset_version`：版本，`uk(dataset_id, version_code)`；status 状态机 DRAFT→BACKFILLING→QUALIFYING→QUALIFIED/REJECTED→RELEASED/RETIRED；`source_provider` 声明事实来源；FK→mdf_dataset。
+- `mdf_universe_snapshot`：股票池快照，`uk(provider_code, canonical_symbol, as_of_date)`。
+- `mdf_industry_taxonomy`：行业分类体系，`uk(taxonomy_code)`；SINA_INDUSTRY 非申万、禁混称。
+- `mdf_industry_membership`：PIT 成分，`uk(taxonomy_code, canonical_symbol, effective_from)`；半开区间 `[effective_from, effective_to)`、`effective_to` NULL=至今；同 symbol 区间重叠由导入校验+质量检查双防线。
+- `mdf_coverage_watermark`：覆盖水位，`uk(dataset_version_id, canonical_symbol)`；expected_days 来自日历、coverage_ratio=covered/expected；FK→mdf_dataset_version。
+- `mdf_backfill_task`：回补任务，普通索引 `idx_mdf_backfill_scope(dataset_code, provider_code, adjust_type, start_date, end_date, symbols_hash)`（活跃重复由服务层 `countActiveByScope` 防重，终态后允许同 scope 重建=幂等重跑工作流）；claim_token/claimed_at 防并发。
+- `mdf_backfill_chunk`：分片，`uk(task_id, chunk_index)`；断点=按 chunk 状态续跑（终态跳过）；attempts 保留重试计数；FK→mdf_backfill_task。
+- `mdf_import_batch`：导入批次，`uk(import_kind, file_hash)`=同内容幂等；error_report_json 行级错误（≤50 条）。
+- `mdf_quality_result`：13 族质量检查结果，`uk(dataset_version_id, check_code)`；FAIL 或空数据阻断发布；FK→mdf_dataset_version。
+
 ### agent_api_audit_log
 
 状态：已实现（V16 migration）。用途：Agent 只读 API 调用持久化脱敏审计。记录 requestId、clientId（Token hash）、senderHash（QQ OpenID hash）、operationCode、method、path、paramSummary（脱敏截断）、httpStatus、errorCode、resultCount、durationMs、requestedAt、completedAt。严禁记录 Token、Longbridge 凭据、完整请求/响应或异常堆栈。
@@ -549,7 +564,8 @@ V12 新增 `sub_task_id`，关联逐标的日 K 子任务。父任务为 `RUNNIN
 7. 行情 P1.5 已实现市场行业关注与不可变快照（V14：`market_sector_watch`、`market_sector_snapshot`、`market_sector_member_snapshot`）。
 8. 行情 P1.6 已实现全市场板块历史榜单与自动采集（V15：`market_sector_ranking_config`、`market_sector_ranking_batch`、`market_sector_ranking_item`），并扩展关注/快照表的采集频率、claim、质量和错误状态。
 9. 证券目录 P1.4b-D1 已实现 `stock_basic` 扩展和 `stock_alias`（V17），支持 CSV 原子幂等导入、本地确定性搜索和详情查询。P1.4b-D3 已实现 `security_directory_sync_state`（V18）与目录同步（CSV 快照 provider、五阶段管线、复用 `market_data_sync_task` 的 `SECURITY_MASTER_SYNC`）。
-10. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
+10. QTA V2-1 数据底座已实现 `mdf_*` 10 表（V24，ADR-0015）：数据集/版本/发布指针、股票池快照、行业分类与 PIT 成分、覆盖水位、回补任务/分片、导入批次、质量结果；事实复用既有日 K/证券/日历表。
+11. 技术指标、策略信号和回测表在对应模块开发时逐步落地。
 
 详细行情边界见 `docs/features/MARKET_DATA_FOUNDATION_DESIGN.md`。
 

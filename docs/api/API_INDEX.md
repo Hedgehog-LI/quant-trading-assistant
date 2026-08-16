@@ -64,9 +64,13 @@
 | Market Data | GET | `/api/v1/market-data/sector-catalog/industry-peers` | 已实现（LongPort 行业层级摘要，只读） | `MARKET_DATA_API.md` |
 | Market Data | POST / GET / DELETE | `/api/v1/market-data/sector-catalog/watches[/{id}]` | 已实现（行业关注、手工快照和历史） | `MARKET_DATA_API.md` |
 | Market Data | PUT | `/api/v1/market-data/sector-catalog/watches/{id}/collection` | 已实现（关注板块自动采集频率） | `MARKET_DATA_API.md` |
-| Market Data | GET / PUT | `/api/v1/market-data/sector-catalog/ranking-configs[/{market}]` | 已实现（CN/HK/US 全市场榜单采集配置） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET | `/api/v1/market-data/sector-catalog/ranking-configs[/{market}]` | 已实现（CN/HK/US 全市场榜单采集配置） | `MARKET_DATA_API.md` |
 | Market Data | POST | `/api/v1/market-data/sector-catalog/ranking-configs/{market}/run` | 已实现（立即采集全市场榜单） | `MARKET_DATA_API.md` |
 | Market Data | GET | `/api/v1/market-data/sector-catalog/ranking-history[/{batchId}/items]` | 已实现（历史榜单批次和明细） | `MARKET_DATA_API.md` |
+| Market Data | POST / GET | `/api/v1/market-data/data-foundation/datasets[/{code}/versions]`、`GET /datasets/{code}/released` | 已实现（QTA V2-1 数据底座：数据集/版本/发布指针；导入类数据集支持手动建版本） | `MARKET_DATA_API.md` §7 |
+| Market Data | POST / GET | `/api/v1/market-data/data-foundation/backfill-tasks[/{id}[/chunks]]`、`POST /backfill-tasks/{id}/run、/pause、/chunks/retry` | 已实现（历史回补：chunk 断点续跑/claim 防并发/ODKU 幂等/重试失败分片） | `MARKET_DATA_API.md` §7 |
+| Market Data | POST / GET | `/api/v1/market-data/data-foundation/dataset-versions/{id}/quality-check、/publish、/quality、/coverage` | 已实现（13 族质量检查与发布门禁、覆盖水位） | `MARKET_DATA_API.md` §7 |
+| Market Data | POST / GET | `/api/v1/market-data/data-foundation/imports[/{id}]` | 已实现（CSV/快照导入，kind+file_hash 幂等，行级错误报告） | `MARKET_DATA_API.md` §7 |
 | Market Research | GET | `/api/v1/market-research/readiness?market=` | 已实现（P1.10-A 数据门禁；无衍生数据返回可解释空态） | `MARKET_RESEARCH_API.md` |
 | Market Research | GET | `/api/v1/market-research/overview?market=CN&start=&end=` | 已实现（MR-1A 市场全景只读后端；首期仅 CN，dataScope=SAMPLE，资金流 UNAVAILABLE；前端尚未接入） | `MARKET_RESEARCH_API.md` §8 |
 | Market Research | POST | `/api/v1/market-research/calculations?market=&asOfDate=&window=` | 已实现（相对强弱 + 固定 5 日轮动，原子发布） | `MARKET_RESEARCH_API.md` |

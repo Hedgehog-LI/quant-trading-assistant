@@ -903,3 +903,71 @@ GET /api/v1/market-data/alerts?severity=&resolved=&subjectType=SECTOR&sectorId=&
 - `MARKET_DATA_ASSET_RANGE_TOO_LARGE`：时间范围或 bar 上限不满足查询契约。
 - `MARKET_DATA_ASSET_COMBINATION_NOT_FOUND`：证券存在但所选 interval/source/adjust 组合不存在；页面应先查 availability 避免正常触发。
 - 其他格式/日期错误复用 `VALIDATION_ERROR`，证券不存在复用 `STOCK_NOT_FOUND`。
+
+## 7. 数据底座接口（QTA V2-1，已实现，ADR-0015）
+
+> 前缀 `/api/v1/market-data/data-foundation`。语义：数据集定义与版本、历史回补任务（chunk 断点续跑/claim 防并发/ODKU 幂等）、CSV/快照导入（kind+file_hash 幂等）、13 族质量检查与发布门禁（QUALIFIED 才可发布，旧 RELEASED→RETIRED）。日 K/证券/日历事实复用 `stock_daily_bar`/`stock_basic`/`market_calendar`，不复制。单位冻结：价格=元、volume=股、amount=元、换手率=小数。公共源 TENCENT_PUBLIC 为实验性来源（节流 300ms+指数退避+401/403 不重试）。运行时证据见 `docs/development/tasks/QTA-V2-DATA-FOUNDATION-V21-RUNTIME-VERIFICATION.md`。
+
+### 7.1 数据集与版本
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/datasets` | 创建数据集定义（body：datasetCode/datasetName/marketCode/barType(首期 DAILY)/frequency(1D)/providerCode/adjustType(首期仅 NONE；IMPORT_* 前缀=导入类数据集)/description） |
+| GET | `/datasets` | 数据集列表（含 currentVersionId 发布指针与 unitCaliber 单位口径） |
+| GET | `/datasets/{code}/versions` | 版本列表（status ∈ DRAFT/BACKFILLING/QUALIFYING/QUALIFIED/REJECTED/RELEASED/RETIRED；isCurrentReleased） |
+| POST | `/datasets/{code}/versions` | 手动建版本（仅 IMPORT_* 数据集；body：startDate/endDate） |
+| GET | `/datasets/{code}/released` | 当前已发布版本（未发布 data=null） |
+
+请求/响应示例（创建导入数据集）：
+
+```json
+POST /api/v1/market-data/data-foundation/datasets
+{"datasetCode":"CN_DAILY_IMPORT_FIXTURE","datasetName":"A股日K导入数据集","marketCode":"CN",
+ "barType":"DAILY","frequency":"1D","providerCode":"IMPORT_CSV_DAILY","adjustType":"NONE","description":"..."}
+→ {"success":true,"code":"SUCCESS","data":{"id":1,"datasetCode":"CN_DAILY_IMPORT_FIXTURE",
+   "unitCaliber":"价格=元，volume=股，amount=元，换手率=小数（ADR-0015 单位冻结）","currentVersionId":null,...}}
+```
+
+### 7.2 历史回补任务
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/backfill-tasks` | 创建（body：datasetCode/marketCode/providerCode/frequency/adjustType 须与数据集定义完全一致；startDate ≥ 2021-01-01；endDate ≤ 今天；symbols ≤ 2000，空=最新池全量；chunkSize 1-500 默认 50）。自动按证券拆 chunk 并创建 DRAFT 版本；同 scope 存在 PENDING/RUNNING/PAUSED 任务时拒绝重复创建 |
+| GET | `/backfill-tasks?status=&page=&pageSize=` | 分页列表（PageResultVO） |
+| GET | `/backfill-tasks/{id}` | 详情：planned/success/fail/skip（标的数）+ inserted/updated（行数）+ totalChunks/succeededChunks/failedChunks + lastError |
+| GET | `/backfill-tasks/{id}/chunks` | 分片明细（chunkIndex/status/attempts/各计数/lastErrorCode/lastErrorMessage） |
+| POST | `/backfill-tasks/{id}/run` | 启动或继续（断点续跑：跳过终态分片，从首个 PENDING 继续；claim token 防并发） |
+| POST | `/backfill-tasks/{id}/pause` | 暂停（RUNNING→PAUSED，释放 claim；执行循环逐片检查状态后停止） |
+| POST | `/backfill-tasks/{id}/chunks/retry` | 重试失败分片（FAILED→PENDING 保留 attempts，随后续跑；仅 PARTIAL_FAILED/FAILED 可调用） |
+
+### 7.3 质量与发布
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/dataset-versions/{id}/quality-check` | 运行 13 族检查并落结果+覆盖水位，版本转 QUALIFIED/REJECTED。检查族：EMPTY_DATASET / DATE_RANGE_COVERAGE / UNIVERSE_COVERAGE / DAILY_BAR_GAP / DUPLICATE_ROWS / OHLC_VALIDITY / UNIT_ANOMALY / NON_TRADING_DAY_ANOMALY / INDUSTRY_MEMBERSHIP_OVERLAP / INDUSTRY_MEMBERSHIP_INVALID_PERIOD / UNMAPPED_INDUSTRY_SYMBOL / PROVIDER_ADJUST_MIXING / DATA_STALENESS（FAIL 族：空数据/重复/OHLC/单位/非交易日/成分重叠/无效区间/口径混用；WARN 族：日历缺失/池覆盖/缺口/未映射/陈旧） |
+| GET | `/dataset-versions/{id}/quality` | 质量结果列表（checkCode/status(OK/WARN/FAIL)/affectedCount/detailJson/checkedAt） |
+| GET | `/dataset-versions/{id}/coverage` | 覆盖水位（canonicalSymbol/firstDate/lastDate/rowCount/expectedDays/coveredDays/coverageRatio） |
+| POST | `/dataset-versions/{id}/publish` | 发布（仅 QUALIFIED 且无 FAIL；事务内同数据集旧 RELEASED→RETIRED、current_version_id 指针切换；失败版本保留可查但永不成为默认版本） |
+
+### 7.4 CSV/快照导入
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/imports?kind=` | multipart 字段 `file`（≤50MB、≤20 万行）；kind ∈ UNIVERSE_SNAPSHOT / TRADING_CALENDAR / DAILY_BAR / INDUSTRY_TAXONOMY / INDUSTRY_MEMBERSHIP_PIT；表头不匹配整批 400；同内容重复导入幂等返回既有批次（不重复处理） |
+| GET | `/imports?kind=&page=&pageSize=` | 批次列表 |
+| GET | `/imports/{id}` | 批次详情（inserted/updated/skipped/rejected + errorReportJson：行级错误数组 [{recordNumber, reason, raw}]，上限 50 条） |
+
+导入 schema（表头冻结；单位元/股/小数；日期 YYYY-MM-DD；落库 data_source=IMPORT_CSV_* 不冒充线上 Provider）：
+
+```text
+UNIVERSE_SNAPSHOT:       symbol,name,market,total_market_cap,circulating_market_cap,turnover_rate,as_of_date
+TRADING_CALENDAR:        market_code,trade_date,is_trading_day   （首期仅 CN；true/false）
+DAILY_BAR:               symbol,trade_date,open,high,low,close,volume,amount
+INDUSTRY_TAXONOMY:       taxonomy_code,taxonomy_name,provider_code,note
+INDUSTRY_MEMBERSHIP_PIT: taxonomy_code,industry_code,industry_name,symbol,effective_from,effective_to
+                         （effective_to 空=至今；同 symbol 半开区间不得交叉，文件内重叠行拒绝）
+```
+
+### 7.5 错误码
+
+`DATA_FOUNDATION_DATASET_NOT_FOUND`（数据集不存在）/ `DATA_FOUNDATION_DATASET_CONFLICT`（请求与数据集定义不一致）/ `DATA_FOUNDATION_VERSION_NOT_FOUND` / `DATA_FOUNDATION_BACKFILL_STATE_INVALID`（状态不允许该操作）/ `DATA_FOUNDATION_BACKFILL_DUPLICATE`（同 scope 活跃任务已存在）/ `DATA_FOUNDATION_BACKFILL_RUNNING`（任务执行中或状态不可 run）/ `DATA_FOUNDATION_UNIVERSE_EMPTY`（全量回补但池快照为空）/ `DATA_FOUNDATION_IMPORT_KIND_INVALID` / `DATA_FOUNDATION_IMPORT_FILE_INVALID`（表头/格式不合法）/ `DATA_FOUNDATION_QUALITY_GATE_FAILED`（发布门禁未通过）。文件类复用 `CSV_EMPTY_FILE`/`CSV_FILE_TOO_LARGE`/`CSV_TOO_MANY_ROWS`。

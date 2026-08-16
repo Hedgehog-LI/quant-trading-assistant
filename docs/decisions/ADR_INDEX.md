@@ -18,3 +18,4 @@
 | [ADR-0012](ADR-0012-market-data-asset-read-model-and-chart-library.md) | 行情资产采用有界只读聚合模型与 Lightweight Charts | Accepted | 2026-08-10 |
 | [ADR-0013](ADR-0013-research-funnel-and-asset-inspection-boundary.md) | 市场研究采用三级决策漏斗并与数据资产检查分离 | Accepted | 2026-08-12 |
 | [ADR-0014](ADR-0014-institutional-market-research-and-data-first-quant-workflow.md) | V2 采用数据优先的机构化市场研究与量化工作流 | Accepted | 2026-08-15 |
+| [ADR-0015](ADR-0015-data-foundation-model-and-provider-boundary.md) | A 股历史数据底座正式模型（mdf_*）与 Provider 边界（公共源实验性、PIT 成分导入、资金流 BLOCKED） | Proposed（随 V2-1 候选交付） | 2026-08-16 |

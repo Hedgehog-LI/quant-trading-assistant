@@ -35,7 +35,7 @@
     </select>
 
     <select id="selectMaxVersionSeq" resultType="int">
-        SELECT COALESCE(MAX(CAST(SUBSTRING(version_code, 2) AS INT)), 0)
+        SELECT COALESCE(MAX(CAST(SUBSTRING(version_code, 2) AS SIGNED)), 0)
         FROM mdf_dataset_version WHERE dataset_id = #{datasetId}
     </select>
 
