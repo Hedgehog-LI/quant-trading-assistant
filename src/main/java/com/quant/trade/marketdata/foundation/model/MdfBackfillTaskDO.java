@@ -35,6 +35,7 @@ public class MdfBackfillTaskDO {
     private Long updatedCount;
     private String claimToken;
     private LocalDateTime claimedAt;
+    private LocalDateTime queuedAt;
     private String lastErrorCode;
     private String lastErrorMessage;
     private LocalDateTime startedAt;

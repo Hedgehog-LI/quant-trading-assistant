@@ -26,4 +26,9 @@ public interface MdfDatasetVersionMapper {
                      @Param("sourceNote") String sourceNote);
 
     int updateRowCount(@Param("id") Long id, @Param("rowCount") Long rowCount);
+
+    /** R1：血缘冻结/漂移状态写入。 */
+    int updateLineage(@Param("id") Long id, @Param("contentHash") String contentHash,
+                      @Param("manifestRowCount") Long manifestRowCount,
+                      @Param("lineageStatus") String lineageStatus);
 }

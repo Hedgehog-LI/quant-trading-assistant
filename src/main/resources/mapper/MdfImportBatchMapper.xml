@@ -14,14 +14,15 @@
         <result column="rejected_count" property="rejectedCount"/>
         <result column="status" property="status"/>
         <result column="error_report_json" property="errorReportJson"/>
+        <result column="dataset_version_id" property="datasetVersionId"/>
         <result column="created_at" property="createdAt"/>
     </resultMap>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO mdf_import_batch (import_kind, provider_code, file_name, file_hash, inserted_count,
-            updated_count, skipped_count, rejected_count, status, error_report_json)
+            updated_count, skipped_count, rejected_count, status, error_report_json, dataset_version_id)
         VALUES (#{importKind}, #{providerCode}, #{fileName}, #{fileHash}, #{insertedCount},
-            #{updatedCount}, #{skippedCount}, #{rejectedCount}, #{status}, #{errorReportJson})
+            #{updatedCount}, #{skippedCount}, #{rejectedCount}, #{status}, #{errorReportJson}, #{datasetVersionId})
     </insert>
 
     <select id="selectById" resultMap="BaseResultMap">
@@ -31,6 +32,15 @@
     <select id="selectByKindAndHash" resultMap="BaseResultMap">
         SELECT * FROM mdf_import_batch WHERE import_kind = #{importKind} AND file_hash = #{fileHash}
     </select>
+
+    <!-- R1：批次先建（id 供 manifest 血缘）后回填 -->
+    <update id="updateCounts">
+        UPDATE mdf_import_batch
+        SET inserted_count = #{insertedCount}, updated_count = #{updatedCount},
+            skipped_count = #{skippedCount}, rejected_count = #{rejectedCount},
+            error_report_json = #{errorReportJson}
+        WHERE id = #{id}
+    </update>
 
     <select id="selectList" resultMap="BaseResultMap">
         SELECT * FROM mdf_import_batch

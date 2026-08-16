@@ -21,4 +21,9 @@ public interface MdfBackfillChunkMapper {
 
     /** 重试准备：FAILED→PENDING（attempts 保留、错误清空）。返回重置分片数。 */
     int resetFailedToPending(@Param("taskId") Long taskId, @Param("now") LocalDateTime now);
+
+    /** R1：崩溃恢复——RUNNING→PENDING（attempts 保留，错误追加恢复标记可追溯）。 */
+    int resetRunningToPending(@Param("taskId") Long taskId,
+                              @Param("errorCode") String errorCode,
+                              @Param("errorMessage") String errorMessage);
 }

@@ -24,6 +24,7 @@
         <result column="updated_count" property="updatedCount"/>
         <result column="claim_token" property="claimToken"/>
         <result column="claimed_at" property="claimedAt"/>
+        <result column="queued_at" property="queuedAt"/>
         <result column="last_error_code" property="lastErrorCode"/>
         <result column="last_error_message" property="lastErrorMessage"/>
         <result column="started_at" property="startedAt"/>
@@ -73,6 +74,61 @@
     <update id="releaseClaim">
         UPDATE mdf_backfill_task SET claim_token = NULL WHERE id = #{id} AND claim_token = #{token}
     </update>
+
+    <!-- R1：入队（POST run 快速返回；PENDING/PAUSED/PARTIAL_FAILED/FAILED→QUEUED） -->
+    <update id="markQueued">
+        UPDATE mdf_backfill_task
+        SET status = 'QUEUED', queued_at = COALESCE(queued_at, #{now}), claim_token = NULL
+        WHERE id = #{id} AND status IN ('PENDING', 'PAUSED', 'PARTIAL_FAILED', 'FAILED')
+    </update>
+
+    <!-- R1：worker 认领 QUEUED→RUNNING（原子条件更新，双 worker 仅一个成功） -->
+    <update id="claimQueued">
+        UPDATE mdf_backfill_task
+        SET status = 'RUNNING', claim_token = #{token}, claimed_at = #{now},
+            started_at = COALESCE(started_at, #{now})
+        WHERE id = #{id} AND status = 'QUEUED' AND claim_token IS NULL
+    </update>
+
+    <!-- R1：QUEUED/RUNNING 均可暂停（释放 claim；worker 执行循环逐证券检查后停止） -->
+    <update id="pauseIfActive">
+        UPDATE mdf_backfill_task SET status = 'PAUSED', claim_token = NULL, updated_at = #{now}
+        WHERE id = #{id} AND status IN ('QUEUED', 'RUNNING')
+    </update>
+
+    <!-- R1：崩溃恢复——claim 超时/丢失的 RUNNING 条件回队（幂等：仅僵尸态命中） -->
+    <update id="requeueStaleRunning">
+        UPDATE mdf_backfill_task
+        SET status = 'QUEUED', claim_token = NULL, queued_at = #{now},
+            last_error_code = 'RECOVERED_STALE_RUNNING',
+            last_error_message = 'claim 超时或丢失，崩溃恢复回队（RUNNING chunk 同步恢复为 PENDING）'
+        WHERE id = #{id} AND status = 'RUNNING'
+          AND (claim_token IS NULL OR claimed_at &lt; #{staleBefore})
+    </update>
+
+    <select id="selectStaleRunning" resultMap="BaseResultMap">
+        SELECT * FROM mdf_backfill_task
+        WHERE status = 'RUNNING' AND (claim_token IS NULL OR claimed_at &lt; #{staleBefore})
+        ORDER BY id LIMIT #{limit}
+    </select>
+
+    <select id="selectNextQueued" resultMap="BaseResultMap">
+        SELECT * FROM mdf_backfill_task
+        WHERE status = 'QUEUED' AND claim_token IS NULL
+        ORDER BY COALESCE(queued_at, created_at), id LIMIT 1
+    </select>
+
+    <select id="selectByDatasetVersionId" resultMap="BaseResultMap">
+        SELECT * FROM mdf_backfill_task WHERE dataset_version_id = #{datasetVersionId} ORDER BY id LIMIT 1
+    </select>
+
+    <select id="selectQueuedUnclaimedWithRunningChunks" resultMap="BaseResultMap">
+        SELECT t.* FROM mdf_backfill_task t
+        WHERE t.status = 'QUEUED' AND t.claim_token IS NULL
+          AND EXISTS (SELECT 1 FROM mdf_backfill_chunk c
+                      WHERE c.task_id = t.id AND c.status = 'RUNNING')
+        ORDER BY t.id LIMIT #{limit}
+    </select>
 
     <update id="pauseIfRunning">
         UPDATE mdf_backfill_task SET status = 'PAUSED', claim_token = NULL,

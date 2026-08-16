@@ -25,6 +25,12 @@ public class MdfDatasetVersionDO {
     private Long rowCount;
     private LocalDateTime qualifiedAt;
     private LocalDateTime releasedAt;
+    /** R1 血缘：内容哈希（发布前冻结）。 */
+    private String contentHash;
+    /** R1 血缘：manifest 行数（发布前冻结）。 */
+    private Long manifestRowCount;
+    /** R1 血缘：FROZEN / DRIFTED（底层事实漂移时阻断"静默可复现"）。 */
+    private String lineageStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

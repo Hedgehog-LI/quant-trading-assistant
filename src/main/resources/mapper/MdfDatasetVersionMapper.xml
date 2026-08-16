@@ -14,6 +14,9 @@
         <result column="row_count" property="rowCount"/>
         <result column="qualified_at" property="qualifiedAt"/>
         <result column="released_at" property="releasedAt"/>
+        <result column="content_hash" property="contentHash"/>
+        <result column="manifest_row_count" property="manifestRowCount"/>
+        <result column="lineage_status" property="lineageStatus"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
@@ -50,5 +53,14 @@
 
     <update id="updateRowCount">
         UPDATE mdf_dataset_version SET row_count = #{rowCount} WHERE id = #{id}
+    </update>
+
+    <!-- R1：血缘冻结/漂移状态写入（null 字段保持原值——漂移标记不清除冻结身份） -->
+    <update id="updateLineage">
+        UPDATE mdf_dataset_version
+        SET content_hash = COALESCE(#{contentHash}, content_hash),
+            manifest_row_count = COALESCE(#{manifestRowCount}, manifest_row_count),
+            lineage_status = #{lineageStatus}
+        WHERE id = #{id}
     </update>
 </mapper>

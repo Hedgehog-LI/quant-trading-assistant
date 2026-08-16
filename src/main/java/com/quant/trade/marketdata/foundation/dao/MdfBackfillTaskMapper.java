@@ -27,6 +27,33 @@ public interface MdfBackfillTaskMapper {
     int tryClaim(@Param("id") Long id, @Param("token") String token,
                  @Param("now") LocalDateTime now, @Param("staleBefore") LocalDateTime staleBefore);
 
+    /** R1：入队（PENDING/PAUSED/PARTIAL_FAILED/FAILED→QUEUED，释放 claim；POST run 只做此转换立即返回）。 */
+    int markQueued(@Param("id") Long id, @Param("now") LocalDateTime now);
+
+    /** R1：worker 认领 QUEUED→RUNNING（条件 UPDATE，双 worker 仅一个成功）。 */
+    int claimQueued(@Param("id") Long id, @Param("token") String token,
+                    @Param("now") LocalDateTime now);
+
+    /** R1：QUEUED/RUNNING 均可暂停（PAUSED 释放 claim）。 */
+    int pauseIfActive(@Param("id") Long id, @Param("now") LocalDateTime now);
+
+    /** R1：崩溃恢复——claim 超时/丢失的 RUNNING 条件回队（幂等：仅命中时更新）。 */
+    int requeueStaleRunning(@Param("id") Long id, @Param("now") LocalDateTime now,
+                            @Param("staleBefore") LocalDateTime staleBefore);
+
+    /** R1：待恢复的僵尸任务（RUNNING 且 claim 为空或超时）。 */
+    List<MdfBackfillTaskDO> selectStaleRunning(@Param("staleBefore") LocalDateTime staleBefore,
+                                               @Param("limit") int limit);
+
+    /** 待认领的 QUEUED 任务（worker 轮询取一个；按 queued_at 先进先出）。 */
+    MdfBackfillTaskDO selectNextQueued(@Param("now") LocalDateTime now);
+
+    /** R1：按版本反查回补任务（质量检查解析版本 scope=任务证券范围）。 */
+    MdfBackfillTaskDO selectByDatasetVersionId(@Param("datasetVersionId") Long datasetVersionId);
+
+    /** R1：QUEUED 且无 claim、但仍有 RUNNING 分片的任务（worker 重派后残留分片的恢复对象）。 */
+    List<MdfBackfillTaskDO> selectQueuedUnclaimedWithRunningChunks(@Param("limit") int limit);
+
     /** 释放 claim（token 不匹配不释放）。 */
     int releaseClaim(@Param("id") Long id, @Param("token") String token);
 
