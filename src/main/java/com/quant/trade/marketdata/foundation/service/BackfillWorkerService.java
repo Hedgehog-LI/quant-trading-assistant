@@ -25,15 +25,20 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 
 /**
- * 回补后台 worker（Repair R1 §二/§三）。
+ * 回补后台 worker（Repair R1 §二/§三 + R2 §一/§二/§五：所有权 fencing、心跳续租、有界并发）。
  *
- * - DB 为事实源：claimQueued 条件 UPDATE 认领（双 worker 仅一个成功）；崩溃后 claim 超时由恢复机制回队。
- * - 短事务纪律：数据库状态短事务（txRequiresNew），provider 网络调用始终在事务外（先例 MarketDataPlanExecutionService）。
- * - 每证券执行单元检查任务状态：PAUSED 即停止（QUEUED/RUNNING 均可暂停）。
- * - 幂等：日 K ODKU（uk 含 data_source）；事实落库后写入版本 manifest（血缘，R1 §六）。
- * - 终态与计数从 chunk 事实确定性汇总；残留 RUNNING chunk 不得判 SUCCEEDED（未全部终态→重新入队）。
+ * - DB 为事实源：claimQueued 条件 UPDATE 认领；执行全程持 token。
+ * - 心跳/所有权：每个 chunk 开始、每个证券执行前、每次 chunk/task 终态写入前调用
+ *   heartbeat(id, token)（id+status=RUNNING+token 三重校验）。返回 0 = 所有权已丢失
+ *   （暂停/回队/恢复/新 worker 抢占）→ 旧 worker 立即停止：不再请求 Provider、不写任何状态。
+ *   心跳同时刷新 claimed_at，长任务不会被恢复器按 stale 误判。
+ * - 写入栅栏：task 终态/计数经 updateByIdIfOwner（WHERE status='RUNNING' AND claim_token=token），
+ *   旧 token 永远不能覆盖新 owner 的任务与分片状态。
+ * - 有界并发：dataFoundationWorkerSlots 信号量（=worker.concurrency）；hasCapacity 供调度器
+ *   跳过饱和提交，避免向已满线程池持续堆积空轮询。
  */
 @Slf4j
 @Service
@@ -51,38 +56,62 @@ public class BackfillWorkerService {
     private final VersionLineageService lineageService;
     private final TransactionTemplate txRequiresNew;
     private final Clock marketDataClock;
+    private final Semaphore dataFoundationWorkerSlots;
 
     /**
      * 认领并执行一个 QUEUED 任务（worker 轮询单元；测试直接调用）。
      *
-     * @return true=认领成功并已执行到终态/暂停；false=当前无 QUEUED 任务或争抢失败。
+     * @return true=认领成功并已执行到终态/停止点；false=无 QUEUED 任务、争抢失败或并发槽已满。
      */
     public boolean claimAndExecuteOne() {
-        MdfBackfillTaskDO queued = taskMapper.selectNextQueued(LocalDateTime.now(marketDataClock));
-        if (queued == null) {
+        if (!dataFoundationWorkerSlots.tryAcquire()) {
             return false;
         }
-        String token = UUID.randomUUID().toString();
-        Integer claimed = txRequiresNew.execute(status ->
-                taskMapper.claimQueued(queued.getId(), token, LocalDateTime.now(marketDataClock)));
-        if (claimed == null || claimed != 1) {
-            return false;
-        }
-        MdfBackfillTaskDO task = taskMapper.selectById(queued.getId());
         try {
-            executeTask(task, token);
-            return true;
+            MdfBackfillTaskDO queued = taskMapper.selectNextQueued(LocalDateTime.now(marketDataClock));
+            if (queued == null) {
+                return false;
+            }
+            String token = UUID.randomUUID().toString();
+            Integer claimed = txRequiresNew.execute(status ->
+                    taskMapper.claimQueued(queued.getId(), token, LocalDateTime.now(marketDataClock)));
+            if (claimed == null || claimed != 1) {
+                return false;
+            }
+            MdfBackfillTaskDO task = taskMapper.selectById(queued.getId());
+            try {
+                executeTask(task, token);
+                return true;
+            } finally {
+                txRequiresNew.executeWithoutResult(status -> taskMapper.releaseClaim(task.getId(), token));
+            }
         } finally {
-            txRequiresNew.executeWithoutResult(status -> taskMapper.releaseClaim(task.getId(), token));
+            dataFoundationWorkerSlots.release();
         }
     }
 
-    // ---------------------------------------------------------------- 执行
+    /** R2 §五：调度器提交前检查是否有空闲并发槽（饱和时跳过本轮，不堆积空轮询）。 */
+    public boolean hasCapacity() {
+        return dataFoundationWorkerSlots.availablePermits() > 0;
+    }
+
+    /** 心跳续租；false=所有权已丢失（暂停/回队/恢复/新 owner），调用方必须立即停止。 */
+    private boolean owns(long taskId, String token) {
+        Integer beat = txRequiresNew.execute(status ->
+                taskMapper.heartbeat(taskId, token, LocalDateTime.now(marketDataClock)));
+        return beat != null && beat == 1;
+    }
+
+    // ---------------------------------------------------------------- 执行（全程所有权栅栏）
 
     private void executeTask(MdfBackfillTaskDO task, String token) {
         HistoricalBarProvider provider = providerRegistry.require(task.getProviderCode());
         boolean firstRun = FoundationConstants.VERSION_DRAFT.equals(currentVersionStatus(task.getDatasetVersionId()));
         if (firstRun) {
+            // 新 owner 才允许推进版本状态（认领后立即校验一次所有权）
+            if (!owns(task.getId(), token)) {
+                return;
+            }
             txRequiresNew.executeWithoutResult(tx -> versionMapper.updateStatus(
                     task.getDatasetVersionId(), FoundationConstants.VERSION_BACKFILLING, null, null, null));
         }
@@ -91,18 +120,19 @@ public class BackfillWorkerService {
             if (!FoundationConstants.CHUNK_PENDING.equals(chunk.getStatus())) {
                 continue;
             }
-            String taskStatus = taskMapper.selectById(task.getId()).getStatus();
-            if (!FoundationConstants.TASK_RUNNING.equals(taskStatus)) {
-                log.info("回补任务停止（状态={}）: taskId={}, 停于 chunkIndex={}",
-                        taskStatus, task.getId(), chunk.getChunkIndex());
+            // 每个 chunk 执行前：所有权校验（丢失→立即停止，不写任何状态）
+            if (!owns(task.getId(), token)) {
+                log.info("worker 失去任务所有权，停止执行: taskId={}, 停于 chunkIndex={}",
+                        task.getId(), chunk.getChunkIndex());
                 return;
             }
-            executeChunk(task, chunk, provider);
+            executeChunk(task, chunk, provider, token);
         }
-        finalizeTask(task.getId());
+        finalizeTask(task.getId(), token);
     }
 
-    private void executeChunk(MdfBackfillTaskDO task, MdfBackfillChunkDO chunk, HistoricalBarProvider provider) {
+    private void executeChunk(MdfBackfillTaskDO task, MdfBackfillChunkDO chunk,
+                              HistoricalBarProvider provider, String token) {
         LocalDateTime now = LocalDateTime.now(marketDataClock);
         chunk.setStatus(FoundationConstants.CHUNK_RUNNING);
         chunk.setAttempts(chunk.getAttempts() + 1);
@@ -115,13 +145,11 @@ public class BackfillWorkerService {
         String firstErrorCode = null, firstErrorMessage = null;
 
         for (String symbol : symbols) {
-            // 每证券执行单元检查暂停：PAUSED/QUEUED(恢复重派) 即停止本任务执行
-            String taskStatus = taskMapper.selectById(task.getId()).getStatus();
-            if (!FoundationConstants.TASK_RUNNING.equals(taskStatus)) {
-                log.info("回补执行中检测到任务状态={}，停止分片: taskId={}, chunkIndex={}",
-                        taskStatus, task.getId(), chunk.getChunkIndex());
-                chunk.setStatus(FoundationConstants.CHUNK_PENDING);
-                txRequiresNew.executeWithoutResult(status -> chunkMapper.updateById(chunk));
+            // 每个证券执行前：心跳续租 + 所有权校验（兼防恢复器误判长任务）。
+            // 丢失（暂停/回队/新 owner）→ 立即停止，不再请求 Provider、不写 chunk 状态。
+            if (!owns(task.getId(), token)) {
+                log.info("worker 失去任务所有权，停止分片执行: taskId={}, chunkIndex={}",
+                        task.getId(), chunk.getChunkIndex());
                 return;
             }
             try {
@@ -163,6 +191,12 @@ public class BackfillWorkerService {
             }
         }
 
+        // chunk 终态写入前：所有权校验（丢失→放弃写入，chunk 留待新 owner/恢复器处理）
+        if (!owns(task.getId(), token)) {
+            log.info("worker 失去任务所有权，放弃 chunk 终态写入: taskId={}, chunkIndex={}",
+                    task.getId(), chunk.getChunkIndex());
+            return;
+        }
         chunk.setInsertedCount(inserted);
         chunk.setUpdatedCount(updated);
         chunk.setSkippedCount(skipped);
@@ -173,19 +207,22 @@ public class BackfillWorkerService {
         chunk.setStatus(failedSymbols == 0 ? FoundationConstants.CHUNK_SUCCEEDED
                 : FoundationConstants.CHUNK_FAILED);
         txRequiresNew.executeWithoutResult(status -> chunkMapper.updateById(chunk));
-        refreshTaskCounters(task.getId());
+        refreshTaskCounters(task.getId(), token);
     }
 
-    /** 终态与计数从 chunk 事实确定性汇总（R1 §二.7/§三.5）。 */
-    private void finalizeTask(long taskId) {
+    /** 终态与计数从 chunk 事实确定性汇总；写入经所有权栅栏（旧 token 不可覆盖新 owner 状态）。 */
+    private void finalizeTask(long taskId, String token) {
         MdfBackfillTaskDO task = taskMapper.selectById(taskId);
         String status = task.getStatus();
         if (FoundationConstants.TASK_QUEUED.equals(status)) {
-            // 执行中崩溃后被恢复重派：本 worker 停手，由重新认领继续
             return;
         }
         if (!FoundationConstants.TASK_RUNNING.equals(status)) {
-            refreshTaskCounters(taskId);
+            refreshTaskCounters(taskId, token);
+            return;
+        }
+        if (!owns(taskId, token)) {
+            log.info("worker 失去任务所有权，放弃终态写入: taskId={}", taskId);
             return;
         }
         long failedChunks = chunkMapper.countByTaskAndStatus(taskId, FoundationConstants.CHUNK_FAILED);
@@ -194,7 +231,6 @@ public class BackfillWorkerService {
         long pendingChunks = chunkMapper.countByTaskAndStatus(taskId, FoundationConstants.CHUNK_PENDING);
         String next;
         if (runningChunks > 0 || pendingChunks > 0) {
-            // 残留非终态分片（并发恢复等）：不得判 SUCCEEDED，重新入队继续
             next = FoundationConstants.TASK_QUEUED;
         } else if (failedChunks == 0) {
             next = FoundationConstants.TASK_SUCCEEDED;
@@ -209,13 +245,13 @@ public class BackfillWorkerService {
                 || FoundationConstants.TASK_FAILED.equals(next)) {
             done.setFinishedAt(LocalDateTime.now(marketDataClock));
         }
-        txRequiresNew.executeWithoutResult(tx -> taskMapper.updateById(done));
+        txRequiresNew.executeWithoutResult(tx -> taskMapper.updateByIdIfOwner(done, token));
         log.info("回补任务阶段结束: taskId={}, status={}, success={}, fail={}, skip={}, inserted={}, updated={}",
                 taskId, next, done.getSuccessCount(), done.getFailCount(), done.getSkipCount(),
                 done.getInsertedCount(), done.getUpdatedCount());
     }
 
-    private void refreshTaskCounters(long taskId) {
+    private void refreshTaskCounters(long taskId, String token) {
         List<MdfBackfillChunkDO> chunks = chunkMapper.selectByTaskId(taskId);
         int success = 0, fail = 0, skip = 0;
         long inserted = 0, updated = 0;
@@ -243,7 +279,8 @@ public class BackfillWorkerService {
         progress.setUpdatedCount(updated);
         progress.setLastErrorCode(errorCode);
         progress.setLastErrorMessage(errorMessage);
-        txRequiresNew.executeWithoutResult(status -> taskMapper.updateById(progress));
+        // 所有权栅栏：非当前 owner 不写（WHERE status='RUNNING' AND claim_token=token）
+        txRequiresNew.executeWithoutResult(status -> taskMapper.updateByIdIfOwner(progress, token));
     }
 
     private String currentVersionStatus(Long versionId) {

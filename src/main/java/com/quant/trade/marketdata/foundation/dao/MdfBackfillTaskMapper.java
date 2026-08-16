@@ -34,6 +34,12 @@ public interface MdfBackfillTaskMapper {
     int claimQueued(@Param("id") Long id, @Param("token") String token,
                     @Param("now") LocalDateTime now);
 
+    /** R2 §一：心跳续租（id+status=RUNNING+token 三重校验）；返回 0=所有权已丢失，worker 必须立即停止。 */
+    int heartbeat(@Param("id") Long id, @Param("token") String token, @Param("now") LocalDateTime now);
+
+    /** R2 §一/§二：按所有权栅栏更新任务（仅持有 token 且 RUNNING 时生效；旧 token 不可覆盖新 owner 状态）。 */
+    int updateByIdIfOwner(@Param("task") MdfBackfillTaskDO task, @Param("token") String token);
+
     /** R1：QUEUED/RUNNING 均可暂停（PAUSED 释放 claim）。 */
     int pauseIfActive(@Param("id") Long id, @Param("now") LocalDateTime now);
 

@@ -144,6 +144,7 @@ public class DataQualityService {
                                   List<LocalDate> tradingDates,
                                   Map<String, MdfSymbolBarStatDO> manifestStats,
                                   List<String> universeSymbols,
+                                  List<String> scopeSymbols,
                                   long expectedRows,
                                   Map<String, LocalDate> symbolListDates,
                                   List<MdfCoverageWatermarkDO> coverageRows) {
@@ -173,7 +174,7 @@ public class DataQualityService {
         return new QualityContext(version, dataset,
                 dataset.getProviderCode(), dataset.getAdjustType(),
                 now, manifestRows, calendarDays, tradingDates, manifestStats, universeSymbols,
-                expectedRows, listDates,
+                scopeSymbols, expectedRows, listDates,
                 buildCoverageRows(version.getId(), stats, calendarDays, now));
     }
 
@@ -427,9 +428,12 @@ public class DataQualityService {
                         "contentHash", version.getContentHash()));
     }
 
-    /** 首末日在市证券数（上市日缺失=窗口起点假设）。 */
+    /**
+     * 首末日在市证券数（分母=完整版本 scope；stock_basic 缺行或 list_date 缺失按冻结规则
+     * 视为窗口起点计入分母，不从分母中消失——R2 §四）。
+     */
     private long activeSymbolsAt(QualityContext ctx, LocalDate date) {
-        return ctx.symbolListDates().keySet().stream()
+        return ctx.scopeSymbols().stream()
                 .filter(symbol -> {
                     LocalDate listDate = ctx.symbolListDates().get(symbol);
                     return listDate == null || !listDate.isAfter(date);

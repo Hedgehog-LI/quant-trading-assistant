@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-08-16 — QTA V2-1 修复收口 R2：心跳/所有权 fencing 与并发安全（SELF_CHECKED）
+
+- **目标**：在 R1 成果上完成五项收口修复（不重写、不动 V24/V25 结构）：长任务心跳与所有权栅栏、暂停/恢复/崩溃恢复并发安全、QUEUED 防重、边界分母完整性、worker 轮询有界化。
+- **根因与修复**：①旧 worker 靠只读状态检查存在竞态——新增 `heartbeat(id,status='RUNNING',claim_token)` 三重校验：每个 chunk 开始/每个证券执行前/chunk 与 task 终态写入前续租+验权，丢失即停（不再外联、不写状态）；心跳同时刷新 claimed_at，长任务不会被恢复器按 stale 误判；task 终态/计数写入走 `updateByIdIfOwner`（WHERE status='RUNNING' AND claim_token=token），旧 token 不可覆盖新 owner。②恢复器回队与 RUNNING chunk→PENDING 改同一事务。③`countActiveByScope` 活动状态补 QUEUED。④边界覆盖分母从 stock_basic 命中集改为完整版本 scope（缺行/缺 list_date 按冻结规则计窗口起点）。⑤调度器提交前检查信号量容量（`dataFoundationWorkerSlots`=worker.concurrency），槽满跳过本轮——不再向饱和线程池堆空轮询；worker 认领前 tryAcquire 双保险。
+- **验证**：新增 BackfillFencingAndGuardTest 6 用例（心跳三重校验+续租防误判、mid-run 抢占后旧 worker 立即停、旧 token 迟到写入被栅栏拒绝、QUEUED 防重、槽满跳过且释放后恢复）+ StrictGateCoexistAndLineageTest 边界分母用例（scope 证券缺 stock_basic 行仍阻断）；全量 **651 tests / 0 failures / 0 errors / 1 skipped** + package + `git diff --check`。
+- **遗留**：真实多线程压测未做（fencing 语义由条件 UPDATE 原子性与专项测试锁定）；其他同 R1（SELF_CHECKED 待验收、NOT_DEPLOYED、全市场回补未执行）。
+- **关联**：`tasks/QTA-V2-DATA-FOUNDATION-V21-{REPAIR-R1-ADDENDUM,RUNTIME-VERIFICATION-R1}.md`（R2 无独立 addendum，按用户指令直接修复）。
+
 ## 2026-08-16 — QTA V2-1 修复收口 R1（二维分片/QUEUED 后台执行/崩溃恢复/严格门禁/血缘，SELF_CHECKED）
 
 - **目标**：对 V2-1 候选做定点修复（Repair Addendum R1）：全 A 长窗口二维分片、持久化后台执行与崩溃恢复、严格质量门禁、Provider 混用误判修复、版本血缘与内容身份、CSV×版本打通、默认数据集初始化。保留 V24/解析器/Provider/Controller 与既有测试可复用部分；不改前端、不改 V24。

@@ -399,6 +399,8 @@
 
 ### QTA V2-1 修复收口 R1 已完成（2026-08-16，SELF_CHECKED 待独立验收）
 
+- [x] **R2 收口（同日第二轮，SELF_CHECKED）**：①心跳/所有权 fencing（heartbeat 三重校验+逐证券逐 chunk 验权+丢失即停+updateByIdIfOwner 终态栅栏+心跳续租防恢复器误判长任务）；②恢复回队与 chunk 复位同事务；③countActiveByScope 活动状态含 QUEUED；④边界覆盖分母=完整版本 scope（stock_basic 缺行按冻结规则计窗口起点，不消失）；⑤worker 轮询有界化（信号量=concurrency，槽满跳过提交+认领 tryAcquire）。新增 BackfillFencingAndGuardTest 6 用例+边界分母用例；全量 **651 tests / 0/0/1** + package + `git diff --check`。残余：真实多线程压测未做（条件 UPDATE 原子性+专项测试锁定语义）。
+
 - [x] Repair Addendum R1 冻结（`QTA-V2-DATA-FOUNDATION-V21-REPAIR-R1-ADDENDUM.md`）；V24 未改动，数据库修复全部入 V25。
 - [x] 二维分片：`mdf_backfill_task_symbol`（uk task+symbol）承载全 A 范围（≥6000 可创建，上限 10000 输入保护）；Provider 安全窗（腾讯 365 天防 640 截断）；chunk=证券组×日期窗、start/end=实际区间；5000+ 证券×2021 至今纯 stub 分片测试。
 - [x] QUEUED 持久化后台执行：POST run 状态转换快速返回（Docker 实测 0.106s）；worker @Scheduled+可配线程池；claimQueued 条件认领双 worker 单胜；逐证券暂停检查；QUEUED/RUNNING 均可暂停；终态/计数从 chunk 事实确定性汇总（残留 RUNNING chunk→重入队不判 SUCCEEDED）。

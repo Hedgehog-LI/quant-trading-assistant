@@ -936,7 +936,7 @@ POST /api/v1/market-data/data-foundation/datasets
 | GET | `/backfill-tasks?status=&page=&pageSize=` | 分页列表（PageResultVO） |
 | GET | `/backfill-tasks/{id}` | 详情：planned/success/fail/skip（标的数）+ inserted/updated（行数）+ totalChunks/succeededChunks/failedChunks + lastError；**symbols 仅在 ≤50 时返回（全 A 任务避免巨列表，plannedCount 恒可见）** |
 | GET | `/backfill-tasks/{id}/chunks` | 分片明细（chunkIndex/status/attempts/各计数/lastErrorCode/lastErrorMessage/实际日期窗）；供前端轮询 |
-| POST | `/backfill-tasks/{id}/run` | **R1：异步——仅做状态转换（PENDING/PAUSED/PARTIAL_FAILED/FAILED→QUEUED）快速返回 BackfillTaskVO（QUEUED 或已被 worker 认领的 RUNNING），不等待执行**；后台 worker（可配轮询 `qta.data-foundation.worker.poll-ms`/并发 `worker.concurrency`）条件认领执行，断点续跑跳过终态分片 |
+| POST | `/backfill-tasks/{id}/run` | **R1：异步——仅做状态转换（PENDING/PAUSED/PARTIAL_FAILED/FAILED→QUEUED）快速返回 BackfillTaskVO（QUEUED 或已被 worker 认领的 RUNNING），不等待执行**；后台 worker（可配轮询 `qta.data-foundation.worker.poll-ms`/并发 `worker.concurrency`；**R2：信号量有界并发，槽满跳过轮询**）条件认领执行，断点续跑跳过终态分片。**R2：worker 全程所有权 fencing——执行期心跳续租（id+RUNNING+token 三重校验），暂停/回队/恢复/新 owner 抢占后旧 worker 立即停止且不可写任务与分片状态**；同 scope 存在 PENDING/QUEUED/RUNNING/PAUSED 任务时重复创建拒绝 |
 | POST | `/backfill-tasks/{id}/pause` | 暂停（**QUEUED/RUNNING 均可**；释放 claim，worker 逐证券检查后停止） |
 | POST | `/backfill-tasks/{id}/chunks/retry` | 重试失败分片（FAILED→PENDING 保留 attempts，随后**入队**返回 QUEUED；仅 PARTIAL_FAILED/FAILED 可调用）。容器重启/claim 超时的 RUNNING 任务由启动+定时恢复自动回队（chunk RUNNING→PENDING，错误置 RECOVERED_STALE_RUNNING 可追溯） |
 

@@ -71,6 +71,25 @@
           AND (claim_token IS NULL OR claim_token = #{token} OR claimed_at &lt; #{staleBefore})
     </update>
 
+    <!-- R2 §一：心跳续租——同时校验 id+status=RUNNING+claim_token；返回 0 即所有权已丢失 -->
+    <update id="heartbeat">
+        UPDATE mdf_backfill_task
+        SET claimed_at = #{now}
+        WHERE id = #{id} AND status = 'RUNNING' AND claim_token = #{token}
+    </update>
+
+    <!-- R2 §一/§二：按所有权栅栏更新任务（终态/计数只允许持 token 且 RUNNING 的 worker 写） -->
+    <update id="updateByIdIfOwner">
+        UPDATE mdf_backfill_task
+        SET dataset_version_id = #{task.datasetVersionId}, status = #{task.status},
+            planned_count = #{task.plannedCount}, success_count = #{task.successCount},
+            fail_count = #{task.failCount}, skip_count = #{task.skipCount},
+            inserted_count = #{task.insertedCount}, updated_count = #{task.updatedCount},
+            last_error_code = #{task.lastErrorCode}, last_error_message = #{task.lastErrorMessage},
+            started_at = #{task.startedAt}, finished_at = #{task.finishedAt}
+        WHERE id = #{task.id} AND status = 'RUNNING' AND claim_token = #{token}
+    </update>
+
     <update id="releaseClaim">
         UPDATE mdf_backfill_task SET claim_token = NULL WHERE id = #{id} AND claim_token = #{token}
     </update>
@@ -151,6 +170,6 @@
         WHERE dataset_code = #{datasetCode} AND provider_code = #{providerCode}
           AND adjust_type = #{adjustType} AND start_date = #{startDate} AND end_date = #{endDate}
           AND symbols_hash = #{symbolsHash}
-          AND status IN ('PENDING', 'RUNNING', 'PAUSED')
+          AND status IN ('PENDING', 'QUEUED', 'RUNNING', 'PAUSED')
     </select>
 </mapper>

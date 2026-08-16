@@ -25,4 +25,11 @@ public class FoundationWorkerConfig {
         executor.initialize();
         return executor;
     }
+
+    /** R2 §五：有界并发槽（=worker.concurrency）；worker 认领前 tryAcquire，调度器饱和时跳过提交防堆积。 */
+    @Bean
+    public java.util.concurrent.Semaphore dataFoundationWorkerSlots(
+            @Value("${qta.data-foundation.worker.concurrency:1}") int concurrency) {
+        return new java.util.concurrent.Semaphore(Math.max(1, concurrency));
+    }
 }

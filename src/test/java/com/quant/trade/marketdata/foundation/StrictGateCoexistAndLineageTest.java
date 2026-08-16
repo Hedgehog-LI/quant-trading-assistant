@@ -154,6 +154,27 @@ class StrictGateCoexistAndLineageTest {
         assertNotNull(released.getContentHash());
     }
 
+    // ---------------------------------------------------------------- §四 边界分母=完整 scope
+
+    @Test
+    void boundaryDenominatorKeepsScopeSymbolsMissingStockBasic() {
+        datasetService.createDataset("SCOPE_DEN", "边界分母", "CN", "DAILY", "1D", "IMPORT_CSV_DAILY", "NONE", "测试");
+        importCalendar("CN,2026-07-01,true\nCN,2026-07-02,true\n");
+        MdfDatasetVersionDO version = datasetService.createVersion("SCOPE_DEN",
+                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 2));
+        // 两证券仅末日缺数据 → 末日覆盖 1/2=0.5 必 FAIL
+        importBars(version.getId(), bar("SH.600519", "2026-07-01") + bar("SH.600519", "2026-07-02")
+                + bar("SZ.000002", "2026-07-01"));
+
+        // R2 §四：删除 scope 证券的 stock_basic 行——分母不得把它丢掉（缺失按窗口起点计）
+        jdbcTemplate.update("DELETE FROM stock_basic WHERE canonical_symbol = 'SZ.000002'");
+
+        Map<String, String> statusByCode = statuses(version.getId());
+        assertEquals("FAIL", statusByCode.get(FoundationConstants.BOUNDARY_COVERAGE_CHECK),
+                "scope 证券缺 stock_basic 行时边界覆盖不足仍必须阻断（分母=完整 scope）");
+        assertEquals("REJECTED", datasetService.getVersion(version.getId()).getStatus());
+    }
+
     // ---------------------------------------------------------------- §六 血缘漂移检测
 
     @Test

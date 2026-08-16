@@ -39,12 +39,16 @@ public class BackfillRecoveryService {
         List<MdfBackfillTaskDO> stale = taskMapper.selectStaleRunning(now.minusMinutes(staleMinutes), RECOVERY_BATCH);
         int recovered = 0;
         for (MdfBackfillTaskDO task : stale) {
-            Integer requeued = txRequiresNew.execute(status ->
-                    taskMapper.requeueStaleRunning(task.getId(), now, now.minusMinutes(staleMinutes)));
+            // R2 §二：任务回队与 RUNNING chunk→PENDING 同一事务（避免半恢复状态被新 worker 抢占）
+            Integer requeued = txRequiresNew.execute(status -> {
+                int rows = taskMapper.requeueStaleRunning(task.getId(), now, now.minusMinutes(staleMinutes));
+                if (rows == 1) {
+                    chunkMapper.resetRunningToPending(task.getId(), FoundationConstants.RECOVERY_STALE_CODE,
+                            "claim 超时/丢失恢复：RUNNING→PENDING（attempts 保留）");
+                }
+                return rows;
+            });
             if (requeued != null && requeued == 1) {
-                txRequiresNew.executeWithoutResult(status -> chunkMapper.resetRunningToPending(
-                        task.getId(), FoundationConstants.RECOVERY_STALE_CODE,
-                        "claim 超时/丢失恢复：RUNNING→PENDING（attempts 保留）"));
                 recovered++;
                 log.warn("回补任务崩溃恢复: taskId={}, 上次claimAt={}", task.getId(), task.getClaimedAt());
             }

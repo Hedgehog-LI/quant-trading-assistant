@@ -27,6 +27,12 @@ public class StubHistoricalBarProvider implements HistoricalBarProvider {
     private final AtomicInteger fetchCount = new AtomicInteger();
     private final Map<String, List<ProviderDailyBar>> barsBySymbol = new ConcurrentHashMap<>();
     private final Set<String> failingSymbols = ConcurrentHashMap.newKeySet();
+    /** R2 测试钩子：每次 getDailyBars 开头执行（模拟执行中并发改库，如抢占 claim）。 */
+    private volatile Runnable onFetch;
+
+    public void onFetch(Runnable hook) {
+        this.onFetch = hook;
+    }
 
     @Override
     public String providerCode() {
@@ -46,6 +52,10 @@ public class StubHistoricalBarProvider implements HistoricalBarProvider {
     @Override
     public List<ProviderDailyBar> getDailyBars(String canonicalSymbol, LocalDate start, LocalDate end) {
         fetchCount.incrementAndGet();
+        Runnable hook = onFetch;
+        if (hook != null) {
+            hook.run();
+        }
         if (failingSymbols.contains(canonicalSymbol)) {
             throw new BusinessException(ErrorCodeEnum.MARKET_DATA_PROVIDER_TIMEOUT,
                     "stub 模拟拉取失败: " + canonicalSymbol);
@@ -77,6 +87,7 @@ public class StubHistoricalBarProvider implements HistoricalBarProvider {
         barsBySymbol.clear();
         failingSymbols.clear();
         fetchCount.set(0);
+        onFetch = null;
     }
 
     public int fetchCount() {

@@ -56,13 +56,16 @@ public class DataFoundationBackgroundRunner implements ApplicationRunner {
         }
     }
 
-    /** worker 轮询：向线程池提交一次认领执行（claimQueued 条件更新，多线程/多实例安全）。 */
+    /** worker 轮询：仅在有空闲并发槽时提交（R2 §五：饱和线程池不再持续堆入空轮询任务）。 */
     @Scheduled(fixedDelayString = "${qta.data-foundation.worker.poll-ms:2000}")
     public void pollQueuedTasks() {
         if (!workerEnabled) {
             return;
         }
         try {
+            if (!workerService.hasCapacity()) {
+                return;
+            }
             dataFoundationWorkerExecutor.execute(() -> {
                 try {
                     workerService.claimAndExecuteOne();
